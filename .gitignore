@@ -1,5 +1,7 @@
 node_modules/
 dist/
+static/
+.data/
 *.log
 
 # editor and OS junk
