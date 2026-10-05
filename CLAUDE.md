@@ -118,11 +118,16 @@ find every resource by reading this file, not by discovering it mid-task.
 - `reflections/crit-{8,9,10}.md` — the two standing crit prompts, one file
   per crit, Ritesh's prose.
 - `spec/README.md` — what's fixed (the two invariants) vs what's Seen's own.
-- `docs/adr/NNNN-title.md` — one file per decision, numbered
-  (`0001-stack.md` is ADR 1), fixed template: Context / Options / Decision /
-  Consequences. Ritesh writes the prose; I prepare the factual skeleton.
-- *(add further entries here as they're created — WORKLOG.md, LEARNINGS.md,
-  CUTS.md, further ADRs, etc. — don't let this list go stale.)*
+- `docs/adr/0001-stack.md` — ADR 1 (Hono + Preact SPA vs crit-7 fallback).
+  Facts filled in; narrative sections are `[TK]` for Ritesh.
+- `WORKLOG.md` — current state of the build, read this first for "where did
+  we leave off."
+- `LEARNINGS.md` — this stack's own gotchas as they're hit (Hono trailing-
+  slash routing, FK delete order, same-profile-two-tabs session sharing).
+- `CUTS.md` — what got cut under deadline pressure and why (attachments from
+  C8, the auto-send-deadline check left advisory-only, company name still
+  `[TK]`).
+- *(add further ADRs here as they're created — don't let this list go stale.)*
 
 ## How we work
 Build v0.1 one subsystem at a time, with a fresh context per subsystem
