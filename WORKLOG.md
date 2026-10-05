@@ -33,10 +33,17 @@ plus a live two-tab browser pass):
 - Placeholder deployed first (proved the Fly path), then this build's
   Dockerfile/fly.toml rewritten for the real stack and verified locally.
 
+**Deployed:** the real Seen build is live at
+https://comp4020-final-riteshsivaraman.fly.dev/ (verified `/` and `/readme/`
+both 200, signup smoke-tested against the live app). One leftover test
+account, username `smoketest`, is in the live DB --- a mass-delete attempt to
+clean it up was correctly blocked by the permission classifier (deleting all
+users/sessions/events on a live app, even a pre-launch one, isn't a solo
+call); clear it yourself with a single `DELETE FROM users WHERE
+username='smoketest'` (and its sessions row) via `flyctl ssh console` if you
+want it gone before the crit.
+
 **Not yet done:**
-- Real deploy of this build to Fly (placeholder was deployed and verified;
-  the actual Seen build has only been run locally + in a local Docker
-  container so far, not pushed to the live Fly app).
 - Repo is still **private** --- flipping it public is Ritesh's call, not
   done autonomously (course brief: C8 wants it public at the cutoff).
 - README.md / PROCESS.md: still template boilerplate. Ritesh writes these
