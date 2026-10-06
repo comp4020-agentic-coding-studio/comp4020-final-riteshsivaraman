@@ -8,6 +8,27 @@ entry cites the commit(s) it's about, e.g.
 so a claim can be checked against what actually happened. Append-only --- if
 one turns out to be wrong, add a correction entry, don't delete the original.
 
+## "Navigate to a non-Inbox page and check" needs an in-app click, not a URL bar change, or the test can pass for the wrong reason
+
+[`a4c671f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a4c671f)
+
+Verifying the global live-preview banner, my first check used the browser
+tool's `navigate` action to jump straight to `/sent` by URL. The banner
+vanished -- which looked exactly like a failed fix, but wasn't: a URL-bar
+navigation is a full page reload in this SPA, which opens a brand-new
+`EventSource` with nothing played back (ADR 2's design is deliberately
+no-queue, no-replay). It would have told me the old, already-saved draft
+event was "lost," when the real question -- does the banner survive
+*client-side* route changes within one mounted session -- was never asked.
+Re-tested by clicking the in-app sidebar links (Inbox -> Compose -> Board)
+instead, which is how an actual user navigates and how the feature is
+specified to work, and the banner correctly persisted. Lesson: when a
+feature's whole point is "survives navigating away," the verification step
+has to navigate the way the app is actually used (`route()`/client-side),
+not however the tool defaults to doing it -- a reload-based check tests a
+different, stricter thing than what was asked for, and a failure there
+isn't evidence of anything.
+
 ## Hono sub-app routes don't match a trailing slash on the mount path
 
 `draftRoutes.post("/", ...)` mounted at `app.route("/api/drafts", draftRoutes)`
