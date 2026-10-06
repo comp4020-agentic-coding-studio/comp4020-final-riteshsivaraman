@@ -12,6 +12,12 @@ ambiguous requirement by picking the most plausible reading and proceeding —
 stop and ask. A wrong guess built on top of other code is more expensive to
 unwind than a short pause would have cost.
 
+For a decision affecting multiple users or expensive to reverse (per the week
+8 lecture: stack, user/person definition, persistence, real-time mechanism —
+see the ADR note below), lay out the real options and their costs first,
+without picking one, and let Ritesh choose before anything gets built or
+written up. Don't collapse straight to a recommendation on these.
+
 ## Event log is load-bearing
 Every user action (send, open, draft edit, forward, contribute, destroy)
 writes an `events` row first. Stats, sorts, the C10 "creepy mirror", and any
