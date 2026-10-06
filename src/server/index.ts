@@ -10,6 +10,7 @@ import { renderMarkdown } from "./lib/markdown.ts";
 import { authRoutes, readSessionCookie } from "./routes/auth.ts";
 import { draftRoutes } from "./routes/drafts.ts";
 import { mailRoutes } from "./routes/mail.ts";
+import { streamRoutes } from "./routes/stream.ts";
 
 const app = new Hono<{ Variables: Vars }>();
 
@@ -22,6 +23,7 @@ app.use("*", async (c, next) => {
 app.route("/api/auth", authRoutes);
 app.route("/api/mail", mailRoutes);
 app.route("/api/drafts", draftRoutes);
+app.route("/api/stream", streamRoutes);
 
 // /readme/: README.md rendered verbatim, same contract the placeholder
 // Dockerfile proved (spec/README.md: "no script runs").

@@ -27,14 +27,29 @@ export interface SendResult {
   bounced: string[]; // addresses that didn't resolve to a user
 }
 
+/** Resolves a free-text address to a registered user by lowercase match,
+ * silently skipping anything that doesn't resolve (same as a bounce ---
+ * no error, no event). Shared by sendEmail's bounce accounting and the
+ * live-preview broadcast audience (lib/livePreview.ts), so there's exactly
+ * one place that implements "address -> real user". */
+export function resolveAddresses(addresses: string[]): { userId: string; address: string }[] {
+  const resolved: { userId: string; address: string }[] = [];
+  for (const address of addresses) {
+    const user = db.select().from(users).where(eq(users.address, address.toLowerCase())).get();
+    if (user) resolved.push({ userId: user.id, address });
+  }
+  return resolved;
+}
+
 /** Resolves addresses, creates the email + recipient rows, logs events.
  * Unknown addresses bounce privately to the sender only (seen-spec §2). */
 export function sendEmail(input: ComposeInput): SendResult {
   const bounced: string[] = [];
   const resolved: { userId: string; kind: RecipientKind }[] = [];
+  const byAddress = new Map(resolveAddresses(input.recipients.map((r) => r.address)).map((r) => [r.address.toLowerCase(), r.userId]));
   for (const r of input.recipients) {
-    const user = db.select().from(users).where(eq(users.address, r.address.toLowerCase())).get();
-    if (user) resolved.push({ userId: user.id, kind: r.kind });
+    const userId = byAddress.get(r.address.toLowerCase());
+    if (userId) resolved.push({ userId, kind: r.kind });
     else bounced.push(r.address);
   }
 

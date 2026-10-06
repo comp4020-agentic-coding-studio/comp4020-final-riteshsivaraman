@@ -8,7 +8,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db.ts";
 import { draftContributors, drafts, type drafts as draftsTable } from "../schema.ts";
 import { logEvent } from "./events.ts";
-import { type RecipientKind, sendEmail } from "./mail.ts";
+import { publish } from "./livePreview.ts";
+import { resolveAddresses, type RecipientKind, sendEmail } from "./mail.ts";
 
 const HEARTBEAT_TIMEOUT_MS = 30_000;
 const AUTO_SEND_MS = 24 * 60 * 60 * 1000;
@@ -80,7 +81,9 @@ export function saveDraft(
     recordContributor(draftId, userId);
     logEvent(userId, "draft_edit", { draftId });
     // strangers edit the body only --- never subject/recipients (seen-spec §4)
-    db.update(drafts).set({ body: fields.body ?? draft.body, lastHeartbeatAt: Date.now() }).where(eq(drafts.id, draftId)).run();
+    const newBody = fields.body ?? draft.body;
+    db.update(drafts).set({ body: newBody, lastHeartbeatAt: Date.now() }).where(eq(drafts.id, draftId)).run();
+    broadcastDraftPreview(draftId, draft.recipientsJson, draft.subject, newBody);
     return;
   }
   if (draft.ownerId !== userId) throw new DraftError("not your draft to edit yet");
@@ -92,8 +95,27 @@ export function saveDraft(
   if (fields.selfDestructDurationMs !== undefined) updates.selfDestructDurationMs = fields.selfDestructDurationMs;
   db.update(drafts).set(updates).where(eq(drafts.id, draftId)).run();
   logEvent(userId, "draft_save", { draftId });
+  broadcastDraftPreview(
+    draftId,
+    updates.recipientsJson ?? draft.recipientsJson,
+    fields.subject ?? draft.subject,
+    fields.body ?? draft.body,
+  );
 
   if (makePublic && !draft.isPublic) publicize(draftId, draft.fastMode);
+}
+
+/** Pushes the draft's current content to every live-preview subscriber among
+ * its resolved to/cc/bcc recipients (ADR 2 --- audience is all three kinds,
+ * same "BCC exposed both ways" precedent as recipientsFor in lib/mail.ts).
+ * Not itself a loggable action --- it's a side-effect of the draft_save/
+ * draft_edit event already logged above, not a new user action. */
+function broadcastDraftPreview(draftId: string, recipientsJson: string, subject: string, body: string): void {
+  const recipients: DraftRecipient[] = JSON.parse(recipientsJson);
+  const resolved = resolveAddresses(recipients.map((r) => r.address));
+  for (const { userId } of resolved) {
+    publish(userId, { draftId, subject, body });
+  }
 }
 
 function publicize(draftId: string, fastMode: boolean): void {

@@ -27,9 +27,20 @@ plus a live two-tab browser pass):
   per-user fast mode, a minimal voice-escalation module.
 - Event log (`events` table) behind everything --- every action tested
   writes its row; checked directly against the SQLite file, not just the API.
-- `spec/seen.test.ts`: 9 tests covering the fast/automatic/trustworthy checks
+- `spec/seen.test.ts`: 14 tests covering the fast/automatic/trustworthy checks
   from seen-spec.md §13 (see CLAUDE.md "Spec traceability" for what's
   deliberately NOT here and why).
+- Live draft preview backend (ADR 2, `docs/adr/0002-live-preview-transport.md`):
+  authenticated `GET /api/stream` (`src/server/routes/stream.ts`) using
+  `hono/streaming`'s `streamSSE`, backed by an in-process pub/sub
+  (`src/server/lib/livePreview.ts`, no persistence --- `drafts` stays the
+  source of truth). `saveDraft()` in `src/server/lib/drafts.ts` broadcasts to
+  every resolved to/cc/bcc recipient on both the owner-edit and
+  stranger-public-draft-edit branches; address resolution is shared with
+  `sendEmail` via `resolveAddresses()` (extracted in `src/server/lib/mail.ts`).
+  No client UI yet --- that's a separate subsystem. Mutation-checked: dropping
+  bcc from the broadcast audience is caught by
+  `spec/seen.test.ts`'s "live draft preview (ADR 2)" describe block.
 - Placeholder deployed first (proved the Fly path), then this build's
   Dockerfile/fly.toml rewritten for the real stack and verified locally.
 

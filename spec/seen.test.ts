@@ -201,3 +201,87 @@ describe("forward alerts", () => {
     expect(forwardNotices.length).toBe(2); // both the original forward and the forward-of-forward
   });
 });
+
+interface DraftPreviewPush {
+  draftId: string;
+  subject: string;
+  body: string;
+}
+
+/** Opens `/api/stream` as this client and returns a function that reads the
+ * next SSE "draft" push off it, racing a timeout so a missing push fails the
+ * test instead of hanging. */
+async function openPreviewStream(client: Client): Promise<() => Promise<DraftPreviewPush>> {
+  const res = await client.request("/api/stream");
+  expect(res.status).toBe(200);
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  return async function nextEvent(): Promise<DraftPreviewPush> {
+    for (;;) {
+      const match = buffer.match(/data: (.*)\n\n/);
+      if (match) {
+        buffer = buffer.slice(match.index! + match[0].length);
+        return JSON.parse(match[1]);
+      }
+      const { value, done } = await reader.read();
+      if (done) throw new Error("SSE stream closed before an event arrived");
+      buffer += decoder.decode(value, { stream: true });
+    }
+  };
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([p, new Promise<never>((_, reject) => setTimeout(() => reject(new Error(label)), ms))]);
+}
+
+describe("live draft preview (ADR 2)", () => {
+  it("pushes a draft's content to a To recipient over SSE as the sender saves it", async () => {
+    const alice = await newUser();
+    const bob = await newUser();
+
+    // Open bob's SSE connection before alice saves anything, same as a
+    // recipient who already has the app open.
+    const nextEvent = await openPreviewStream(bob.client);
+
+    const draft = await alice.client.post<{ ok: boolean; id: string }>("/api/drafts", {
+      subject: "being watched",
+      recipients: [{ address: bob.address, kind: "to" }],
+    });
+
+    await alice.client.post(`/api/drafts/${draft.id}/save`, { body: "typing, live" });
+
+    const event = await withTimeout(nextEvent(), 5000, "timed out waiting for the SSE push");
+    expect(event.draftId).toBe(draft.id);
+    expect(event.subject).toBe("being watched");
+    expect(event.body).toBe("typing, live");
+  });
+
+  it("also pushes to a Bcc recipient --- ADR 2's audience is to/cc/bcc, same as the BCC-exposed-both-ways precedent", async () => {
+    const alice = await newUser();
+    const bob = await newUser(); // ordinary To recipient, included for contrast
+    const carol = await newUser(); // Bcc
+
+    const bobNext = await openPreviewStream(bob.client);
+    const carolNext = await openPreviewStream(carol.client);
+
+    const draft = await alice.client.post<{ ok: boolean; id: string }>("/api/drafts", {
+      subject: "quietly cc'd",
+      recipients: [
+        { address: bob.address, kind: "to" },
+        { address: carol.address, kind: "bcc" },
+      ],
+    });
+
+    await alice.client.post(`/api/drafts/${draft.id}/save`, { body: "bcc should see this too" });
+
+    const [bobEvent, carolEvent] = await Promise.all([
+      withTimeout(bobNext(), 5000, "timed out waiting for the To recipient's SSE push"),
+      withTimeout(carolNext(), 5000, "timed out waiting for the Bcc recipient's SSE push"),
+    ]);
+    expect(bobEvent.body).toBe("bcc should see this too");
+    expect(carolEvent.draftId).toBe(draft.id);
+    expect(carolEvent.body).toBe("bcc should see this too");
+  });
+});

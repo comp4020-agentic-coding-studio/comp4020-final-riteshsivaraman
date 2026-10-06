@@ -81,3 +81,28 @@ turning the guess into an explicit choice before any code exists. Written
 into CLAUDE.md itself (the commit above) so this is a standing move the next
 session takes too, not something that only happened because I was asked
 twice in one session.
+
+## `pkill -f "tsx src/server/index.ts"` doesn't reliably kill the dev server, and a stale one fakes a passing mutation check
+
+Building the live-preview SSE feature, I edited `src/server/lib/drafts.ts` to
+add a deliberate mutation (dropping `bcc` from the live-preview broadcast
+audience, per the mutation-check skill), restarted with
+`pkill -f "tsx src/server/index.ts"; pnpm start &`, and reran the spec --- it
+passed clean, which should have been alarming on its own (a real bug in the
+code should fail a test written specifically to catch it). The `pkill`
+pattern didn't match anything (`tsx` execs into a bare `node` process that
+`lsof -i :8080` shows as `COMMAND node` with no visible args), so it never
+killed the old process; `pnpm start &` then hit `EADDRINUSE` and exited
+silently into its own log file I hadn't checked, leaving the *original*
+(pre-mutation, then later also post-revert) server still answering
+requests the whole time. I only caught it because a later bcc-only manual
+`curl`/`fetch` check against what I believed was the freshly-mutated server
+still delivered the preview --- the one result that shouldn't have been
+possible if the mutation were actually live. Lesson: after any
+"kill the dev server and restart" step, confirm the restart actually
+happened --- `lsof -ti :8080` (not `pkill -f` on the launch command string)
+for the PID, kill that PID directly, re-check the port is free, *then*
+start, and read the startup log for `EADDRINUSE` before trusting that a
+subsequent test run reflects the code on disk. A green (or red) result
+against a stale process is worse than no result, since it looks identical
+to a real one.
