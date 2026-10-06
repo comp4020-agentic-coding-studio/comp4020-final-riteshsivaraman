@@ -47,3 +47,16 @@ runs `pnpm check` with `APP_URL=http://localhost:8080` against the same
 Docker image on the same runner (near-zero latency) --- identical to a local
 run, which is green. This only surfaces when testing against the public
 internet URL directly, which goes beyond what CI does.
+
+## 2026-10-07: General UI/UX polish deferred past C8
+
+Ritesh's own read after using the live app: "the UI/UX is very poor." This
+is distinct from the design-token mismatch fixed earlier today (`dbb8e65`)
+--- that pass made the app's colors/font/radii actually match
+`docs/design-handoff.md`'s written values, but matching the spec's tokens
+isn't the same as the layout, spacing, density, and overall feel actually
+being good to use. Nobody has done an actual UX pass yet. Explicitly covered
+by C8's own spec ("feature completeness, real-time functionality, and
+polish are explicitly deferred" for this crit) --- not cut under pressure so
+much as never in scope for tonight. Deferred to C9/v0.2 with real time
+budgeted for it, rather than rushed in the ~3.5 hours before the C8 cutoff.
