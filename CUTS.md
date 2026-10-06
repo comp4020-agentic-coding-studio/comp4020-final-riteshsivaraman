@@ -26,3 +26,24 @@ Ritesh deferred the real company name decision; `Panopticorp` is a
 placeholder throughout code and copy (search for `[TK]` / `panopticorp` to
 find every spot). Needs a real decision before shipping --- check it's not a
 real company.
+
+## 2026-10-07: `spec/seen.test.ts`'s self-destruct timing is only safe at near-zero latency
+
+Running `APP_URL=<live fly.dev URL> pnpm check` (not what CI does --- see
+below) against the deployed app fails "stays silent (no notice) when opened
+before destruction" consistently, not flakily. Cause: the test opens an
+email with a 300ms self-destruct window, and `mailRoutes`' own middleware
+calls `catchUpUserEmails` on every request including the `/open` request
+itself --- if real network latency pushes that request's arrival past the
+300ms deadline, the middleware's catch-up destroys-and-notifies before the
+route handler gets to mark it opened. That's not a bug: if the open request
+genuinely didn't land within the window, "opened too late" is the correct
+outcome. The test's 300ms budget is simply too tight to assert over real
+internet latency to the deployed instance, same class of problem as the
+auto-send check above.
+
+**Not a submission blocker**: `.github/workflows/checks.yml`'s `check` job
+runs `pnpm check` with `APP_URL=http://localhost:8080` against the same
+Docker image on the same runner (near-zero latency) --- identical to a local
+run, which is green. This only surfaces when testing against the public
+internet URL directly, which goes beyond what CI does.
