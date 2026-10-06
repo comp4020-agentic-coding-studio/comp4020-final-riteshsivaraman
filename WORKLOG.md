@@ -73,6 +73,33 @@ want it gone before the crit.
 - Fiction-integrity sweep (CLAUDE.md) not yet run --- do this before shipping
   public, after the company name is real.
 
+## Design-token implementation pass (2026-10-07)
+
+`docs/design-handoff.md` (the real design spec, not tracked here until
+`?? docs/design-handoff.md` in git status is resolved -- it's currently
+untracked, add it when ready) had never actually been implemented:
+`styles.css` had its own blue `--accent`, IBM Plex Sans instead of Inter, and
+a `--radius-md` that was really the spec's `--radius-lg` value wearing the
+wrong name. Fixed in commit `dbb8e65`: every color/font/radius token renamed
+to match the doc exactly (brick-red `--signal`, `--onyx`/`--bone` "stamped
+chrome" pair, `--sidebar-bg`, radius-sm/md/lg = 6/8/10px), `.watch-strip`'s
+stale hardcoded `rgba(179,38,30,...)` replaced with a `color-mix()` derived
+from `--danger`, and Inter swapped in for IBM Plex Sans in `index.html`.
+Verified with computed-style JS against a running instance (not just
+screenshot eyeballing) -- every token matches the doc's literal hex.
+
+Also added the first of the two signature devices: the unread asterisk
+(`✳`, rotated, `--signal`) in `EmailListRow`, wired through `Inbox.tsx` via a
+new `myAddress` prop; `Sent.tsx` doesn't pass it, so it never shows on your
+own sent mail. The ghost-read line (second signature device) is still not
+built -- its trigger condition is `[TK]` in the design doc itself, don't
+guess at it.
+
+No new LEARNINGS.md entry from this pass -- the stale-`static/`-dir gotcha I
+hit (`pnpm build` after editing client source, since `pnpm start` serves
+the gitignored `static/` dir, not a dev server) is already documented in
+CLAUDE.md's "Known gotchas."
+
 ## Next session should
 
 1. Confirm the Fly token is still valid (`mise exec -- flyctl status -a
