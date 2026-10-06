@@ -433,6 +433,44 @@ a:focus-visible {
   background: var(--accent-bg);
 }
 
+.address-field {
+  position: relative;
+}
+
+.address-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 2px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.address-suggestions li {
+  padding: 7px var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.address-suggestions li:hover {
+  background: var(--bg);
+}
+
+.address-suggestions li.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
 form.compose {
   width: 100%;
   max-width: 640px;

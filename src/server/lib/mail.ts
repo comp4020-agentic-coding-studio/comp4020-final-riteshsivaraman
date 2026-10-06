@@ -171,6 +171,30 @@ export function getNotices(userId: string): Notice[] {
     .map((e) => ({ type: e.type, at: e.at, payload: JSON.parse(e.payloadJson) as Record<string, unknown> }));
 }
 
+/** Addresses this user has recently sent to, most-recent-first, deduped,
+ * capped at 20 --- feeds the compose autocomplete. Read-only, no events row
+ * (not a user action, just a query). */
+export function recentRecipients(userId: string): string[] {
+  const sent = db.select().from(emails).where(eq(emails.senderId, userId)).orderBy(desc(emails.sentAt)).all();
+  const seen = new Set<string>();
+  const addresses: string[] = [];
+  for (const email of sent) {
+    const recipients = recipientsFor(email.id);
+    for (const r of recipients) {
+      const user = userById(r.userId);
+      if (!user || seen.has(user.address)) continue;
+      seen.add(user.address);
+      addresses.push(user.address);
+      if (addresses.length >= 20) return addresses;
+    }
+  }
+  return addresses;
+}
+
+function userById(id: string) {
+  return db.select().from(users).where(eq(users.id, id)).get();
+}
+
 export function catchUpUserEmails(userId: string): void {
   const asSender = db.select().from(emails).where(eq(emails.senderId, userId)).all();
   const asRecipient = db.select().from(emailRecipients).where(eq(emailRecipients.userId, userId)).all();

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db.ts";
 import { users } from "../schema.ts";
 import type { Vars } from "../lib/context.ts";
-import { catchUpUserEmails, getInbox, getNotices, getSent, openEmail, sendEmail } from "../lib/mail.ts";
+import { catchUpUserEmails, getInbox, getNotices, getSent, openEmail, recentRecipients, sendEmail } from "../lib/mail.ts";
 import { voiceLine } from "../lib/voice.ts";
 
 export const mailRoutes = new Hono<{ Variables: Vars }>();
@@ -52,6 +52,11 @@ mailRoutes.get("/inbox", (c) => {
 mailRoutes.get("/notices", (c) => {
   const user = c.get("user")!;
   return c.json({ ok: true, notices: getNotices(user.id) });
+});
+
+mailRoutes.get("/recent-recipients", (c) => {
+  const user = c.get("user")!;
+  return c.json({ ok: true, addresses: recentRecipients(user.id) });
 });
 
 mailRoutes.get("/sent", (c) => {

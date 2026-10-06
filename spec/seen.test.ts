@@ -47,6 +47,32 @@ describe("sending", () => {
   });
 });
 
+describe("recent recipients", () => {
+  it("returns this user's recently-sent-to addresses, most-recent-first and deduplicated, never another user's", async () => {
+    const alice = await newUser();
+    const bob = await newUser();
+    const carol = await newUser();
+    const dave = await newUser();
+
+    await alice.client.post("/api/mail/send", { to: [bob.address], subject: "first", body: "x", hesitationMs: 10 });
+    await alice.client.post("/api/mail/send", { to: [carol.address], subject: "second", body: "x", hesitationMs: 10 });
+    await alice.client.post("/api/mail/send", { to: [bob.address], subject: "third", body: "x", hesitationMs: 10 }); // bob again, most recent
+
+    // Dave only ever hears from carol, never from alice --- his recent list
+    // must not leak alice's sent history.
+    await carol.client.post("/api/mail/send", { to: [dave.address], subject: "unrelated", body: "x", hesitationMs: 10 });
+
+    const aliceRecent = await alice.client.json<{ ok: boolean; addresses: string[] }>("/api/mail/recent-recipients");
+    expect(aliceRecent.addresses[0]).toBe(bob.address); // most recent occurrence wins over the earlier one
+    expect(aliceRecent.addresses.filter((a) => a === bob.address).length).toBe(1); // deduped
+    expect(aliceRecent.addresses).toContain(carol.address);
+    expect(aliceRecent.addresses).not.toContain(dave.address); // alice never sent to dave
+
+    const daveRecent = await dave.client.json<{ ok: boolean; addresses: string[] }>("/api/mail/recent-recipients");
+    expect(daveRecent.addresses).toEqual([]); // dave has never sent anything
+  });
+});
+
 describe("the public draft board", () => {
   it("never exposes recipients or the quoted thread to a stranger", async () => {
     const alice = await newUser();

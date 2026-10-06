@@ -21,6 +21,7 @@ export const api = {
   inbox: () => req<{ ok: boolean; emails: MailItem[] }>("/api/mail/inbox"),
   notices: () => req<{ ok: boolean; notices: { type: string; at: number; payload: Record<string, unknown> }[] }>("/api/mail/notices"),
   sent: () => req<{ ok: boolean; emails: MailItem[] }>("/api/mail/sent"),
+  recentRecipients: () => req<{ ok: boolean; addresses: string[] }>("/api/mail/recent-recipients"),
   openEmail: (id: string) => req<{ ok: boolean }>(`/api/mail/${id}/open`, { method: "POST" }),
   send: (payload: SendPayload) => req<{ ok: boolean; emailId?: string; bounced?: string[]; voice?: string }>("/api/mail/send", { method: "POST", body: JSON.stringify(payload) }),
 
