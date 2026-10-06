@@ -96,11 +96,13 @@ Gemini key (and anything else secret) goes in Fly secrets
 ## Session handoff
 Keep `WORKLOG.md` current in the repo (not `~/.claude/plans/`, which is
 local-only and won't survive a fresh session or machine). Append to
-`LEARNINGS.md` as this stack's own gotchas are hit (Hono/Preact/Drizzle are
-new here, not reused verbatim from crit 7). Every reply says whether that
-turn added a LEARNINGS.md entry. Log cuts as they happen in `CUTS.md` (what,
-why, when) rather than reconstructing them from memory later — a cut made
-under deadline pressure is real process evidence, not just a loose end.
+`LEARNINGS.md` as Ritesh learns something about prompting or working with AI
+coding assistants — not stack gotchas; that's what the file tracked before
+this was flagged and is being redirected (see the file's own header). Cite
+the commit(s) each entry is about. Every reply says whether that turn added a
+LEARNINGS.md entry. Log cuts as they happen in `CUTS.md` (what, why, when)
+rather than reconstructing them from memory later — a cut made under
+deadline pressure is real process evidence, not just a loose end.
 
 ## Where things live
 This file is the index. Any time a new document gets created that records a
@@ -119,14 +121,29 @@ find every resource by reading this file, not by discovering it mid-task.
   per crit, Ritesh's prose.
 - `spec/README.md` — what's fixed (the two invariants) vs what's Seen's own.
 - `docs/adr/0001-stack.md` — ADR 1 (Hono + Preact SPA vs crit-7 fallback).
-  Facts filled in; narrative sections are `[TK]` for Ritesh.
+  Facts filled in; narrative sections are `[TK]` for Ritesh. Read everything
+  in `docs/adr/` before changing stack, storage, or the data model — an
+  accepted record is never edited; a changed decision gets a new, numbered
+  record that supersedes it and says why.
+- `docs/design-handoff.md` — the visual design spec the real app is built
+  against: color/type tokens, layout, the two permitted signature "dread"
+  devices, copy voice, component inventory. Came from a standalone frontend
+  exploration outside this repo; read this doc, not that directory, going
+  forward.
 - `WORKLOG.md` — current state of the build, read this first for "where did
   we leave off."
-- `LEARNINGS.md` — this stack's own gotchas as they're hit (Hono trailing-
-  slash routing, FK delete order, same-profile-two-tabs session sharing).
+- `LEARNINGS.md` — what Ritesh is learning about prompting/working with AI
+  coding assistants, cited to commits (older entries predate this and are
+  stack gotchas instead).
 - `CUTS.md` — what got cut under deadline pressure and why (attachments from
   C8, the auto-send-deadline check left advisory-only, company name still
   `[TK]`).
+- `.claude/agents/event-log-reviewer.md` — checks the event-log-write-
+  completeness invariant above; run it after a subsystem build.
+- `.claude/agents/fiction-integrity-reviewer.md` — the fiction-integrity
+  sweep below; run it before shipping public.
+- `.claude/skills/mutation-check/` — the defect-loop mutation check below,
+  on demand for code built unwatched (timers, draft-visibility).
 - *(add further ADRs here as they're created — don't let this list go stale.)*
 
 ## How we work
@@ -169,6 +186,13 @@ part of the app works — the mechanism, not just the diff — since this is
 Ritesh's app to understand and defend at a crit, not just to have built. A
 status update that only says what changed is a missed opportunity if the
 underlying structure is new to him.
+
+End every response with one or two lessons from the COMP4020 lecture notes
+relevant to whatever comes next — not necessarily the most recent lecture,
+whichever week's content actually applies (e.g. drawing on persistence or
+decision-record guidance from an earlier week while building a later
+feature). Fetch live via the `comp4020:handbook` skill rather than recalling
+from memory.
 
 ## One idea, carried all the way
 Every feature serves "someone's always watching." A feature that doesn't tie

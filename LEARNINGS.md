@@ -1,8 +1,12 @@
 # Learnings
 
-Stack-specific gotchas, found the hard way, as they come up. Append-only ---
-if one turns out to be wrong, add a correction entry, don't delete the
-original. (Pattern carried from crit 7's LEARNINGS.md.)
+What Ritesh is learning about prompting and working with AI coding assistants
+on this project --- not stack gotchas (those were tracked here up to the entry
+below this note; new entries are about the prompter, not the stack). Each
+entry cites the commit(s) it's about, e.g.
+[`a1b2c3d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a1b2c3d),
+so a claim can be checked against what actually happened. Append-only --- if
+one turns out to be wrong, add a correction entry, don't delete the original.
 
 ## Hono sub-app routes don't match a trailing slash on the mount path
 
