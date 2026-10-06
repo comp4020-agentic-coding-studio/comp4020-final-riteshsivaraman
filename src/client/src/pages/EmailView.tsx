@@ -72,13 +72,34 @@ export function EmailDetail({ email, myAddress }: { email: MailItem; myAddress: 
   );
 }
 
-export function EmailListRow({ email, active, onClick }: { email: MailItem; active: boolean; onClick: () => void }) {
+export function EmailListRow({
+  email,
+  active,
+  onClick,
+  myAddress,
+}: {
+  email: MailItem;
+  active: boolean;
+  onClick: () => void;
+  myAddress?: string;
+}) {
+  const unread = myAddress != null && email.recipients.find((r) => r.address === myAddress)?.openedAt == null;
   return (
     <button class={`list-row ${active ? "active" : ""}`} onClick={onClick}>
       <Avatar address={email.senderAddress} />
       <div class="row-main">
         <div class="row-top">
-          <span class="sender">{email.senderAddress}</span>
+          <span class="sender">
+            {unread && (
+              <span
+                aria-hidden="true"
+                style={{ display: "inline-block", color: "var(--signal)", transform: "rotate(-8deg)", marginRight: 4 }}
+              >
+                ✳
+              </span>
+            )}
+            {email.senderAddress}
+          </span>
           <span class="time">{fmtTime(email.sentAt)}</span>
         </div>
         <span class="subject">{email.subject || "(no subject)"}</span>

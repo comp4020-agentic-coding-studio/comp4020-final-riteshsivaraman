@@ -84,7 +84,7 @@ export function Inbox({ me }: { me: Me; path?: string }) {
         <LiveDrafts drafts={liveDrafts} />
         <WatchStrip lines={notices} />
         {emails.map((e) => (
-          <EmailListRow email={e} active={e.id === selected} onClick={() => open(e.id)} />
+          <EmailListRow email={e} active={e.id === selected} onClick={() => open(e.id)} myAddress={me.address} />
         ))}
         {emails.length === 0 && <p class="empty-state">Nothing here yet.</p>}
       </div>

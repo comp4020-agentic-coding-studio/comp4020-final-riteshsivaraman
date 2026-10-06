@@ -1,16 +1,19 @@
 :root {
-  --bg: #f3f4f2;
+  --panel-muted: #f7f6f3;
   --surface: #ffffff;
-  --ink: #1c1f1d;
-  --muted: #6b716c;
-  --faint: #9aa09b;
-  --line: #e2e4e0;
-  --line-strong: #d0d3cd;
-  --accent: #3b5bdb;
-  --accent-bg: #eef1fc;
-  --watch: #b3261e;
-  --watch-bg: #fbeceb;
-  --font-ui: "IBM Plex Sans", system-ui, sans-serif;
+  --sidebar-bg: #f7f6f3;
+  --ink: #26231e;
+  --muted: #6f6a60;
+  --faint: #a7a195;
+  --line: #ebe8e2;
+  --line-strong: #ddd8cf;
+  --signal: #6e2f2a;
+  --signal-soft: #f4e8e5;
+  --signal-ink: #8a3f38;
+  --danger: #9a3b32;
+  --onyx: #1c1a16;
+  --bone: #f3efe6;
+  --font-ui: "Inter", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   --space-1: 4px;
@@ -21,7 +24,8 @@
   --space-6: 28px;
 
   --radius-sm: 6px;
-  --radius-md: 10px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
 
   --shadow-sm: 0 1px 2px rgba(20, 20, 15, 0.04), 0 1px 3px rgba(20, 20, 15, 0.06);
   --shadow-md: 0 4px 10px rgba(20, 20, 15, 0.07), 0 1px 3px rgba(20, 20, 15, 0.06);
@@ -39,7 +43,7 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--panel-muted);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 14px;
@@ -48,7 +52,7 @@ body {
 }
 
 a {
-  color: var(--accent);
+  color: var(--signal);
 }
 
 button {
@@ -62,7 +66,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--signal);
   outline-offset: 2px;
 }
 
@@ -73,10 +77,10 @@ a:focus-visible {
 .watch-strip {
   font-family: var(--font-mono);
   font-size: 11.5px;
-  color: var(--watch);
-  background: var(--watch-bg);
-  border: 1px solid rgba(179, 38, 30, 0.15);
-  border-left: 3px solid var(--watch);
+  color: var(--danger);
+  background: var(--signal-soft);
+  border: 1px solid color-mix(in srgb, var(--danger) 15%, transparent);
+  border-left: 3px solid var(--danger);
   border-radius: var(--radius-sm);
   padding: var(--space-2) var(--space-3);
   margin-top: var(--space-4);
@@ -98,7 +102,7 @@ a:focus-visible {
 }
 
 .live-draft-card {
-  background: var(--accent-bg);
+  background: var(--signal-soft);
   border-bottom: 1px solid var(--line);
   padding: var(--space-3) var(--space-4);
 }
@@ -180,7 +184,7 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: var(--bg);
+  background: var(--panel-muted);
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 7px var(--space-4);
@@ -206,20 +210,20 @@ a:focus-visible {
   color: var(--muted);
 }
 .icon-btn:hover {
-  background: var(--bg);
+  background: var(--panel-muted);
   border-color: var(--line);
   color: var(--ink);
 }
 .icon-btn.active {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-bg);
+  color: var(--signal);
+  border-color: var(--signal);
+  background: var(--signal-soft);
 }
 
 .sidebar {
   border-right: 1px solid var(--line);
   padding: var(--space-4) var(--space-2);
-  background: var(--surface);
+  background: var(--sidebar-bg);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -240,14 +244,14 @@ a:focus-visible {
 }
 
 .sidebar a:hover {
-  background: var(--bg);
+  background: var(--panel-muted);
   color: var(--ink);
 }
 
 .sidebar a.active {
-  background: var(--accent-bg);
-  color: var(--accent);
-  border-left-color: var(--accent);
+  background: var(--signal-soft);
+  color: var(--signal);
+  border-left-color: var(--signal);
   font-weight: 600;
 }
 
@@ -261,19 +265,19 @@ a:focus-visible {
   font-family: var(--font-mono);
   color: var(--faint);
   font-size: 11px;
-  background: var(--bg);
+  background: var(--panel-muted);
   border-radius: 999px;
   padding: 1px 7px;
 }
 .sidebar a.active .count {
-  color: var(--accent);
+  color: var(--signal);
   background: #fff;
 }
 
 .sidebar .compose-btn {
   margin: var(--space-2) var(--space-1) var(--space-4);
-  background: var(--ink);
-  color: var(--surface);
+  background: var(--onyx);
+  color: var(--bone);
   border: none;
   border-radius: var(--radius-sm);
   padding: 10px var(--space-3);
@@ -308,12 +312,12 @@ a:focus-visible {
 }
 
 .list-row:hover {
-  background: var(--bg);
+  background: var(--panel-muted);
 }
 
 .list-row.active {
-  background: var(--accent-bg);
-  border-left-color: var(--accent);
+  background: var(--signal-soft);
+  border-left-color: var(--signal);
 }
 
 .list-row .row-main {
@@ -355,7 +359,7 @@ a:focus-visible {
 
 .list-row .tombstone-tag {
   font-family: var(--font-mono);
-  color: var(--watch);
+  color: var(--danger);
   font-size: 10.5px;
 }
 
@@ -431,9 +435,9 @@ a:focus-visible {
 }
 
 .pill.fast {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-bg);
+  border-color: var(--signal);
+  color: var(--signal);
+  background: var(--signal-soft);
 }
 
 .field-row {
@@ -472,7 +476,7 @@ a:focus-visible {
 }
 .field-row input:focus {
   outline: none;
-  background: var(--accent-bg);
+  background: var(--signal-soft);
 }
 
 .address-field {
@@ -505,12 +509,12 @@ a:focus-visible {
 }
 
 .address-suggestions li:hover {
-  background: var(--bg);
+  background: var(--panel-muted);
 }
 
 .address-suggestions li.active {
-  background: var(--accent-bg);
-  color: var(--accent);
+  background: var(--signal-soft);
+  color: var(--signal);
 }
 
 form.compose {
@@ -534,7 +538,7 @@ form.compose textarea {
 }
 form.compose textarea:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--signal);
 }
 
 .compose-footer {
@@ -583,12 +587,12 @@ form.compose textarea:focus {
   font-weight: 500;
 }
 .btn.secondary:hover {
-  background: var(--bg);
+  background: var(--panel-muted);
 }
 
 .draft-card {
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   padding: var(--space-4);
@@ -625,13 +629,13 @@ form.compose textarea:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: var(--panel-muted);
 }
 
 .auth-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   padding: var(--space-6);
   width: 340px;
@@ -648,7 +652,7 @@ form.compose textarea:focus {
 
 .auth-tabs {
   display: flex;
-  background: var(--bg);
+  background: var(--panel-muted);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 3px;
@@ -688,16 +692,16 @@ form.compose textarea:focus {
   padding: 10px var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: var(--panel-muted);
   color: var(--ink);
 }
 .auth-card input:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--signal);
   background: var(--surface);
 }
 
 .error {
-  color: var(--watch);
+  color: var(--danger);
   font-size: 12px;
 }
