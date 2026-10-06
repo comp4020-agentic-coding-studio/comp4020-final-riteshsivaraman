@@ -10,6 +10,40 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## Live-preview banner made global (2026-10-07)
+
+Fixed the reported bug: the live-draft preview (ADR 2, `d8a87f2`) only
+existed inside `Inbox.tsx`'s own mount effect, so the `EventSource` and the
+card both died on navigating away from `/inbox`. Moved the connection and
+state up to the app shell:
+
+- `src/client/src/LiveStreamContext.tsx` (new) --- owns the single
+  `EventSource("/api/stream")` for the logged-in session's lifetime, a
+  `Map<draftId, {subject, body}>` that replaces per-`draftId`, exposed via
+  `LiveStreamProvider`/`useLiveStream()`. Shaped to carry a second event
+  type later without restructuring (state object, not a hardcoded "just
+  drafts" value).
+- `src/client/src/LiveStreamBanner.tsx` (new) --- the pinned bar: one
+  collapsed line per tracked draft, click to expand in place. Calm/neutral
+  styling per ADR 2 (not `.watch-strip`'s red treatment).
+- `src/client/src/App.tsx` --- wraps the shell in `LiveStreamProvider`,
+  renders `<LiveStreamBanner />` directly (outside `<Router>`) between the
+  topbar and the rest.
+- `src/client/src/pages/Inbox.tsx` --- the old `EventSource`/`LiveDrafts`
+  code removed entirely; back to just being the inbox.
+- `src/client/src/styles.css` --- `.app-shell` changed from a single grid to
+  a flex column (topbar / banner / `.app-body`), because the banner renders
+  `null` when empty and a CSS Grid row sized for an item that sometimes
+  isn't there breaks auto-placement (see LEARNINGS.md). `.app-body` is the
+  original two-column grid, now one level down.
+
+Verified live, not just by reading code: signed in as a second account over
+curl, addressed and saved a draft to the browser account's address while
+that tab sat on `/sent`, `/board`, and `/compose` (via in-app sidebar nav,
+not a full reload) --- the banner appeared and updated on all three without
+the tab ever visiting `/inbox`. `pnpm check` (typecheck + the 14 existing
+vitest tests) green against a rebuilt `static/`.
+
 ## Where this stands (2026-10-06, overnight session)
 
 Built v0.1 for the C8 cutoff (Wed 7 Oct, 08:30), attachments cut (see

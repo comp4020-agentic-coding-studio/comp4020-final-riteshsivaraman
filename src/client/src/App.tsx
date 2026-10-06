@@ -9,6 +9,8 @@ import { Inbox } from "./pages/Inbox.tsx";
 import { Sent } from "./pages/Sent.tsx";
 import { Board } from "./pages/Board.tsx";
 import { Compose } from "./pages/Compose.tsx";
+import { LiveStreamProvider } from "./LiveStreamContext.tsx";
+import { LiveStreamBanner } from "./LiveStreamBanner.tsx";
 
 export interface Me {
   username: string;
@@ -65,50 +67,55 @@ export function App() {
   };
 
   return (
-    <div class="app-shell">
-      <div class="topbar">
-        <span class="brand">Panopticorp Mail</span>
-        <div class="topbar-search">
-          <SearchIcon />
-          <span>Search mail</span>
+    <LiveStreamProvider active={true}>
+      <div class="app-shell">
+        <div class="topbar">
+          <span class="brand">Panopticorp Mail</span>
+          <div class="topbar-search">
+            <SearchIcon />
+            <span>Search mail</span>
+          </div>
+          <div class="topbar-right">
+            <button class={`icon-btn ${me.fastMode ? "active" : ""}`} onClick={toggleFast}>
+              {me.fastMode ? "Fast mode: on" : "Fast mode: off"}
+            </button>
+            <button class="icon-btn" onClick={logout}>
+              Log out
+            </button>
+            <Avatar address={me.address} size={30} />
+          </div>
         </div>
-        <div class="topbar-right">
-          <button class={`icon-btn ${me.fastMode ? "active" : ""}`} onClick={toggleFast}>
-            {me.fastMode ? "Fast mode: on" : "Fast mode: off"}
-          </button>
-          <button class="icon-btn" onClick={logout}>
-            Log out
-          </button>
-          <Avatar address={me.address} size={30} />
+        <LiveStreamBanner />
+        <div class="app-body">
+          <div class="sidebar">
+            <NavLink href="/compose" active={false} class="compose-btn">
+              <ComposeIcon />
+              Compose
+            </NavLink>
+            <NavLink href="/inbox" active={path === "/" || path === "/inbox"}>
+              <InboxIcon />
+              Inbox
+              {inboxCount > 0 && <span class="count">{inboxCount}</span>}
+            </NavLink>
+            <NavLink href="/sent" active={path === "/sent"}>
+              <SentIcon />
+              Sent
+            </NavLink>
+            <NavLink href="/board" active={path === "/board"}>
+              <DraftsIcon />
+              Public drafts
+              {boardCount > 0 && <span class="count">{boardCount}</span>}
+            </NavLink>
+          </div>
+          <Router onChange={(e) => setPath(e.url)}>
+            <Inbox path="/" me={me} />
+            <Inbox path="/inbox" me={me} />
+            <Sent path="/sent" me={me} />
+            <Board path="/board" me={me} />
+            <Compose path="/compose" me={me} />
+          </Router>
         </div>
       </div>
-      <div class="sidebar">
-        <NavLink href="/compose" active={false} class="compose-btn">
-          <ComposeIcon />
-          Compose
-        </NavLink>
-        <NavLink href="/inbox" active={path === "/" || path === "/inbox"}>
-          <InboxIcon />
-          Inbox
-          {inboxCount > 0 && <span class="count">{inboxCount}</span>}
-        </NavLink>
-        <NavLink href="/sent" active={path === "/sent"}>
-          <SentIcon />
-          Sent
-        </NavLink>
-        <NavLink href="/board" active={path === "/board"}>
-          <DraftsIcon />
-          Public drafts
-          {boardCount > 0 && <span class="count">{boardCount}</span>}
-        </NavLink>
-      </div>
-      <Router onChange={(e) => setPath(e.url)}>
-        <Inbox path="/" me={me} />
-        <Inbox path="/inbox" me={me} />
-        <Sent path="/sent" me={me} />
-        <Board path="/board" me={me} />
-        <Compose path="/compose" me={me} />
-      </Router>
-    </div>
+    </LiveStreamProvider>
   );
 }
