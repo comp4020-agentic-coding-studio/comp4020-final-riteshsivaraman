@@ -1,6 +1,9 @@
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import Router, { route } from "preact-router";
 import { api } from "./api.ts";
+import { Avatar } from "./Avatar.tsx";
+import { ComposeIcon, DraftsIcon, InboxIcon, SearchIcon, SentIcon } from "./icons.tsx";
 import { AuthScreen } from "./pages/AuthScreen.tsx";
 import { Inbox } from "./pages/Inbox.tsx";
 import { Sent } from "./pages/Sent.tsx";
@@ -13,8 +16,19 @@ export interface Me {
   fastMode: boolean;
 }
 
+function NavLink({ href, active, class: className, children }: { href: string; active: boolean; class?: string; children: ComponentChildren }) {
+  return (
+    <a href={href} class={[className, active ? "active" : ""].filter(Boolean).join(" ")} onClick={(e) => (e.preventDefault(), route(href))}>
+      {children}
+    </a>
+  );
+}
+
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined); // undefined = loading
+  const [inboxCount, setInboxCount] = useState(0);
+  const [boardCount, setBoardCount] = useState(0);
+  const [path, setPath] = useState(window.location.pathname);
 
   const refreshMe = async () => {
     const res = await api.me();
@@ -24,6 +38,17 @@ export function App() {
   useEffect(() => {
     refreshMe();
   }, []);
+
+  useEffect(() => {
+    if (!me) return;
+    const refreshCounts = () => {
+      api.inbox().then((r) => r.ok && setInboxCount(r.emails.length));
+      api.board().then((r) => r.ok && setBoardCount(r.drafts.length));
+    };
+    refreshCounts();
+    const interval = setInterval(refreshCounts, 8000);
+    return () => clearInterval(interval);
+  }, [me]);
 
   if (me === undefined) return null;
   if (me === null) return <AuthScreen onAuthed={refreshMe} />;
@@ -43,25 +68,41 @@ export function App() {
     <div class="app-shell">
       <div class="topbar">
         <span class="brand">Panopticorp Mail</span>
-        <span>
-          <span class="pill" style={{ marginRight: 8 }}>
-            {me.address}
-          </span>
-          <button class={`btn secondary ${me.fastMode ? "fast" : ""}`} onClick={toggleFast} style={{ marginRight: 8 }}>
+        <div class="topbar-search">
+          <SearchIcon />
+          <span>Search mail</span>
+        </div>
+        <div class="topbar-right">
+          <button class={`icon-btn ${me.fastMode ? "active" : ""}`} onClick={toggleFast}>
             {me.fastMode ? "Fast mode: on" : "Fast mode: off"}
           </button>
-          <button class="btn secondary" onClick={logout}>
+          <button class="icon-btn" onClick={logout}>
             Log out
           </button>
-        </span>
+          <Avatar address={me.address} size={30} />
+        </div>
       </div>
       <div class="sidebar">
-        <a href="/inbox">Inbox</a>
-        <a href="/sent">Sent</a>
-        <a href="/board">Public drafts</a>
-        <a href="/compose">Compose</a>
+        <NavLink href="/compose" active={false} class="compose-btn">
+          <ComposeIcon />
+          Compose
+        </NavLink>
+        <NavLink href="/inbox" active={path === "/" || path === "/inbox"}>
+          <InboxIcon />
+          Inbox
+          {inboxCount > 0 && <span class="count">{inboxCount}</span>}
+        </NavLink>
+        <NavLink href="/sent" active={path === "/sent"}>
+          <SentIcon />
+          Sent
+        </NavLink>
+        <NavLink href="/board" active={path === "/board"}>
+          <DraftsIcon />
+          Public drafts
+          {boardCount > 0 && <span class="count">{boardCount}</span>}
+        </NavLink>
       </div>
-      <Router>
+      <Router onChange={(e) => setPath(e.url)}>
         <Inbox path="/" me={me} />
         <Inbox path="/inbox" me={me} />
         <Sent path="/sent" me={me} />

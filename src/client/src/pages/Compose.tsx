@@ -93,35 +93,58 @@ export function Compose({ me }: { me: Me; path?: string }) {
 
   return (
     <div class="reading-pane">
-      <form class="compose" onSubmit={send}>
-        <input placeholder="To" value={to} onInput={(e) => (setTo((e.target as HTMLInputElement).value), onEdit())} />
-        <input placeholder="Cc" value={cc} onInput={(e) => (setCc((e.target as HTMLInputElement).value), onEdit())} />
-        <input placeholder="Bcc" value={bcc} onInput={(e) => (setBcc((e.target as HTMLInputElement).value), onEdit())} />
-        <input placeholder="Subject" value={subject} onInput={(e) => (setSubject((e.target as HTMLInputElement).value), onEdit())} />
+      <form class="compose content-col" onSubmit={send}>
+        <div class="field-row">
+          <label for="to">To</label>
+          <input id="to" value={to} onInput={(e) => (setTo((e.target as HTMLInputElement).value), onEdit())} />
+        </div>
+        <div class="field-row">
+          <label for="cc">Cc</label>
+          <input id="cc" value={cc} onInput={(e) => (setCc((e.target as HTMLInputElement).value), onEdit())} />
+        </div>
+        <div class="field-row">
+          <label for="bcc">Bcc</label>
+          <input id="bcc" value={bcc} onInput={(e) => (setBcc((e.target as HTMLInputElement).value), onEdit())} />
+        </div>
+        <div class="field-row">
+          <label for="subject">Subject</label>
+          <input id="subject" value={subject} onInput={(e) => (setSubject((e.target as HTMLInputElement).value), onEdit())} />
+        </div>
         <textarea placeholder="Write something." value={body} onInput={(e) => (setBody((e.target as HTMLTextAreaElement).value), onEdit())} />
-        <label style={{ fontSize: 12, color: "var(--muted)" }}>
-          Self-destruct:{" "}
-          <select
-            onChange={(e) => {
-              const val = (e.target as HTMLSelectElement).value;
-              setSelfDestructMs(val === "" ? null : val === "fast" ? SELF_DESTRUCT_FAST.ms : Number(val));
-            }}
-          >
-            {SELF_DESTRUCT_OPTIONS.map((o) => (
-              <option value={o.ms ?? ""}>{o.label}</option>
-            ))}
-            {me.fastMode && <option value="fast">{SELF_DESTRUCT_FAST.label}</option>}
-          </select>
-        </label>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div class="compose-footer">
           <button class="btn" type="submit">
             Send
           </button>
           <button type="button" class="btn secondary" onClick={saveAndPublish}>
             Save draft
           </button>
+          <label
+            style={{
+              fontSize: 12.5,
+              color: "var(--muted)",
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            Self-destruct
+            <select
+              onChange={(e) => {
+                const val = (e.target as HTMLSelectElement).value;
+                setSelfDestructMs(val === "" ? null : val === "fast" ? SELF_DESTRUCT_FAST.ms : Number(val));
+              }}
+            >
+              {SELF_DESTRUCT_OPTIONS.map((o) => (
+                <option value={o.ms ?? ""}>{o.label}</option>
+              ))}
+              {me.fastMode && <option value="fast">{SELF_DESTRUCT_FAST.label}</option>}
+            </select>
+          </label>
         </div>
-        {status && <span class="watch-strip">{status}</span>}
+        {status && <div class="watch-strip">{status}</div>}
       </form>
     </div>
   );

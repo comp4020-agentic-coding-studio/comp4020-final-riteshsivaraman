@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { api, type DraftItem } from "../api.ts";
 import type { Me } from "../App.tsx";
+import { Avatar } from "../Avatar.tsx";
 
 export function Board({ me }: { me: Me; path?: string }) {
   const [drafts, setDrafts] = useState<DraftItem[]>([]);
@@ -37,23 +38,21 @@ export function Board({ me }: { me: Me; path?: string }) {
 
   return (
     <div class="reading-pane">
-      <h2>Public drafts</h2>
-      <p style={{ color: "var(--muted)" }}>
-        Everyone here left a draft unsent. You can see the subject and edit the body --- never the recipients, never what it's replying
-        to.
-      </p>
-      {drafts.length === 0 && <p style={{ color: "var(--muted)" }}>Nobody's slipping up right now.</p>}
-      {drafts.map((d) => (
-        <div class="draft-card">
-          <div class="meta" style={{ marginBottom: 6 }}>
-            {d.creatorAddress} · {d.subject || "(no subject)"}
-            {d.fastMode && (
-              <span class="pill fast" style={{ marginLeft: 6 }}>
-                fast
-              </span>
-            )}
-          </div>
-          {editing === d.id ? (
+      <div class="content-col">
+        <h1 style={{ fontSize: 19, margin: "0 0 4px" }}>Public drafts</h1>
+        <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 0, marginBottom: 20 }}>
+          Everyone here left a draft unsent. You can see the subject and edit the body --- never the recipients, never what it's replying
+          to.
+        </p>
+        {drafts.length === 0 && <p class="empty-state">Nobody's slipping up right now.</p>}
+        {drafts.map((d) => (
+          <div class="draft-card">
+            <div class="draft-meta">
+              <Avatar address={d.creatorAddress} size={22} />
+              <span class="draft-subject">{d.subject || "(no subject)"}</span>
+              {d.fastMode && <span class="pill fast">fast</span>}
+            </div>
+            {editing === d.id ? (
             <>
               <textarea value={body} onInput={(e) => setBody((e.target as HTMLTextAreaElement).value)} />
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -74,13 +73,14 @@ export function Board({ me }: { me: Me; path?: string }) {
               Edit
             </button>
           )}
-          <div class="watch-strip">
-            {d.contributors.length > 0 && <div>edited by: {d.contributors.join(", ")}</div>}
-            {d.autoSendAt && <div>auto-sends at {new Date(d.autoSendAt).toLocaleTimeString()} with whatever's there then</div>}
-            {d.lockedBy && <div>currently locked by {d.lockedBy}</div>}
+            <div class="watch-strip">
+              {d.contributors.length > 0 && <div>edited by: {d.contributors.join(", ")}</div>}
+              {d.autoSendAt && <div>auto-sends at {new Date(d.autoSendAt).toLocaleTimeString()} with whatever's there then</div>}
+              {d.lockedBy && <div>currently locked by {d.lockedBy}</div>}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

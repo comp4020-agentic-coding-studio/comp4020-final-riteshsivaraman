@@ -19,20 +19,37 @@ export function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
     <div class="auth-screen">
       <form class="auth-card" onSubmit={submit}>
         <span class="brand">Panopticorp Mail</span>
-        <p style={{ color: "var(--muted)", fontSize: 12 }}>Everything you do here can be seen by someone.</p>
-        <input placeholder="username" value={username} onInput={(e) => setUsername((e.target as HTMLInputElement).value)} />
-        <input
-          type="password"
-          placeholder="password"
-          value={password}
-          onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
-        />
+        <p class="tagline">Everything you do here can be seen by someone.</p>
+
+        {/* A segmented control, not just a button whose label changes ---
+            the mode has to be visually unmistakable, not inferred from text. */}
+        <div class="auth-tabs" role="tablist">
+          <button type="button" role="tab" aria-selected={mode === "login"} class={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>
+            Log in
+          </button>
+          <button type="button" role="tab" aria-selected={mode === "signup"} class={mode === "signup" ? "active" : ""} onClick={() => setMode("signup")}>
+            Sign up
+          </button>
+        </div>
+
+        <div class="auth-field">
+          <label for="username">Username</label>
+          <input id="username" value={username} onInput={(e) => setUsername((e.target as HTMLInputElement).value)} autocomplete="username" />
+        </div>
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
+            autocomplete={mode === "login" ? "current-password" : "new-password"}
+          />
+        </div>
+
         {error && <span class="error">{error}</span>}
         <button class="btn" type="submit">
-          {mode === "login" ? "Log in" : "Sign up"}
-        </button>
-        <button type="button" class="btn secondary" onClick={() => setMode(mode === "login" ? "signup" : "login")}>
-          {mode === "login" ? "Need an account? Sign up" : "Have an account? Log in"}
+          {mode === "login" ? "Log in" : "Create account"}
         </button>
       </form>
     </div>
