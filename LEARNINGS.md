@@ -56,3 +56,28 @@ pressure: check `flyctl logs --no-tail` first (the crash reason is always
 right there), not the proxy's generic 502. Worth considering for a future
 pass: should the FK check degrade (log + continue) rather than hard-crash
 the boot, given this app wakes from a cold stop on every request after idle.
+
+*(Entries above this line predate the redirect described in this file's
+header and are stack gotchas, not prompting lessons --- kept as history.)*
+
+## "Lay out options, don't pick yet" turned a guess into a real decision
+
+[`cf2242d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/cf2242d)
+
+Asked to build "live preview (reading an email someone is sending you)" for
+a real-time, multi-user feature, I had a plausible reading ready to run with
+(keystroke-level stream to the recipient) but it wasn't the only one
+(coarse presence-only was equally plausible from the words alone), and the
+transport choice underneath it (polling / SSE / WebSocket) was explicitly
+the kind of decision the week 8 lecture says gets its own ADR. Laying out
+both the semantics question and the transport options as separate
+AskUserQuestion calls --- without picking one in either case --- surfaced
+that Ritesh wanted the more invasive keystroke-level version *and* SSE over
+the WebSocket ADR 1 had already named, neither of which I'd have guessed
+right by defaulting to "pick the most plausible reading and proceed."
+Lesson: when a request names a feature but not its exact shape, and the
+shape is itself a multi-user decision, the fix isn't a better guess --- it's
+turning the guess into an explicit choice before any code exists. Written
+into CLAUDE.md itself (the commit above) so this is a standing move the next
+session takes too, not something that only happened because I was asked
+twice in one session.
