@@ -84,6 +84,8 @@ twice in one session.
 
 ## `pkill -f "tsx src/server/index.ts"` doesn't reliably kill the dev server, and a stale one fakes a passing mutation check
 
+[`ae9a0cd`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/ae9a0cd)
+
 Building the live-preview SSE feature, I edited `src/server/lib/drafts.ts` to
 add a deliberate mutation (dropping `bcc` from the live-preview broadcast
 audience, per the mutation-check skill), restarted with
@@ -106,3 +108,26 @@ start, and read the startup log for `EADDRINUSE` before trusting that a
 subsequent test run reflects the code on disk. A green (or red) result
 against a stale process is worse than no result, since it looks identical
 to a real one.
+
+## Interviewing for "what good means" surfaced a real framing gap I'd have papered over
+
+[`3284399`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/3284399)
+
+Asked to help define "good" for the README, I used the week 8 lecture's own
+framework (function / quality of execution / differentiation from the
+median) and asked one question at a time instead of drafting a definition
+and asking Ritesh to react to it. Two of the three came back fast and
+specific (quality of execution: buys the transparency pitch first, only
+gradually clocks the horror; differentiation: no villain, it's the culture's
+own stated values applied with total consistency) --- but the first one,
+"who is this actually for," got an answer about the company's culture, not
+a specific persona, and I didn't push past that before moving on. The
+scaffold I wrote (structure/fact-list/`[TK]`, not finished prose, per
+CLAUDE.md) correctly left that one `[TK]` rather than inventing a persona to
+fill the gap --- but if I'd been drafting instead of interviewing, "a young
+employee at a transparency-first startup" is exactly the kind of plausible-
+sounding filler I'd have written in without noticing it was never actually
+answered. Lesson: when interviewing for a definition that'll anchor later
+decisions (this one anchors a C9 grading criterion), an unanswered question
+needs to stay visibly unanswered (`[TK]`), not get smoothed over by my own
+next-most-plausible guess just because the conversation moved on.
