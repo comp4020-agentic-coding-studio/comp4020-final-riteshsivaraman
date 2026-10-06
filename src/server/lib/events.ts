@@ -7,6 +7,7 @@ import { events } from "../schema.ts";
 
 export type EventType =
   | "signup"
+  | "login"
   | "send"
   | "open"
   | "draft_save"

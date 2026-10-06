@@ -141,12 +141,24 @@ export function catchUpSelfDestruct(emailId: string): void {
 
   db.update(emails).set({ destroyedAt: Date.now() }).where(eq(emails.id, emailId)).run();
   const recipients = recipientsFor(emailId);
+  let notified = false;
   for (const r of recipients) {
     if (r.openedAt == null) {
       logEvent(email.senderId, "self_destruct", { emailId, recipientId: r.userId, opened: false });
       logEvent(r.userId, "self_destruct", { emailId, senderId: email.senderId, opened: false });
+      notified = true;
     }
   }
+  // Every recipient had already opened it before the deadline, so nobody
+  // gets (or needs) a notice --- but the tombstone write above is still a
+  // state change, and CLAUDE.md's event-log invariant doesn't carve out an
+  // exception for "nobody needs telling." userId: null keeps this out of
+  // every getNotices() feed (which always filters by a specific userId) so
+  // product behavior is unchanged; it exists purely so the destroy action
+  // itself always has a row. Not asserted in spec/ --- there's no HTTP-
+  // observable consequence to check (that's the point), so this is verified
+  // by direct inspection, same tier as the draft-auto-send-deadline check.
+  if (!notified) logEvent(null, "self_destruct", { emailId, opened: true });
 }
 
 /** Sweeps every email this user sent or received for a passed self-destruct

@@ -63,7 +63,9 @@ export function login(username: string, password: string): string {
   if (!user || !verifyPassword(password, user.passwordHash)) {
     throw new LoginError("wrong username or password");
   }
-  return createSession(user.id);
+  const sessionId = createSession(user.id);
+  logEvent(user.id, "login", { username: normalized });
+  return sessionId;
 }
 
 function createSession(userId: string): string {
