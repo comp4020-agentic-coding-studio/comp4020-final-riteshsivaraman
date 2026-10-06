@@ -1,74 +1,63 @@
-# `[TK: company name]`
+# Seen
 
-<!-- Images are committed to the repo and linked relatively ---
-     `![alt](docs/before.png)` --- so they render on GitHub; making them
-     resolve at `/readme/` too is this app's job. -->
+An internal email client for a company whose whole brand is radical
+transparency. I built it by taking that premise literally, with no
+exceptions. Nobody in it is a villain, and that is the point.
 
-`[TK: Ritesh --- one or two sentences saying what this is, in your own voice.
-Facts to draw from are below; this line is the pitch, not the argument.]`
+## What good means here
 
-## What this is
+**Function.** Seen is for a new hire on their first week at a company whose
+careers page says "no secrets." It is a normal email client with one change:
+nothing is private by default. Everyone sees the BCC, drafts sit on a public
+board anyone can edit, and a recipient sees a draft being typed to them before
+it is sent.
 
-Raw facts, settled 2026-10-07 (not yet argued into prose):
+**Quality of execution.** Good here is a slow reveal. At first a user should
+believe the pitch, because it reads as nice, on brand corporate values, and
+only gradually notice what the mechanics are doing. This is why the interface
+is deliberately boring and trustworthy, with one small unread asterisk that
+gives it away on a second look (`docs/design-handoff.md`). If it feels spooky
+on the first screen, it has failed.
 
-- An internal email client for a fictional company whose whole brand is
-  radical transparency --- "no secrets," open honesty, default-to-open ---
-  the kind of stated culture a Gen-Z-coded startup would actually put on a
-  careers page.
-- Built as an experiment: what does a communications tool look like if that
-  premise is taken completely literally, with zero carve-outs.
-- Every mechanic (BCC exposed to every recipient, the public draft board,
-  self-destruct that still logs an event even when nobody saw it, the live
-  preview a recipient gets of a draft being typed to them) is the
-  transparency pitch applied with total consistency --- not a separate
-  "horror" layer bolted onto an otherwise-normal email app.
-
-`[TK: Ritesh --- turn the above into the app's actual pitch/overview.]`
-
-## What "good" means for this app
-
-This is the C8/C9 definition the brief asks for. Facts below are settled;
-the argument connecting them is yours to write.
-
-**Function --- who it's for, what it does**
-
-- `[TK: Ritesh --- the specific scenario/persona this is "for." e.g. is the
-  intended frame literally "a new hire's first day on this company's email
-  system"? Pin this down before writing the paragraph.]`
-
-**Quality of execution --- what success feels like**
-
-- The win condition is the slow reveal, not immediate unease: someone using
-  it should believe the transparency pitch at first --- it should read as
-  genuinely nice, on-brand corporate values --- and only gradually clock the
-  horror as the mechanics reveal themselves.
-- This is why `docs/design-handoff.md` commits to "boringly trustworthy
-  first, reveals it's watching back on a second look" as the UI's whole
-  visual strategy. That wasn't just a style choice --- it's the mechanism
-  this definition of "good" requires.
-
-**Differentiation --- what a generic/median version would miss**
-
-- Not generic ominous surveillance-horror: no villain, nothing visibly
-  spooky, no Big-Brother framing.
-- The actual differentiator: there is no villain. It's transparency
-  culture's own stated values, applied with total, unflinching consistency.
-  The horror is that the product is just living up to its own marketing.
-
-`[TK: Ritesh --- the paragraph(s) that argue these three into "here's what
-good means for Seen." This is the part that has to be in your voice; see
-CLAUDE.md "Ritesh writes the prose."]`
+**Differentiation.** A generic version would be surveillance horror, with a
+villain and a Big Brother feel. Seen has no villain. It only lives up to what
+transparency culture already says about itself, and the unease comes from
+that consistency.
 
 ## Core mechanics
 
-`[TK: Ritesh --- pick what's actually worth describing here from what's
-built: compose/send/inbox/threads/reply/forward, the public draft board
-("humiliation" --- manual publish or 30s-silence auto-publish, single-editor
-lock, contributors frozen onto the sent mail), BCC exposed both ways,
-self-destruct (unopened/opened/tombstone), forward alerts, live preview
-(in progress), recipient autocomplete.]`
+- Compose, send, reply and forward, with BCC exposed both ways.
+- A public draft board. A draft publishes on request, or after 30 seconds of
+  silence, and has one editor at a time.
+- Self destruct, which still logs an event when nobody saw the email.
+- Forward alerts, and a live preview of a draft for its To, Cc and Bcc
+  recipients.
+
+## What is enforced and what is judged
+
+Enforced in `spec/`: every action writes an event row, drafts that should be
+hidden from strangers are hidden, and the live preview reaches Bcc recipients.
+Judged by me: whether it feels slow and uncomfortable. No automated check can
+tell me that, so I sit in two separate browsers as two users and judge it
+myself (`CLAUDE.md`).
+
+## What I read
+
+I used the week 8 lecture's three questions (function, quality of execution
+and differentiation from the median) to shape this definition, and the final
+project brief's notes on what good means at a small scale. For the decisions
+behind the app I followed Michael Nygard's
+[architecture decision records](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
+(`docs/adr/`). This is a first version, and I expect to add sources as I go.
+
+## What I chose not to build
+
+Attachments are cut for now, so the draft board, self destruct and forward
+alerts got the time. I also left out any villain, any spooky styling and any
+framing that says someone is to blame.
 
 ## Status
 
-`[TK: Ritesh --- what's live, what's still in progress, link to WORKLOG.md
-if useful.]`
+Live at [comp4020-final-riteshsivaraman.fly.dev](https://comp4020-final-riteshsivaraman.fly.dev/).
+Accounts, mail, the draft board, self destruct, forward alerts and the live
+preview are built. The second signature design device is not built yet.

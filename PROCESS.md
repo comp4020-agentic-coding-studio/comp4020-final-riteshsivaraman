@@ -1,20 +1,42 @@
 # Process overview
 
-<!-- TEMPLATE: replace everything in this file with your own account, this
-     comment included --- `pnpm check:evidence` fails while it's still here. -->
+## What I built
 
-How you got from the brief to the harness, agentic workflow and stack behind
-this app, told however suits the work. The
-[final project brief](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/assessments/final-project/#what-you-submit)
-says what it covers and how long it runs.
+Seen is an email client for a company whose whole brand is radical
+transparency. I applied that premise with no exceptions, which is why BCC is
+visible to every recipient, drafts sit on a public board anyone can edit, and a
+recipient watches a draft being typed to them before it is sent. It runs on
+Hono, a Preact SPA, better-sqlite3 and Drizzle
+([`dc9a8ab`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/dc9a8ab)).
+I did not reuse my crit 7 Astro stack, because crit 9 needs raw WebSocket
+access and Astro would have needed a Node layer bolted on. The cost is a
+slower boot, since the server runs through `tsx` with no compile step.
 
-Markers follow the links you give them; they don't trawl the repo for evidence
-you didn't point at. A link to the record is one whose text is the commit hash,
-and it can sit anywhere in a sentence:
-[`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d) for one
-commit, or
-[`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
-for a range.
+## The moments that mattered
 
-`pnpm check:evidence` checks that this comment is gone and that every commit you
-link exists in this repo. Whether the account is any good is the marker's call.
+### 1. Options before picking
+
+I asked for a live preview of a draft, and the agent had a plausible reading
+ready. Instead it laid out what the feature meant and which transport to use
+as separate questions, and I chose keystroke level over SSE, not the WebSocket
+plan from my first ADR
+([`cf2242d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/cf2242d)).
+This became a rule in CLAUDE.md, written before any app code
+([`168ca9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/168ca9b)).
+
+### 2. A design spec the app ignored
+
+I had a design doc with real colours, fonts and radii, but the app still used
+its own blue accent and a different typeface. Nothing failed, because nothing
+checked it. I compared the computed styles against the doc's hex values and
+renamed every token to match
+([`dbb8e65`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/dbb8e65)).
+A rule I had written down was not the same as an app that followed it.
+
+### 3. A reviewer for the invariant
+
+I could not read every line the agents wrote, so I built an event log reviewer.
+It found two actions that did not write their event
+([`9127d9d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9127d9d)).
+I also cut attachments to protect the draft board, and kept every check
+(`CUTS.md`).
