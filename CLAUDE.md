@@ -131,6 +131,9 @@ find every resource by reading this file, not by discovering it mid-task.
   in `docs/adr/` before changing stack, storage, or the data model — an
   accepted record is never edited; a changed decision gets a new, numbered
   record that supersedes it and says why.
+- `docs/adr/0002-live-preview-transport.md` — ADR 2: SSE for the one-way
+  live-preview broadcast, a deliberate split from (not a reversal of) ADR
+  1's WS+Yjs plan, which stays reserved for the board's multi-editor merge.
 - `docs/design-handoff.md` — the visual design spec the real app is built
   against: color/type tokens, layout, the two permitted signature "dread"
   devices, copy voice, component inventory. Came from a standalone frontend
