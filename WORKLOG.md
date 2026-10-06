@@ -38,9 +38,16 @@ plus a live two-tab browser pass):
   every resolved to/cc/bcc recipient on both the owner-edit and
   stranger-public-draft-edit branches; address resolution is shared with
   `sendEmail` via `resolveAddresses()` (extracted in `src/server/lib/mail.ts`).
-  No client UI yet --- that's a separate subsystem. Mutation-checked: dropping
-  bcc from the broadcast audience is caught by
+  Mutation-checked: dropping bcc from the broadcast audience is caught by
   `spec/seen.test.ts`'s "live draft preview (ADR 2)" describe block.
+- Live draft preview frontend: `Inbox.tsx` opens an `EventSource` to
+  `/api/stream` on mount, keyed by `draftId`, and renders a quiet card above
+  the inbox list (styled in `styles.css`, deliberately not styled like the
+  red `.watch-strip` motif --- this is a feature surface, not a third
+  signature device). Verified live: curl-driven sender (separate cookie jar
+  from the browser) saving a draft addressed to a browser-logged-in
+  recipient via `to` and via `bcc` both showed up and updated in place.
+  `Compose.tsx` and the server are untouched.
 - Placeholder deployed first (proved the Fly path), then this build's
   Dockerfile/fly.toml rewritten for the real stack and verified locally.
 
