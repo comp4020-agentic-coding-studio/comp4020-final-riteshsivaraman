@@ -31,6 +31,19 @@ import {
   bayCentre,
   type Box,
 } from "../../shared/world.ts";
+import {
+  BACK_WALL,
+  BAY_SHELVES,
+  BAY_SIGN_Y,
+  DOOR_H as PLAN_DOOR_H,
+  GLASS,
+  LIGHTBOXES,
+  LIGHTBOX_BOTTOM,
+  LIGHTBOX_H,
+  MONITORS_Z,
+  STOOLS,
+  WALL_BANDS,
+} from "../../shared/plan.ts";
 import { net } from "./net.ts";
 
 // The store's scenery: plain geometry and flat colour on purpose (see
@@ -46,7 +59,7 @@ const BOX_COLOURS = ["#f2f2f0", "#dfe6ee", "#e9e2d6", "#cfd8d2", "#f3d9c8", "#d6
 const HALF_W = FLOOR.maxX + 0.6;
 const DOOR_W = DOOR.maxX - DOOR.minX;
 const DOOR_X = (DOOR.minX + DOOR.maxX) / 2;
-const DOOR_H = 2.6;
+const DOOR_H = PLAN_DOOR_H;
 
 function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): CanvasTexture {
   const canvas = document.createElement("canvas");
@@ -418,9 +431,9 @@ function Device({
 // Which products stand on each column of tables: phones, watches and earbuds,
 // laptops, tablets, then audio and trackers.
 const COLUMN_KINDS: Record<number, Kind[]> = {
-  [COLUMN_X[0]]: ["phone", "phone", "watch", "earbuds"],
-  [COLUMN_X[1]]: ["laptop", "laptop", "tablet", "tabletKb"],
-  [COLUMN_X[2]]: ["headphones", "speaker", "airtag", "earbuds"],
+  [COLUMN_X[0]]: ["phone", "phone", "phone", "watch", "watch", "earbuds"],
+  [COLUMN_X[1]]: ["laptop", "laptop", "laptop", "tablet", "tabletKb", "tablet"],
+  [COLUMN_X[2]]: ["headphones", "speaker", "headphones", "airtag", "speaker", "earbuds"],
 };
 
 function Table({ box, kinds }: { box: Box; kinds: Kind[] }) {
@@ -428,13 +441,14 @@ function Table({ box, kinds }: { box: Box; kinds: Kind[] }) {
   // each has room for a person standing at it
   const alongX = box.w >= box.d;
   const len = alongX ? box.w : box.d;
-  const n = 2;
+  const short = alongX ? box.d : box.w;
+  const n = len >= 2.6 ? 3 : 2;
   const step = (len - 0.6) / (n - 1);
   const items: Array<{ x: number; z: number; rotY: number; i: number; kind: Kind }> = [];
   for (let side = 0; side < 2; side++) {
     for (let k = 0; k < n; k++) {
       const along = -(len - 0.6) / 2 + k * step;
-      const off = side === 0 ? -0.22 : 0.22;
+      const off = (side === 0 ? -1 : 1) * (short / 2 - 0.3);
       const i = side * n + k;
       items.push({
         x: alongX ? box.x + along : box.x + off,
@@ -501,8 +515,8 @@ const BAY_LABELS: Record<number, string[]> = {
   [-1]: ["AUDIO", "CHARGING", "CASES", "TRACKERS"],
   [1]: ["WATCH BANDS", "KEYBOARDS", "SMART HOME", "CREATIVE"],
 };
-const BAND_LOW = 0.95; // top of the dark lower band: the bench height
-const BAND_MID = 1.9; // top of the mid band: bottom of the lightboxes
+const BAND_LOW = WALL_BANDS.low; // top of the dark lower band: the bench height
+const BAND_MID = WALL_BANDS.mid; // top of the mid band: bottom of the lightboxes
 
 function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } {
   const frames: Cuboid[] = [];
@@ -526,10 +540,10 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
     for (let i = 0; i < BAY_COUNT; i++) {
       const zc = bayCentre(i);
       // dark back panel, flush with the wall, floor to near the ceiling
-      frames.push({ x: side * (FACE_X - 0.02), y: 1.7, z: zc, w: 0.04, h: 3.4, d: BAY_W, colour: "#3b3f45" });
+      frames.push({ x: side * (FACE_X - 0.02), y: BAY_SHELVES.panelH / 2, z: zc, w: 0.04, h: BAY_SHELVES.panelH, d: BAY_W, colour: "#3b3f45" });
       const style = i % 3;
-      for (let k = 0; k < 9; k++) {
-        const y = 0.45 + k * 0.33;
+      for (let k = 0; k < BAY_SHELVES.count; k++) {
+        const y = BAY_SHELVES.first + k * BAY_SHELVES.step;
         frames.push({ x: side * (FACE_X - 0.14), y, z: zc, w: 0.24, h: 0.025, d: BAY_W - 0.04, colour: "#8b9096" });
         if (style === 0) {
           // slim white boxes lined up along each shelf
@@ -639,8 +653,8 @@ function LightBox({
   kind: "phones" | "laptops" | "card";
 }) {
   const map = useMemo(() => lightboxTexture(kind), [kind]);
-  const h = 1.4;
-  const y = BAND_MID + h / 2 + 0.05;
+  const h = LIGHTBOX_H;
+  const y = LIGHTBOX_BOTTOM + h / 2;
   return (
     <group position={[side * (FACE_X - 0.03), y, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
       <mesh>
@@ -721,16 +735,23 @@ function WallSections() {
       <BoxField boxes={flats} roughness={0.35} />
       {([-1, 1] as const).map((side) => (
         <group key={side}>
-          <LightBox side={side} z={-5.0} w={3.2} kind={side === -1 ? "phones" : "laptops"} />
-          <LightBox side={side} z={-1.9} w={2.0} kind={side === -1 ? "laptops" : "phones"} />
-          <LightBox side={side} z={0.2} w={0.9} kind="card" />
-          <Monitor x={side * 7.55} z={-2.4} side={side} />
-          <Monitor x={side * 7.55} z={-1.4} side={side} />
+          {LIGHTBOXES.map((lb, i) => (
+            <LightBox
+              key={lb.z}
+              side={side}
+              z={lb.z}
+              w={lb.w}
+              kind={i === 2 ? "card" : (i + (side === -1 ? 0 : 1)) % 2 === 0 ? "phones" : "laptops"}
+            />
+          ))}
+          {MONITORS_Z.map((mz) => (
+            <Monitor key={mz} x={side * 7.55} z={mz} side={side} />
+          ))}
           {BAY_LABELS[side].map((label, i) => (
             <Sign
               key={label}
               text={label}
-              position={[side * (FACE_X - 0.04), 3.55, bayCentre(i)]}
+              position={[side * (FACE_X - 0.04), BAY_SIGN_Y, bayCentre(i)]}
               rotY={side === -1 ? Math.PI / 2 : -Math.PI / 2}
               w={1.1}
             />
@@ -860,9 +881,10 @@ function BackRoom() {
 
 function Stools() {
   const stools = [];
-  for (let k = 0; k < 5; k++) {
+  for (const sx of STOOLS.x) {
+    const k = sx;
     stools.push(
-      <group key={k} position={[-3 + k * 1.5, 0, COUNTER.z - 0.95]}>
+      <group key={k} position={[sx, 0, COUNTER.z - 0.95]}>
         <mesh position={[0, 0.34, 0]}>
           <cylinderGeometry args={[0.03, 0.03, 0.68, 8]} />
           <meshStandardMaterial color="#8d9399" metalness={0.5} roughness={0.4} />
@@ -1019,7 +1041,7 @@ export function Room() {
         <boxGeometry args={[w, CEILING, 0.05]} />
         <meshPhysicalMaterial color="#cfe6f0" transparent opacity={0.16} roughness={0.05} />
       </mesh>
-      {[-6, -3, 0, 3, 6].map((x) => (
+      {GLASS.mullionX.map((x) => (
         <mesh key={x} position={[x, CEILING / 2, FLOOR.minZ - 0.5]}>
           <boxGeometry args={[0.06, CEILING, 0.08]} />
           <meshStandardMaterial color="#9aa1a8" metalness={0.5} roughness={0.4} />
@@ -1031,24 +1053,25 @@ export function Room() {
       </mesh>
 
       {/* the bar's back wall: three screens and a service mark between them */}
-      {[-3, 0, 3].map((x, i) => (
+      {BACK_WALL.screenX.map((x, i) => (
         <Poster
           key={x}
-          position={[x, 2.6, WALL_FACE_Z - 0.03]}
+          position={[x, BACK_WALL.screenY, WALL_FACE_Z - 0.03]}
           rotY={Math.PI}
           pair={POSTER_PAIRS[i]}
           dark
-          w={1.9}
-          h={1.1}
+          w={BACK_WALL.screenW}
+          h={BACK_WALL.screenH}
         />
       ))}
-      <ServiceMark position={[-1.5, 2.6, WALL_FACE_Z - 0.03]} />
-      <ServiceMark position={[1.5, 2.6, WALL_FACE_Z - 0.03]} />
+      {BACK_WALL.markX.map((x) => (
+        <ServiceMark key={x} position={[x, BACK_WALL.screenY, WALL_FACE_Z - 0.03]} />
+      ))}
       <Sign
         text="SERVICE BAR"
-        position={[0, 3.5, WALL_FACE_Z - 0.03]}
+        position={[0, BACK_WALL.signY, WALL_FACE_Z - 0.03]}
         rotY={Math.PI}
-        w={2.0}
+        w={BACK_WALL.signW}
         fg="#ffffff"
         bg="#1f2430"
       />

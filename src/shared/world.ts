@@ -26,19 +26,19 @@ export interface Rect {
 }
 
 // Three columns of tables at -1/4, 0 and +1/4 of the room width, as in the
-// reference photo: five short rows down each side column, three down the
-// middle. Tables are about a tenth of the room's width across and run across
-// the room; products stand on both long sides, 1.7 m apart.
+// reference photo. Tables run front to back (Ritesh: vertical on the plan),
+// about a tenth of the room's width across; products stand along both long
+// sides. Three tables down each side column, two down the middle.
 export const COLUMN_X = [-4, 0, 4] as const;
-export const SIDE_ROW_Z = [-4.9, -2.7, -0.5, 1.7, 3.9] as const;
-export const CENTRE_ROW_Z = [-4.2, -0.6, 3.0] as const;
-export const TABLE_W = 1.7;
-export const TABLE_D = 1.0;
+export const SIDE_ROW_Z = [-4.0, -0.35, 3.3] as const;
+export const CENTRE_ROW_Z = [-3.2, 1.2] as const;
+export const TABLE_W = 1.7; // across the room (x)
+export const TABLE_LEN = 2.8; // front to back (z)
 export const TABLES: Box[] = [
   ...[COLUMN_X[0], COLUMN_X[2]].flatMap((x) =>
-    SIDE_ROW_Z.map((z) => ({ x, z, w: TABLE_W, d: TABLE_D, h: 0.9 })),
+    SIDE_ROW_Z.map((z) => ({ x, z, w: TABLE_W, d: TABLE_LEN, h: 0.9 })),
   ),
-  ...CENTRE_ROW_Z.map((z) => ({ x: COLUMN_X[1], z, w: TABLE_W, d: TABLE_D, h: 0.9 })),
+  ...CENTRE_ROW_Z.map((z) => ({ x: COLUMN_X[1], z, w: TABLE_W, d: TABLE_LEN, h: 0.9 })),
 ];
 
 // Long benches along both side walls, carrying devices.
@@ -74,7 +74,9 @@ export const SERVICE_DESKS: Box[] = [
 ];
 
 // The flush staff door in the back wall, left of the bar.
-export const DOOR = { minX: -5.8, maxX: -4.5 } as const;
+// On the visitor's LEFT of the bar as they face it, which is the +x side
+// (facing +z, the visitor's right hand is -x).
+export const DOOR = { minX: 4.5, maxX: 5.8 } as const;
 
 // Product walls on both side walls: four recessed bays between full-height
 // piers, toward the back of the shop. The bays are indented into the wall.

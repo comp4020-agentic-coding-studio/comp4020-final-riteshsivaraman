@@ -7,7 +7,7 @@ import {
   DOOR,
   SOLIDS,
   TABLES,
-  TABLE_W,
+  TABLE_LEN,
   clampToWalkable,
   resolveCollisions,
   solidsFor,
@@ -40,8 +40,8 @@ it("pushes a visitor out of a table instead of letting them stand in it", () => 
 });
 
 it("leaves room for a person at each product: 1 m or more between neighbours", () => {
-  // two products along each long side of a table: spacing = (length - 0.6) / (n - 1)
-  expect(TABLE_W - 0.6).toBeGreaterThanOrEqual(1.0);
+  // three products along each long side of a table: spacing = (length - 0.6) / (n - 1)
+  expect((TABLE_LEN - 0.6) / 2).toBeGreaterThanOrEqual(1.0);
 });
 
 it("keeps customers out of the back room and behind the bar", () => {

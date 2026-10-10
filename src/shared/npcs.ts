@@ -93,8 +93,8 @@ export const NPCS: NpcDef[] = [
     "stock-runner",
     "stock",
     [
-      { minX: -5.6, maxX: -4.7, minZ: 5.7, maxZ: 7.2 },
-      { minX: -5.6, maxX: -4.7, minZ: 8.8, maxZ: 10.3 },
+      { minX: 4.7, maxX: 5.6, minZ: 5.7, maxZ: 7.2 },
+      { minX: 4.7, maxX: 5.6, minZ: 8.8, maxZ: 10.3 },
     ],
     11000,
     2000,

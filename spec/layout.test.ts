@@ -5,6 +5,7 @@ import {
   COLUMN_X,
   COUNTER,
   TABLES,
+  TABLE_LEN,
   TABLE_W,
 } from "../src/shared/world.ts";
 
@@ -18,7 +19,8 @@ import {
 //   - five evenly spaced lines: wall bench, table column, centre column,
 //     table column, wall bench, so columns sit at about +-1/4 of the width
 //   - a table is about 0.1 of the room width across
-//   - five short rows down each side column, about three down the centre
+//   - tables run front to back (Ritesh: vertical on the plan): three down
+//     each side column and two down the middle
 //   - the service counter looked about three quarters of the back wall in the
 //     photo, but Ritesh asked for it shorter (2026-10-11): about half
 const ROOM_W = FLOOR.maxX - FLOOR.minX;
@@ -42,11 +44,16 @@ it("makes a table about a tenth of the room width", () => {
   expect(TABLE_W / ROOM_W).toBeLessThan(0.13);
 });
 
-it("puts about five tables in each side column and about three down the middle", () => {
+it("runs tables front to back: longer in z than in x", () => {
+  expect(TABLE_LEN).toBeGreaterThan(TABLE_W);
+  for (const t of TABLES) expect(t.d).toBeGreaterThan(t.w);
+});
+
+it("puts three tables in each side column and two down the middle", () => {
   const count = (x: number) => TABLES.filter((t) => t.x === x).length;
-  expect(count(COLUMN_X[0])).toBe(5);
-  expect(count(COLUMN_X[2])).toBe(5);
-  expect(count(COLUMN_X[1])).toBe(3);
+  expect(count(COLUMN_X[0])).toBe(3);
+  expect(count(COLUMN_X[2])).toBe(3);
+  expect(count(COLUMN_X[1])).toBe(2);
 });
 
 it("makes the service bar about half the wall width (shorter than the photo, by request)", () => {
