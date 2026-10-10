@@ -5,6 +5,7 @@ import type { Group } from "three";
 import { CEILING, FLOOR, STORE_Y } from "../../shared/protocol.ts";
 import { MALL, ROUTES, routePose } from "../../shared/mall.ts";
 import { Person, type PersonState } from "./Person.tsx";
+import { settledPeople } from "../../shared/people.ts";
 import { net } from "./net.ts";
 
 // The mall around the store, which is on the first floor: a walkway outside
@@ -394,13 +395,20 @@ export function Mall() {
 export function MallPeople() {
   const root = useRef<Group>(null);
   const states = useRef<PersonState[]>(ROUTES.map(() => ({ speed: 0, mode: "idle" })));
+  const shown = useRef(new Map<string, { x: number; z: number }>());
 
   useFrame(() => {
     const now = net.serverNow();
+    const walkway = settledPeople(now).walkway;
     root.current?.children.forEach((child, i) => {
       const r = ROUTES[i];
       const p = routePose(r, now);
-      child.position.set(p.x, p.y, p.z);
+      const at = walkway.get(r.id) ?? p; // people on the store's floor collide
+      const k = shown.current.get(r.id);
+      const nx = k ? k.x + (at.x - k.x) * 0.25 : at.x;
+      const nz = k ? k.z + (at.z - k.z) * 0.25 : at.z;
+      shown.current.set(r.id, { x: nx, z: nz });
+      child.position.set(nx, p.y, nz);
       child.rotation.y = p.ry;
       states.current[i] = { speed: p.walking ? r.speed : 0, mode: p.walking ? "idle" : "observe" };
     });

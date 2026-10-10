@@ -15,7 +15,11 @@ import { CEILING, FLOOR } from "../../shared/protocol.ts";
 import {
   BACK_ROOM_Z0,
   BACK_ROOM_Z1,
+  BACK_AREAS,
+  BACK_DOOR,
+  BACK_FURNITURE,
   BACK_SHELVES,
+  BACK_WALLS,
   BACK_SHELF_ROW_Z,
   BACK_SHELF_UNIT_X,
   BAY_COUNT,
@@ -654,9 +658,10 @@ function Device({
 function Table({ box }: { box: TableSpec }) {
   const kinds = box.products as readonly Kind[];
   const inset = 0.2; // a product stands this far in from its edge
-  // The long sides carry a row of the same product (a real table is long, with
-  // a product every half metre or so); the two ends carry one product each.
-  const perSide = Math.max(1, Math.floor((box.d - 0.5) / 0.55) + 1);
+  // Products stand only on the two long sides (Ritesh, 2026-10-11): a row of
+  // the same product along each, a person standing at that side has them in
+  // front of them. The ends are bare.
+  const perSide = Math.max(1, Math.floor((box.d - 0.5) / 0.42) + 1);
   const along = (i: number): number => (perSide === 1 ? 0 : (i / (perSide - 1) - 0.5) * (box.d - 0.7));
   const items = box.service
     ? []
@@ -673,8 +678,6 @@ function Table({ box }: { box: TableSpec }) {
           rotY: Math.PI / 2,
           kind: kinds[1],
         })),
-        { x: box.x, z: box.z - (box.d / 2 - inset), rotY: Math.PI, kind: kinds[2] },
-        { x: box.x, z: box.z + (box.d / 2 - inset), rotY: 0, kind: kinds[3] },
       ];
   return (
     <group>
@@ -815,7 +818,7 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
             stock.push({
               x: side * (FACE_X - 0.14),
               y: y + 0.0125 + 0.11,
-              z: zc - BAY_W / 2 + 0.1 + j * 0.15,
+              z: zc - BAY_W / 2 + 0.1 + (j * (BAY_W - 0.2)) / 8,
               w: 0.16,
               h: 0.22,
               d: 0.09,
@@ -827,7 +830,7 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
             stock.push({
               x: side * (FACE_X - 0.14),
               y: y + 0.0125 + 0.12,
-              z: zc - BAY_W / 2 + 0.17 + j * 0.27,
+              z: zc - BAY_W / 2 + 0.17 + (j * (BAY_W - 0.34)) / 4,
               w: 0.18,
               h: 0.24,
               d: 0.15,
@@ -1094,7 +1097,134 @@ function WallSections() {
 const BACK_LABELS = [
   ["PHONES  BLK", "PHONES  SLV", "TABLETS"],
   ["LAPTOPS", "WATCHES", "EARBUDS"],
+  ["CASES", "CHARGERS", "CABLES"],
+  ["BANDS", "KEYBOARDS", "SMART HOME"],
 ];
+
+// The areas behind the shop and what is in them: partition walls with
+// doorways, a sign over each area, a desk and computers, lockers, restrooms,
+// pallets and the roller door of the loading dock.
+function BackAreas() {
+  const slats = useMemo(() => {
+    const t = canvasTexture(64, 64, (g) => {
+      g.fillStyle = "#b8bec5";
+      g.fillRect(0, 0, 64, 64);
+      g.fillStyle = "#8e959d";
+      for (let y = 0; y < 64; y += 8) g.fillRect(0, y, 64, 2);
+    });
+    t.wrapS = t.wrapT = RepeatWrapping;
+    t.repeat.set(2, 3);
+    return t;
+  }, []);
+  const rz = BACK_ROOM_Z1;
+  return (
+    <group>
+      {BACK_WALLS.map((w, i) => (
+        <mesh key={i} position={[w.x, w.h / 2, w.z]}>
+          <boxGeometry args={[w.w, w.h, w.d]} />
+          <meshStandardMaterial color="#e2e6ea" roughness={0.8} />
+        </mesh>
+      ))}
+      {BACK_AREAS.filter((a) => a.id !== "storage").map((a) => (
+        <Sign
+          key={a.id}
+          text={a.name.split(":")[0].split("(")[0].trim()}
+          position={[(a.x0 + a.x1) / 2, 2.35, a.z0 + 0.09]}
+          rotY={Math.PI}
+          w={2.4}
+          fg="#ffffff"
+          bg="#2f3a4a"
+        />
+      ))}
+      {BACK_FURNITURE.map((f, i) => {
+        if (f.kind === "lockers") {
+          return (
+            <group key={i}>
+              <mesh position={[f.x, f.h / 2, f.z]}>
+                <boxGeometry args={[f.w, f.h, f.d]} />
+                <meshStandardMaterial color="#6f8fa8" roughness={0.5} metalness={0.3} />
+              </mesh>
+              {Array.from({ length: 7 }, (_, k) => (
+                <mesh key={k} position={[f.x + f.w / 2 + 0.005, f.h / 2, f.z - f.d / 2 + 0.2 + k * 0.4]}>
+                  <boxGeometry args={[0.01, f.h - 0.2, 0.02]} />
+                  <meshStandardMaterial color="#2c3f4f" />
+                </mesh>
+              ))}
+            </group>
+          );
+        }
+        if (f.kind === "restroom") {
+          return (
+            <group key={i}>
+              <mesh position={[f.x, f.h / 2, f.z]}>
+                <boxGeometry args={[f.w, f.h, f.d]} />
+                <meshStandardMaterial color="#dfe3e7" roughness={0.8} />
+              </mesh>
+              {[-0.6, 0.6].map((dx) => (
+                <mesh key={dx} position={[f.x + dx, 1.05, f.z - f.d / 2 - 0.01]}>
+                  <boxGeometry args={[0.8, 2.0, 0.03]} />
+                  <meshStandardMaterial color="#9aa5b1" roughness={0.6} />
+                </mesh>
+              ))}
+              <Sign text="RESTROOMS" position={[f.x, 2.25, f.z - f.d / 2 - 0.03]} rotY={Math.PI} w={1.6} fg="#ffffff" bg="#2f3a4a" />
+            </group>
+          );
+        }
+        if (f.kind === "pallet") {
+          return (
+            <group key={i}>
+              <mesh position={[f.x, 0.08, f.z]}>
+                <boxGeometry args={[f.w, 0.16, f.d]} />
+                <meshStandardMaterial color="#b58a54" roughness={0.9} />
+              </mesh>
+              <mesh position={[f.x, 0.16 + (f.h - 0.16) / 2, f.z]}>
+                <boxGeometry args={[f.w - 0.1, f.h - 0.16, f.d - 0.1]} />
+                <meshStandardMaterial color="#c9a46b" roughness={0.9} />
+              </mesh>
+            </group>
+          );
+        }
+        if (f.kind === "computers") {
+          return (
+            <group key={i}>
+              <mesh position={[f.x, f.h - 0.02, f.z]}>
+                <boxGeometry args={[f.w, 0.04, f.d]} />
+                <meshStandardMaterial color="#e6cfa8" roughness={0.5} />
+              </mesh>
+              {[-0.9, 0, 0.9].map((dz) => (
+                <Device key={dz} kind="tabletKb" x={f.x} y={f.h} z={f.z + dz} rotY={-Math.PI / 2} colour="#3a4a63" />
+              ))}
+            </group>
+          );
+        }
+        // a desk or a table: a top on four legs
+        return (
+          <group key={i}>
+            <mesh position={[f.x, f.h - 0.03, f.z]}>
+              <boxGeometry args={[f.w, 0.06, f.d]} />
+              <meshStandardMaterial color="#e6cfa8" roughness={0.5} />
+            </mesh>
+            {[-1, 1].flatMap((sx) =>
+              [-1, 1].map((sz) => (
+                <mesh key={`${sx}:${sz}`} position={[f.x + sx * (f.w / 2 - 0.05), (f.h - 0.06) / 2, f.z + sz * (f.d / 2 - 0.05)]}>
+                  <boxGeometry args={[0.05, f.h - 0.06, 0.05]} />
+                  <meshStandardMaterial color="#8d9399" metalness={0.5} />
+                </mesh>
+              )),
+            )}
+            {f.kind === "desk" && <Device kind="laptop" x={f.x} y={f.h} z={f.z - 0.1} rotY={0} colour="#2b2f36" />}
+          </group>
+        );
+      })}
+      {/* the back door onto the loading dock: a roller door and a sign */}
+      <mesh position={[(BACK_DOOR.minX + BACK_DOOR.maxX) / 2, 1.3, rz - 0.04]}>
+        <boxGeometry args={[BACK_DOOR.maxX - BACK_DOOR.minX, 2.6, 0.06]} />
+        <meshStandardMaterial map={slats} roughness={0.6} metalness={0.3} />
+      </mesh>
+      <Sign text="DELIVERIES" position={[0, 2.85, rz - 0.1]} rotY={Math.PI} w={2.2} fg="#111111" bg="#ffd23f" />
+    </group>
+  );
+}
 
 function BackRoom() {
   const { frames, stock } = useMemo(() => {
@@ -1122,22 +1252,8 @@ function BackRoom() {
         }
       });
     });
-    // a parts wall along the very back
-    for (const y of [0.9, 1.5, 2.1]) {
-      const half = HALF_W - 0.8;
-      frames.push({ x: 0, y, z: BACK_ROOM_Z1 - 0.35, w: half * 2, h: 0.035, d: 0.4, colour: "#c9ced3" });
-      for (let x = -half + 0.2; x <= half - 0.2; x += 0.4) {
-        stock.push({
-          x,
-          y: y + 0.12,
-          z: BACK_ROOM_Z1 - 0.35,
-          w: 0.3,
-          h: 0.2,
-          d: 0.3,
-          colour: BOX_COLOURS[Math.abs(Math.round(x * 5 + y * 3)) % BOX_COLOURS.length],
-        });
-      }
-    }
+    // the rolling shelves sit on floor rails, so they read as movable stock
+    for (const u of BACK_SHELVES) frames.push({ x: u.x, y: 0.04, z: u.z, w: u.w + 0.1, h: 0.08, d: u.d + 0.1, colour: "#4b5058" });
     return { frames, stock };
   }, []);
 
@@ -1173,6 +1289,9 @@ function BackRoom() {
           <Sign key={`${r}:${u}`} text={BACK_LABELS[r][u]} position={[x, 2.6, z - 0.33]} rotY={Math.PI} w={1.7} />
         )),
       )}
+
+      {/* walls between the areas (with doorways), area signs, furniture, the dock door */}
+      <BackAreas />
 
       {/* repair benches: a work surface, a mat, open devices and parts trays */}
       {SERVICE_DESKS.map((d, i) => (
