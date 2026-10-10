@@ -1,8 +1,8 @@
 # syntax = docker/dockerfile:1
 
-# Seen: Hono + Preact SPA. The image Fly builds and runs: install, build the
-# client bundle, keep only production deps and the server source (run via
-# tsx --- no server-side compile step, see package.json).
+# Hono server (+ ws) with a React Three Fiber client. The image Fly builds and
+# runs: install, build the client bundle, keep only production deps and the
+# server source (run via tsx --- no server-side compile step, see package.json).
 
 ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-slim AS base
@@ -40,13 +40,13 @@ RUN apt-get update -qq && \
 COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/static /app/static
 COPY --from=build /app/src/server /app/src/server
-COPY --from=build /app/drizzle /app/drizzle
+COPY --from=build /app/src/shared /app/src/shared
 COPY --from=build /app/README.md /app/README.md
 COPY --from=build /app/package.json /app/package.json
 COPY --from=build /app/tsconfig.json /app/tsconfig.json
 
 ENV HOST=0.0.0.0
 ENV PORT=8080
-ENV DATABASE_PATH=/data/app.db
+ENV DATABASE_PATH=/data/store.db
 EXPOSE 8080
 CMD ["npx", "tsx", "src/server/index.ts"]

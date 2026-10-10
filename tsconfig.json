@@ -1,6 +1,5 @@
 {
-  // Covers the supplied harness (spec/, scripts/); widen `include` if your app
-  // is TypeScript and you want `pnpm typecheck` to cover it too.
+  // Covers the supplied harness (spec/, scripts/) and the app (src/).
   "compilerOptions": {
     "target": "ES2023",
     "module": "ESNext",
@@ -15,8 +14,7 @@
     "skipLibCheck": true,
     "moduleDetection": "force",
     "verbatimModuleSyntax": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsx": "react-jsx"
   },
   "include": ["*.ts", "spec", "scripts", "src"]
 }
