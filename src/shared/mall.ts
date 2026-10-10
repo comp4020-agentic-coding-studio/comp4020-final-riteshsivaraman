@@ -50,8 +50,12 @@ const passer = (id: string, colour: string, speed: number, phase: number, points
   points,
 });
 
-// Four ways in and out. They all go through the 3 m opening in the glass
-// (x between -1.5 and 1.5) and then up an aisle between the tables.
+// Ways in and out. They go through the opening in the glass (|x| <= 1.5) and
+// then up an aisle between the tables. Positions follow the store's own edges.
+const OUT = FLOOR.minZ - 3.5; // on the concourse, in front of the store
+const DOOR_Z = FLOOR.minZ - 0.7; // just outside the glass
+const IN_Z = FLOOR.minZ + 0.9; // just inside
+
 const shopper = (id: string, colour: string, phase: number, laneX: number, stops: RoutePoint[]): Route => ({
   id,
   kind: "shopper",
@@ -60,70 +64,70 @@ const shopper = (id: string, colour: string, phase: number, laneX: number, stops
   phase,
   colour,
   points: [
-    { x: -30, z: -12 },
-    { x: laneX, z: -12 },
-    { x: laneX, z: -9.0 },
-    { x: laneX, z: -6.4 },
+    { x: -30, z: OUT },
+    { x: laneX, z: OUT },
+    { x: laneX, z: DOOR_Z },
+    { x: laneX, z: IN_Z },
     ...stops,
-    { x: laneX, z: -6.4 },
-    { x: laneX, z: -9.0 },
-    { x: laneX, z: -12 },
-    { x: 30, z: -12 },
-    { x: 30, z: -10.6 },
-    { x: -30, z: -10.6 },
+    { x: laneX, z: IN_Z },
+    { x: laneX, z: DOOR_Z },
+    { x: laneX, z: OUT },
+    { x: 30, z: OUT },
+    { x: 30, z: OUT - 1.4 },
+    { x: -30, z: OUT - 1.4 },
   ],
 });
 
 export const ROUTES: Route[] = [
   // people walking past the store, two ways along the concourse
   passer("walker-1", "#c9a227", 1.25, 0, [
-    { x: -30, z: -12.5 },
-    { x: 30, z: -12.5 },
-    { x: 30, z: -11.5 },
-    { x: -30, z: -11.5 },
+    { x: -30, z: -9.5 },
+    { x: 30, z: -9.5 },
+    { x: 30, z: -10.5 },
+    { x: -30, z: -10.5 },
   ]),
   passer("walker-2", "#8a5a9e", 1.1, 21000, [
-    { x: 30, z: -10.6 },
-    { x: -30, z: -10.6 },
-    { x: -30, z: -13.6 },
-    { x: 30, z: -13.6 },
+    { x: 30, z: -8.0 },
+    { x: -30, z: -8.0 },
+    { x: -30, z: -11.5 },
+    { x: 30, z: -11.5 },
   ]),
   passer("walker-3", "#4a8f7a", 1.4, 9000, [
-    { x: -30, z: -15.5 },
-    { x: 30, z: -15.5 },
-    { x: 30, z: -16.5 },
-    { x: -30, z: -16.5 },
-  ]),
-  // window shoppers: stop and look in at the glass
-  passer("window-1", "#d46a4e", 1.0, 33000, [
-    { x: -30, z: -9.9 },
-    { x: -6, z: -9.9, pause: 7000 },
-    { x: 6, z: -9.9, pause: 5000 },
-    { x: 30, z: -9.9 },
+    { x: -30, z: -13.5 },
+    { x: 30, z: -13.5 },
     { x: 30, z: -14.5 },
     { x: -30, z: -14.5 },
   ]),
+  // window shoppers: stop and look in at the glass
+  passer("window-1", "#d46a4e", 1.0, 33000, [
+    { x: -30, z: -7.6 },
+    { x: -3.5, z: -7.6, pause: 7000 },
+    { x: 3.5, z: -7.6, pause: 5000 },
+    { x: 30, z: -7.6 },
+    { x: 30, z: -12.5 },
+    { x: -30, z: -12.5 },
+  ]),
   passer("window-2", "#5b7fb5", 1.05, 52000, [
-    { x: 30, z: -9.7 },
-    { x: 11, z: -9.7, pause: 6000 },
-    { x: -30, z: -9.7 },
-    { x: -30, z: -14.0 },
-    { x: 30, z: -14.0 },
+    { x: 30, z: -7.4 },
+    { x: 7, z: -7.4, pause: 6000 },
+    { x: -30, z: -7.4 },
+    { x: -30, z: -12.0 },
+    { x: 30, z: -12.0 },
   ]),
   // customers: come in through the opening, look at a table or two, leave
-  shopper("shopper-1", "#e07a5f", 4000, 2.0, [
-    { x: 2.0, z: -3.0, pause: 9000 },
-    { x: 2.0, z: 1.0, pause: 6000 },
+  shopper("shopper-1", "#e07a5f", 4000, 1.25, [
+    { x: 1.25, z: -1.9, pause: 9000 },
+    { x: 1.25, z: 1.2, pause: 6000 },
   ]),
-  shopper("shopper-2", "#81b29a", 61000, -2.0, [
-    { x: -2.0, z: -2.2, pause: 8000 },
-    { x: -2.0, z: 2.4, pause: 7000 },
+  shopper("shopper-2", "#81b29a", 61000, -1.25, [
+    { x: -1.25, z: -1.4, pause: 8000 },
+    { x: -1.25, z: 1.7, pause: 7000 },
   ]),
-  shopper("shopper-3", "#f2cc8f", 98000, 2.0, [
-    { x: 6.0, z: -6.2 },
-    { x: 6.0, z: -1.0, pause: 10000 },
-    { x: 6.0, z: 3.0, pause: 6000 },
-    { x: 6.0, z: -6.2 },
+  shopper("shopper-3", "#f2cc8f", 98000, 1.25, [
+    { x: 3.8, z: -4.35 },
+    { x: 3.8, z: -1.2, pause: 10000 },
+    { x: 3.8, z: 2.0, pause: 6000 },
+    { x: 3.8, z: -4.35 },
   ]),
   // up on the mezzanine, across the way
   {

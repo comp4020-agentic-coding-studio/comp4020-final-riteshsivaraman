@@ -69,6 +69,7 @@ What this implies for scope (inference, to confirm):
 | D18 | The back room is staff-only, behind a flush door that blends into the wall, with labelled shelving and repair benches where technicians work. Enforced on the server by clamping positions per role | 2026-10-11 |
 | D19 | The store sits in a shopping mall so it does not feel isolated: a concourse along the glass front, neighbouring and opposite shops, a mezzanine walkway with people on it, people walking past, and customers who come in and out. Mall people are scenery driven by the shared clock (no real accounts); the mezzanine and neighbours are not enterable | 2026-10-11 |
 | D20 | The drawings (plan, four wall elevations, ceiling) are the specification: 3D, server and checks are built from the same data (`src/shared/plan.ts`, `world.ts`, `mall.ts`), and a check fails if the committed drawings are stale. Ritesh approves the drawings before the 3D is changed | 2026-10-11 |
+| D21 | The shop is about 10 x 10 x 3 m, from the rectified references (back wall 3.3 : 1, side walls 3.35 : 1, wall height 3 m as Ritesh gave it). This replaces the earlier 16 x 15 x 3.8 m, whose proportions the photographs did not support. The 3 m height is the one absolute scale; not yet deployed, held for approval of the blueprint PDF | 2026-10-11 |
 | D13 | Intent: shopping is pretend ("the joy of shopping, no real purchase"), including fun details such as the card swipe. Tier and flow not yet decided; this partly re-opens the Tier 3 cut of purchases | 2026-10-10 |
 
 Superseded: the earlier "no runtime AI calls" constraint in `references/help-me-scope.md`
@@ -270,7 +271,7 @@ parody data, never real ones (`[TK]`). Breadth of **scenarios** is the
 expensive axis (each needs a state machine, dialogue and a test), so the
 catalogue can be wide while the scenarios stay few.
 
-## 3f. Layout reference: `references/canberra-store.png` (Ritesh: a Canberra store)
+## 3f. Layout reference: `references/canberra-store.png` (Ritesh: a Canberra store). Rectified corners and ratios: `docs/blueprint/rectify.json`
 
 Reference only. Do not ship the photo or its logo. What I read from it:
 glass shopfront on a mall concourse; one wide, symmetric room on a central

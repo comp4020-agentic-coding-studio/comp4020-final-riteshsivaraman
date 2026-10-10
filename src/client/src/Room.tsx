@@ -37,6 +37,7 @@ import {
   BAY_SHELVES,
   BAY_SIGN_Y,
   CEILING_SPEC,
+  COLUMN_PRODUCTS,
   DOOR_H as PLAN_DOOR_H,
   GLASS,
   LIGHTBOX_BOTTOM,
@@ -61,6 +62,8 @@ const HALF_W = FLOOR.maxX + 0.6;
 const DOOR_W = DOOR.maxX - DOOR.minX;
 const DOOR_X = (DOOR.minX + DOOR.maxX) / 2;
 const DOOR_H = PLAN_DOOR_H;
+const BENCH_X = Math.abs(BENCHES[0].x); // the benches stand this far from the middle
+const BENCH_HALF = BENCHES[0].d / 2;
 
 function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): CanvasTexture {
   const canvas = document.createElement("canvas");
@@ -467,13 +470,11 @@ function Device({
 
 // Which products stand on each column of tables: phones, watches and earbuds,
 // laptops, tablets, then audio and trackers.
-const COLUMN_KINDS: Record<number, Kind[]> = {
-  [COLUMN_X[0]]: ["phone", "phone", "phone", "watch", "watch", "earbuds"],
-  [COLUMN_X[1]]: ["laptop", "laptop", "laptop", "tablet", "tabletKb", "tablet"],
-  [COLUMN_X[2]]: ["headphones", "speaker", "headphones", "airtag", "speaker", "earbuds"],
-};
+const COLUMN_KINDS: Record<number, readonly Kind[]> = Object.fromEntries(
+  Object.entries(COLUMN_PRODUCTS).map(([x, kinds]) => [Number(x), kinds]),
+);
 
-function Table({ box, kinds }: { box: Box; kinds: Kind[] }) {
+function Table({ box, kinds }: { box: Box; kinds: readonly Kind[] }) {
   // products along each long side, facing outward and far enough apart that
   // each has room for a person standing at it
   const alongX = box.w >= box.d;
@@ -625,9 +626,13 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
     }
     // devices laid flat in two rows along the bench, except where desktops
     // and headphones stand (the -x wall)
-    const benchX = side * 7.55;
-    for (let z = -6.0; z <= 6.0; z += 0.26) {
-      if (side === -1 && ((z > 1.2 && z < 4.8) || z < -4.5)) continue;
+    const benchX = side * BENCH_X;
+    // keep clear of the desktops and headphones that stand on the -x bench
+    const kept = SIDE_WALL[side === 1 ? "+x" : "-x"].filter((f) => f.kind === "desktops" || f.kind === "headphones");
+    const blocked = (z: number): boolean =>
+      kept.some((f) => (f.kind === "desktops" || f.kind === "headphones") && z > f.z0 - 0.3 && z < f.z0 + (f.count - 1) * f.pitch + 0.3);
+    for (let z = -BENCH_HALF + 0.3; z <= BENCH_HALF - 0.3; z += 0.22) {
+      if (blocked(z)) continue;
       for (const dx of [-0.17, 0.17]) {
         flats.push({
           x: benchX + dx,
@@ -825,18 +830,18 @@ function WallSections() {
               );
             }
             if (f.kind === "monitors") {
-              return f.zs.map((mz) => <Monitor key={`m${mz}`} x={side * 7.55} z={mz} side={side} />);
+              return f.zs.map((mz) => <Monitor key={`m${mz}`} x={side * BENCH_X} z={mz} side={side} />);
             }
             if (f.kind === "desktops") {
               return Array.from({ length: f.count }, (_, k) => (
-                <Desktop key={`d${k}`} x={side * 7.55} z={f.z0 + k * f.pitch} side={side} />
+                <Desktop key={`d${k}`} x={side * BENCH_X} z={f.z0 + k * f.pitch} side={side} />
               ));
             }
             return Array.from({ length: f.count }, (_, k) => (
               <Device
                 key={`h${k}`}
                 kind="headphones"
-                x={side * 7.55}
+                x={side * BENCH_X}
                 y={0.95}
                 z={f.z0 + k * f.pitch}
                 rotY={faceRot(side)}
@@ -862,8 +867,8 @@ function WallSections() {
 // Staff-only back room: rows of labelled shelving, two repair benches with
 // technicians, and a parts wall, behind the flush door left of the bar.
 const BACK_LABELS = [
-  ["PHONES  BLK", "PHONES  SLV", "PHONES  BLU", "PHONES  GLD", "TABLETS  S"],
-  ["TABLETS  L", "LAPTOPS  13", "LAPTOPS  15", "WATCHES", "EARBUDS"],
+  ["PHONES  BLK", "PHONES  SLV", "TABLETS"],
+  ["LAPTOPS", "WATCHES", "EARBUDS"],
 ];
 
 function BackRoom() {
@@ -878,7 +883,8 @@ function BackRoom() {
       }
       [0.25, 0.85, 1.45, 2.05].forEach((y, s) => {
         frames.push({ x: u.x, y, z: u.z, w: u.w, h: 0.04, d: u.d, colour: "#c9ced3" });
-        for (let k = 0; k < 9; k++) {
+        const perShelf = Math.floor((u.w - 0.4) / 0.31) + 1;
+        for (let k = 0; k < perShelf; k++) {
           stock.push({
             x: u.x - u.w / 2 + 0.25 + k * 0.31,
             y: y + 0.17,
@@ -893,8 +899,9 @@ function BackRoom() {
     });
     // a parts wall along the very back
     for (const y of [0.9, 1.5, 2.1]) {
-      frames.push({ x: 0, y, z: BACK_ROOM_Z1 - 0.35, w: 15, h: 0.035, d: 0.4, colour: "#c9ced3" });
-      for (let x = -7.3; x <= 7.3; x += 0.4) {
+      const half = HALF_W - 0.8;
+      frames.push({ x: 0, y, z: BACK_ROOM_Z1 - 0.35, w: half * 2, h: 0.035, d: 0.4, colour: "#c9ced3" });
+      for (let x = -half + 0.2; x <= half - 0.2; x += 0.4) {
         stock.push({
           x,
           y: y + 0.12,

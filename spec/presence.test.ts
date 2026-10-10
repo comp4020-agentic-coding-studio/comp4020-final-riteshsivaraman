@@ -113,7 +113,7 @@ it("keeps a customer out of the back room, and lets staff in", async () => {
   const b = await visitor();
 
   // a customer asking for a spot in the back room is held on the shop floor
-  b.send({ type: "move", x: -3, z: 15, ry: 0 });
+  b.send({ type: "move", x: -2, z: 10, ry: 0 });
   const held = await a.next((m) => m.type === "moved" && m.id === b.id);
   if (held.type !== "moved") throw new Error("wrong message");
   expect(held.z).toBeLessThanOrEqual(FLOOR.maxZ);
@@ -122,10 +122,10 @@ it("keeps a customer out of the back room, and lets staff in", async () => {
   b.send({ type: "role", role: "staff" });
   await a.next((m) => m.type === "role" && m.id === b.id && m.role === "staff");
   await new Promise((r) => setTimeout(r, 60)); // past the per-visitor rate limit
-  b.send({ type: "move", x: -3, z: 15, ry: 0 });
+  b.send({ type: "move", x: -2, z: 10, ry: 0 });
   const inside = await a.next((m) => m.type === "moved" && m.id === b.id && m.z > FLOOR.maxZ);
   if (inside.type !== "moved") throw new Error("wrong message");
-  expect(inside.z).toBeCloseTo(15, 3);
+  expect(inside.z).toBeCloseTo(10, 3);
 });
 
 it("pulls someone back out of staff areas when they stop being staff", async () => {
@@ -133,7 +133,7 @@ it("pulls someone back out of staff areas when they stop being staff", async () 
   const b = await visitor();
   b.send({ type: "role", role: "staff" });
   await new Promise((r) => setTimeout(r, 60));
-  b.send({ type: "move", x: 0, z: 15, ry: 0 });
+  b.send({ type: "move", x: 0, z: 10, ry: 0 });
   await a.next((m) => m.type === "moved" && m.id === b.id && m.z > FLOOR.maxZ);
   b.send({ type: "role", role: "customer" });
   const back = await a.next((m) => m.type === "moved" && m.id === b.id && m.z <= FLOOR.maxZ);

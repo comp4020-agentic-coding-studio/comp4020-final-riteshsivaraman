@@ -5,6 +5,7 @@ import {
   BACK_ROOM_Z1,
   BODY_RADIUS,
   DOOR,
+  COUNTER,
   SOLIDS,
   TABLES,
   TABLE_LEN,
@@ -40,22 +41,27 @@ it("pushes a visitor out of a table instead of letting them stand in it", () => 
 });
 
 it("leaves room for a person at each product: 1 m or more between neighbours", () => {
-  // three products along each long side of a table: spacing = (length - 0.6) / (n - 1)
-  expect((TABLE_LEN - 0.6) / 2).toBeGreaterThanOrEqual(1.0);
+  // products stand along each long side of a table: two on a short table,
+  // three on a long one; spacing = (length - 0.6) / (n - 1)
+  const n = TABLE_LEN >= 2.6 ? 3 : 2;
+  expect((TABLE_LEN - 0.6) / (n - 1)).toBeGreaterThanOrEqual(1.0);
 });
 
 it("keeps customers out of the back room and behind the bar", () => {
-  const inBackRoom = clampToWalkable("customer", -3, BACK_ROOM_Z0 + 5);
+  const inBackRoom = clampToWalkable("customer", -3, BACK_ROOM_Z0 + 4);
   expect(inBackRoom.z).toBeLessThanOrEqual(FLOOR.maxZ);
-  const behindBar = clampToWalkable("customer", 0, 6.8);
-  expect(behindBar.z).toBeLessThanOrEqual(5.35 + 1e-6);
+  const barFront = COUNTER.z - COUNTER.d / 2;
+  const behindBar = clampToWalkable("customer", 0, FLOOR.maxZ - 0.3);
+  expect(behindBar.z).toBeLessThanOrEqual(barFront + 1e-6);
 });
 
 it("lets staff go behind the bar and through the door into the back room", () => {
-  expect(clampToWalkable("staff", 0, 6.8)).toEqual({ x: 0, z: 6.8 });
+  const behind = FLOOR.maxZ - 0.3; // in the staff space behind the bar
+  expect(clampToWalkable("staff", 0, behind)).toEqual({ x: 0, z: behind });
   const doorX = (DOOR.minX + DOOR.maxX) / 2;
   expect(clampToWalkable("staff", doorX, 8)).toEqual({ x: doorX, z: 8 });
-  expect(clampToWalkable("staff", 0, 15)).toEqual({ x: 0, z: 15 });
+  const deep = BACK_ROOM_Z0 + 4;
+  expect(clampToWalkable("staff", 0, deep)).toEqual({ x: 0, z: deep });
 });
 
 it("keeps staff inside the building", () => {

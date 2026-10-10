@@ -29,11 +29,11 @@ export interface Rect {
 // reference photo. Tables run front to back (Ritesh: vertical on the plan),
 // about a tenth of the room's width across; products stand along both long
 // sides. Three tables down each side column, two down the middle.
-export const COLUMN_X = [-4, 0, 4] as const;
-export const SIDE_ROW_Z = [-4.0, -0.35, 3.3] as const;
-export const CENTRE_ROW_Z = [-3.2, 1.2] as const;
-export const TABLE_W = 1.7; // across the room (x)
-export const TABLE_LEN = 2.8; // front to back (z)
+export const COLUMN_X = [-2.5, 0, 2.5] as const;
+export const SIDE_ROW_Z = [-2.85, -0.35, 2.15] as const;
+export const CENTRE_ROW_Z = [-2.1, 1.4] as const;
+export const TABLE_W = 1.05; // across the room (x)
+export const TABLE_LEN = 1.9; // front to back (z)
 export const TABLES: Box[] = [
   ...[COLUMN_X[0], COLUMN_X[2]].flatMap((x) =>
     SIDE_ROW_Z.map((z) => ({ x, z, w: TABLE_W, d: TABLE_LEN, h: 0.9 })),
@@ -43,16 +43,16 @@ export const TABLES: Box[] = [
 
 // Long benches along both side walls, carrying devices.
 export const BENCHES: Box[] = [
-  { x: -7.55, z: 0, w: 0.9, d: 13, h: 0.95 },
-  { x: 7.55, z: 0, w: 0.9, d: 13, h: 0.95 },
+  { x: -4.72, z: 0, w: 0.56, d: 8.6, h: 0.95 },
+  { x: 4.72, z: 0, w: 0.56, d: 8.6, h: 0.95 },
 ];
 
 // The service bar along the back and the partitions that close off the staff
 // space behind it.
-export const COUNTER: Box = { x: 0, z: 5.8, w: 8, d: 0.9, h: 1.05 };
+export const COUNTER: Box = { x: 0, z: 4.0, w: 5, d: 0.8, h: 1.05 };
 export const PARTITIONS: Box[] = [
-  { x: -4, z: 6.875, w: 0.15, d: 1.25, h: 1.05 },
-  { x: 4, z: 6.875, w: 0.15, d: 1.25, h: 1.05 },
+  { x: -2.5, z: 4.7, w: 0.12, d: 0.6, h: 1.05 },
+  { x: 2.5, z: 4.7, w: 0.12, d: 0.6, h: 1.05 },
 ];
 
 // The back room: same footprint as the store, behind the back wall. Its first
@@ -61,29 +61,29 @@ export const WALL_FACE_Z = FLOOR.maxZ + 0.4;
 export const BACK_ROOM_Z0 = WALL_FACE_Z + 0.2;
 export const BACK_ROOM_Z1 = BACK_ROOM_Z0 + (FLOOR.maxZ - FLOOR.minZ);
 
-export const BACK_SHELF_ROW_Z = [BACK_ROOM_Z0 + 2.9, BACK_ROOM_Z0 + 7.1] as const;
-export const BACK_SHELF_UNIT_X = [-6.4, -3.2, 0, 3.2, 6.4] as const;
+export const BACK_SHELF_ROW_Z = [BACK_ROOM_Z0 + 2.0, BACK_ROOM_Z0 + 4.6] as const;
+export const BACK_SHELF_UNIT_X = [-3.1, 0, 3.1] as const;
 export const BACK_SHELVES: Box[] = BACK_SHELF_ROW_Z.flatMap((z) =>
-  BACK_SHELF_UNIT_X.map((x) => ({ x, z, w: 3.0, d: 0.62, h: 2.4 })),
+  BACK_SHELF_UNIT_X.map((x) => ({ x, z, w: 2.7, d: 0.62, h: 2.4 })),
 );
 
 // Two repair benches where technicians work, near the back of the back room.
 export const SERVICE_DESKS: Box[] = [
-  { x: -3.5, z: BACK_ROOM_Z0 + 11, w: 3.2, d: 0.9, h: 0.95 },
-  { x: 3.5, z: BACK_ROOM_Z0 + 11, w: 3.2, d: 0.9, h: 0.95 },
+  { x: -2.2, z: BACK_ROOM_Z0 + 7.2, w: 2.4, d: 0.8, h: 0.95 },
+  { x: 2.2, z: BACK_ROOM_Z0 + 7.2, w: 2.4, d: 0.8, h: 0.95 },
 ];
 
 // The flush staff door in the back wall, left of the bar.
 // On the visitor's LEFT of the bar as they face it, which is the +x side
 // (facing +z, the visitor's right hand is -x).
-export const DOOR = { minX: 4.5, maxX: 5.8 } as const;
+export const DOOR = { minX: 2.9, maxX: 3.9 } as const;
 
-// Product walls on both side walls: four recessed bays between full-height
-// piers, toward the back of the shop. The bays are indented into the wall.
+// Product walls on both side walls: three recessed bays between piers, toward
+// the back of the shop. The bays are indented into the wall.
 export const BAY_COUNT = 3;
-export const BAY_W = 1.4;
-export const PIER_W = 0.3;
-export const BAY_START_Z = 1.4;
+export const BAY_W = 0.9;
+export const PIER_W = 0.2;
+export const BAY_START_Z = 0.7;
 export function bayCentre(i: number): number {
   return BAY_START_Z + PIER_W + BAY_W / 2 + i * (BAY_W + PIER_W);
 }

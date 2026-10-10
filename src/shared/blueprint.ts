@@ -7,6 +7,7 @@
 // Everything is drawn as a visitor standing at the entrance, facing in, would
 // see it: the +x wall is on the visitor's LEFT, the -x wall on their right.
 import { MALL, ROUTES } from "./mall.ts";
+import { COLUMN_PRODUCTS } from "./plan.ts";
 import { CEILING, FLOOR, SPAWN } from "./protocol.ts";
 import {
   BACK_WALL,
@@ -103,17 +104,20 @@ function vDim(g: Svg, y1: number, y2: number, x: number, label: string): void {
 }
 
 // =====================================================================
-// Top-down plan. Entrance at the bottom; the +x wall on the LEFT.
+// Top-down plan of the shop and the staff-only back room. Entrance at the
+// bottom; the +x wall on the LEFT, as a visitor entering sees it.
 // =====================================================================
 export function renderPlan(): string {
-  const S = 48;
+  const S = 62;
+  const half = FLOOR.maxX + 2.2; // metres either side of the middle that are drawn
   const zTop = BACK_ROOM_Z1 + 0.9;
-  const zBottom = MALL.farZ - 1.6;
-  const W = Math.round(9.4 * 2 * S + 120);
+  const zBottom = FLOOR.minZ - 1.9;
+  const W = Math.round(half * 2 * S + 120);
   const H = Math.round((zTop - zBottom) * S + 150);
-  const cx = 60 + 9.4 * S;
+  const cx = 60 + half * S;
   const px = (x: number): number => cx - x * S; // mirrored: +x is on the left
   const py = (z: number): number => 50 + (zTop - z) * S;
+  const benchX = Math.abs(BENCHES[0].x);
   const g = new Svg();
   g.head(W, H);
   g.text(60, 28, "Floor plan, as a visitor sees it entering: +x wall on the LEFT, entrance at the bottom (metres)", 16, "start", "#111", "700");
@@ -124,36 +128,16 @@ export function renderPlan(): string {
     g.line(px(x1), py(z1), px(x2), py(z2), stroke, sw, extra);
 
   // back room
-  const half = FLOOR.maxX + 0.6;
-  R(0, (BACK_ROOM_Z0 + BACK_ROOM_Z1) / 2, half * 2, BACK_ROOM_Z1 - BACK_ROOM_Z0, "#f4f1e8", "#9a9484", 1.5, 'stroke-dasharray="6 4"');
-  g.text(px(0), py(BACK_ROOM_Z1) + 16, "BACK ROOM (staff only): same footprint as the shop", 12, "middle", "#6b6556", "600");
+  const brHalf = FLOOR.maxX + 0.6;
+  R(0, (BACK_ROOM_Z0 + BACK_ROOM_Z1) / 2, brHalf * 2, BACK_ROOM_Z1 - BACK_ROOM_Z0, "#f4f1e8", "#9a9484", 1.5, 'stroke-dasharray="6 4"');
+  g.text(px(0), py(BACK_ROOM_Z1) + 18, "BACK ROOM (staff only): same footprint as the shop", 12, "middle", "#6b6556", "600");
   for (const u of BACK_SHELVES) R(u.x, u.z, u.w, u.d, "#cfd3d8", "#6b7280");
   g.text(px(0), py(BACK_SHELVES[0].z) + 4, "labelled shelving rows", 10, "middle", "#555");
   for (const d of SERVICE_DESKS) R(d.x, d.z, d.w, d.d, "#b7c4d0", "#355a7a", 1.2);
-  g.text(px(0), py(SERVICE_DESKS[0].z) + 4, "REPAIR BENCHES (technicians stand behind)", 10, "middle", "#355a7a");
-  R(0, BACK_ROOM_Z1 - 0.35, 15, 0.4, "#cfd3d8", "#6b7280");
+  g.text(px(0), py(SERVICE_DESKS[0].z) + 4, "REPAIR BENCHES", 10, "middle", "#355a7a");
+  g.text(px(0), py(SERVICE_DESKS[0].z) + 18, "(technicians stand behind)", 9, "middle", "#355a7a");
+  R(0, BACK_ROOM_Z1 - 0.35, brHalf * 2 - 1.6, 0.4, "#cfd3d8", "#6b7280");
   g.text(px(0), py(BACK_ROOM_Z1 - 0.35) + 3, "parts wall", 9, "middle", "#555");
-
-  // the mall: concourse, the mezzanine across the way, and the routes people
-  // take (drawn clipped to this page; they carry on along the concourse)
-  const clipX = (x: number): number => Math.max(-9.2, Math.min(9.2, x));
-  R(0, (MALL.frontZ + MALL.farZ) / 2, 18.4, MALL.frontZ - MALL.farZ, "#eef0f2", "#b0b5ba", 1, 'stroke-dasharray="4 3"');
-  g.text(px(0), py(MALL.frontZ - 1.5), "MALL CONCOURSE (carries on both ways, 68 m)", 12, "middle", "#555", "600");
-  R(0, (MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2, 18.4, MALL.mezzanineZ1 - MALL.mezzanineZ0, "#e4e0d4", "#9a9484", 1.2, 'stroke-dasharray="6 3"');
-  g.text(px(0), py((MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2) + 4, `MEZZANINE walkway above (y = ${MALL.mezzanineY} m), glass balustrade on the concourse side`, 11, "middle", "#6b6556");
-  g.text(px(0), py(MALL.farZ) + 16, "opposite shopfronts (ground level and upstairs)", 11, "middle", "#555");
-  g.text(px(0), py(MALL.frontZ) + 14, "neighbouring shops either side of the store", 10, "middle", "#555");
-  for (const route of ROUTES) {
-    const col = route.kind === "shopper" ? "#d1495b" : route.kind === "upper" ? "#7a6a3a" : "#4a8f7a";
-    const pts = route.points;
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i];
-      const b = pts[(i + 1) % pts.length];
-      if ((a.x < -9.2 && b.x < -9.2) || (a.x > 9.2 && b.x > 9.2)) continue;
-      g.line(px(clipX(a.x)), py(a.z), px(clipX(b.x)), py(b.z), col, route.kind === "shopper" ? 1.8 : 1, 'stroke-dasharray="5 4"');
-    }
-  }
-  g.text(px(-5.5), py(-17), "walkers (green) pass along the concourse; shoppers (red) come in through the opening and out again; upstairs (olive)", 10, "start", "#444");
 
   // shop floor
   R(0, (FLOOR.minZ + FLOOR.maxZ) / 2, FLOOR.maxX - FLOOR.minX, FLOOR.maxZ - FLOOR.minZ, "#f6f7f8", "none", 0);
@@ -163,10 +147,10 @@ export function renderPlan(): string {
     for (const f of SIDE_WALL[side === 1 ? "+x" : "-x"]) {
       if (f.kind === "lightbox") R(x, f.z, 0.12, f.w, "#ffffff", "#8aa", 1.2);
       else if (f.kind === "display") R(x, f.z, 0.12, f.w, "#101216", "#000", 1.2);
-      else if (f.kind === "monitors") for (const z of f.zs) R(side * 7.55, z, 0.12, MONITOR.w, "#1a4fb8", "#0b2a6b");
+      else if (f.kind === "monitors") for (const z of f.zs) R(side * benchX, z, 0.1, MONITOR.w, "#1a4fb8", "#0b2a6b");
       else if (f.kind === "desktops")
-        for (let k = 0; k < f.count; k++) R(side * 7.55, f.z0 + k * f.pitch, 0.12, DESKTOP.w, "#6b45d6", "#3a2a8a");
-      else for (let k = 0; k < f.count; k++) g.circle(px(side * 7.55), py(f.z0 + k * f.pitch), 0.12 * S, "#e8a98c", "#8a5a46");
+        for (let k = 0; k < f.count; k++) R(side * benchX, f.z0 + k * f.pitch, 0.1, DESKTOP.w, "#6b45d6", "#3a2a8a");
+      else for (let k = 0; k < f.count; k++) g.circle(px(side * benchX), py(f.z0 + k * f.pitch), 0.1 * S, "#e8a98c", "#8a5a46");
     }
     for (let i = 0; i <= BAY_COUNT; i++) {
       const zp = bayCentre(0) - BAY_W / 2 - PIER_W / 2 + i * (BAY_W + PIER_W);
@@ -174,37 +158,39 @@ export function renderPlan(): string {
     }
     for (let i = 0; i < BAY_COUNT; i++) R(side * (FLOOR.maxX + 0.38), bayCentre(i), 0.04, BAY_W, "#3b3f45", "#222");
   }
-  g.text(px(8.55), py(-3.3), "lightboxes", 9, "middle", "#678");
-  g.text(px(8.55), py(7.5), "recessed bays", 9, "middle", "#555");
+  g.text(px(FLOOR.maxX + 0.75), py(-3.1), "lightboxes", 10, "end", "#678");
+  g.text(px(FLOOR.maxX + 0.75), py(bayCentre(1)), "product bays", 10, "end", "#555");
+  g.text(px(-FLOOR.maxX - 0.75), py(bayCentre(1)), "product bays", 10, "start", "#555");
 
   // tables run front to back
   TABLES.forEach((t, i) => {
     R(t.x, t.z, TABLE_W, TABLE_LEN, "#e6cfa8", "#8a6a2f", 1.2);
     g.text(px(t.x), py(t.z) + 4, `T${i + 1}`, 11, "middle", "#5a4210", "700");
   });
-  g.text(px(COLUMN_X[0]), py(-6.0), "phones / watches", 10, "middle", "#555");
-  g.text(px(COLUMN_X[1]), py(-5.6), "laptops / tablets", 10, "middle", "#555");
-  g.text(px(COLUMN_X[2]), py(-6.0), "audio / trackers", 10, "middle", "#555");
+  const labelZ = FLOOR.minZ + 0.62;
+  g.text(px(COLUMN_X[0]), py(labelZ), "phones / watches / earbuds", 10, "middle", "#555");
+  g.text(px(COLUMN_X[1]), py(labelZ), "laptops / tablets", 10, "middle", "#555");
+  g.text(px(COLUMN_X[2]), py(labelZ), "audio / trackers", 10, "middle", "#555");
 
   // bar, stools, staff partitions
   R(COUNTER.x, COUNTER.z, COUNTER.w, COUNTER.d, "#d9b98c", "#8a6a2f", 1.5);
-  g.text(px(0), py(COUNTER.z) + 4, "SERVICE BAR (checkout / repair desk)", 11, "middle", "#4a3510", "700");
-  for (const sx of STOOLS.x) g.circle(px(sx), py(COUNTER.z - 0.95), 0.2 * S, "#e6cfa8", "#8a6a2f");
+  g.text(px(0), py(COUNTER.z) + 4, "SERVICE BAR", 11, "middle", "#4a3510", "700");
+  for (const sx of STOOLS.x) g.circle(px(sx), py(COUNTER.z - 0.9), 0.18 * S, "#e6cfa8", "#8a6a2f");
   for (const p of PARTITIONS) R(p.x, p.z, p.w, p.d, "#8a6a2f", "#5a4210");
-  g.text(px(0), py(6.85) + 4, "staff space behind the bar", 10, "middle", "#555");
+  g.text(px(0), py(COUNTER.z + COUNTER.d / 2 + 0.3) + 4, "staff space behind the bar", 10, "middle", "#555");
 
-  // walls and glass
+  // walls and glass, with the entrance opening
   L(FLOOR.maxX + 0.5, FLOOR.minZ - 0.5, GLASS.entranceX[1], FLOOR.minZ - 0.5, "#5aa9d6", 4);
   L(GLASS.entranceX[0], FLOOR.minZ - 0.5, FLOOR.minX - 0.5, FLOOR.minZ - 0.5, "#5aa9d6", 4);
-  g.text(px(0), py(FLOOR.minZ - 0.5) - 6, "entrance opening (3 m, assumed)", 10, "middle", "#2a6a95");
+  g.text(px(0), py(FLOOR.minZ - 0.5) - 8, "entrance opening, 3 m (assumed)", 10, "middle", "#2a6a95");
+  g.text(px(0), py(FLOOR.minZ - 0.5) + 26, "to the mall concourse (see the mall drawing)", 10, "middle", "#2a6a95");
   for (const x of GLASS.mullionX) g.line(px(x), py(FLOOR.minZ - 0.7), px(x), py(FLOOR.minZ - 0.3), "#3a7ca5", 3);
-  g.text(px(0), py(FLOOR.minZ - 0.5) + 18, "GLASS FRONT", 11, "middle", "#2a6a95", "700");
   L(FLOOR.minX - 0.5, FLOOR.minZ - 0.5, FLOOR.minX - 0.5, WALL_FACE_Z + 0.2, "#111", 3);
   L(FLOOR.maxX + 0.5, FLOOR.minZ - 0.5, FLOOR.maxX + 0.5, WALL_FACE_Z + 0.2, "#111", 3);
   L(FLOOR.minX - 0.5, WALL_FACE_Z + 0.1, DOOR.minX, WALL_FACE_Z + 0.1, "#111", 3);
   L(DOOR.maxX, WALL_FACE_Z + 0.1, FLOOR.maxX + 0.5, WALL_FACE_Z + 0.1, "#111", 3);
   L(DOOR.minX, WALL_FACE_Z + 0.1, DOOR.maxX, WALL_FACE_Z + 0.1, "#c0392b", 4, 'stroke-dasharray="4 3"');
-  g.text(px((DOOR.minX + DOOR.maxX) / 2), py(WALL_FACE_Z + 0.1) - 8, "staff door, left of the bar as you face it", 10, "middle", "#c0392b", "700");
+  g.text(px((DOOR.minX + DOOR.maxX) / 2), py(WALL_FACE_Z + 0.1) - 8, "staff door (flush), left of the bar as you face it", 10, "start", "#c0392b", "700");
 
   // spawn
   g.circle(px(SPAWN.x), py(SPAWN.z), 6, "#2a9d8f");
@@ -212,30 +198,103 @@ export function renderPlan(): string {
 
   // dimensions
   const SW = FLOOR.maxX - FLOOR.minX;
-  hDim(g, px(FLOOR.maxX), px(FLOOR.minX), py(FLOOR.minZ - 1.25), `${SW} m wide`);
-  vDim(g, py(FLOOR.maxZ), py(FLOOR.minZ), px(FLOOR.maxX) - 0.95 * S, `${FLOOR.maxZ - FLOOR.minZ} m deep`);
-  vDim(g, py(BACK_ROOM_Z1), py(BACK_ROOM_Z0), px(FLOOR.maxX) - 0.95 * S, `${(BACK_ROOM_Z1 - BACK_ROOM_Z0).toFixed(0)} m deep`);
-  hDim(g, px(COLUMN_X[2] + TABLE_W / 2), px(COLUMN_X[2] - TABLE_W / 2), py(FLOOR.minZ + 0.35), `${TABLE_W} m`);
-  hDim(g, px(COLUMN_X[2] - TABLE_W / 2), px(COLUMN_X[1] + TABLE_W / 2), py(FLOOR.minZ + 0.35), `${(COLUMN_X[2] - COLUMN_X[1] - TABLE_W).toFixed(1)} m aisle`);
-  hDim(g, px(COUNTER.x + COUNTER.w / 2), px(COUNTER.x - COUNTER.w / 2), py(7.72), `bar ${COUNTER.w} m`);
+  hDim(g, px(FLOOR.maxX), px(FLOOR.minX), py(FLOOR.minZ - 1.4), `${SW} m wide`);
+  vDim(g, py(FLOOR.maxZ), py(FLOOR.minZ), px(FLOOR.maxX) - 1.0 * S, `${FLOOR.maxZ - FLOOR.minZ} m deep`);
+  vDim(g, py(BACK_ROOM_Z1), py(BACK_ROOM_Z0), px(FLOOR.maxX) - 1.0 * S, `${(BACK_ROOM_Z1 - BACK_ROOM_Z0).toFixed(0)} m deep`);
   const t0 = TABLES[0];
-  vDim(g, py(t0.z + TABLE_LEN / 2), py(t0.z - TABLE_LEN / 2), px(t0.x + TABLE_W / 2) - 0.4 * S, `${TABLE_LEN} m long`);
+  hDim(g, px(t0.x + TABLE_W / 2), px(t0.x - TABLE_W / 2), py(FLOOR.minZ + 0.3), `${TABLE_W} m`);
+  hDim(g, px(COLUMN_X[1] + TABLE_W / 2), px(COLUMN_X[0] + TABLE_W / 2), py(FLOOR.minZ + 0.3), `${(COLUMN_X[1] - COLUMN_X[0] - TABLE_W).toFixed(2)} m aisle`);
+  vDim(g, py(t0.z + TABLE_LEN / 2), py(t0.z - TABLE_LEN / 2), px(t0.x - TABLE_W / 2) + 0.4 * S, `${TABLE_LEN} m long`);
+  hDim(g, px(COUNTER.x + COUNTER.w / 2), px(COUNTER.x - COUNTER.w / 2), py(BACK_ROOM_Z0 + 0.45), `bar ${COUNTER.w} m`);
 
   const ly = H - 62;
-  g.text(60, ly, `Ceiling ${CEILING} m. Tables ${TABLE_W} wide x ${TABLE_LEN} long, six products each, 1.1 m apart. Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
-  g.text(60, ly + 16, "From the photos: three table columns, wall benches, glass front about 3.8x as wide as it is tall. Bar shortened to half the wall at your request.", 11, "start", "#333");
-  g.text(60, ly + 32, "Assumed, not measurable: shop depth (15 m), back-room size (your instruction: same as the shop), door position (your note: left of the bar), real table sizes.", 11, "start", "#a33");
+  g.text(60, ly, `Ceiling ${CEILING} m. Tables ${TABLE_W} wide x ${TABLE_LEN} long, four products each. Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
+  g.text(60, ly + 16, "Proportions from the rectified reference photographs (back wall 3.3 : 1, side walls 3.35 : 1); the 3 m wall height gives the metres.", 11, "start", "#333");
+  g.text(60, ly + 32, "Assumed, not measurable: table length, the entrance opening, the back-room layout (your instruction: same footprint), the door width.", 11, "start", "#a33");
+  return g.done();
+}
+
+// =====================================================================
+// The mall around the store, drawn at a much smaller scale: the concourse
+// along the glass front, neighbouring and opposite shops, the mezzanine, and
+// the routes people take.
+// =====================================================================
+export function renderMallPlan(): string {
+  const S = 22;
+  const half = 36;
+  const zTop = FLOOR.minZ + 1.7;
+  const zBottom = MALL.farZ - 2.2;
+  const W = Math.round(half * 2 * S + 120);
+  const H = Math.round((zTop - zBottom) * S + 190);
+  const cx = 60 + half * S;
+  const px = (x: number): number => cx - x * S; // +x on the left, as in the shop plan
+  const py = (z: number): number => 60 + (zTop - z) * S;
+  const g = new Svg();
+  g.head(W, H);
+  g.text(60, 28, "The mall around the store: concourse, shops, mezzanine and routes (metres; +x on the LEFT)", 16, "start", "#111", "700");
+  const R = (x: number, z: number, w: number, d: number, fill: string, stroke = "#888", sw = 1, extra = ""): void =>
+    g.rect(px(x + w / 2), py(z + d / 2), w * S, d * S, fill, stroke, sw, extra);
+  // concourse
+  R(0, (MALL.frontZ + MALL.farZ) / 2, MALL.maxX - MALL.minX, MALL.frontZ - MALL.farZ, "#eef0f2", "#b0b5ba", 1, 'stroke-dasharray="4 3"');
+  g.text(px(0), py(MALL.frontZ - 1.2), `CONCOURSE: ${MALL.maxX - MALL.minX} m long, ${(MALL.frontZ - MALL.farZ).toFixed(1)} m wide, roof at ${MALL.ceilingY} m`, 12, "middle", "#555", "600");
+  // mezzanine strip above the far shopfronts
+  R(0, (MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2, MALL.maxX - MALL.minX, MALL.mezzanineZ1 - MALL.mezzanineZ0, "#e4e0d4", "#9a9484", 1.2, 'stroke-dasharray="6 3"');
+  g.text(px(0), py((MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2) + 4, `MEZZANINE walkway above (floor at ${MALL.mezzanineY} m), glass balustrade on the concourse side`, 11, "middle", "#6b6556");
+  g.text(px(0), py(MALL.farZ) + 16, "opposite shopfronts: ground level and upstairs", 11, "middle", "#555");
+  // the store and its neighbours along the near side
+  const storeD = zTop - (FLOOR.minZ - 0.5);
+  R(0, (zTop + (FLOOR.minZ - 0.5)) / 2, FLOOR.maxX - FLOOR.minX + 1, storeD, "#f6f7f8", "#111", 2);
+  g.text(px(0), py(FLOOR.minZ + 0.7), "THE STORE", 12, "middle", "#111", "700");
+  g.text(px(0), py(FLOOR.minZ + 1.25), "(see the shop plan)", 10, "middle", "#555");
+  for (const sd of [-1, 1]) {
+    for (let k = 0; k < 3; k++) {
+      const x = sd * (FLOOR.maxX + 5.1 + k * 9);
+      R(x, FLOOR.minZ + 0.15, 9, 0.6, "#d3d6da", "#888", 1);
+      g.text(px(x), py(FLOOR.minZ) - 14, "shop", 9, "middle", "#777");
+    }
+  }
+  R(0, FLOOR.minZ - 0.15, GLASS.entranceX[1] - GLASS.entranceX[0], 0.5, "#ffffff", "#2a6a95", 2, 'stroke-dasharray="5 3"');
+  g.text(px(0), py(FLOOR.minZ - 0.5) + 12, "entrance opening", 10, "middle", "#2a6a95", "700");
+  // columns holding up the mezzanine
+  for (const x of Array.from({ length: 9 }, (_, k) => -32 + k * 8)) g.circle(px(x), py(MALL.mezzanineZ1 + 0.3), 0.28 * S, "#b9bdc2", "#6b7076");
+  // routes
+  const colours = { passer: "#4a8f7a", shopper: "#d1495b", upper: "#7a6a3a" } as const;
+  for (const r of ROUTES) {
+    const pts = r.points;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const za = Math.min(a.z, zTop);
+      const zb = Math.min(b.z, zTop);
+      if (a.z > zTop && b.z > zTop) continue; // wholly inside the store: see the shop plan
+      g.line(px(a.x), py(za), px(b.x), py(zb), colours[r.kind], r.kind === "shopper" ? 2 : 1.2, 'stroke-dasharray="6 4"');
+    }
+    const p0 = pts[0];
+    if (p0.z <= zTop) g.circle(px(p0.x), py(p0.z), 3, colours[r.kind]);
+  }
+  const ly = H - 70;
+  g.text(60, ly, "Green: people walking past (two stop to window-shop). Red: customers who come in through the opening, look at tables and leave. Olive: people on the mezzanine.", 11, "start", "#333");
+  g.text(60, ly + 16, "Everyone is placed by the shared server clock, so all visitors see the same people in the same places. The mezzanine and neighbouring shops are not enterable.", 11, "start", "#333");
+  g.text(60, ly + 32, `Sizes of the concourse, the neighbours and the mezzanine are assumed; only the store itself comes from the reference photographs.`, 11, "start", "#a33");
   return g.done();
 }
 
 // =====================================================================
 // Wall elevations, each seen from inside the shop, looking at the wall.
 // =====================================================================
+// Width of the wall drawings: the longest wall plus the margins and the
+// dimension labels at the right-hand end.
+export function wallsWidth(): number {
+  const sideLen = WALL_FACE_Z - (FLOOR.minZ - 0.5);
+  const backLen = FLOOR.maxX - FLOOR.minX + 1;
+  return Math.round(Math.max(sideLen, backLen) * 62 + 70 * 2 + 150);
+}
+
 export function renderWalls(): string {
   const ES = 62; // pixels per metre
   const MX = 70; // left margin
   const PANEL_H = Math.round(CEILING * ES + 200);
-  const W = Math.round(17.2 * ES + MX * 2 + 40);
+  const W = wallsWidth();
   const H = Math.round(PANEL_H * 4 + 120);
   const g = new Svg();
   g.head(W, H);
@@ -297,7 +356,7 @@ export function renderWalls(): string {
     // bench slab (open underneath), devices laid on it, two monitors
     const bench = BENCHES[0];
     wRect(-bench.d / 2, bench.d / 2, bench.h - 0.12, bench.h, "#e6cfa8", "#8a6a2f", 1.2);
-    for (let z = -6.0; z <= 6.0; z += 0.26) wRect(z - 0.075, z + 0.075, bench.h, bench.h + 0.012, "#2d3f66");
+    for (let z = -bench.d / 2 + 0.3; z <= bench.d / 2 - 0.3; z += 0.22) wRect(z - 0.075, z + 0.075, bench.h, bench.h + 0.012, "#2d3f66");
     for (const f of SIDE_WALL[wall]) {
       if (f.kind === "monitors") {
         for (const mz of f.zs) {
@@ -420,10 +479,12 @@ export function renderWalls(): string {
 // Ceiling, looking up. Entrance at the bottom; the +x wall on the LEFT.
 // =====================================================================
 export function renderCeiling(): string {
-  const S = 52;
-  const W = Math.round(17.4 * S + 120);
-  const H = Math.round(16.5 * S + 200);
-  const cx = 60 + 8.7 * S;
+  const S = 60;
+  const fw = FLOOR.maxX - FLOOR.minX;
+  const fd = FLOOR.maxZ - FLOOR.minZ;
+  const W = Math.round((fw + 2) * S + 120);
+  const H = Math.round((fd + 1.5) * S + 200);
+  const cx = 60 + ((fw + 2) / 2) * S;
   const px = (x: number): number => cx - x * S;
   const py = (z: number): number => 90 + (FLOOR.maxZ - z) * S;
   const g = new Svg();
@@ -471,4 +532,131 @@ export function renderCeiling(): string {
   g.text(60, H - 44, `Ceiling height ${CEILING} m; the rails sit at ${TRACK_LIGHT_Y} m. Panel rows read from the front-on photograph; the exact count is an estimate.`, 11, "start", "#333");
   g.text(60, H - 28, "The hanging mark is an original service mark, not anyone's logo.", 11, "start", "#a33");
   return g.done();
+}
+
+// =====================================================================
+// The printable document: one HTML page that Chrome prints to a single PDF
+// (see scripts/blueprint.ts). Cover and tables, then the plan, the four
+// walls and the ceiling.
+// =====================================================================
+const PRODUCT_WORDS: Record<string, string> = {
+  phone: "phones",
+  tablet: "tablets",
+  tabletKb: "tablets with keyboards",
+  laptop: "laptops",
+  watch: "watches",
+  earbuds: "earbuds",
+  headphones: "headphones",
+  speaker: "speakers",
+  airtag: "trackers",
+};
+
+// A copy of an SVG showing only part of it, so a tall drawing can be split
+// across printed pages without redrawing anything.
+function crop(svg: string, x: number, y: number, w: number, h: number): string {
+  return svg.replace(
+    /^<svg [^>]*>/,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(w)}" height="${Math.round(h)}" viewBox="${Math.round(x)} ${Math.round(y)} ${Math.round(w)} ${Math.round(h)}">`,
+  );
+}
+
+export function renderDocument(): string {
+  // the walls, one panel each (see renderWalls)
+  const wallPanelH = Math.round(CEILING * 62 + 200);
+  const walls = renderWalls();
+  const wallW = wallsWidth();
+  // each panel: from just above its title to just below its dimension labels
+  const panel = (i: number): string => crop(walls, 0, 110 + i * wallPanelH - 62, wallW, Math.round(CEILING * 62 + 135));
+  const W = FLOOR.maxX - FLOOR.minX;
+  const D = FLOOR.maxZ - FLOOR.minZ;
+  const sideName = (x: number): string =>
+    Math.abs(x) < 0.01 ? "centre" : x > 0 ? "left column (the +x side, as you enter)" : "right column (the -x side)";
+  const rows = TABLES.map((t, i) => {
+    const kinds = COLUMN_PRODUCTS[String(t.x)] ?? [];
+    const words = [...new Set(kinds.map((k) => PRODUCT_WORDS[k] ?? k))].join(", ");
+    const long = t.d >= t.w ? "front to back (along z)" : "side to side (along x)";
+    return `<tr><td>T${i + 1}</td><td>${sideName(t.x)}</td><td>${t.x.toFixed(2)}</td><td>${t.z.toFixed(2)}</td><td>${t.w.toFixed(2)} x ${t.d.toFixed(2)}</td><td>${long}</td><td>${words}</td></tr>`;
+  }).join("\n");
+  const css = `
+    @page { size: A3 portrait; margin: 12mm; }
+    @page wide { size: A3 landscape; margin: 12mm; }
+    section.wide { page: wide; }
+    section.wide svg { max-height: 270mm; }
+    * { box-sizing: border-box; }
+    body { font: 12pt/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: #15181d; margin: 0; }
+    section { page-break-after: always; break-after: page; }
+    section:last-child { page-break-after: auto; break-after: auto; }
+    h1 { font-size: 26pt; margin: 0 0 4mm; }
+    h2 { font-size: 15pt; margin: 6mm 0 2mm; }
+    p, li { max-width: 95%; }
+    table { border-collapse: collapse; width: 100%; margin: 2mm 0 4mm; font-size: 10.5pt; }
+    th, td { border: 1px solid #c9ced6; padding: 2mm 3mm; text-align: left; vertical-align: top; }
+    th { background: #f0f2f5; }
+    svg { width: auto; height: auto; max-width: 100%; max-height: 345mm; display: block; margin: 0 auto; }
+    section.walls svg { max-height: 170mm; margin-bottom: 8mm; }
+    .small { color: #5b6370; font-size: 10pt; }
+    .warn { color: #a33; }
+  `;
+  return `<!doctype html>
+<html lang="en-AU"><head><meta charset="utf-8"><title>Canberra-style store: blueprint</title><style>${css}</style></head><body>
+<section>
+  <h1>Canberra-style store: blueprint</h1>
+  <p class="small">Drawn from the model's own constants (src/shared), so these pages cannot differ from the 3D scene. Metres. A visitor entering stands at the glass front facing the bar; the +x wall is on their left.</p>
+  <h2>What the references say</h2>
+  <p>From the corners you set in the rectify tool (docs/blueprint/rectify.json):
+  the side walls are about <b>3.35 times as long as they are high</b>, the back wall about <b>3.3 times as wide as high</b>,
+  and you gave the wall height as <b>3 m</b>. That makes the shop about
+  <b>${W} m wide by ${D} m deep by ${CEILING} m high</b>: close to square, and much smaller than the 16 x 15 x 3.8 m used before.</p>
+  <h2>Dimensions</h2>
+  <table>
+    <tr><th>Part</th><th>Value</th><th>Source</th></tr>
+    <tr><td>Shop width x depth x height</td><td>${W} x ${D} x ${CEILING} m</td><td>Wall ratios 3.3 and 3.35 at your 3 m wall height</td></tr>
+    <tr><td>Table columns</td><td>x = ${COLUMN_X.join(", ")}</td><td>About a quarter of the width either side of the middle (photo)</td></tr>
+    <tr><td>Tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long, three down each side column, two down the middle</td><td>About a tenth of the width across (photo); length assumed</td></tr>
+    <tr><td>Bench along each side wall</td><td>${BENCHES[0].w} m deep, ${BENCHES[0].d} m long, ${BENCHES[0].h} m high</td><td>Photo; the bench sits at about 0.3 of the wall height</td></tr>
+    <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${STOOLS.x.length} stools</td><td>Shortened to half the back wall at your request</td></tr>
+    <tr><td>Staff door</td><td>${(DOOR.maxX - DOOR.minX).toFixed(1)} m wide, left of the bar as you face it (+x)</td><td>Your description</td></tr>
+    <tr><td>Entrance opening</td><td>${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, middle of the glass front</td><td class="warn">Assumed [TK]</td></tr>
+    <tr><td>Back room</td><td>${D} m deep, same footprint, two shelving rows, two repair benches</td><td>Your instruction</td></tr>
+  </table>
+  <h2>Where the scale is uncertain</h2>
+  <ul>
+    <li><b>The 3 m wall height is the one absolute number.</b> The photographs fix the proportions; everything in metres follows from it. If the real ceiling is higher, the whole shop scales with it.</li>
+    <li>Table length, the entrance opening and the back room are assumptions.</li>
+    <li>Wall features (lightboxes, bays, monitors) are placed by their proportion of the wall in the close-up photographs.</li>
+  </ul>
+</section>
+<section>
+  <h1>Tables: position and orientation</h1>
+  <p>Every table runs <b>front to back</b> (long side parallel to the side walls, standing like rows in a column), three columns across: the left column, the centre column and the right column as you enter. There is no true top-down photograph of the tables, so positions come from the proportions of the reference photographs and the plan on the next page; orientation is the one thing the photographs show directly.</p>
+  <table>
+    <tr><th>Table</th><th>Column</th><th>Centre x</th><th>Centre z</th><th>Size (across x long)</th><th>Long side runs</th><th>Stands on it</th></tr>
+    ${rows}
+  </table>
+  <p class="small">z is negative towards the glass front and positive towards the bar. Products stand along both long sides of each table, facing outward, spaced at least 1 m apart so one person fits at each.</p>
+</section>
+<section>
+  <h1>Top-down plan: the shop and the staff-only back room</h1>
+  ${renderPlan()}
+</section>
+<section class="wide">
+  <h1>Top-down plan: the mall around the store</h1>
+  ${renderMallPlan()}
+</section>
+<section class="walls">
+  <h1>Walls: the side walls</h1>
+  ${panel(0)}
+  ${panel(1)}
+</section>
+<section class="walls">
+  <h1>Walls: the back wall and the glass front</h1>
+  ${panel(2)}
+  ${panel(3)}
+</section>
+<section>
+  <h1>Ceiling and lights</h1>
+  ${renderCeiling()}
+</section>
+</body></html>
+`;
 }

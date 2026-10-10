@@ -142,8 +142,8 @@ export function Mall() {
   // neighbouring shops: left and right of the store along the near row
   const near: Array<{ x: number; i: number }> = [];
   for (let k = 0; k < 3; k++) {
-    near.push({ x: -13.5 - k * 9, i: k });
-    near.push({ x: 13.5 + k * 9, i: k + 3 });
+    near.push({ x: -(FLOOR.maxX + 5.1 + k * 9), i: k });
+    near.push({ x: FLOOR.maxX + 5.1 + k * 9, i: k + 3 });
   }
   const far: Array<{ x: number; i: number }> = [];
   for (let k = -3; k <= 3; k++) far.push({ x: k * 9.5, i: Math.abs(k) + 1 });

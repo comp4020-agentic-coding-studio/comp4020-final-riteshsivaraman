@@ -61,14 +61,29 @@ it("makes the service bar about half the wall width (shorter than the photo, by 
   expect(COUNTER.w / ROOM_W).toBeLessThan(0.6);
 });
 
-it("keeps at least 2 m of clear aisle between table columns", () => {
+it("keeps at least 1.3 m of clear aisle between table columns and beside the benches", () => {
   const aisle = COLUMN_X[1] - TABLE_W / 2 - (COLUMN_X[0] + TABLE_W / 2);
-  expect(aisle).toBeGreaterThanOrEqual(2);
+  expect(aisle).toBeGreaterThanOrEqual(1.3);
+  const outer = Math.abs(BENCHES[0].x) - BENCHES[0].w / 2 - (Math.abs(COLUMN_X[0]) + TABLE_W / 2);
+  expect(outer).toBeGreaterThanOrEqual(1.2);
 });
 
-it("is about as wide as the glass front is tall times 4 (photo: 3.8 to 1)", () => {
-  // measured: the glass front is about 3.8 times as wide as it is high
+// Ritesh's rectified references (docs/blueprint/rectify.json): the back wall is
+// about 3.3 times as wide as high, the side walls about 3.35 times as long as
+// high, and he gave the wall height as 3 m. These are the checks that tie the
+// model to them.
+it("is as wide as the back wall reference: about 3.3 times the ceiling height", () => {
   const ratio = ROOM_W / CEILING;
-  expect(ratio).toBeGreaterThan(3.4);
-  expect(ratio).toBeLessThan(4.6);
+  expect(ratio).toBeGreaterThan(3.0);
+  expect(ratio).toBeLessThan(3.7);
+});
+
+it("is as deep as the side wall reference: about 3.35 times the ceiling height", () => {
+  const ratio = (FLOOR.maxZ - FLOOR.minZ) / CEILING;
+  expect(ratio).toBeGreaterThan(3.0);
+  expect(ratio).toBeLessThan(3.7);
+});
+
+it("has the 3 m wall height from the references", () => {
+  expect(CEILING).toBe(3);
 });

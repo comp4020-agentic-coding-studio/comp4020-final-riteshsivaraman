@@ -65,49 +65,49 @@ function customer(id: string, colour: string, zone: Zone, period: number, phase:
   return { id, role: "customer", colour, zones: [zone], period, phase, seed };
 }
 
-// Lanes between the three table columns (tables are 1.7 m wide, centred at
-// x = -4, 0 and 4), and the outer lanes beside the wall benches.
+// Lanes between the three table columns (tables are 1.05 m wide, centred at
+// x = -2.5, 0 and 2.5), and the outer lanes beside the wall benches.
 const LANE = {
-  outerL: { minX: -6.8, maxX: -5.2 },
-  a: { minX: -2.9, maxX: -1.1 },
-  b: { minX: 1.1, maxX: 2.9 },
-  outerR: { minX: 5.2, maxX: 6.8 },
+  outerL: { minX: -4.2, maxX: -3.35 },
+  a: { minX: -1.75, maxX: -0.8 },
+  b: { minX: 0.8, maxX: 1.75 },
+  outerR: { minX: 3.35, maxX: 4.2 },
 };
-const SHOP_Z = { minZ: -5.8, maxZ: 4.9 };
+const SHOP_Z = { minZ: -4.3, maxZ: 3.35 };
 
 // Zones are rectangles that contain no table, bench, bar or shelf, so a
 // straight line between two points in a zone never crosses one.
 export const NPCS: NpcDef[] = [
   // at the door of the shop
-  staff("greeter-1", "greeter", [{ minX: -3, maxX: 3, minZ: -6.8, maxZ: -5.4 }], 10000, 0, 1),
+  staff("greeter-1", "greeter", [{ minX: -2, maxX: 2, minZ: -4.7, maxZ: -4.05 }], 10000, 0, 1),
   // one specialist per product lane
   staff("spec-phones", "specialist", [{ ...LANE.outerL, ...SHOP_Z }], 12000, 1500, 2),
   staff("spec-laptops", "specialist", [{ ...LANE.a, ...SHOP_Z }], 12000, 6000, 3),
   staff("spec-tablets", "specialist", [{ ...LANE.b, ...SHOP_Z }], 12000, 3000, 4),
   staff("spec-audio", "specialist", [{ ...LANE.outerR, ...SHOP_Z }], 12000, 9000, 5),
   // behind the service bar
-  staff("genius-1", "genius", [{ minX: -3.6, maxX: -0.8, minZ: 6.4, maxZ: 7.3 }], 9000, 0, 6),
-  staff("genius-2", "genius", [{ minX: 0.8, maxX: 3.6, minZ: 6.4, maxZ: 7.3 }], 10000, 3500, 7),
+  staff("genius-1", "genius", [{ minX: -2.2, maxX: -0.5, minZ: 4.45, maxZ: 4.85 }], 9000, 0, 6),
+  staff("genius-2", "genius", [{ minX: 0.5, maxX: 2.2, minZ: 4.45, maxZ: 4.85 }], 10000, 3500, 7),
   // fetches stock: out of the door, along the aisle, back again
   staff(
     "stock-runner",
     "stock",
     [
-      { minX: 4.7, maxX: 5.6, minZ: 5.7, maxZ: 7.2 },
-      { minX: 4.7, maxX: 5.6, minZ: 8.8, maxZ: 10.3 },
+      { minX: 3.1, maxX: 3.7, minZ: 4.5, maxZ: 4.9 },
+      { minX: 3.1, maxX: 3.7, minZ: 6.1, maxZ: 6.9 },
     ],
     11000,
     2000,
     8,
   ),
   // back room, in the aisles between shelving
-  staff("stock-1", "stock", [{ minX: -6.2, maxX: -1.5, minZ: 11.8, maxZ: 14.4 }], 11000, 5000, 9),
-  staff("stock-2", "stock", [{ minX: 1.5, maxX: 6.2, minZ: 16, maxZ: 18.1 }], 11000, 8000, 10),
+  staff("stock-1", "stock", [{ minX: -3.8, maxX: -0.9, minZ: 8.3, maxZ: 9.5 }], 11000, 5000, 9),
+  staff("stock-2", "stock", [{ minX: 0.9, maxX: 3.8, minZ: 11.0, maxZ: 12.0 }], 11000, 8000, 10),
   // technicians at the repair benches
-  staff("tech-1", "technician", [{ minX: -4.1, maxX: -2.9, minZ: 20.1, maxZ: 20.5 }], 12000, 0, 11, true),
-  staff("tech-2", "technician", [{ minX: 2.9, maxX: 4.1, minZ: 20.1, maxZ: 20.5 }], 12000, 4000, 12, true),
+  staff("tech-1", "technician", [{ minX: -2.7, maxX: -1.7, minZ: 13.5, maxZ: 13.9 }], 12000, 0, 11, true),
+  staff("tech-2", "technician", [{ minX: 1.7, maxX: 2.7, minZ: 13.5, maxZ: 13.9 }], 12000, 4000, 12, true),
   // customers
-  customer("cust-front", "#e07a5f", { minX: -4, maxX: 4, minZ: -6.8, maxZ: -5.4 }, 11000, 500, 21),
+  customer("cust-front", "#e07a5f", { minX: -3.2, maxX: 3.2, minZ: -4.7, maxZ: -4.05 }, 11000, 500, 21),
   customer("cust-a", "#81b29a", { ...LANE.a, ...SHOP_Z }, 12000, 4000, 22),
   customer("cust-b", "#f2cc8f", { ...LANE.b, ...SHOP_Z }, 12000, 8000, 23),
   customer("cust-c", "#9b72aa", { ...LANE.outerL, ...SHOP_Z }, 12000, 2500, 24),
