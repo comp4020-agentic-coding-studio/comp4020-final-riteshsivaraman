@@ -10,7 +10,9 @@ import { MALL, ROUTES } from "./mall.ts";
 import { CEILING, FLOOR, SPAWN } from "./protocol.ts";
 import {
   BACK_WALL,
+  BAY_LEDGES,
   BAY_SHELVES,
+  LEDGE_DEPTH,
   BAY_SIGN_Y,
   CARD_READER,
   CEILING_SPEC,
@@ -160,7 +162,16 @@ export function renderPlan(): string {
     }
     for (let i = 0; i < BAY_COUNT; i++) R(side * (FLOOR.maxX + 0.38), bayCentre(i), 0.04, BAY_W, "#3b3f45", "#222");
   }
-  g.text(px(FLOOR.maxX + 0.75), py(-3.1), "lightboxes", 10, "end", "#678");
+  // ledges in front of the bays, at the wall face
+  for (const side of [-1, 1]) {
+    for (const l of BAY_LEDGES[side === 1 ? "+x" : "-x"]) {
+      const c = bayCentre(l.bay);
+      const zc = l.half === "front" ? c - BAY_W / 4 : c + BAY_W / 4;
+      R(side * (FLOOR.maxX + 0.4 - LEDGE_DEPTH / 2), zc, LEDGE_DEPTH, BAY_W / 2, "#e6cfa8", "#8a6a2f", 1.2);
+      g.circle(px(side * (FLOOR.maxX + 0.4 - LEDGE_DEPTH / 2)), py(zc), 0.07 * S, "#2d3f66", "#0b1530");
+    }
+  }
+  g.text(px(FLOOR.maxX + 0.75), py(FLOOR.minZ + 2.0), "lightboxes", 10, "end", "#678");
   g.text(px(FLOOR.maxX + 0.75), py(bayCentre(1)), "product bays", 10, "end", "#555");
   g.text(px(-FLOOR.maxX - 0.75), py(bayCentre(1)), "product bays", 10, "start", "#555");
 
@@ -168,10 +179,10 @@ export function renderPlan(): string {
   TABLES.forEach((t, i) => {
     if (t.service) {
       R(t.x, t.z, t.w, t.d, "#d9c196", "#5a4210", 2, 'stroke-dasharray="5 3"');
-      g.text(px(t.x), py(t.z) + 4, `S${i + 1}`, 11, "middle", "#5a4210", "700");
+      g.text(px(t.x), py(t.z) + 4, t.id, 11, "middle", "#5a4210", "700");
     } else {
       R(t.x, t.z, t.w, t.d, "#e6cfa8", "#8a6a2f", 1.2);
-      g.text(px(t.x), py(t.z) + 4, `T${i + 1}`, 11, "middle", "#5a4210", "700");
+      g.text(px(t.x), py(t.z) + 4, t.id, 11, "middle", "#5a4210", "700");
       // one product on each side, facing outward
       const m = 0.2;
       for (const [dx, dz] of [
@@ -225,10 +236,18 @@ export function renderPlan(): string {
   vDim(g, py(t0.z + TABLE_LEN / 2), py(t0.z - TABLE_LEN / 2), px(t0.x - TABLE_W / 2) + 0.4 * S, `${TABLE_LEN} m`);
 
   hDim(g, px(COUNTER.x + COUNTER.w / 2), px(COUNTER.x - COUNTER.w / 2), py(BACK_ROOM_Z0 + 0.45), `bar ${COUNTER.w} m`);
+  // the clear space where customers are received, and the gap between tables
+  const prod = TABLES.filter((t) => !t.service && t.x === COLUMN_X[0]).sort((a, b) => a.z - b.z);
+  const frontEdge = Math.min(...TABLES.map((t) => t.z - t.d / 2));
+  vDim(g, py(FLOOR.minZ), py(frontEdge), px(4.1), `${(frontEdge - FLOOR.minZ).toFixed(1)} m clear: customers are received here`);
+  if (prod.length > 1) {
+    const gap = prod[1].z - prod[1].d / 2 - (prod[0].z + prod[0].d / 2);
+    vDim(g, py(prod[1].z - prod[1].d / 2), py(prod[0].z + prod[0].d / 2), px(COLUMN_X[0] + TABLE_W / 2) - 0.45 * S, `${gap.toFixed(2)} m clear`);
+  }
 
   const ly = H - 62;
-  g.text(60, ly, `Ceiling ${CEILING} m. T = product table (${TABLE_W} x ${TABLE_LEN} m, one product per side). S = square service table (${TABLE_LEN} m side, no products, a stool each side). Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
-  g.text(60, ly + 16, "Proportions from the rectified reference photographs (back wall 3.3 : 1, side walls 3.35 : 1); the 3 m wall height gives the metres.", 11, "start", "#333");
+  g.text(60, ly, `Ceiling ${CEILING} m. T = product table (${TABLE_W} x ${TABLE_LEN} m, one product per side). S = square service table (${TABLE_LEN} m side, no products, two stools each side, tucked under). Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
+  g.text(60, ly + 16, "The 3 m wall height is from the references; the width and depth were enlarged on request (option A) so there is room to move between tables.", 11, "start", "#333");
   g.text(60, ly + 32, "Assumed, not measurable: table length, the entrance opening, the back-room layout (your instruction: same footprint), the door width.", 11, "start", "#a33");
   return g.done();
 }
@@ -374,8 +393,16 @@ export function renderWalls(): string {
     }
     // bench slab (open underneath), devices laid on it, two monitors
     const bench = BENCHES[0];
-    wRect(-bench.d / 2, bench.d / 2, bench.h - 0.12, bench.h, "#e6cfa8", "#8a6a2f", 1.2);
-    for (let z = -bench.d / 2 + 0.3; z <= bench.d / 2 - 0.3; z += 0.22) wRect(z - 0.075, z + 0.075, bench.h, bench.h + 0.012, "#2d3f66");
+    wRect(bench.z - bench.d / 2, bench.z + bench.d / 2, bench.h - 0.12, bench.h, "#e6cfa8", "#8a6a2f", 1.2);
+    for (let z = bench.z - bench.d / 2 + 0.3; z <= bench.z + bench.d / 2 - 0.3; z += 0.22) wRect(z - 0.075, z + 0.075, bench.h, bench.h + 0.012, "#2d3f66");
+    // the bench stops where the bays start; a short ledge in front of half of
+    // a bay carries one product
+    for (const l of BAY_LEDGES[wall]) {
+      const c = bayCentre(l.bay);
+      const [za, zb] = l.half === "front" ? [c - BAY_W / 2, c] : [c, c + BAY_W / 2];
+      wRect(za, zb, bench.h - 0.12, bench.h, "#e6cfa8", "#8a6a2f", 1.2);
+      wRect((za + zb) / 2 - 0.08, (za + zb) / 2 + 0.08, bench.h, bench.h + 0.18, "#2d3f66", "#0b1530");
+    }
     for (const f of SIDE_WALL[wall]) {
       if (f.kind === "monitors") {
         for (const mz of f.zs) {
@@ -431,7 +458,7 @@ export function renderWalls(): string {
     const hy = (y: number): number => base - y * ES;
     const wRect = (xa: number, xb: number, ya: number, yb: number, fill: string, stroke = "none", sw = 1): void =>
       g.rect(Math.min(hx(xa), hx(xb)), hy(yb), Math.abs(hx(xb) - hx(xa)), (yb - ya) * ES, fill, stroke, sw);
-    g.text(MX, top - 46, "3. BACK WALL, shop side (z = +7.9), seen facing it. The +x side is on the left.", 13, "start", "#111", "700");
+    g.text(MX, top - 46, `3. BACK WALL, shop side (z = +${WALL_FACE_Z.toFixed(1)}), seen facing it. The +x side is on the left.`, 13, "start", "#111", "700");
     wRect(-x0, x0, 0, CEILING, "#d9dcdf", "#7b8087");
     // the bar stands in front of the wall
     wRect(COUNTER.x - COUNTER.w / 2, COUNTER.x + COUNTER.w / 2, 0, COUNTER.h, "#e6cfa8", "#8a6a2f", 1.5);
@@ -475,7 +502,7 @@ export function renderWalls(): string {
     const x0 = FLOOR.maxX + 0.5;
     const hx = (x: number): number => MX + (x + x0) * ES;
     const hy = (y: number): number => base - y * ES;
-    g.text(MX, top - 46, "4. FRONT GLASS WALL (z = -8), seen from inside facing it. The +x side is on the right.", 13, "start", "#111", "700");
+    g.text(MX, top - 46, `4. FRONT GLASS WALL (z = ${(FLOOR.minZ - 0.5).toFixed(1)}), seen from inside facing it. The +x side is on the right.`, 13, "start", "#111", "700");
     g.rect(hx(-x0), hy(CEILING), 2 * x0 * ES, CEILING * ES, "#e6f2f8", "#5aa9d6", 2);
     // the entrance opening: no glass
     g.rect(hx(GLASS.entranceX[0]), hy(CEILING) + GLASS.headerH * ES, (GLASS.entranceX[1] - GLASS.entranceX[0]) * ES, (CEILING - GLASS.headerH) * ES, "#ffffff", "#2a6a95", 1.5, 'stroke-dasharray="5 3"');
@@ -589,15 +616,18 @@ export function renderDocument(): string {
   const panel = (i: number): string => crop(walls, 0, 110 + i * wallPanelH - 62, wallW, Math.round(CEILING * 62 + 135));
   const W = FLOOR.maxX - FLOOR.minX;
   const D = FLOOR.maxZ - FLOOR.minZ;
+  const productsLeft = TABLES.filter((t) => !t.service && t.x === COLUMN_X[0]).sort((a, b) => a.z - b.z);
+  const CLEAR_GAP = productsLeft[1].z - productsLeft[1].d / 2 - (productsLeft[0].z + productsLeft[0].d / 2);
+  const CLEAR_ZONE = Math.min(...TABLES.map((t) => t.z - t.d / 2)) - FLOOR.minZ;
   const sideName = (x: number): string =>
     Math.abs(x) < 0.01 ? "centre" : x > 0 ? "left column (the +x side, as you enter)" : "right column (the -x side)";
   const rows = TABLES.map((t, i) => {
     const kinds = t.products;
     const words = t.service
-      ? "nothing: a table to sit and talk with staff, a stool each side"
+      ? "nothing: a table to sit and talk with staff, two stools each side tucked under it"
       : [...new Set(kinds.map((k) => PRODUCT_WORDS[k] ?? k))].join(", ");
     const kind = t.service ? "service (square)" : "product";
-    return `<tr><td>${t.service ? "S" : "T"}${i + 1}</td><td>${sideName(t.x)}</td><td>${kind}</td><td>${t.x.toFixed(2)}</td><td>${t.z.toFixed(2)}</td><td>${t.w.toFixed(2)} x ${t.d.toFixed(2)}</td><td>${words}</td></tr>`;
+    return `<tr><td>${t.id}</td><td>${sideName(t.x)}</td><td>${kind}</td><td>${t.x.toFixed(2)}</td><td>${t.z.toFixed(2)}</td><td>${t.w.toFixed(2)} x ${t.d.toFixed(2)}</td><td>${words}</td></tr>`;
   }).join("\n");
   const css = `
     @page { size: A3 portrait; margin: 12mm; }
@@ -624,20 +654,22 @@ export function renderDocument(): string {
 <section>
   <h1>Canberra-style store: blueprint</h1>
   <p class="small">Drawn from the model's own constants (src/shared), so these pages cannot differ from the 3D scene. Metres. A visitor entering stands at the glass front facing the bar; the +x wall is on their left.</p>
-  <h2>What the references say</h2>
-  <p>From the corners you set in the rectify tool (docs/blueprint/rectify.json):
-  the side walls are about <b>3.35 times as long as they are high</b>, the back wall about <b>3.3 times as wide as high</b>,
-  and you gave the wall height as <b>3 m</b>. That makes the shop about
-  <b>${W} m wide by ${D} m deep by ${CEILING} m high</b>: close to square, and much smaller than the 16 x 15 x 3.8 m used before.</p>
+  <h2>What the references say, and what changed</h2>
+  <p>From the corners you set in the rectify tool (docs/blueprint/rectify.json) the references gave a shop about
+  <b>10 m wide by 10 m deep</b> under a <b>3 m</b> wall (side walls 3.35 times as long as high, back wall 3.3 times as wide as high).
+  You then asked for more room so the tables are spread out and people can move between them, and chose to keep the 3 m wall.
+  The shop is now <b>${W} m wide by ${D} m deep by ${CEILING} m high</b>, so it is deliberately wider and much longer than the reference proportions.</p>
   <h2>Dimensions</h2>
   <table>
     <tr><th>Part</th><th>Value</th><th>Source</th></tr>
-    <tr><td>Shop width x depth x height</td><td>${W} x ${D} x ${CEILING} m</td><td>Wall ratios 3.3 and 3.35 at your 3 m wall height</td></tr>
+    <tr><td>Shop width x depth x height</td><td>${W} x ${D} x ${CEILING} m</td><td>Your choice (option A): more room than the 10 x 10 m the references gave</td></tr>
     <tr><td>Table columns</td><td>x = ${COLUMN_X.join(", ")}</td><td>About a quarter of the width either side of the middle (photo)</td></tr>
-    <tr><td>Product tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long (almost square), four in each side column and three in the middle, one product on each side</td><td>Your description; width about a tenth of the shop's (photo)</td></tr>
-    <tr><td>Service tables</td><td>${SERVICE_SIDE} m square (the long edge of a product table), one nearest the bar in each side column and one in the middle column, a stool to the left and right of each, no products</td><td>Your description</td></tr>
-    <tr><td>Bench along each side wall</td><td>${BENCHES[0].w} m deep, ${BENCHES[0].d} m long, ${BENCHES[0].h} m high</td><td>Photo; the bench sits at about 0.3 of the wall height</td></tr>
-    <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${BAR_STOOLS.length} stools</td><td>Shortened to half the back wall at your request</td></tr>
+    <tr><td>Product tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long (almost square), four in each side column and three in the middle, one product on each side, ${CLEAR_GAP.toFixed(1)} m clear between them front to back</td><td>Your description</td></tr>
+    <tr><td>Service tables</td><td>${SERVICE_SIDE} m square (the long edge of a product table), one nearest the bar in each side column and one in the middle column, two stools tucked under each of its left and right sides, no products</td><td>Your description</td></tr>
+    <tr><td>Bench along each side wall</td><td>${BENCHES[0].w} m deep, ${BENCHES[0].d} m long (it stops where the indented bays start), ${BENCHES[0].h} m high</td><td>Your instruction, from the references</td></tr>
+    <tr><td>Ledges in front of the bays</td><td>one short ledge on the ${BAY_LEDGES["+x"][0].half} half of each of the three bays on each side, ${LEDGE_DEPTH} m out from the wall, one product on each</td><td class="warn">Which half and which product are [TK]: working defaults</td></tr>
+    <tr><td>Entrance clear zone</td><td>${CLEAR_ZONE.toFixed(1)} m from the glass to the first table, kept empty: customers are received here</td><td>Your instruction</td></tr>
+    <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${BAR_STOOLS.length} stools tucked under the overhang</td><td>Almost from the far end of one service table to the far end of the other; 13 stools by your instruction</td></tr>
     <tr><td>Staff door</td><td>${(DOOR.maxX - DOOR.minX).toFixed(1)} m wide, left of the bar as you face it (+x)</td><td>Your description</td></tr>
     <tr><td>Entrance opening</td><td>${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, middle of the glass front</td><td class="warn">Assumed [TK]</td></tr>
     <tr><td>Back room</td><td>${D} m deep, same footprint, two shelving rows, two repair benches</td><td>Your instruction</td></tr>
@@ -651,7 +683,7 @@ export function renderDocument(): string {
 </section>
 <section>
   <h1>Tables: position and orientation</h1>
-  <p>Three columns across (the left column, the centre column and the right column as you enter). The <b>left and right columns</b> each have <b>four almost-square product tables</b> and, nearest the bar, a larger <b>square service table</b> with a stool on its left and right where a customer can sit and talk with staff. The <b>centre column</b> has <b>three product tables and one square service table</b>. Product tables carry a product on each of their four sides, facing outward; service tables carry nothing. There is no true top-down photograph of the tables, so positions come from your description and the proportions of the reference photographs.</p>
+  <p>Three columns across (the left column, the centre column and the right column as you enter). The <b>left and right columns</b> each have <b>four almost-square product tables</b> and, nearest the bar, a larger <b>square service table</b> with two stools on its left and two on its right, tucked under the table, where a customer can sit and talk with staff. The <b>centre column</b> has <b>three product tables and one square service table</b>. Product tables carry a product on each of their four sides, facing outward; service tables carry nothing. There is no true top-down photograph of the tables, so positions come from your description and the proportions of the reference photographs.</p>
   <table>
     <tr><th>Table</th><th>Column</th><th>Kind</th><th>Centre x</th><th>Centre z</th><th>Size (x by z)</th><th>On it</th></tr>
     ${rows}

@@ -47,13 +47,15 @@ export type ServerMessage =
 
 // The walkable shop floor. Positions are clamped to the walkable areas in
 // world.ts (clampToWalkable), which start from this box.
-// From the rectified reference photos: the back wall is about 3.3 times as wide
-// as it is high and the side walls about 3.35 times as long as high; with the
-// 3 m wall height Ritesh gave, the shop is about 10 m wide by 10 m deep.
-export const FLOOR = { minX: -5, maxX: 5, minZ: -5, maxZ: 5 } as const;
+// The rectified reference photos gave about 10 m by 10 m under a 3 m wall.
+// Ritesh then asked for more room so the tables can be about a metre apart and
+// the bar can seat 13 (2026-10-11, "option A"): 11 m wide and 15.4 m deep, the
+// wall height unchanged. The 3.3x / 3.35x height ratios are therefore no longer
+// the shop's; they stay in SCOPE.md as the evidence the first size came from.
+export const FLOOR = { minX: -5.5, maxX: 5.5, minZ: -7.7, maxZ: 7.7 } as const;
 
 // Ceiling height in metres (drawn by the client; kept here beside the floor).
 export const CEILING = 3.0;
 
 // Where a visitor appears: just inside the glass front, facing into the store.
-export const SPAWN: Pose = { x: 0, z: -4.6, ry: Math.PI };
+export const SPAWN: Pose = { x: 0, z: FLOOR.minZ + 0.4, ry: Math.PI };

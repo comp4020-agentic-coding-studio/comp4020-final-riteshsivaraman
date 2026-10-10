@@ -37,7 +37,9 @@ import {
 } from "../../shared/world.ts";
 import {
   BACK_WALL,
+  BAY_LEDGES,
   BAY_SHELVES,
+  LEDGE_DEPTH,
   BAY_SIGN_Y,
   CEILING_SPEC,
   DOOR_H as PLAN_DOOR_H,
@@ -521,6 +523,34 @@ function Table({ box }: { box: TableSpec }) {
   );
 }
 
+const BAR_TOP = 0.06; // thickness of the bar top
+const BAR_OVERHANG = 0.3; // how far the top stands out in front of its base
+
+// A short ledge at bench height in front of part of each bay, carrying one
+// product (BAY_LEDGES in plan.ts says which half and what).
+function BayLedges() {
+  return (
+    <group>
+      {([1, -1] as const).flatMap((side) =>
+        BAY_LEDGES[side === 1 ? "+x" : "-x"].map((l) => {
+          const c = bayCentre(l.bay);
+          const z = l.half === "front" ? c - BAY_W / 4 : c + BAY_W / 4;
+          const x = side * (FACE_X - LEDGE_DEPTH / 2);
+          return (
+            <group key={`${side}:${l.bay}`}>
+              <mesh position={[x, 0.95 - 0.06, z]}>
+                <boxGeometry args={[LEDGE_DEPTH, 0.12, BAY_W / 2]} />
+                <meshStandardMaterial color={WOOD} roughness={0.5} />
+              </mesh>
+              <Device kind={l.kind} x={x} y={0.95} z={z} rotY={side === 1 ? -Math.PI / 2 : Math.PI / 2} colour="#c9ced3" />
+            </group>
+          );
+        }),
+      )}
+    </group>
+  );
+}
+
 // A plain stool, for the service tables.
 function TableStool({ x, z }: { x: number; z: number }) {
   return (
@@ -637,7 +667,7 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
     const kept = SIDE_WALL[side === 1 ? "+x" : "-x"].filter((f) => f.kind === "desktops" || f.kind === "headphones");
     const blocked = (z: number): boolean =>
       kept.some((f) => (f.kind === "desktops" || f.kind === "headphones") && z > f.z0 - 0.3 && z < f.z0 + (f.count - 1) * f.pitch + 0.3);
-    for (let z = -BENCH_HALF + 0.3; z <= BENCH_HALF - 0.3; z += 0.22) {
+    for (let z = BENCHES[0].z - BENCH_HALF + 0.3; z <= BENCHES[0].z + BENCH_HALF - 0.3; z += 0.22) {
       if (blocked(z)) continue;
       for (const dx of [-0.17, 0.17]) {
         flats.push({
@@ -1210,11 +1240,18 @@ export function Room() {
       ))}
       <WallBench box={BENCHES[0]} side={-1} />
       <WallBench box={BENCHES[1]} side={1} />
+      <BayLedges />
 
       {/* the service bar, its staff-side partitions and stools */}
-      <mesh position={[COUNTER.x, COUNTER.h / 2, COUNTER.z]}>
-        <boxGeometry args={[COUNTER.w, COUNTER.h, COUNTER.d]} />
+      {/* a base set back 0.3 m and a top that overhangs it, so a stool tucks
+          under the edge and knees go beneath, as on a real bar */}
+      <mesh position={[COUNTER.x, (COUNTER.h - BAR_TOP) / 2, COUNTER.z + BAR_OVERHANG / 2]}>
+        <boxGeometry args={[COUNTER.w - 0.1, COUNTER.h - BAR_TOP, COUNTER.d - BAR_OVERHANG]} />
         <meshStandardMaterial color={WOOD} roughness={0.55} />
+      </mesh>
+      <mesh position={[COUNTER.x, COUNTER.h - BAR_TOP / 2, COUNTER.z]}>
+        <boxGeometry args={[COUNTER.w, BAR_TOP, COUNTER.d]} />
+        <meshStandardMaterial color="#e6cfa8" roughness={0.5} />
       </mesh>
       {PARTITIONS.map((p, i) => (
         <mesh key={i} position={[p.x, p.h / 2, p.z]}>

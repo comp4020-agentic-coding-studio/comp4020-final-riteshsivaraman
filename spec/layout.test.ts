@@ -1,6 +1,8 @@
 import { expect, it } from "vitest";
 import { CEILING, FLOOR } from "../src/shared/protocol.ts";
 import {
+  BAR_STOOLS,
+  BAY_START_Z,
   BENCHES,
   COLUMN_X,
   COUNTER,
@@ -9,7 +11,9 @@ import {
   TABLE_LEN,
   TABLE_STOOLS,
   TABLE_W,
+  bayCentre,
 } from "../src/shared/world.ts";
+import { BAY_LEDGES } from "../src/shared/plan.ts";
 
 // Promise: the shop floor follows the Canberra reference photo, by numbers
 // measured from it (SCOPE.md 3f), not by feel. The measurements are one
@@ -88,20 +92,51 @@ it("puts a service table nearest the bar in each side column", () => {
   }
 });
 
-it("gives every service table a stool on its left and its right, and none on product tables", () => {
+// Ritesh (2026-10-11): stools are tucked under the service tables and the bar,
+// the way you actually sit; two on each of a service table's left and right.
+const SEAT_R = 0.2;
+it("gives every service table two stools on its left and two on its right, tucked under it", () => {
   const service = TABLES.filter((t) => t.service);
-  expect(TABLE_STOOLS).toHaveLength(service.length * 2);
+  expect(TABLE_STOOLS).toHaveLength(service.length * 4);
   for (const t of service) {
-    const mine = TABLE_STOOLS.filter((s) => Math.abs(s.z - t.z) < 1e-9 && Math.abs(s.x - t.x) < t.w / 2 + 0.6);
-    expect(mine).toHaveLength(2);
-    expect(mine.some((s) => s.x < t.x)).toBe(true);
-    expect(mine.some((s) => s.x > t.x)).toBe(true);
+    const mine = TABLE_STOOLS.filter((s) => Math.abs(s.z - t.z) < t.d / 2 && Math.abs(s.x - t.x) < t.w / 2 + 0.5);
+    expect(mine).toHaveLength(4);
+    expect(mine.filter((s) => s.x < t.x)).toHaveLength(2);
+    expect(mine.filter((s) => s.x > t.x)).toHaveLength(2);
+    for (const s of mine) {
+      // the seat reaches under the table edge by some, but not past the middle
+      const under = t.w / 2 - (Math.abs(s.x - t.x) - SEAT_R);
+      expect(under, `${s.id} tucked under ${t.id}`).toBeGreaterThan(0.05);
+      expect(under).toBeLessThan(0.35);
+    }
+  }
+  for (const t of TABLES.filter((t) => !t.service)) {
+    expect(TABLE_STOOLS.some((s) => Math.abs(s.x - t.x) < t.w / 2 + 0.7 && Math.abs(s.z - t.z) < t.d / 2)).toBe(false);
   }
 });
 
-it("makes the service bar about half the wall width (shorter than the photo, by request)", () => {
-  expect(COUNTER.w / ROOM_W).toBeGreaterThan(0.4);
-  expect(COUNTER.w / ROOM_W).toBeLessThan(0.6);
+it("makes the service bar run almost from the far edge of one service table to the other", () => {
+  const edges = TABLES.filter((t) => t.service).map((t) => Math.abs(t.x) + t.w / 2);
+  const outer = Math.max(...edges);
+  expect(COUNTER.w / 2).toBeLessThan(outer);
+  expect(COUNTER.w / 2).toBeGreaterThan(outer - 0.25);
+});
+
+it("seats 13 at the bar, each tucked under the overhang and inside its ends", () => {
+  expect(BAR_STOOLS).toHaveLength(13);
+  const front = COUNTER.z - COUNTER.d / 2;
+  for (const s of BAR_STOOLS) {
+    expect(Math.abs(s.z - front), `${s.id} against the bar edge`).toBeLessThanOrEqual(0.1);
+    expect(Math.abs(s.x) + SEAT_R).toBeLessThanOrEqual(COUNTER.w / 2);
+  }
+  const xs = BAR_STOOLS.map((s) => s.x).sort((a, b) => a - b);
+  for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1], "seats not on top of each other").toBeGreaterThanOrEqual(0.4);
+});
+
+it("leaves a metre-wide aisle behind people seated at the bar", () => {
+  const seatedBack = Math.min(...BAR_STOOLS.map((s) => s.z)) - 0.3; // a person's back is ~0.3 m behind the seat centre
+  const tablesBack = Math.max(...TABLES.map((t) => t.z + t.d / 2));
+  expect(seatedBack - tablesBack).toBeGreaterThanOrEqual(1.0 - 1e-6);
 });
 
 it("keeps at least 1.3 m of clear aisle between table columns and beside the benches", () => {
@@ -116,16 +151,47 @@ it("keeps at least 1.3 m of clear aisle between table columns and beside the ben
 // about 3.3 times as wide as high, the side walls about 3.35 times as long as
 // high, and he gave the wall height as 3 m. These are the checks that tie the
 // model to them.
-it("is as wide as the back wall reference: about 3.3 times the ceiling height", () => {
-  const ratio = ROOM_W / CEILING;
-  expect(ratio).toBeGreaterThan(3.0);
-  expect(ratio).toBeLessThan(3.7);
+// Ritesh chose to enlarge the room for free movement (2026-10-11, "option A"):
+// the references' proportions (3.3x and 3.35x the wall height, so 10 x 10 m)
+// are now a floor, not a target.
+it("is at least as wide and deep as the 10 x 10 m the references gave, and about 11 x 15 m", () => {
+  expect(ROOM_W).toBeGreaterThanOrEqual(10);
+  expect(FLOOR.maxZ - FLOOR.minZ).toBeGreaterThanOrEqual(10);
+  expect(ROOM_W).toBeGreaterThan(10.5);
+  expect(FLOOR.maxZ - FLOOR.minZ).toBeGreaterThan(14.5);
+  expect(FLOOR.maxZ - FLOOR.minZ).toBeLessThan(16);
 });
 
-it("is as deep as the side wall reference: about 3.35 times the ceiling height", () => {
-  const ratio = (FLOOR.maxZ - FLOOR.minZ) / CEILING;
-  expect(ratio).toBeGreaterThan(3.0);
-  expect(ratio).toBeLessThan(3.7);
+it("keeps a metre clear between tables, front to back and side to side", () => {
+  const ts = TABLES;
+  for (let i = 0; i < ts.length; i++) {
+    for (let j = i + 1; j < ts.length; j++) {
+      const a = ts[i], b = ts[j];
+      const gapX = Math.abs(a.x - b.x) - (a.w + b.w) / 2;
+      const gapZ = Math.abs(a.z - b.z) - (a.d + b.d) / 2;
+      const gap = gapX > 0 && gapZ > 0 ? Math.hypot(gapX, gapZ) : Math.max(gapX, gapZ);
+      expect(gap, `${a.id} to ${b.id}`).toBeGreaterThanOrEqual(1.0 - 1e-6);
+    }
+  }
+});
+
+// "this is where customers are received" (Ritesh, 2026-10-11)
+it("keeps 2.5 m clear inside the glass: no table or stool, so customers can be received", () => {
+  const limit = FLOOR.minZ + 2.5;
+  for (const t of TABLES) expect(t.z - t.d / 2, t.id).toBeGreaterThanOrEqual(limit - 1e-6);
+  for (const s of [...TABLE_STOOLS, ...BAR_STOOLS]) expect(s.z - 0.2, s.id).toBeGreaterThanOrEqual(limit - 1e-6);
+});
+
+it("stops the wall benches where the indented bays start, with a short ledge in front of half of each bay", () => {
+  for (const b of BENCHES) expect(b.z + b.d / 2).toBeLessThanOrEqual(BAY_START_Z + 1e-6);
+  for (const side of ["+x", "-x"] as const) {
+    expect(BAY_LEDGES[side]).toHaveLength(3);
+    for (const l of BAY_LEDGES[side]) {
+      expect(l.bay).toBeGreaterThanOrEqual(0);
+      expect(l.bay).toBeLessThan(3);
+      expect(bayCentre(l.bay)).toBeGreaterThan(BENCHES[0].z + BENCHES[0].d / 2);
+    }
+  }
 });
 
 it("has the 3 m wall height from the references", () => {

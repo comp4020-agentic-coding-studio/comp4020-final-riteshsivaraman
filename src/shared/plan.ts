@@ -5,14 +5,25 @@
 // Heights are above the floor (the walls are 3 m). Positions along a side wall
 // are z (0 is the middle of the shop, negative is the glass front).
 //
-// Scale: everything here follows from the rectified reference photographs
-// (SCOPE.md 3f): the shop is about 10 m wide and deep and 3 m high. Features
-// on the walls are placed by their proportion of the wall in the photographs.
+// Scale: the wall features were placed from the rectified reference
+// photographs (SCOPE.md 3f) for a shop 10 m deep. The shop is now 15.4 m deep
+// (Ritesh, 2026-10-11), so the features keep their order and proportions along
+// the wall: positions are stretched from the old front-to-bay span to the new
+// one (wallZ), widths by WALL_W_STRETCH. Heights are unchanged.
+import { FLOOR } from "./protocol.ts";
+import { BAY_START_Z } from "./world.ts";
 
 // Brushed-grey wall in three tones: dark below the bench, mid above it, then
 // the light upper wall. Lightboxes start at the top of the mid band.
 export const WALL_BANDS = { low: 0.95, mid: 1.5 } as const;
 export const FLOOR_REVEAL = 0.05; // dark gap between the wall panels and the floor
+
+const OLD_FRONT = -4.6; // where the old wall features started (z, 10 m shop)
+const OLD_BAYS = 0.7; // and where the old bays started
+const WALL_STRETCH = (BAY_START_Z - (FLOOR.minZ + 0.4)) / (OLD_BAYS - OLD_FRONT);
+const WALL_W_STRETCH = 1.5;
+const wallZ = (z: number): number => Math.round((FLOOR.minZ + 0.4 + (z - OLD_FRONT) * WALL_STRETCH) * 100) / 100;
+const wallW = (w: number): number => Math.round(w * WALL_W_STRETCH * 100) / 100;
 
 // What hangs on each side wall, front to back, read from the two close-up
 // photographs. The two walls are not the same.
@@ -26,17 +37,18 @@ export type WallFeature =
 // "+x" is the visitor's LEFT wall as they enter; "-x" is their right.
 export const SIDE_WALL: Record<"+x" | "-x", readonly WallFeature[]> = {
   "+x": [
-    { kind: "lightbox", z: -3.6, w: 2.0, art: "phones" },
-    { kind: "lightbox", z: -1.55, w: 1.25, art: "phones" },
-    { kind: "lightbox", z: -0.2, w: 0.6, art: "card" },
-    { kind: "monitors", zs: [-1.85, -1.25] },
+    { kind: "lightbox", z: wallZ(-3.6), w: wallW(2.0), art: "phones" },
+    { kind: "lightbox", z: wallZ(-1.55), w: wallW(1.25), art: "phones" },
+    { kind: "lightbox", z: wallZ(-0.2), w: wallW(0.6), art: "card" },
+    { kind: "monitors", zs: [wallZ(-1.85), wallZ(-1.25)] },
   ],
   "-x": [
-    { kind: "lightbox", z: -3.6, w: 2.0, art: "phones" },
-    { kind: "display", z: -1.55, w: 1.5, h: 0.8 },
-    { kind: "lightbox", z: -0.2, w: 0.8, art: "laptops" },
-    { kind: "desktops", z0: 0.75, count: 5, pitch: 0.42 },
-    { kind: "headphones", z0: -4.2, count: 3, pitch: 0.3 },
+    { kind: "lightbox", z: wallZ(-3.6), w: wallW(2.0), art: "phones" },
+    { kind: "display", z: wallZ(-1.55), w: wallW(1.5), h: 0.8 },
+    { kind: "lightbox", z: wallZ(-0.2), w: wallW(0.8), art: "laptops" },
+    // the bench stops where the bays start, so the desktops end 0.5 m short of it
+    { kind: "desktops", z0: Math.round((BAY_START_Z - 0.5 - 4 * 0.5) * 100) / 100, count: 5, pitch: 0.5 },
+    { kind: "headphones", z0: wallZ(-4.2), count: 3, pitch: 0.3 },
   ],
 };
 export const LIGHTBOX_H = 1.0;
@@ -49,14 +61,38 @@ export const DESKTOP = { w: 0.36, h: 0.25, standH: 0.2 } as const;
 export const BAY_SHELVES = { count: 6, first: 1.05, step: 0.27, panelBottom: WALL_BANDS.low, panelTop: 2.55 } as const;
 export const BAY_SIGN_Y = 2.75;
 
+// The wall bench stops where the bays start. In front of some bays a short
+// ledge at bench height carries one product (Ritesh, 2026-10-11: "one half of
+// each indented shelf may have a bench to showcase a product"). Which half and
+// which product are [TK]: these are working defaults, one ledge on the front
+// half of every bay, so they can be changed here and everything follows.
+export interface BayLedge {
+  bay: number; // 0 is the bay nearest the glass
+  half: "front" | "back";
+  kind: "phone" | "tablet" | "watch" | "laptop" | "headphones" | "speaker";
+}
+export const LEDGE_DEPTH = 0.35; // how far it stands out from the wall, metres
+export const BAY_LEDGES: Record<"+x" | "-x", readonly BayLedge[]> = {
+  "+x": [
+    { bay: 0, half: "front", kind: "phone" },
+    { bay: 1, half: "front", kind: "tablet" },
+    { bay: 2, half: "front", kind: "watch" },
+  ],
+  "-x": [
+    { bay: 0, half: "front", kind: "laptop" },
+    { bay: 1, half: "front", kind: "headphones" },
+    { bay: 2, half: "front", kind: "speaker" },
+  ],
+};
+
 // The bar's back wall: three screens with a service mark between them, and a
 // sign above.
 export const BACK_WALL = {
-  screenX: [-1.8, 0, 1.8],
+  screenX: [-2.4, 0, 2.4],
   screenY: 1.95,
-  screenW: 1.3,
+  screenW: 1.5,
   screenH: 0.75,
-  markX: [-0.9, 0.9],
+  markX: [-1.2, 1.2],
   markSize: 0.6,
   signY: 2.6,
   signW: 1.4,
@@ -64,7 +100,7 @@ export const BACK_WALL = {
 
 // The glass front: mullions, a header band across the top, and an entrance
 // opening (assumed 3 m wide, in the middle: [TK] until the real door is known).
-export const GLASS = { mullionX: [-3.7, 3.7], headerH: 0.45, entranceX: [-1.5, 1.5] } as const;
+export const GLASS = { mullionX: [-4.1, 4.1], headerH: 0.45, entranceX: [-1.5, 1.5] } as const;
 
 export const DOOR_H = 2.3;
 // The card reader sits just outside the door, away from the bar (dx is added
@@ -80,13 +116,14 @@ export const STOOL_SEAT_H = 0.7;
 // and down both sides, and a mark hangs near the front.
 export const CEILING_SPEC = {
   slatPitch: 0.25,
-  panelRowsZ: [-3.6, -2.2, -0.8, 0.6, 2.0, 3.4],
-  panelX: [-2.3, 2.3],
+  // light panels in rows 1.4 m apart, from 1.1 m inside the glass to the back
+  panelRowsZ: Array.from({ length: Math.floor((FLOOR.maxZ - FLOOR.minZ - 2.2) / 1.4) + 1 }, (_, i) => Math.round((FLOOR.minZ + 1.1 + i * 1.4) * 10) / 10),
+  panelX: [-2.8, 2.8],
   panelW: 1.8, // along x
   panelD: 0.4, // along z
   spotPitch: 1.1,
   trackInset: 0.5, // rails run this far inside the walls
-  hangingMark: { x: 0, z: -4.3, y: 2.4, size: 0.7 },
+  hangingMark: { x: 0, z: FLOOR.minZ + 0.7, y: 2.4, size: 0.7 },
 } as const;
 export const TRACK_LIGHT_Y = 2.96;
 

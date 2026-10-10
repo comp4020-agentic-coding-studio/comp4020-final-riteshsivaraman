@@ -3,20 +3,23 @@
 // people here are a pure function of the server clock, so every visitor sees
 // the same shoppers walk past, the same few come in, wander, and leave.
 //
-// z is the same axis as the store: the glass front is at z = -8, and the
-// concourse runs out to the opposite shopfronts at z = -26.
+// z is the same axis as the store. Every z below was set for a shop whose glass
+// front was at z = -5; D moves the whole mall back by however much deeper the
+// shop is now, so the concourse sits in front of the glass wherever it is.
 import { FLOOR } from "./protocol.ts";
+
+const D = FLOOR.minZ + 5;
 
 export const MALL = {
   minX: -34,
   maxX: 34,
   frontZ: FLOOR.minZ - 0.5, // the store's glass front
-  farZ: -26, // the opposite shopfronts
+  farZ: D - 26, // the opposite shopfronts
   ceilingY: 7.4, // high atrium roof
   mezzanineY: 4.4, // upper walkway slab
-  mezzanineZ0: -26, // slab runs from the far shopfronts...
-  mezzanineZ1: -19.5, // ...to the glass balustrade
-  upperWalkZ: [-21.8, -20.6],
+  mezzanineZ0: D - 26, // slab runs from the far shopfronts...
+  mezzanineZ1: D - 19.5, // ...to the glass balustrade
+  upperWalkZ: [D - 21.8, D - 20.6],
 } as const;
 
 export interface RoutePoint {
@@ -81,51 +84,51 @@ const shopper = (id: string, colour: string, phase: number, laneX: number, stops
 export const ROUTES: Route[] = [
   // people walking past the store, two ways along the concourse
   passer("walker-1", "#c9a227", 1.25, 0, [
-    { x: -30, z: -9.5 },
-    { x: 30, z: -9.5 },
-    { x: 30, z: -10.5 },
-    { x: -30, z: -10.5 },
+    { x: -30, z: D - 9.5 },
+    { x: 30, z: D - 9.5 },
+    { x: 30, z: D - 10.5 },
+    { x: -30, z: D - 10.5 },
   ]),
   passer("walker-2", "#8a5a9e", 1.1, 21000, [
-    { x: 30, z: -8.0 },
-    { x: -30, z: -8.0 },
-    { x: -30, z: -11.5 },
-    { x: 30, z: -11.5 },
+    { x: 30, z: D - 8 },
+    { x: -30, z: D - 8 },
+    { x: -30, z: D - 11.5 },
+    { x: 30, z: D - 11.5 },
   ]),
   passer("walker-3", "#4a8f7a", 1.4, 9000, [
-    { x: -30, z: -13.5 },
-    { x: 30, z: -13.5 },
-    { x: 30, z: -14.5 },
-    { x: -30, z: -14.5 },
+    { x: -30, z: D - 13.5 },
+    { x: 30, z: D - 13.5 },
+    { x: 30, z: D - 14.5 },
+    { x: -30, z: D - 14.5 },
   ]),
   // window shoppers: stop and look in at the glass
   passer("window-1", "#d46a4e", 1.0, 33000, [
-    { x: -30, z: -7.6 },
-    { x: -3.5, z: -7.6, pause: 7000 },
-    { x: 3.5, z: -7.6, pause: 5000 },
-    { x: 30, z: -7.6 },
-    { x: 30, z: -12.5 },
-    { x: -30, z: -12.5 },
+    { x: -30, z: D - 7.6 },
+    { x: -3.5, z: D - 7.6, pause: 7000 },
+    { x: 3.5, z: D - 7.6, pause: 5000 },
+    { x: 30, z: D - 7.6 },
+    { x: 30, z: D - 12.5 },
+    { x: -30, z: D - 12.5 },
   ]),
   passer("window-2", "#5b7fb5", 1.05, 52000, [
-    { x: 30, z: -7.4 },
-    { x: 7, z: -7.4, pause: 6000 },
-    { x: -30, z: -7.4 },
-    { x: -30, z: -12.0 },
-    { x: 30, z: -12.0 },
+    { x: 30, z: D - 7.4 },
+    { x: 7, z: D - 7.4, pause: 6000 },
+    { x: -30, z: D - 7.4 },
+    { x: -30, z: D - 12 },
+    { x: 30, z: D - 12 },
   ]),
   // customers: come in through the opening, look at a table or two, leave
   shopper("shopper-1", "#e07a5f", 4000, 1.25, [
-    { x: 1.25, z: -1.9, pause: 9000 },
+    { x: 1.25, z: -3.2, pause: 9000 },
     { x: 1.25, z: 0.45, pause: 6000 },
   ]),
   shopper("shopper-2", "#81b29a", 61000, -1.25, [
-    { x: -1.25, z: -1.4, pause: 8000 },
+    { x: -1.25, z: -2.0, pause: 8000 },
     { x: -1.25, z: 0.3, pause: 7000 },
   ]),
   shopper("shopper-3", "#f2cc8f", 98000, 1.25, [
     { x: 3.8, z: IN_Z },
-    { x: 3.8, z: -1.2, pause: 10000 },
+    { x: 3.8, z: -2.4, pause: 10000 },
     { x: 3.8, z: 1.4, pause: 6000 },
     { x: 3.8, z: IN_Z },
   ]),
@@ -153,7 +156,7 @@ export const ROUTES: Route[] = [
     colour: "#3d7ea6",
     points: [
       { x: 28, z: MALL.upperWalkZ[1] },
-      { x: 6, z: -20.2, pause: 9000 },
+      { x: 6, z: D - 20.2, pause: 9000 },
       { x: -28, z: MALL.upperWalkZ[1] },
       { x: -28, z: MALL.upperWalkZ[0] },
       { x: 28, z: MALL.upperWalkZ[0] },
@@ -167,8 +170,8 @@ export const ROUTES: Route[] = [
     phase: 71000,
     colour: "#8c4f8c",
     points: [
-      { x: -20, z: -20.2, pause: 12000 },
-      { x: 20, z: -20.2 },
+      { x: -20, z: D - 20.2, pause: 12000 },
+      { x: 20, z: D - 20.2 },
       { x: 20, z: MALL.upperWalkZ[0] },
       { x: -20, z: MALL.upperWalkZ[0] },
     ],

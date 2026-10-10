@@ -60,9 +60,9 @@ interface LayoutFile {
 }
 const LAYOUT = layoutData as LayoutFile;
 
-// The reference columns (a quarter of the shop's width either side of the
-// middle). Tables sit near these but are free to move.
-export const COLUMN_X = [-2.5, 0, 2.5] as const;
+// The table columns: about a quarter of the shop's width either side of the
+// middle. Tables sit near these but are free to move (src/shared/layout.json).
+export const COLUMN_X = [-2.8, 0, 2.8] as const;
 export const TABLE_H = 0.9;
 
 export const TABLES: Table[] = LAYOUT.tables.map((t) => ({ ...t, h: TABLE_H }));
@@ -83,13 +83,27 @@ export const BAR_STOOLS: Stool[] = STOOL_LIST.filter((s) => s.kind === "bar");
 // Stools beside the service tables. (Small and not solid, like the bar's.)
 export const TABLE_STOOLS: Stool[] = STOOL_LIST.filter((s) => s.kind === "table");
 
-// The service bar along the back and the partitions that close off the staff
-// space behind it.
-export const COUNTER: Box = { x: 0, z: 4.0, w: 5, d: 0.8, h: 1.05 };
-export const PARTITIONS: Box[] = [
-  { x: -2.5, z: 4.7, w: 0.12, d: 0.6, h: 1.05 },
-  { x: 2.5, z: 4.7, w: 0.12, d: 0.6, h: 1.05 },
-];
+// The service bar along the back, from almost the far edge of one service
+// table to almost the far edge of the other (Ritesh, 2026-10-11), and the
+// partitions that close off the staff space behind it. The bar's front edge
+// leaves a metre-wide aisle behind the seated people at it (their stools are
+// tucked 0.2 m under the edge), and the partitions run from the bar's back to
+// the wall.
+const SERVICE_TABLES = LAYOUT.tables.filter((t) => t.service);
+const OUTER_EDGE = Math.max(...SERVICE_TABLES.map((t) => Math.abs(t.x) + t.w / 2));
+export const BAR_HALF = Math.round((OUTER_EDGE - 0.1) * 100) / 100; // ends 0.1 m short of the tables' far edges
+export const BAR_D = 0.8;
+export const BAR_H = 1.05;
+const BAR_FRONT = Math.round(Math.max(...SERVICE_TABLES.map((t) => t.z + t.d / 2)) * 100) / 100 + 1.45;
+export const COUNTER: Box = { x: 0, z: BAR_FRONT + BAR_D / 2, w: BAR_HALF * 2, d: BAR_D, h: BAR_H };
+const PART_D = FLOOR.maxZ - (COUNTER.z + BAR_D / 2);
+export const PARTITIONS: Box[] = [-1, 1].map((s) => ({
+  x: s * (BAR_HALF - 0.06),
+  z: FLOOR.maxZ - PART_D / 2,
+  w: 0.12,
+  d: PART_D,
+  h: BAR_H,
+}));
 
 // The back room: same footprint as the store, behind the back wall. Its first
 // row of shelving starts after the wall (the wall's inner face is at maxZ+0.4).
@@ -98,7 +112,7 @@ export const BACK_ROOM_Z0 = WALL_FACE_Z + 0.2;
 export const BACK_ROOM_Z1 = BACK_ROOM_Z0 + (FLOOR.maxZ - FLOOR.minZ);
 
 export const BACK_SHELF_ROW_Z = [BACK_ROOM_Z0 + 2.0, BACK_ROOM_Z0 + 4.6] as const;
-export const BACK_SHELF_UNIT_X = [-3.1, 0, 3.1] as const;
+export const BACK_SHELF_UNIT_X = [-3.6, 0, 3.6] as const;
 export const BACK_SHELVES: Box[] = BACK_SHELF_ROW_Z.flatMap((z) =>
   BACK_SHELF_UNIT_X.map((x) => ({ x, z, w: 2.7, d: 0.62, h: 2.4 })),
 );
@@ -112,14 +126,15 @@ export const SERVICE_DESKS: Box[] = [
 // The flush staff door in the back wall, left of the bar.
 // On the visitor's LEFT of the bar as they face it, which is the +x side
 // (facing +z, the visitor's right hand is -x).
-export const DOOR = { minX: 2.9, maxX: 3.9 } as const;
+export const DOOR = { minX: BAR_HALF + 0.4, maxX: BAR_HALF + 1.4 } as const;
 
 // Product walls on both side walls: three recessed bays between piers, toward
 // the back of the shop. The bays are indented into the wall.
 export const BAY_COUNT = 3;
 export const BAY_W = 0.9;
 export const PIER_W = 0.2;
-export const BAY_START_Z = 0.7;
+// The bays run to 0.8 m short of the back wall; the wall bench stops where they start.
+export const BAY_START_Z = FLOOR.maxZ - 0.8 - (BAY_COUNT * BAY_W + (BAY_COUNT + 1) * PIER_W);
 export function bayCentre(i: number): number {
   return BAY_START_Z + PIER_W + BAY_W / 2 + i * (BAY_W + PIER_W);
 }
