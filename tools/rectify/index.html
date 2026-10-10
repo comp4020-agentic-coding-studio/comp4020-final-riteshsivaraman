@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rectify a wall</title>
+    <style>
+      :root {
+        --bg: #f4f5f7;
+        --fg: #15181d;
+        --muted: #5b6370;
+        --line: #d5d9e0;
+        --accent: #1f6feb;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg); }
+      header { padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+      header h1 { font-size: 15px; margin: 0; }
+      select, input[type="number"], button { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--fg); }
+      input[type="number"] { width: 74px; }
+      button { cursor: pointer; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      label { color: var(--muted); }
+      main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 14px 16px; align-items: start; }
+      @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+      section { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+      section h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+      canvas { display: block; max-width: 100%; background: #e9ecf0; border-radius: 6px; touch-action: none; }
+      #quads { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+      .q { padding: 3px 9px; border-radius: 999px; border: 2px solid; cursor: pointer; background: #fff; font-size: 13px; }
+      .q.on { color: #fff; }
+      #info { margin-top: 8px; color: var(--muted); }
+      #info b { color: var(--fg); }
+      #measures { margin: 6px 0 0; padding-left: 18px; }
+      .warn { color: #a33; }
+      kbd { background: #eef0f3; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Rectify a wall</h1>
+      <label>Photo <select id="image"></select></label>
+      <label><input type="checkbox" id="auto" checked /> estimate the true shape from the perspective</label>
+      <label>Real height (m) <input type="number" id="realH" step="0.05" min="0" /></label>
+      <label>Real width (m) <input type="number" id="realW" step="0.05" min="0" /></label>
+      <button id="save" class="primary">Save corners</button>
+      <button id="reset">Reset this photo to candidates</button>
+      <span id="status" style="color: var(--muted)"></span>
+    </header>
+    <main>
+      <section>
+        <h2>The photo: drag the four corners of each wall</h2>
+        <div id="quads"></div>
+        <canvas id="src"></canvas>
+        <div id="info"></div>
+      </section>
+      <section>
+        <h2>Straightened: click two points to measure</h2>
+        <canvas id="out"></canvas>
+        <ol id="measures"></ol>
+        <div style="margin-top: 6px"><button id="clearM">Clear measurements</button></div>
+        <p style="color: var(--muted); margin-top: 8px">
+          Corners go top-left, top-right, bottom-right, bottom-left. Enter one real size you trust
+          (for instance floor to ceiling is 3.8 m); the other follows from the perspective.
+          This assumes square pixels and a camera centred on the photo, so treat the result as
+          an estimate, not a survey. Crops and wide-angle lenses will throw it off.
+        </p>
+      </section>
+    </main>
+
+    <script type="module">
+      import { estimateAspect, rectify } from "/lib/homography.js";
+
+      const $ = (id) => document.getElementById(id);
+      const srcCanvas = $("src");
+      const outCanvas = $("out");
+      let state = { images: {} };
+      let imageName = null;
+      let quadIdx = 0;
+      let img = null;
+      let pixels = null; // full-size RGBA of the photo
+      let scale = 1;
+      let measures = []; // points on the rectified view (output pixels)
+      let ppm = 100; // output pixels per metre
+      let outW = 0;
+      let outH = 0;
+      let dragging = null;
+
+      const status = (t) => {
+        $("status").textContent = t;
+        if (t) setTimeout(() => ($("status").textContent === t ? ($("status").textContent = "") : 0), 2500);
+      };
+
+      async function boot() {
+        const [list, st] = await Promise.all([fetch("/ref-list").then((r) => r.json()), fetch("/api/state").then((r) => r.json())]);
+        state = st;
+        state.images ??= {};
+        // photos that already have corners first, in the order they were saved
+        const names = Object.keys(state.images).filter((n) => list.includes(n));
+        const rest = list.filter((n) => !state.images[n]);
+        for (const n of rest) state.images[n] = { quads: [] };
+        $("image").innerHTML = [...names, ...rest].map((n) => `<option>${n}</option>`).join("");
+        $("image").onchange = () => loadImage($("image").value);
+        await loadImage($("image").value);
+      }
+
+      async function loadImage(name) {
+        imageName = name;
+        quadIdx = 0;
+        measures = [];
+        img = new Image();
+        img.src = "/ref/" + name;
+        await img.decode();
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const g = c.getContext("2d");
+        g.drawImage(img, 0, 0);
+        pixels = g.getImageData(0, 0, c.width, c.height).data;
+        const dispW = Math.min(920, img.naturalWidth);
+        scale = dispW / img.naturalWidth;
+        srcCanvas.width = Math.round(img.naturalWidth * scale);
+        srcCanvas.height = Math.round(img.naturalHeight * scale);
+        renderQuadButtons();
+        syncInputs();
+        draw();
+      }
+
+      const quads = () => state.images[imageName].quads;
+      const cur = () => quads()[quadIdx];
+
+      function renderQuadButtons() {
+        const box = $("quads");
+        box.innerHTML = "";
+        quads().forEach((q, i) => {
+          const b = document.createElement("button");
+          b.className = "q" + (i === quadIdx ? " on" : "");
+          b.style.borderColor = q.colour;
+          if (i === quadIdx) b.style.background = q.colour;
+          b.textContent = q.label;
+          b.onclick = () => {
+            quadIdx = i;
+            measures = [];
+            renderQuadButtons();
+            syncInputs();
+            draw();
+          };
+          box.appendChild(b);
+        });
+        if (!quads().length) box.textContent = "No corners for this photo yet: use Reset to start from candidates, or ask for some.";
+      }
+
+      function syncInputs() {
+        const q = cur();
+        $("realH").value = q?.realHeight ?? "";
+        $("realW").value = q?.realWidth ?? "";
+      }
+
+      // --- the source view -------------------------------------------------
+      function draw() {
+        const g = srcCanvas.getContext("2d");
+        g.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
+        g.drawImage(img, 0, 0, srcCanvas.width, srcCanvas.height);
+        quads().forEach((q, i) => {
+          const p = q.pts.map(([x, y]) => [x * scale, y * scale]);
+          g.beginPath();
+          p.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y)));
+          g.closePath();
+          if (i === quadIdx) {
+            g.fillStyle = q.colour + "33";
+            g.fill();
+          }
+          g.lineWidth = i === quadIdx ? 2.5 : 1.5;
+          g.strokeStyle = q.colour;
+          g.stroke();
+          if (i === quadIdx) {
+            p.forEach(([x, y], k) => {
+              g.beginPath();
+              g.arc(x, y, 8, 0, Math.PI * 2);
+              g.fillStyle = "#fff";
+              g.fill();
+              g.lineWidth = 2.5;
+              g.strokeStyle = q.colour;
+              g.stroke();
+              g.fillStyle = q.colour;
+              g.font = "bold 11px system-ui";
+              g.textAlign = "center";
+              g.textBaseline = "middle";
+              g.fillText(String(k + 1), x, y);
+            });
+          }
+        });
+        update();
+      }
+
+      function pointerPos(e) {
+        const r = srcCanvas.getBoundingClientRect();
+        return [((e.clientX - r.left) / r.width) * srcCanvas.width, ((e.clientY - r.top) / r.height) * srcCanvas.height];
+      }
+      srcCanvas.addEventListener("pointerdown", (e) => {
+        const q = cur();
+        if (!q) return;
+        const [px, py] = pointerPos(e);
+        let best = -1;
+        let bd = 14;
+        q.pts.forEach(([x, y], k) => {
+          const d = Math.hypot(x * scale - px, y * scale - py);
+          if (d < bd) {
+            bd = d;
+            best = k;
+          }
+        });
+        if (best >= 0) {
+          dragging = best;
+          srcCanvas.setPointerCapture(e.pointerId);
+        }
+      });
+      srcCanvas.addEventListener("pointermove", (e) => {
+        if (dragging === null) return;
+        const [px, py] = pointerPos(e);
+        const q = cur();
+        q.pts[dragging] = [Math.max(0, Math.min(img.naturalWidth, px / scale)), Math.max(0, Math.min(img.naturalHeight, py / scale))];
+        draw();
+      });
+      const endDrag = () => {
+        if (dragging !== null) {
+          dragging = null;
+          measures = [];
+          save(true);
+        }
+      };
+      srcCanvas.addEventListener("pointerup", endDrag);
+      srcCanvas.addEventListener("pointercancel", endDrag);
+
+      // --- the straightened view ------------------------------------------
+      function update() {
+        const q = cur();
+        const info = $("info");
+        const octx = outCanvas.getContext("2d");
+        if (!q) {
+          octx.clearRect(0, 0, outCanvas.width, outCanvas.height);
+          info.textContent = "";
+          return;
+        }
+        const quad = q.pts;
+        const est = estimateAspect(quad, img.naturalWidth / 2, img.naturalHeight / 2);
+        const useAuto = $("auto").checked && est;
+        const rh = parseFloat($("realH").value) || null;
+        const rw = parseFloat($("realW").value) || null;
+        let aspect;
+        if (useAuto) aspect = est.aspect;
+        else if (rh && rw) aspect = rw / rh;
+        else aspect = est?.aspect ?? 1.5;
+        // one real size is enough; the other follows from the aspect
+        let heightM = rh;
+        let widthM = rw;
+        if (heightM && (useAuto || !widthM)) widthM = heightM * aspect;
+        else if (widthM && (useAuto || !heightM)) heightM = widthM / aspect;
+        // output size
+        const unitsH = heightM ?? 3;
+        ppm = Math.min(160, 520 / unitsH, 900 / (unitsH * aspect));
+        outH = Math.max(40, Math.round(unitsH * ppm));
+        outW = Math.max(40, Math.round(outH * aspect));
+        outCanvas.width = outW;
+        outCanvas.height = outH;
+        try {
+          const data = rectify(pixels, img.naturalWidth, img.naturalHeight, quad, outW, outH);
+          octx.putImageData(new ImageData(data, outW, outH), 0, 0);
+        } catch (e) {
+          octx.clearRect(0, 0, outW, outH);
+          info.innerHTML = `<span class="warn">Cannot straighten this shape: ${e.message}</span>`;
+          return;
+        }
+        // measurements
+        octx.lineWidth = 2;
+        measures.forEach((m, i) => {
+          octx.fillStyle = "#e6194b";
+          octx.beginPath();
+          octx.arc(m[0], m[1], 4, 0, Math.PI * 2);
+          octx.fill();
+          if (i % 2 === 1) {
+            const a = measures[i - 1];
+            octx.strokeStyle = "#e6194b";
+            octx.beginPath();
+            octx.moveTo(a[0], a[1]);
+            octx.lineTo(m[0], m[1]);
+            octx.stroke();
+          }
+        });
+        const lines = [];
+        for (let i = 0; i + 1 < measures.length; i += 2) {
+          const a = measures[i];
+          const b = measures[i + 1];
+          const dx = (b[0] - a[0]) / ppm;
+          const dy = (b[1] - a[1]) / ppm;
+          lines.push(`${Math.hypot(dx, dy).toFixed(2)} m  (across ${Math.abs(dx).toFixed(2)}, up ${Math.abs(dy).toFixed(2)})`);
+        }
+        $("measures").innerHTML = lines.map((l) => `<li>${l}</li>`).join("");
+        const parts = [];
+        parts.push(est ? `Perspective says the true shape is <b>${est.aspect.toFixed(2)} : 1</b> (wide : high), camera focal length about ${Math.round(est.focal)} px.` : `<span class="warn">No usable perspective in this quad (it is close to a parallelogram), so the shape cannot be recovered: enter both real sizes.</span>`);
+        if (heightM && widthM) parts.push(`Real size used: <b>${widthM.toFixed(2)} m wide</b> by <b>${heightM.toFixed(2)} m high</b>, drawn at ${Math.round(ppm)} px per metre.`);
+        else parts.push("Enter a real height or width to get measurements in metres.");
+        info.innerHTML = parts.join("<br>");
+        if (useAuto && widthM) $("realW").value = widthM.toFixed(2);
+        if (useAuto && heightM) $("realH").value = heightM.toFixed(2);
+      }
+
+      outCanvas.addEventListener("click", (e) => {
+        const r = outCanvas.getBoundingClientRect();
+        const x = ((e.clientX - r.left) / r.width) * outCanvas.width;
+        const y = ((e.clientY - r.top) / r.height) * outCanvas.height;
+        if (measures.length % 2 === 0 && measures.length >= 6) measures = [];
+        measures.push([x, y]);
+        update();
+      });
+      $("clearM").onclick = () => {
+        measures = [];
+        update();
+      };
+
+      // --- inputs and saving ----------------------------------------------
+      function readInputs(which) {
+        const q = cur();
+        if (!q) return;
+        const v = parseFloat($(which).value);
+        const key = which === "realH" ? "realHeight" : "realWidth";
+        if (Number.isFinite(v) && v > 0) q[key] = v;
+        else delete q[key];
+        // the other one is derived while the estimate is on; keep what was typed
+        if ($("auto").checked) delete q[key === "realHeight" ? "realWidth" : "realHeight"];
+        measures = [];
+        syncInputs();
+        update();
+      }
+      $("realH").oninput = () => readInputs("realH");
+      $("realW").oninput = () => readInputs("realW");
+      $("auto").onchange = () => update();
+
+      async function save(quiet) {
+        const r = await fetch("/api/state", { method: "POST", body: JSON.stringify(state, null, 1) });
+        status(r.ok ? (quiet ? "saved" : "Saved to docs/blueprint/rectify.json") : "save failed");
+      }
+      $("save").onclick = () => save(false);
+      $("reset").onclick = async () => {
+        const c = await fetch("/api/candidates").then((r) => r.json());
+        if (c.images[imageName]) state.images[imageName] = structuredClone(c.images[imageName]);
+        quadIdx = 0;
+        measures = [];
+        renderQuadButtons();
+        syncInputs();
+        draw();
+        save(true);
+      };
+
+      boot();
+    </script>
+  </body>
+</html>

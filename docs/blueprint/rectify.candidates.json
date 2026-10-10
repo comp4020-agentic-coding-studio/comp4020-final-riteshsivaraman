@@ -1,0 +1,265 @@
+{
+ "note": "Candidate corners, in the photo's own pixel coordinates, order TL, TR, BR, BL. Rough: drag them to fit.",
+ "images": {
+  "canberra-store.png": {
+   "quads": [
+    {
+     "id": "left-wall",
+     "label": "Left wall (+x), glass front to back corner",
+     "colour": "#e6194b",
+     "pts": [
+      [
+       143,
+       381
+      ],
+      [
+       714,
+       473
+      ],
+      [
+       707,
+       625
+      ],
+      [
+       143,
+       827
+      ]
+     ],
+     "realHeight": 3.8
+    },
+    {
+     "id": "right-wall",
+     "label": "Right wall (-x)",
+     "colour": "#3cb44b",
+     "pts": [
+      [
+       1334,
+       473
+      ],
+      [
+       1907,
+       381
+      ],
+      [
+       1907,
+       827
+      ],
+      [
+       1341,
+       625
+      ]
+     ],
+     "realHeight": 3.8
+    },
+    {
+     "id": "back-wall",
+     "label": "Back wall, ceiling to floor",
+     "colour": "#4363d8",
+     "pts": [
+      [
+       812,
+       541
+      ],
+      [
+       1237,
+       541
+      ],
+      [
+       1237,
+       617
+      ],
+      [
+       812,
+       617
+      ]
+     ],
+     "realHeight": 3.8
+    },
+    {
+     "id": "ceiling",
+     "label": "Ceiling, glass front to back wall",
+     "colour": "#f58231",
+     "pts": [
+      [
+       307,
+       401
+      ],
+      [
+       1741,
+       401
+      ],
+      [
+       1239,
+       539
+      ],
+      [
+       809,
+       539
+      ]
+     ],
+     "realWidth": 16
+    },
+    {
+     "id": "floor",
+     "label": "Floor, back wall to glass front",
+     "colour": "#911eb4",
+     "pts": [
+      [
+       809,
+       623
+      ],
+      [
+       1239,
+       623
+      ],
+      [
+       1905,
+       850
+      ],
+      [
+       143,
+       850
+      ]
+     ],
+     "realWidth": 16
+    }
+   ]
+  },
+  "canberra-left-wall.png": {
+   "quads": [
+    {
+     "id": "left-band",
+     "label": "Left wall: lightbox tops to floor",
+     "colour": "#e6194b",
+     "pts": [
+      [
+       292,
+       185
+      ],
+      [
+       1485,
+       385
+      ],
+      [
+       1485,
+       1075
+      ],
+      [
+       292,
+       1245
+      ]
+     ],
+     "realHeight": 3.35
+    },
+    {
+     "id": "left-bench",
+     "label": "Left wall: bench top to ceiling edge",
+     "colour": "#3cb44b",
+     "pts": [
+      [
+       292,
+       850
+      ],
+      [
+       1485,
+       690
+      ],
+      [
+       1485,
+       380
+      ],
+      [
+       292,
+       185
+      ]
+     ],
+     "realHeight": 2.4
+    }
+   ]
+  },
+  "canberra-right-wall.png": {
+   "quads": [
+    {
+     "id": "right-band",
+     "label": "Right wall: lightbox tops to floor",
+     "colour": "#3cb44b",
+     "pts": [
+      [
+       560,
+       235
+      ],
+      [
+       1855,
+       55
+      ],
+      [
+       1855,
+       830
+      ],
+      [
+       560,
+       745
+      ]
+     ],
+     "realHeight": 3.35
+    }
+   ]
+  },
+  "canberra-bays.png": {
+   "quads": [
+    {
+     "id": "bay-1",
+     "label": "First bay (recess)",
+     "colour": "#4363d8",
+     "pts": [
+      [
+       165,
+       75
+      ],
+      [
+       330,
+       85
+      ],
+      [
+       330,
+       495
+      ],
+      [
+       165,
+       500
+      ]
+     ],
+     "realHeight": 2.2
+    }
+   ]
+  },
+  "canberra-front-ceiling.png": {
+   "quads": [
+    {
+     "id": "ceiling-front",
+     "label": "Ceiling, near edge to far panels",
+     "colour": "#f58231",
+     "pts": [
+      [
+       300,
+       150
+      ],
+      [
+       1700,
+       150
+      ],
+      [
+       1280,
+       285
+      ],
+      [
+       720,
+       285
+      ]
+     ],
+     "realWidth": 16
+    }
+   ]
+  }
+ }
+}
