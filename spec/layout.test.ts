@@ -54,24 +54,28 @@ it("makes a table about a tenth of the room width", () => {
 // almost-square product tables and, nearest the bar, a larger square service
 // table with a stool each side; the middle column has three product tables and
 // one square service table.
-it("makes product tables almost square, the long edge running front to back", () => {
+// Ritesh (2026-10-11): "the tables are WAY too small ... larger, and more
+// elongated"; service tables 50% longer on each side.
+it("makes product tables long, the long edge running front to back, and big enough for people", () => {
   const products = TABLES.filter((t) => !t.service);
   for (const t of products) {
     expect(t.d).toBeGreaterThan(t.w);
-    expect(t.d / t.w).toBeGreaterThan(1.05); // not quite square
-    expect(t.d / t.w).toBeLessThan(1.4); // but almost
+    expect(t.d / t.w, `${t.id} is elongated`).toBeGreaterThan(1.4);
+    expect(t.d / t.w).toBeLessThan(2.5);
+    expect(t.w).toBeGreaterThanOrEqual(1.2);
+    expect(t.d).toBeGreaterThanOrEqual(2.0);
   }
 });
 
-it("makes each service table a square whose side is the long edge of a product table", () => {
+it("makes each service table a square 1.5 times the old 1.2 m side, wider than a product table", () => {
   const service = TABLES.filter((t) => t.service);
   expect(service).toHaveLength(3);
   for (const t of service) {
     expect(t.w).toBeCloseTo(t.d, 9);
-    expect(t.w).toBeCloseTo(TABLE_LEN, 9);
-    expect(t.w).toBeGreaterThan(TABLE_W); // slightly larger than a product table's width
+    expect(t.w).toBeCloseTo(1.2 * 1.5, 9);
+    expect(t.w).toBeGreaterThan(TABLE_W);
   }
-  expect(SERVICE_SIDE).toBe(TABLE_LEN);
+  expect(SERVICE_SIDE).toBeCloseTo(1.8, 9);
 });
 
 it("puts four product tables and a service table in each side column, three and one in the middle", () => {
@@ -154,12 +158,13 @@ it("keeps at least 1.3 m of clear aisle between table columns and beside the ben
 // Ritesh chose to enlarge the room for free movement (2026-10-11, "option A"):
 // the references' proportions (3.3x and 3.35x the wall height, so 10 x 10 m)
 // are now a floor, not a target.
-it("is at least as wide and deep as the 10 x 10 m the references gave, and about 11 x 15 m", () => {
+it("is at least as wide and deep as the 10 x 10 m the references gave, and about 12 x 18 m", () => {
   expect(ROOM_W).toBeGreaterThanOrEqual(10);
   expect(FLOOR.maxZ - FLOOR.minZ).toBeGreaterThanOrEqual(10);
-  expect(ROOM_W).toBeGreaterThan(10.5);
-  expect(FLOOR.maxZ - FLOOR.minZ).toBeGreaterThan(14.5);
-  expect(FLOOR.maxZ - FLOOR.minZ).toBeLessThan(16);
+  expect(ROOM_W).toBeGreaterThan(11);
+  expect(ROOM_W).toBeLessThan(13);
+  expect(FLOOR.maxZ - FLOOR.minZ).toBeGreaterThan(17);
+  expect(FLOOR.maxZ - FLOOR.minZ).toBeLessThan(19.5);
 });
 
 it("keeps a metre clear between tables, front to back and side to side", () => {
@@ -175,9 +180,12 @@ it("keeps a metre clear between tables, front to back and side to side", () => {
   }
 });
 
-// "this is where customers are received" (Ritesh, 2026-10-11)
-it("keeps 2.5 m clear inside the glass: no table or stool, so customers can be received", () => {
-  const limit = FLOOR.minZ + 2.5;
+// "this is where customers are received" (Ritesh, 2026-10-11); first asked for
+// 2.5 m, then "too much space at the front": 1.5 m.
+it("keeps 1.5 m clear inside the glass, and no more: customers are received there", () => {
+  const limit = FLOOR.minZ + 1.5;
+  const first = Math.min(...TABLES.map((t) => t.z - t.d / 2));
+  expect(first - FLOOR.minZ, "not wasting the front").toBeLessThan(1.5 + 0.25);
   for (const t of TABLES) expect(t.z - t.d / 2, t.id).toBeGreaterThanOrEqual(limit - 1e-6);
   for (const s of [...TABLE_STOOLS, ...BAR_STOOLS]) expect(s.z - 0.2, s.id).toBeGreaterThanOrEqual(limit - 1e-6);
 });

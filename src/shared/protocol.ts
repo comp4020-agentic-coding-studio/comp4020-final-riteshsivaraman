@@ -49,10 +49,22 @@ export type ServerMessage =
 // world.ts (clampToWalkable), which start from this box.
 // The rectified reference photos gave about 10 m by 10 m under a 3 m wall.
 // Ritesh then asked for more room so the tables can be about a metre apart and
-// the bar can seat 13 (2026-10-11, "option A"): 11 m wide and 15.4 m deep, the
-// wall height unchanged. The 3.3x / 3.35x height ratios are therefore no longer
+// the bar can seat 13 (2026-10-11, "option A"), then for larger, longer tables
+// (1.2 x 2.0 m, service tables 1.8 m square), 1.5 m clear inside the glass and
+// a 4+1 row count kept: 12 m wide and 18.2 m deep, the wall height unchanged. The 3.3x / 3.35x height ratios are therefore no longer
 // the shop's; they stay in SCOPE.md as the evidence the first size came from.
-export const FLOOR = { minX: -5.5, maxX: 5.5, minZ: -7.7, maxZ: 7.7 } as const;
+export const FLOOR = { minX: -6, maxX: 6, minZ: -9.1, maxZ: 9.1 } as const;
+
+// The store is on the first floor of the mall (Ritesh, 2026-10-11): its floor
+// is this high above the ground-floor concourse. Everything in the store is
+// drawn this far up; x and z are unchanged, so every other model is unaffected.
+export const STORE_Y = 4.4;
+
+// The first-floor walkway outside the glass: this deep, with a balustrade at
+// its far edge looking down into the atrium, reached through the entrance
+// opening (half-width in metres).
+export const WALKWAY_DEPTH = 3.4;
+export const ENTRANCE_HALF = 1.5;
 
 // Ceiling height in metres (drawn by the client; kept here beside the floor).
 export const CEILING = 3.0;

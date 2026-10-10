@@ -10,7 +10,7 @@
 // (Ritesh, 2026-10-11), so the features keep their order and proportions along
 // the wall: positions are stretched from the old front-to-bay span to the new
 // one (wallZ), widths by WALL_W_STRETCH. Heights are unchanged.
-import { FLOOR } from "./protocol.ts";
+import { ENTRANCE_HALF, FLOOR } from "./protocol.ts";
 import { BAY_START_Z } from "./world.ts";
 
 // Brushed-grey wall in three tones: dark below the bench, mid above it, then
@@ -21,7 +21,7 @@ export const FLOOR_REVEAL = 0.05; // dark gap between the wall panels and the fl
 const OLD_FRONT = -4.6; // where the old wall features started (z, 10 m shop)
 const OLD_BAYS = 0.7; // and where the old bays started
 const WALL_STRETCH = (BAY_START_Z - (FLOOR.minZ + 0.4)) / (OLD_BAYS - OLD_FRONT);
-const WALL_W_STRETCH = 1.5;
+const WALL_W_STRETCH = 1 + (WALL_STRETCH - 1) * 0.5; // widths grow half as much as the spacing
 const wallZ = (z: number): number => Math.round((FLOOR.minZ + 0.4 + (z - OLD_FRONT) * WALL_STRETCH) * 100) / 100;
 const wallW = (w: number): number => Math.round(w * WALL_W_STRETCH * 100) / 100;
 
@@ -88,11 +88,11 @@ export const BAY_LEDGES: Record<"+x" | "-x", readonly BayLedge[]> = {
 // The bar's back wall: three screens with a service mark between them, and a
 // sign above.
 export const BACK_WALL = {
-  screenX: [-2.4, 0, 2.4],
+  screenX: [-3.0, 0, 3.0],
   screenY: 1.95,
   screenW: 1.5,
   screenH: 0.75,
-  markX: [-1.2, 1.2],
+  markX: [-1.5, 1.5],
   markSize: 0.6,
   signY: 2.6,
   signW: 1.4,
@@ -100,7 +100,7 @@ export const BACK_WALL = {
 
 // The glass front: mullions, a header band across the top, and an entrance
 // opening (assumed 3 m wide, in the middle: [TK] until the real door is known).
-export const GLASS = { mullionX: [-4.1, 4.1], headerH: 0.45, entranceX: [-1.5, 1.5] } as const;
+export const GLASS = { mullionX: [-4.5, 4.5], headerH: 0.45, entranceX: [-ENTRANCE_HALF, ENTRANCE_HALF] } as const;
 
 export const DOOR_H = 2.3;
 // The card reader sits just outside the door, away from the bar (dx is added
@@ -118,7 +118,7 @@ export const CEILING_SPEC = {
   slatPitch: 0.25,
   // light panels in rows 1.4 m apart, from 1.1 m inside the glass to the back
   panelRowsZ: Array.from({ length: Math.floor((FLOOR.maxZ - FLOOR.minZ - 2.2) / 1.4) + 1 }, (_, i) => Math.round((FLOOR.minZ + 1.1 + i * 1.4) * 10) / 10),
-  panelX: [-2.8, 2.8],
+  panelX: [-3.2, 3.2],
   panelW: 1.8, // along x
   panelD: 0.4, // along z
   spotPitch: 1.1,

@@ -1,4 +1,4 @@
-import { FLOOR, type Role } from "./protocol.ts";
+import { ENTRANCE_HALF, FLOOR, WALKWAY_DEPTH, type Role } from "./protocol.ts";
 
 // The store's solid objects and walkable areas, as axis-aligned boxes on the
 // floor plan. One list feeds both the scene (what is drawn) and the movement
@@ -62,7 +62,7 @@ const LAYOUT = layoutData as LayoutFile;
 
 // The table columns: about a quarter of the shop's width either side of the
 // middle. Tables sit near these but are free to move (src/shared/layout.json).
-export const COLUMN_X = [-2.8, 0, 2.8] as const;
+export const COLUMN_X = [-3.2, 0, 3.2] as const;
 export const TABLE_H = 0.9;
 
 export const TABLES: Table[] = LAYOUT.tables.map((t) => ({ ...t, h: TABLE_H }));
@@ -157,14 +157,32 @@ export function solidsFor(role: Role): Box[] {
 // Walkable areas. A point outside them is pulled to the nearest edge.
 const BAR_FRONT_Z = COUNTER.z - COUNTER.d / 2;
 const BAR_X = Math.abs(PARTITIONS[0].x) + PARTITIONS[0].w / 2;
+// The first-floor walkway outside the glass, through the entrance opening:
+// anyone may step out to the balustrade and look down into the atrium. Its
+// balustrade is 0.5 m past the far edge (the glass front is 0.5 m outside the
+// floor).
+export const WALKWAY: Rect = {
+  minX: -10,
+  maxX: 10,
+  minZ: FLOOR.minZ - 0.5 - WALKWAY_DEPTH + 0.5,
+  maxZ: FLOOR.minZ - 0.65,
+};
+const ENTRANCE: Rect = {
+  minX: -ENTRANCE_HALF + 0.3,
+  maxX: ENTRANCE_HALF - 0.3,
+  minZ: FLOOR.minZ - 0.7,
+  maxZ: FLOOR.minZ + 0.1,
+};
+const OUTSIDE: Rect[] = [WALKWAY, ENTRANCE];
 const CUSTOMER_RECTS: Rect[] = [
   { ...FLOOR, maxZ: BAR_FRONT_Z },
   { minX: FLOOR.minX, maxX: -BAR_X, minZ: BAR_FRONT_Z, maxZ: FLOOR.maxZ },
   { minX: BAR_X, maxX: FLOOR.maxX, minZ: BAR_FRONT_Z, maxZ: FLOOR.maxZ },
+  ...OUTSIDE,
 ];
 const DOORWAY: Rect = { minX: DOOR.minX + 0.1, maxX: DOOR.maxX - 0.1, minZ: FLOOR.maxZ - 0.1, maxZ: BACK_ROOM_Z0 + 0.5 };
 const BACK_ROOM: Rect = { minX: FLOOR.minX, maxX: FLOOR.maxX, minZ: BACK_ROOM_Z0 + 0.3, maxZ: BACK_ROOM_Z1 - 0.3 };
-const STAFF_RECTS: Rect[] = [{ ...FLOOR }, DOORWAY, BACK_ROOM];
+const STAFF_RECTS: Rect[] = [{ ...FLOOR }, DOORWAY, BACK_ROOM, ...OUTSIDE];
 
 export function clampToWalkable(role: Role, x: number, z: number): { x: number; z: number } {
   const rects = role === "staff" ? STAFF_RECTS : CUSTOMER_RECTS;
@@ -213,6 +231,33 @@ export function resolveCollisions(x: number, z: number, role: Role = "customer")
         else if (m === right) x = maxX + BODY_RADIUS;
         else if (m === front) z = minZ - BODY_RADIUS;
         else z = maxZ + BODY_RADIUS;
+      }
+    }
+  }
+  return { x, z };
+}
+
+// People do not walk through each other (Ritesh, 2026-10-11). Push a point out
+// of every other person's body: two bodies of BODY_RADIUS may touch but not
+// overlap. A person standing exactly on top of another is nudged along x so the
+// result is deterministic.
+export function separateFromPeople(
+  x: number,
+  z: number,
+  others: ReadonlyArray<{ x: number; z: number }>,
+): { x: number; z: number } {
+  const min = BODY_RADIUS * 2;
+  for (let pass = 0; pass < 4; pass++) {
+    for (const o of others) {
+      const dx = x - o.x;
+      const dz = z - o.z;
+      const d = Math.hypot(dx, dz);
+      if (d >= min) continue;
+      if (d < 1e-6) {
+        x = o.x + min;
+      } else {
+        x = o.x + (dx / d) * min;
+        z = o.z + (dz / d) * min;
       }
     }
   }

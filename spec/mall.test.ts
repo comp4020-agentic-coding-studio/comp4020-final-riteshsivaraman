@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { MALL, ROUTES, routePose } from "../src/shared/mall.ts";
-import { FLOOR } from "../src/shared/protocol.ts";
+import { FLOOR, STORE_Y } from "../src/shared/protocol.ts";
 import { SOLIDS } from "../src/shared/world.ts";
 
 // Promise: the mall around the store is the same for everyone and the people
@@ -27,19 +27,30 @@ it("never jumps: every step is at most walking speed, around the whole loop", ()
   }
 });
 
-it("keeps the concourse people between the shopfronts and on their own level", () => {
+// The store is on the first floor (Ritesh, 2026-10-11): outside the glass is a
+// walkway at the store's level with a balustrade, then a void down to the
+// ground-floor concourse; the opposite shopfronts have a walkway at the same
+// level. People are on one level or the other and never in the void.
+it("keeps everyone on a floor: walkers below, walkway and mezzanine people at the store's level", () => {
+  expect(MALL.mezzanineY).toBe(STORE_Y);
   for (const r of ROUTES) {
     for (let t = 0; t < 300_000; t += 1500) {
       const p = routePose(r, T0 + t);
       expect(p.x).toBeGreaterThanOrEqual(MALL.minX);
       expect(p.x).toBeLessThanOrEqual(MALL.maxX);
       if (r.kind === "upper") {
-        expect(p.z).toBeGreaterThanOrEqual(MALL.mezzanineZ0);
+        expect(p.y).toBe(STORE_Y);
+        expect(p.z, `${r.id}`).toBeGreaterThanOrEqual(MALL.mezzanineZ0);
         expect(p.z).toBeLessThanOrEqual(MALL.mezzanineZ1);
-        expect(p.y).toBeGreaterThan(MALL.mezzanineY);
-      } else {
+      } else if (p.y === STORE_Y) {
+        // on the walkway outside the glass (or inside the store)
+        expect(p.z, `${r.id} stays behind the balustrade`).toBeGreaterThanOrEqual(MALL.walkwayZ);
         expect(p.z).toBeLessThanOrEqual(FLOOR.maxZ);
+      } else {
+        // on the ground floor, in the atrium beyond the walkway
         expect(p.y).toBe(0);
+        expect(p.z, `${r.id} on the ground floor`).toBeLessThanOrEqual(MALL.walkwayZ);
+        expect(p.z).toBeGreaterThanOrEqual(MALL.farZ);
       }
     }
   }

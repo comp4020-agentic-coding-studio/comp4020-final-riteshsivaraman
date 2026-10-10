@@ -9,6 +9,7 @@ import {
   type ServerMessage,
   type VisitorInfo,
 } from "../shared/protocol.ts";
+import { avoidPeople } from "../shared/people.ts";
 import { clampToWalkable } from "../shared/world.ts";
 import { db } from "./db.ts";
 
@@ -24,6 +25,9 @@ interface Session extends VisitorInfo, Pose {
 }
 
 const sessions = new Map<string, Session>(); // visitor id -> live session
+
+const otherVisitors = (id: string): Array<{ x: number; z: number }> =>
+  [...sessions.values()].filter((s) => s.id !== id).map((s) => ({ x: s.x, z: s.z }));
 
 // Dev only: a visitor may switch themselves between customer and staff. The
 // server trusts the claim, so this has to be turned off (or backed by real
@@ -121,7 +125,9 @@ export function handleConnection(socket: WebSocket): void {
         existing.socket.close(4000, "opened elsewhere");
       }
 
-      me = { ...visitor, ...SPAWN, role: "customer", socket, lastMoveAt: 0 };
+      // appear at the spawn point, or beside whoever is standing on it
+      const spot = avoidPeople(SPAWN.x, SPAWN.z, otherVisitors(visitor.id), Date.now());
+      me = { ...visitor, ...SPAWN, x: spot.x, z: spot.z, role: "customer", socket, lastMoveAt: 0 };
       const others = [...sessions.values()].map(present);
       sessions.set(me.id, me);
 
@@ -157,7 +163,10 @@ export function handleConnection(socket: WebSocket): void {
       if (now - me.lastMoveAt < 40) return; // at most 25 updates a second
       if (![message.x, message.z, message.ry].every(Number.isFinite)) return;
       me.lastMoveAt = now;
-      const p = clampToWalkable(me.role, message.x, message.z);
+      let p = clampToWalkable(me.role, message.x, message.z);
+      // people are solid: not through another visitor, staff or customer
+      p = avoidPeople(p.x, p.z, otherVisitors(me.id), now);
+      p = clampToWalkable(me.role, p.x, p.z);
       me.x = p.x;
       me.z = p.z;
       me.ry = message.ry;

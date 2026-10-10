@@ -1,6 +1,8 @@
 import { afterEach, expect, inject, it } from "vitest";
 import WebSocket from "ws";
 import { FLOOR, type ClientMessage, type ServerMessage } from "../src/shared/protocol.ts";
+import { MALL } from "../src/shared/mall.ts";
+import { WALKWAY } from "../src/shared/world.ts";
 
 // Promise: a change one visitor makes reaches every other open session within
 // about a second, with no reload (the brief's real-time requirement). These
@@ -79,16 +81,44 @@ it("shows B's movement to A within a second, with no action from A", async () =>
   expect(moved).toMatchObject({ type: "moved", id: b.id, x: 2.5, z: 1.25 });
 });
 
-it("never lets a visitor stand outside the store", async () => {
+// The store is on the first floor: outside the glass is a walkway a visitor
+// may step onto, with a balustrade. Beyond it is a drop, so nobody stands there.
+it("never lets a visitor stand in the void beyond the balustrade or outside the walls", async () => {
   const a = await visitor();
   const b = await visitor();
   b.send({ type: "move", x: 9999, z: -9999, ry: 0 });
   const moved = await a.next((m) => m.type === "moved" && m.id === b.id);
   if (moved.type !== "moved") throw new Error("wrong message");
   expect(moved.x).toBeGreaterThanOrEqual(FLOOR.minX);
-  expect(moved.x).toBeLessThanOrEqual(FLOOR.maxX);
-  expect(moved.z).toBeGreaterThanOrEqual(FLOOR.minZ);
+  expect(moved.x).toBeLessThanOrEqual(WALKWAY.maxX);
+  expect(moved.z).toBeGreaterThanOrEqual(MALL.walkwayZ);
   expect(moved.z).toBeLessThanOrEqual(FLOOR.maxZ);
+});
+
+it("does not let one visitor walk through another", async () => {
+  const a = await visitor();
+  const b = await visitor();
+  a.send({ type: "move", x: 2.2, z: -2.0, ry: 0 });
+  await b.next((m) => m.type === "moved" && m.id === a.id);
+  await new Promise((r) => setTimeout(r, 60)); // the server accepts a move every 40 ms
+  b.send({ type: "move", x: 2.2, z: -2.0, ry: 0 }); // right on top of a
+  const moved = await a.next((m) => m.type === "moved" && m.id === b.id);
+  if (moved.type !== "moved") throw new Error("wrong message");
+  expect(Math.hypot(moved.x - 2.2, moved.z - -2.0)).toBeGreaterThanOrEqual(0.5);
+});
+
+it("puts a visitor who joins beside, not on top of, the person standing at the spawn", async () => {
+  const a = await visitor();
+  const joined = await visitor();
+  const first = a.messages.find((m) => m.type === "joined" && m.visitor.id === joined.id);
+  if (!first || first.type !== "joined") throw new Error("no join seen");
+  const mine = (await joined.next((m) => m.type === "welcome")) as Extract<ServerMessage, { type: "welcome" }>;
+  const there = mine.others.find((o) => o.id === a.id);
+  expect(there).toBeDefined();
+  // A greeter can stand at the spawn too, and then the newcomer is pushed from
+  // two bodies at once and cannot clear both by a full body width. Not on top
+  // of them is the promise; the full 0.6 m is covered by the pure specs.
+  expect(Math.hypot(first.visitor.x - (there?.x ?? 0), first.visitor.z - (there?.z ?? 0))).toBeGreaterThan(0.25);
 });
 
 // Measured on Fly: a clean WebSocket close takes ~5 s to reach the server

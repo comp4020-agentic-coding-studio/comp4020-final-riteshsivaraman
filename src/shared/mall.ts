@@ -6,19 +6,24 @@
 // z is the same axis as the store. Every z below was set for a shop whose glass
 // front was at z = -5; D moves the whole mall back by however much deeper the
 // shop is now, so the concourse sits in front of the glass wherever it is.
-import { FLOOR } from "./protocol.ts";
+import { FLOOR, STORE_Y, WALKWAY_DEPTH } from "./protocol.ts";
 
 const D = FLOOR.minZ + 5;
 
+// The store is on the first floor (STORE_Y), as in a mall atrium: outside the
+// glass is a walkway with a balustrade, then the void down to the ground-floor
+// concourse (shopfronts under the walkway and opposite), and the opposite
+// first-floor shopfronts with their own walkway.
 export const MALL = {
   minX: -34,
   maxX: 34,
   frontZ: FLOOR.minZ - 0.5, // the store's glass front
+  walkwayZ: FLOOR.minZ - 0.5 - WALKWAY_DEPTH, // the balustrade, looking down into the atrium
   farZ: D - 26, // the opposite shopfronts
-  ceilingY: 7.4, // high atrium roof
-  mezzanineY: 4.4, // upper walkway slab
+  ceilingY: STORE_Y + 5.6, // high atrium roof
+  mezzanineY: STORE_Y, // the opposite walkway, level with the store
   mezzanineZ0: D - 26, // slab runs from the far shopfronts...
-  mezzanineZ1: D - 19.5, // ...to the glass balustrade
+  mezzanineZ1: D - 19.5, // ...to its glass balustrade
   upperWalkZ: [D - 21.8, D - 20.6],
 } as const;
 
@@ -40,103 +45,136 @@ export interface Route {
   points: RoutePoint[]; // a closed loop: the last point leads back to the first
 }
 
-const LEVEL = 0;
-const UPPER = MALL.mezzanineY + 0.15; // top of the mezzanine slab
+const GROUND = 0;
+const FIRST = STORE_Y; // the walkway and the store: feet on the first-floor slab
 
-const passer = (id: string, colour: string, speed: number, phase: number, points: RoutePoint[]): Route => ({
+const passer = (id: string, colour: string, speed: number, phase: number, points: RoutePoint[], y = GROUND): Route => ({
   id,
   kind: "passer",
-  y: LEVEL,
+  y,
   speed,
   phase,
   colour,
   points,
 });
 
-// Ways in and out. They go through the opening in the glass (|x| <= 1.5) and
-// then up an aisle between the tables. Positions follow the store's own edges.
-const OUT = FLOOR.minZ - 3.5; // on the concourse, in front of the store
+// Lanes on the first-floor walkway, from the glass outward.
+const W_NEAR = MALL.frontZ - 0.9; // window-shopping, close to the glass
+const W_MID = MALL.frontZ - 1.7; // the lane customers walk in from
+const W_RAIL = MALL.frontZ - 2.6; // the lane back, by the balustrade
+// Lanes on the ground-floor concourse, below and beyond the walkway.
+const G = (k: number): number => MALL.walkwayZ - k;
+
+// Ways in and out. They come along the walkway, go through the opening in the
+// glass (|x| <= ENTRANCE_HALF) and then up an aisle between the tables.
 const DOOR_Z = FLOOR.minZ - 0.7; // just outside the glass
-const IN_Z = FLOOR.minZ + 0.4; // just inside, in the lane before the first tables
+const IN_Z = FLOOR.minZ + 0.4; // just inside, in the clear zone before the first tables
 
 const shopper = (id: string, colour: string, phase: number, laneX: number, stops: RoutePoint[]): Route => ({
   id,
   kind: "shopper",
-  y: LEVEL,
+  y: FIRST,
   speed: 1.15,
   phase,
   colour,
   points: [
-    { x: -30, z: OUT },
-    { x: laneX, z: OUT },
+    { x: -30, z: W_MID },
+    { x: laneX, z: W_MID },
     { x: laneX, z: DOOR_Z },
     { x: laneX, z: IN_Z },
     ...stops,
     { x: laneX, z: IN_Z },
     { x: laneX, z: DOOR_Z },
-    { x: laneX, z: OUT },
-    { x: 30, z: OUT },
-    { x: 30, z: OUT - 1.4 },
-    { x: -30, z: OUT - 1.4 },
+    { x: laneX, z: W_MID },
+    { x: 30, z: W_MID },
+    { x: 30, z: W_RAIL },
+    { x: -30, z: W_RAIL },
   ],
 });
 
 export const ROUTES: Route[] = [
-  // people walking past the store, two ways along the concourse
+  // people on the ground-floor concourse, seen from above: two ways along it
   passer("walker-1", "#c9a227", 1.25, 0, [
-    { x: -30, z: D - 9.5 },
-    { x: 30, z: D - 9.5 },
-    { x: 30, z: D - 10.5 },
-    { x: -30, z: D - 10.5 },
+    { x: -30, z: G(2) },
+    { x: 30, z: G(2) },
+    { x: 30, z: G(3) },
+    { x: -30, z: G(3) },
   ]),
   passer("walker-2", "#8a5a9e", 1.1, 21000, [
-    { x: 30, z: D - 8 },
-    { x: -30, z: D - 8 },
-    { x: -30, z: D - 11.5 },
-    { x: 30, z: D - 11.5 },
+    { x: 30, z: G(5) },
+    { x: -30, z: G(5) },
+    { x: -30, z: G(6.5) },
+    { x: 30, z: G(6.5) },
   ]),
   passer("walker-3", "#4a8f7a", 1.4, 9000, [
-    { x: -30, z: D - 13.5 },
-    { x: 30, z: D - 13.5 },
-    { x: 30, z: D - 14.5 },
-    { x: -30, z: D - 14.5 },
+    { x: -30, z: G(9) },
+    { x: 30, z: G(9) },
+    { x: 30, z: G(10.5) },
+    { x: -30, z: G(10.5) },
   ]),
-  // window shoppers: stop and look in at the glass
-  passer("window-1", "#d46a4e", 1.0, 33000, [
-    { x: -30, z: D - 7.6 },
-    { x: -3.5, z: D - 7.6, pause: 7000 },
-    { x: 3.5, z: D - 7.6, pause: 5000 },
-    { x: 30, z: D - 7.6 },
-    { x: 30, z: D - 12.5 },
-    { x: -30, z: D - 12.5 },
+  passer("walker-4", "#b5651d", 1.0, 40000, [
+    { x: -12, z: G(4), pause: 6000 },
+    { x: 4, z: G(4) },
+    { x: 8, z: G(7.5), pause: 9000 },
+    { x: -6, z: G(8) },
   ]),
-  passer("window-2", "#5b7fb5", 1.05, 52000, [
-    { x: 30, z: D - 7.4 },
-    { x: 7, z: D - 7.4, pause: 6000 },
-    { x: -30, z: D - 7.4 },
-    { x: -30, z: D - 12 },
-    { x: 30, z: D - 12 },
+  passer("walker-5", "#3d7ea6", 1.15, 66000, [
+    { x: 14, z: G(3.5) },
+    { x: -2, z: G(3.5), pause: 7000 },
+    { x: -14, z: G(9.5), pause: 5000 },
+    { x: 10, z: G(9.5) },
   ]),
-  // customers: come in through the opening, look at a table or two, leave
+  // window shoppers on the walkway: stop and look in at the glass
+  passer(
+    "window-1",
+    "#d46a4e",
+    1.0,
+    33000,
+    [
+      { x: -30, z: W_NEAR },
+      { x: -4.5, z: W_NEAR, pause: 7000 },
+      { x: 4.5, z: W_NEAR, pause: 5000 },
+      { x: 30, z: W_NEAR },
+      { x: 30, z: W_RAIL },
+      { x: -30, z: W_RAIL },
+    ],
+    FIRST,
+  ),
+  passer(
+    "window-2",
+    "#5b7fb5",
+    1.05,
+    52000,
+    [
+      { x: 30, z: W_NEAR },
+      { x: 7, z: W_NEAR, pause: 6000 },
+      { x: -30, z: W_NEAR },
+      { x: -30, z: W_RAIL },
+      { x: 30, z: W_RAIL },
+    ],
+    FIRST,
+  ),
+  // customers: come along the walkway, in through the opening, look at a table
+  // or two, leave
   shopper("shopper-1", "#e07a5f", 4000, 1.25, [
-    { x: 1.25, z: -3.2, pause: 9000 },
-    { x: 1.25, z: 0.45, pause: 6000 },
+    { x: 1.25, z: FLOOR.minZ + 4.5, pause: 9000 },
+    { x: 1.25, z: FLOOR.minZ + 8.0, pause: 6000 },
   ]),
   shopper("shopper-2", "#81b29a", 61000, -1.25, [
-    { x: -1.25, z: -2.0, pause: 8000 },
-    { x: -1.25, z: 0.3, pause: 7000 },
+    { x: -1.25, z: FLOOR.minZ + 5.5, pause: 8000 },
+    { x: -1.25, z: FLOOR.minZ + 9.0, pause: 7000 },
   ]),
   shopper("shopper-3", "#f2cc8f", 98000, 1.25, [
-    { x: 3.8, z: IN_Z },
-    { x: 3.8, z: -2.4, pause: 10000 },
-    { x: 3.8, z: 1.4, pause: 6000 },
-    { x: 3.8, z: IN_Z },
+    { x: 4.6, z: IN_Z },
+    { x: 4.6, z: FLOOR.minZ + 3.5, pause: 10000 },
+    { x: 4.6, z: FLOOR.minZ + 8.5, pause: 6000 },
+    { x: 4.6, z: IN_Z },
   ]),
-  // up on the mezzanine, across the way
+  // across the way, on the opposite first-floor walkway
   {
     id: "upper-1",
     kind: "upper",
-    y: UPPER,
+    y: FIRST,
     speed: 1.2,
     phase: 0,
     colour: "#b5651d",
@@ -150,7 +188,7 @@ export const ROUTES: Route[] = [
   {
     id: "upper-2",
     kind: "upper",
-    y: UPPER,
+    y: FIRST,
     speed: 1.0,
     phase: 40000,
     colour: "#3d7ea6",
@@ -165,7 +203,7 @@ export const ROUTES: Route[] = [
   {
     id: "upper-3",
     kind: "upper",
-    y: UPPER,
+    y: FIRST,
     speed: 1.15,
     phase: 71000,
     colour: "#8c4f8c",
