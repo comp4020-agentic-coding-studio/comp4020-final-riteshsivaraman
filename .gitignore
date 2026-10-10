@@ -24,3 +24,8 @@ mise.local.toml
 # .claude/skills/ are part of the tracked harness --- CLAUDE.md's own "Where
 # things live" index points at them --- so they're not blanket-excluded.
 .claude/settings*.json
+
+# third-party reference photographs stay local (see references/README.md)
+references/*.png
+references/*.jpg
+references/*.jpeg

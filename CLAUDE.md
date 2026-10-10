@@ -73,7 +73,10 @@ since a subtly wrong implementation there looks identical to a correct one
 in every normal run.
 
 ## Git hygiene and dependencies
-Commits are normal and expected. Amend, rebase, and force-push are flatly
+Commit regularly: after each coherent working change, and before
+deploying it, in small logical commits --- not one big batch at the end. The
+history is marked evidence, and PROCESS.md and LEARNINGS.md cite it by hash.
+Pushing still needs a yes from Ritesh. Amend, rebase, and force-push are flatly
 banned, not just "ask first" — PROCESS.md cites commits by hash, and the
 marker follows those links; rewriting history breaks a citation silently.
 Adding a new dependency needs a stated reason at the point it's added (a
