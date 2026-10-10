@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1022" height="1724" viewBox="0 0 1022 1724">
-<rect width="1022" height="1724" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1022" height="2627" viewBox="0 0 1022 2627">
+<rect width="1022" height="2627" fill="#ffffff"/>
 <text x="60.0" y="28.0" font-size="16" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">Floor plan, as a visitor sees it entering: +x wall on the LEFT, entrance at the bottom (metres)</text>
 <rect x="98.4" y="93.2" width="825.6" height="720.0" fill="#f4f1e8" stroke="#9a9484" stroke-width="1.5" stroke-dasharray="6 4"/>
 <text x="511.2" y="109.2" font-size="12" text-anchor="middle" fill="#6b6556" font-weight="600" font-family="system-ui, sans-serif">BACK ROOM (staff only): same footprint as the shop</text>
@@ -19,6 +19,64 @@
 <text x="511.2" y="289.2" font-size="10" text-anchor="middle" fill="#355a7a" font-weight="400" font-family="system-ui, sans-serif">REPAIR BENCHES (technicians stand behind)</text>
 <rect x="151.2" y="100.4" width="720.0" height="19.2" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
 <text x="511.2" y="113.0" font-size="9" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">parts wall</text>
+<rect x="69.6" y="1586.0" width="883.2" height="864.0" fill="#eef0f2" stroke="#b0b5ba" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="511.2" y="1658.0" font-size="12" text-anchor="middle" fill="#555" font-weight="600" font-family="system-ui, sans-serif">MALL CONCOURSE (carries on both ways, 68 m)</text>
+<rect x="69.6" y="2138.0" width="883.2" height="312.0" fill="#e4e0d4" stroke="#9a9484" stroke-width="1.2" stroke-dasharray="6 3"/>
+<text x="511.2" y="2298.0" font-size="11" text-anchor="middle" fill="#6b6556" font-weight="400" font-family="system-ui, sans-serif">MEZZANINE walkway above (y = 4.4 m), glass balustrade on the concourse side</text>
+<text x="511.2" y="2466.0" font-size="11" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">opposite shopfronts (ground level and upstairs)</text>
+<text x="511.2" y="1600.0" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">neighbouring shops either side of the store</text>
+<line x1="952.8" y1="1802.0" x2="69.6" y2="1802.0" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1754.0" x2="952.8" y2="1754.0" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1710.8" x2="952.8" y2="1710.8" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="1854.8" x2="69.6" y2="1854.8" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="1946.0" x2="69.6" y2="1946.0" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1994.0" x2="952.8" y2="1994.0" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="1677.2" x2="799.2" y2="1677.2" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="799.2" y1="1677.2" x2="223.2" y2="1677.2" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="223.2" y1="1677.2" x2="69.6" y2="1677.2" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1898.0" x2="952.8" y2="1898.0" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1667.6" x2="952.8" y2="1667.6" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="1874.0" x2="69.6" y2="1874.0" stroke="#4a8f7a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="1778.0" x2="415.2" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1778.0" x2="415.2" y2="1634.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1634.0" x2="415.2" y2="1509.2" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1509.2" x2="415.2" y2="1346.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1346.0" x2="415.2" y2="1154.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1154.0" x2="415.2" y2="1509.2" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1509.2" x2="415.2" y2="1634.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1634.0" x2="415.2" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1778.0" x2="69.6" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1710.8" x2="952.8" y2="1710.8" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="1778.0" x2="607.2" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1778.0" x2="607.2" y2="1634.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1634.0" x2="607.2" y2="1509.2" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1509.2" x2="607.2" y2="1307.6" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1307.6" x2="607.2" y2="1086.8" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1086.8" x2="607.2" y2="1509.2" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1509.2" x2="607.2" y2="1634.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1634.0" x2="607.2" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="607.2" y1="1778.0" x2="69.6" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1710.8" x2="952.8" y2="1710.8" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="1778.0" x2="415.2" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1778.0" x2="415.2" y2="1634.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1634.0" x2="415.2" y2="1509.2" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1509.2" x2="223.2" y2="1499.6" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="223.2" y1="1499.6" x2="223.2" y2="1250.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="223.2" y1="1250.0" x2="223.2" y2="1058.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="223.2" y1="1058.0" x2="223.2" y2="1499.6" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="223.2" y1="1499.6" x2="415.2" y2="1509.2" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1509.2" x2="415.2" y2="1634.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1634.0" x2="415.2" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="415.2" y1="1778.0" x2="69.6" y2="1778.0" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="1710.8" x2="952.8" y2="1710.8" stroke="#d1495b" stroke-width="1.8" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="2248.4" x2="69.6" y2="2248.4" stroke="#7a6a3a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="2190.8" x2="952.8" y2="2190.8" stroke="#7a6a3a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="2190.8" x2="223.2" y2="2171.6" stroke="#7a6a3a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="223.2" y1="2171.6" x2="952.8" y2="2190.8" stroke="#7a6a3a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="2248.4" x2="69.6" y2="2248.4" stroke="#7a6a3a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="952.8" y1="2171.6" x2="69.6" y2="2171.6" stroke="#7a6a3a" stroke-width="1" stroke-dasharray="5 4"/>
+<line x1="69.6" y1="2248.4" x2="952.8" y2="2248.4" stroke="#7a6a3a" stroke-width="1" stroke-dasharray="5 4"/>
+<text x="775.2" y="2018.0" font-size="10" text-anchor="start" fill="#444" font-weight="400" font-family="system-ui, sans-serif">walkers (green) pass along the concourse; shoppers (red) come in through the opening and out again; upstairs (olive)</text>
 <rect x="127.2" y="842.0" width="768.0" height="720.0" fill="#f6f7f8" stroke="none" stroke-width="0" />
 <rect x="852.0" y="890.0" width="43.2" height="624.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
 <rect x="127.2" y="890.0" width="43.2" height="624.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
@@ -128,7 +186,7 @@
 <line x1="638.2" y1="1326.8" x2="648.2" y2="1326.8" stroke="#1f6feb" stroke-width="1" />
 <line x1="638.2" y1="1461.2" x2="648.2" y2="1461.2" stroke="#1f6feb" stroke-width="1" />
 <text transform="translate(637.2 1394.0) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">2.8 m long</text>
-<text x="60.0" y="1662.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Ceiling 3.8 m. Tables 1.7 wide x 2.8 long, six products each, 1.1 m apart. Columns at x = -4, 0, 4.</text>
-<text x="60.0" y="1678.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">From the photos: three table columns, wall benches, glass front about 3.8x as wide as it is tall. Bar shortened to half the wall at your request.</text>
-<text x="60.0" y="1694.0" font-size="11" text-anchor="start" fill="#a33" font-weight="400" font-family="system-ui, sans-serif">Assumed, not measurable: shop depth (15 m), back-room size (your instruction: same as the shop), door position (your note: left of the bar), real table sizes.</text>
+<text x="60.0" y="2565.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Ceiling 3.8 m. Tables 1.7 wide x 2.8 long, six products each, 1.1 m apart. Columns at x = -4, 0, 4.</text>
+<text x="60.0" y="2581.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">From the photos: three table columns, wall benches, glass front about 3.8x as wide as it is tall. Bar shortened to half the wall at your request.</text>
+<text x="60.0" y="2597.0" font-size="11" text-anchor="start" fill="#a33" font-weight="400" font-family="system-ui, sans-serif">Assumed, not measurable: shop depth (15 m), back-room size (your instruction: same as the shop), door position (your note: left of the bar), real table sizes.</text>
 </svg>
