@@ -42,7 +42,7 @@ import type { ProductKind } from "./plan.ts";
 export interface Table extends Box {
   id: string;
   service: boolean; // a service table: square, no products, stools either side
-  // one product per side, in the order -x side, +x side, -z side, +z side
+  // products on the two long sides only (Ritesh, 2026-10-11), in the order -x side, +x side
   products: readonly ProductKind[];
 }
 
@@ -111,17 +111,85 @@ export const WALL_FACE_Z = FLOOR.maxZ + 0.4;
 export const BACK_ROOM_Z0 = WALL_FACE_Z + 0.2;
 export const BACK_ROOM_Z1 = BACK_ROOM_Z0 + (FLOOR.maxZ - FLOOR.minZ);
 
-export const BACK_SHELF_ROW_Z = [BACK_ROOM_Z0 + 2.0, BACK_ROOM_Z0 + 4.6] as const;
+// What is in the back room (Ritesh, 2026-10-11, from a description of a real
+// store's back of house): inventory on rolling high-density shelves; a repair
+// room where technicians work on devices; a manager's office; a break and
+// training room with computers; lockers and staff restrooms; and a back door
+// to a loading dock for deliveries. The areas and their furniture are mine to
+// place (positions are working defaults, drawn in the blueprint to be
+// corrected); the footprint is the shop's.
+const rz = (v: number): number => BACK_ROOM_Z0 + v;
+export interface BackArea {
+  id: string;
+  name: string;
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
+}
+export const BACK_AREAS: BackArea[] = [
+  { id: "storage", name: "INVENTORY STORAGE (rolling shelves)", x0: FLOOR.minX, x1: FLOOR.maxX, z0: rz(0), z1: rz(8.9) },
+  { id: "repair", name: "GENIUS ROOM: REPAIR", x0: FLOOR.minX, x1: -0.3, z0: rz(8.9), z1: rz(14.3) },
+  { id: "office", name: "MANAGER'S OFFICE", x0: -0.3, x1: 3.3, z0: rz(8.9), z1: rz(14.3) },
+  { id: "break", name: "BREAK & TRAINING", x0: 3.3, x1: FLOOR.maxX, z0: rz(8.9), z1: rz(14.3) },
+  { id: "dock", name: "LOCKERS, RESTROOMS, LOADING DOCK", x0: FLOOR.minX, x1: FLOOR.maxX, z0: rz(14.3), z1: rz(18.2) },
+];
+
+export const BACK_SHELF_ROW_Z = [rz(1.9), rz(3.5), rz(5.1), rz(6.7)] as const;
 export const BACK_SHELF_UNIT_X = [-3.6, 0, 3.6] as const;
 export const BACK_SHELVES: Box[] = BACK_SHELF_ROW_Z.flatMap((z) =>
   BACK_SHELF_UNIT_X.map((x) => ({ x, z, w: 2.7, d: 0.62, h: 2.4 })),
 );
 
-// Two repair benches where technicians work, near the back of the back room.
+// Two repair benches where technicians work, in the repair room.
 export const SERVICE_DESKS: Box[] = [
-  { x: -2.2, z: BACK_ROOM_Z0 + 7.2, w: 2.4, d: 0.8, h: 0.95 },
-  { x: 2.2, z: BACK_ROOM_Z0 + 7.2, w: 2.4, d: 0.8, h: 0.95 },
+  { x: -4.4, z: rz(12.0), w: 2.2, d: 0.8, h: 0.95 },
+  { x: -1.7, z: rz(12.0), w: 2.2, d: 0.8, h: 0.95 },
 ];
+
+// Walls between the areas, with doorways. A wall is split into segments
+// around each doorway, so a solid is a segment and a doorway is a real gap.
+export const DOORWAY_W = 1.0;
+const WALL_T = 0.12;
+const WALL_H = 2.6;
+function wallRun(z: number, doorXs: number[]): Box[] {
+  const stops = [FLOOR.minX, ...doorXs.flatMap((x) => [x - DOORWAY_W / 2, x + DOORWAY_W / 2]), FLOOR.maxX];
+  const out: Box[] = [];
+  for (let i = 0; i < stops.length; i += 2) {
+    const w = stops[i + 1] - stops[i];
+    if (w > 1e-6) out.push({ x: (stops[i] + stops[i + 1]) / 2, z, w, d: WALL_T, h: WALL_H });
+  }
+  return out;
+}
+export const BACK_DOORWAYS = [
+  { x: -3.6, z: rz(8.9) }, // storage to repair
+  { x: 1.5, z: rz(8.9) }, // storage to office
+  { x: 4.65, z: rz(8.9) }, // storage to break room
+  { x: 0, z: rz(14.3) }, // rooms to the dock end
+] as const;
+export const BACK_WALLS: Box[] = [
+  ...wallRun(rz(8.9), [-3.6, 1.5, 4.65]),
+  ...wallRun(rz(14.3), [0]),
+  { x: -0.3, z: rz(11.6), w: WALL_T, d: 5.4, h: WALL_H },
+  { x: 3.3, z: rz(11.6), w: WALL_T, d: 5.4, h: WALL_H },
+];
+
+export type BackKind = "desk" | "table" | "computers" | "lockers" | "restroom" | "pallet";
+export interface BackThing extends Box {
+  kind: BackKind;
+  label?: string;
+}
+export const BACK_FURNITURE: BackThing[] = [
+  { kind: "desk", label: "manager", x: 1.5, z: rz(12.6), w: 1.6, d: 0.8, h: 0.75 },
+  { kind: "table", label: "break table", x: 4.65, z: rz(10.4), w: 1.2, d: 0.9, h: 0.75 },
+  { kind: "computers", label: "training computers", x: 5.6, z: rz(12.4), w: 0.7, d: 2.6, h: 0.75 },
+  { kind: "lockers", label: "lockers", x: -5.7, z: rz(16.5), w: 0.5, d: 2.8, h: 1.9 },
+  { kind: "restroom", label: "restrooms", x: 4.7, z: rz(16.1), w: 2.6, d: 2.4, h: WALL_H },
+  { kind: "pallet", label: "deliveries", x: -1.4, z: rz(17.3), w: 1.0, d: 1.0, h: 0.9 },
+  { kind: "pallet", label: "deliveries", x: 1.2, z: rz(17.3), w: 1.0, d: 1.0, h: 1.1 },
+];
+// the back door onto the loading dock, in the far wall
+export const BACK_DOOR = { minX: -2.0, maxX: 2.0 } as const;
 
 // The flush staff door in the back wall, left of the bar.
 // On the visitor's LEFT of the bar as they face it, which is the +x side
@@ -147,6 +215,8 @@ const COMMON_SOLIDS: Box[] = [
   COUNTER,
   ...BACK_SHELVES,
   ...SERVICE_DESKS,
+  ...BACK_WALLS,
+  ...BACK_FURNITURE,
 ];
 export const SOLIDS: Box[] = [...COMMON_SOLIDS, ...PARTITIONS];
 

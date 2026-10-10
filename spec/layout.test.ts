@@ -56,6 +56,16 @@ it("makes a table about a tenth of the room width", () => {
 // one square service table.
 // Ritesh (2026-10-11): "the tables are WAY too small ... larger, and more
 // elongated"; service tables 50% longer on each side.
+// "for all tables, it should only have products on the left and right sides,
+// not on the other two sides" (Ritesh, 2026-10-11): one product kind per long
+// side, and nothing modelled for the ends.
+it("gives each product table exactly two products, one on each long side, and service tables none", () => {
+  for (const t of TABLES) {
+    if (t.service) expect(t.products, t.id).toHaveLength(0);
+    else expect(t.products, t.id).toHaveLength(2);
+  }
+});
+
 it("makes product tables long, the long edge running front to back, and big enough for people", () => {
   const products = TABLES.filter((t) => !t.service);
   for (const t of products) {

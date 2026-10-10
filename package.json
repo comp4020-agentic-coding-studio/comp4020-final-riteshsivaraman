@@ -8,6 +8,7 @@
     "dev:client": "vite",
     "build": "vite build",
     "start": "tsx src/server/index.ts",
+    "dev": "node scripts/dev.ts",
     "layout": "node scripts/layout-server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm typecheck && pnpm test",

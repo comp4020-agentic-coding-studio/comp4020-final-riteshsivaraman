@@ -1,5 +1,5 @@
 import { FLOOR, type Pose } from "./protocol.ts";
-import { BACK_ROOM_Z0, BENCHES, COLUMN_X, COUNTER, DOOR, TABLES } from "./world.ts";
+import { BACK_ROOM_Z0, BENCHES, COLUMN_X, COUNTER, DOOR, SERVICE_DESKS, TABLES } from "./world.ts";
 
 // NPCs are a pure function of the server's clock, not a simulation. Every
 // client computes the same position for the same moment, so the store looks
@@ -113,12 +113,12 @@ export const NPCS: NpcDef[] = [
     2000,
     8,
   ),
-  // back room, in the aisles between shelving
-  staff("stock-1", "stock", [{ minX: -3.8, maxX: -0.9, minZ: BR + 2.7, maxZ: BR + 3.9 }], 11000, 5000, 9),
-  staff("stock-2", "stock", [{ minX: 0.9, maxX: 3.8, minZ: BR + 5.4, maxZ: BR + 6.4 }], 11000, 8000, 10),
-  // technicians at the repair benches
-  staff("tech-1", "technician", [{ minX: -2.7, maxX: -1.7, minZ: BR + 7.9, maxZ: BR + 8.3 }], 12000, 0, 11, true),
-  staff("tech-2", "technician", [{ minX: 1.7, maxX: 2.7, minZ: BR + 7.9, maxZ: BR + 8.3 }], 12000, 4000, 12, true),
+  // back room: down the cross aisles between the rolling shelves
+  staff("stock-1", "stock", [{ minX: -1.95, maxX: -1.65, minZ: BR + 1.0, maxZ: BR + 8.0 }], 11000, 5000, 9),
+  staff("stock-2", "stock", [{ minX: 1.65, maxX: 1.95, minZ: BR + 1.0, maxZ: BR + 8.0 }], 11000, 8000, 10),
+  // technicians behind the repair benches
+  staff("tech-1", "technician", [{ minX: SERVICE_DESKS[0].x - 0.5, maxX: SERVICE_DESKS[0].x + 0.5, minZ: BR + 12.7, maxZ: BR + 13.1 }], 12000, 0, 11, true),
+  staff("tech-2", "technician", [{ minX: SERVICE_DESKS[1].x - 0.5, maxX: SERVICE_DESKS[1].x + 0.5, minZ: BR + 12.7, maxZ: BR + 13.1 }], 12000, 4000, 12, true),
   // customers
   customer("cust-front", "#e07a5f", { minX: -3.2, maxX: 3.2, ...FRONT_Z }, 11000, 500, 21),
   customer("cust-a", "#81b29a", { ...LANE.a, ...SHOP_Z }, 12000, 4000, 22),

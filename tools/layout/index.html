@@ -308,7 +308,7 @@ function renderPanel(w) {
     + `</div><div class="row">${num("x", it.x)}${num("z", it.z)}</div>`;
   if (kind !== "s") html += `<div class="row">${num("w", it.w)}${num("d", it.d)}</div><div class="help">w is across the shop (x), d is front to back (z), metres.</div>`;
   if (kind === "t" && !it.service) {
-    const names = ["−x side (visitor's right)", "+x side (visitor's left)", "−z side (towards entrance)", "+z side (towards bar)"];
+    const names = ["−x side (visitor's right)", "+x side (visitor's left)"];
     html += `<div class="row">` + it.products.map((p, i) => `<label class="f">${names[i]}<select data-p="${i}">${ctx.kinds.map((k) => `<option${k === p ? " selected" : ""}>${k}</option>`).join("")}</select></label>`).join("") + `</div>`;
   }
   insp.innerHTML = html;
@@ -324,7 +324,7 @@ function onField(kind, it, inp) {
       const was = key(kind, it); it.id = v; selected.delete(was); selected.add(key(kind, it));
     } else if (f === "service") {
       it.service = v === "1";
-      if (it.service) it.products = []; else if (it.products.length !== 4) it.products = ["phone", "phone", "watch", "earbuds"];
+      if (it.service) it.products = []; else if (it.products.length !== 2) it.products = ["phone", "phone"];
     } else if (f === "kind") it.kind = v;
     else { const n = Number(v); if (Number.isFinite(n)) it[f] = (f === "w" || f === "d") ? Math.max(0.2, n) : n; }
   });
@@ -403,8 +403,8 @@ function addAt(kind, make) {
     selected = new Set([key(kind, it)]);
   });
 }
-$("addProduct").onclick = () => addAt("t", () => ({ id: nextId("T", state.tables), x: 0, z: 0, w: 1, d: 1.2, service: false, products: ["phone", "phone", "watch", "earbuds"] }));
-$("addService").onclick = () => addAt("t", () => ({ id: nextId("S", state.tables), x: 0, z: 0, w: 1.2, d: 1.2, service: true, products: [] }));
+$("addProduct").onclick = () => addAt("t", () => ({ id: nextId("T", state.tables), x: 0, z: 0, w: 1.2, d: 2.0, service: false, products: ["phone", "phone"] }));
+$("addService").onclick = () => addAt("t", () => ({ id: nextId("S", state.tables), x: 0, z: 0, w: 1.8, d: 1.8, service: true, products: [] }));
 $("addBench").onclick = () => addAt("b", () => ({ id: nextId("B", state.benches), x: 4.6, z: 0, w: 0.6, d: 4 }));
 $("addStool").onclick = () => addAt("s", () => ({ id: nextId("Q", state.stools), x: 0, z: 0, kind: "table" }));
 $("del").onclick = deleteSel;

@@ -74,11 +74,13 @@ it("shows B's movement to A within a second, with no action from A", async () =>
   const b = await visitor();
 
   const t0 = Date.now();
-  b.send({ type: "move", x: 2.5, z: 1.25, ry: 0.5 });
+  // a spot no NPC ever walks through (beside the bar, past its partition), so
+  // people-collision cannot move it
+  b.send({ type: "move", x: 5.2, z: 6.0, ry: 0.5 });
   const moved = await a.next((m) => m.type === "moved" && m.id === b.id, 1000);
 
   expect(Date.now() - t0).toBeLessThan(1000);
-  expect(moved).toMatchObject({ type: "moved", id: b.id, x: 2.5, z: 1.25 });
+  expect(moved).toMatchObject({ type: "moved", id: b.id, x: 5.2, z: 6.0 });
 });
 
 // The store is on the first floor: outside the glass is a walkway a visitor

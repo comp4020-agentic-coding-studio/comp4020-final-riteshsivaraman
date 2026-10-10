@@ -1,25 +1,68 @@
 import { ROUTES, routePose } from "./mall.ts";
-import { NPCS, npcPose } from "./npcs.ts";
+import { NPCS, isStaff, npcPose } from "./npcs.ts";
 import { STORE_Y } from "./protocol.ts";
-import { separateFromPeople } from "./world.ts";
+import { resolveCollisions, separateFromPeople } from "./world.ts";
 
-// Where the people who are not visitors stand at server time `nowMs`: the
-// store's staff and customers, and the mall's walkers who are on the store's
-// floor (the first-floor walkway). Ground-floor walkers are a floor below and
-// cannot be bumped into. The server and the browser both use this, so the same
-// bodies stop a visitor in both places.
-export function nonVisitorPeople(nowMs: number): Array<{ x: number; z: number }> {
-  const list: Array<{ x: number; z: number }> = [];
+// People are solid (Ritesh, 2026-10-11): visitors cannot walk through staff,
+// customers or each other, and the staff and customers cannot walk through
+// each other either.
+//
+// NPCs and mall walkers move along fixed paths that are a pure function of the
+// server clock, with no simulation to bump them. So their collision is a pure
+// function too: take every path position at this instant, then settle them in
+// a fixed order. Anyone working at a bench stays put; each other person is
+// pushed out of everyone already placed and out of furniture. Every client and
+// the server compute the same answer for the same moment.
+
+export interface Settled {
+  x: number;
+  z: number;
+}
+
+export interface SettledPeople {
+  npc: Map<string, Settled>; // NPC id -> where they actually stand
+  walkway: Map<string, Settled>; // mall walker id -> same, for those on the store's floor
+}
+
+export function settledPeople(nowMs: number): SettledPeople {
+  const npc = new Map<string, Settled>();
+  const walkway = new Map<string, Settled>();
+  const placed: Settled[] = [];
+  const place = (x: number, z: number, staff: boolean, fixed: boolean): Settled => {
+    let p = { x, z };
+    if (!fixed) {
+      p = separateFromPeople(p.x, p.z, placed);
+      p = resolveCollisions(p.x, p.z, staff ? "staff" : "customer");
+      p = separateFromPeople(p.x, p.z, placed);
+    }
+    placed.push(p);
+    return p;
+  };
+  // people at a bench first: they do not move for anyone
   for (const n of NPCS) {
-    const p = npcPose(n, nowMs);
-    list.push({ x: p.x, z: p.z });
+    if (!n.working) continue;
+    const b = npcPose(n, nowMs);
+    npc.set(n.id, place(b.x, b.z, true, true));
+  }
+  for (const n of NPCS) {
+    if (n.working) continue;
+    const b = npcPose(n, nowMs);
+    npc.set(n.id, place(b.x, b.z, isStaff(n), false));
   }
   for (const r of ROUTES) {
     if (r.y !== STORE_Y) continue;
-    const p = routePose(r, nowMs);
-    list.push({ x: p.x, z: p.z });
+    const b = routePose(r, nowMs);
+    walkway.set(r.id, place(b.x, b.z, false, false));
   }
-  return list;
+  return { npc, walkway };
+}
+
+// Where the people who are not visitors stand at server time `nowMs`, after
+// colliding with each other. The ground-floor walkers are a floor below and
+// cannot be bumped into.
+export function nonVisitorPeople(nowMs: number): Array<{ x: number; z: number }> {
+  const s = settledPeople(nowMs);
+  return [...s.npc.values(), ...s.walkway.values()];
 }
 
 // A visitor's position after bumping into everyone else: visitors, staff,

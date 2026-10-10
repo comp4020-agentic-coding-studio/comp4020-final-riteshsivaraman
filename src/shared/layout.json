@@ -9,9 +9,7 @@
    "service": false,
    "products": [
     "phone",
-    "phone",
-    "watch",
-    "earbuds"
+    "phone"
    ]
   },
   {
@@ -23,9 +21,7 @@
    "service": false,
    "products": [
     "phone",
-    "phone",
-    "watch",
-    "earbuds"
+    "phone"
    ]
   },
   {
@@ -36,10 +32,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "phone",
-    "phone",
-    "watch",
-    "earbuds"
+    "tablet",
+    "tablet"
    ]
   },
   {
@@ -50,10 +44,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "phone",
-    "phone",
-    "watch",
-    "earbuds"
+    "tablet",
+    "tablet"
    ]
   },
   {
@@ -73,10 +65,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "laptop",
-    "laptop",
-    "tablet",
-    "tabletKb"
+    "watch",
+    "watch"
    ]
   },
   {
@@ -87,10 +77,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "laptop",
-    "laptop",
-    "tablet",
-    "tabletKb"
+    "watch",
+    "earbuds"
    ]
   },
   {
@@ -102,9 +90,7 @@
    "service": false,
    "products": [
     "laptop",
-    "laptop",
-    "tablet",
-    "tabletKb"
+    "laptop"
    ]
   },
   {
@@ -124,10 +110,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "headphones",
-    "speaker",
-    "airtag",
-    "earbuds"
+    "phone",
+    "phone"
    ]
   },
   {
@@ -138,10 +122,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "headphones",
-    "speaker",
-    "airtag",
-    "earbuds"
+    "phone",
+    "phone"
    ]
   },
   {
@@ -152,10 +134,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "headphones",
-    "speaker",
-    "airtag",
-    "earbuds"
+    "phone",
+    "phone"
    ]
   },
   {
@@ -166,10 +146,8 @@
    "d": 2.0,
    "service": false,
    "products": [
-    "headphones",
-    "speaker",
-    "airtag",
-    "earbuds"
+    "phone",
+    "phone"
    ]
   },
   {

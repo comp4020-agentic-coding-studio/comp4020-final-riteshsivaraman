@@ -51,3 +51,48 @@ it("counts other visitors as solid too", () => {
   const q = avoidPeople(5, 5, [{ x: 5, z: 5.1 }], T0);
   expect(Math.hypot(q.x - 5, q.z - 5.1)).toBeGreaterThanOrEqual(MIN - 1e-9);
 });
+
+// NPC with NPC (Ritesh, 2026-10-11): staff, customers and first-floor walkers
+// are settled in a fixed order, so no two stand inside each other.
+import { settledPeople } from "../src/shared/people.ts";
+
+it("never lets two NPCs or walkers stand inside each other", () => {
+  let worst = Infinity;
+  let pairs = 0;
+  for (let t = 0; t < 600_000; t += 1000) {
+    const s = settledPeople(T0 + t);
+    const all = [...s.npc.entries(), ...s.walkway.entries()];
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const d = Math.hypot(all[i][1].x - all[j][1].x, all[i][1].z - all[j][1].z);
+        pairs++;
+        if (d < worst) worst = d;
+      }
+    }
+  }
+  expect(pairs).toBeGreaterThan(1000);
+  expect(worst, "the closest two ever got").toBeGreaterThanOrEqual(BODY_RADIUS * 2 - 0.05);
+});
+
+it("is the same answer every time for the same moment", () => {
+  const a = settledPeople(T0 + 123_456);
+  const b = settledPeople(T0 + 123_456);
+  expect([...a.npc]).toEqual([...b.npc]);
+  expect([...a.walkway]).toEqual([...b.walkway]);
+});
+
+// Two people walking straight at each other swap sides when they cross, so the
+// one being pushed steps aside by up to two body widths in one tick. That is a
+// side-step, not a teleport: bounded here, and the client eases it over a few
+// frames so it reads as a step.
+it("moves people continuously: nobody is pushed further than a side-step in a tick", () => {
+  let prev = settledPeople(T0);
+  for (let t = 100; t < 120_000; t += 100) {
+    const cur = settledPeople(T0 + t);
+    for (const [id, p] of cur.npc) {
+      const q = prev.npc.get(id)!;
+      expect(Math.hypot(p.x - q.x, p.z - q.z), `${id} at +${t}ms`).toBeLessThan(BODY_RADIUS * 4 + 0.2);
+    }
+    prev = cur;
+  }
+});

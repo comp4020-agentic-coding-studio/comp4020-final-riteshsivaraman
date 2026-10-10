@@ -33,8 +33,8 @@ function check(l: any): string | null {
     if (!num(t.x, -20, 20) || !num(t.z, -20, 20) || !num(t.w, 0.2, 6) || !num(t.d, 0.2, 6)) return `table ${t.id}: bad position or size`;
     if (!inside(t.x, t.z)) return `table ${t.id} is outside the shop`;
     if (typeof t.service !== "boolean") return `table ${t.id}: service must be true or false`;
-    if (!Array.isArray(t.products) || t.products.length > 4 || !t.products.every((k: unknown) => typeof k === "string" && KINDS.includes(k))) return `table ${t.id}: bad products`;
-    if (!t.service && t.products.length !== 4) return `table ${t.id}: a product table needs four products`;
+    if (!Array.isArray(t.products) || t.products.length > 2 || !t.products.every((k: unknown) => typeof k === "string" && KINDS.includes(k))) return `table ${t.id}: bad products`;
+    if (!t.service && t.products.length !== 2) return `table ${t.id}: a product table needs two products, one on each long side`;
   }
   for (const b of l.benches) {
     if (!id(b.id) || ids.has(b.id)) return `bad or repeated id ${b.id}`;
