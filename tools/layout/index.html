@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Layout editor</title>
+<style>
+  :root { --bg:#f3f4f6; --panel:#fff; --ink:#111; --mute:#666; --line:#d4d7dc; --acc:#1a4fb8; --bad:#c0392b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16181b; --panel:#202327; --ink:#eee; --mute:#9aa0a6; --line:#33373d; --acc:#6ea0ff; --bad:#ff6b5e; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:13px/1.4 system-ui, sans-serif; display:flex; height:100vh; }
+  #stage { flex:1; min-width:0; position:relative; }
+  svg { width:100%; height:100%; display:block; touch-action:none; user-select:none; }
+  aside { width:320px; overflow:auto; background:var(--panel); border-left:1px solid var(--line); padding:12px; }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); margin:16px 0 6px; }
+  h2:first-child { margin-top:0; }
+  button, select, input { font:inherit; color:inherit; }
+  button { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:4px 9px; cursor:pointer; }
+  button:hover { border-color:var(--acc); }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0; align-items:center; }
+  label.f { display:flex; flex-direction:column; font-size:11px; color:var(--mute); flex:1; min-width:60px; }
+  label.f input, label.f select { padding:3px 5px; border:1px solid var(--line); border-radius:5px; background:var(--bg); }
+  #warn { color:var(--bad); font-size:12px; }
+  #warn div { margin:2px 0; }
+  #status { color:var(--mute); font-size:12px; min-height:1.4em; }
+  kbd { background:var(--bg); border:1px solid var(--line); border-radius:4px; padding:0 4px; font-size:11px; }
+  .help { color:var(--mute); font-size:12px; }
+  .help p { margin:4px 0; }
+  .t-prod { fill:#e6cfa8; stroke:#8a6a2f; }
+  .t-serv { fill:#d9c196; stroke:#5a4210; stroke-dasharray:5 3; }
+  .bench { fill:#e6cfa8; stroke:#8a6a2f; }
+  .stool-bar { fill:#c9ced4; stroke:#555; }
+  .stool-table { fill:#e6cfa8; stroke:#5a4210; }
+  .sel { stroke:var(--acc) !important; stroke-width:2.5 !important; }
+  .bad { stroke:var(--bad) !important; stroke-width:2.5 !important; }
+  .fixed { fill:#cfd3d8; stroke:#6b7280; opacity:.9; }
+  .lbl { font-size:11px; fill:#222; text-anchor:middle; pointer-events:none; dominant-baseline:middle; }
+</style>
+</head>
+<body>
+<div id="stage"><svg id="svg"></svg></div>
+<aside>
+  <h2>File</h2>
+  <div class="row">
+    <button class="primary" id="save">Save to layout.json</button>
+    <button id="undo">Undo</button>
+    <button id="redo">Redo</button>
+  </div>
+  <div id="status">Loading…</div>
+
+  <h2>Add</h2>
+  <div class="row">
+    <button id="addProduct">Product table</button>
+    <button id="addService">Service table</button>
+    <button id="addBench">Bench</button>
+    <button id="addStool">Stool</button>
+  </div>
+
+  <h2>Selection</h2>
+  <div id="insp" class="help">Nothing selected. Click a piece, or drag on empty floor to select several.</div>
+  <div class="row">
+    <button id="dup">Duplicate</button>
+    <button id="del">Delete</button>
+  </div>
+
+  <h2>Align and space (2 or more)</h2>
+  <div class="row">
+    <button data-al="left">Left edges</button>
+    <button data-al="right">Right edges</button>
+    <button data-al="front">Front edges</button>
+    <button data-al="back">Back edges</button>
+    <button data-al="cx">Centre x</button>
+    <button data-al="cz">Centre z</button>
+    <button data-al="dx">Space across</button>
+    <button data-al="dz">Space front to back</button>
+  </div>
+
+  <h2>Snap</h2>
+  <div class="row">
+    <label class="f">Grid (m)
+      <select id="grid">
+        <option value="0">off</option><option value="0.01">0.01</option><option value="0.05" selected>0.05</option>
+        <option value="0.1">0.1</option><option value="0.25">0.25</option>
+      </select>
+    </label>
+  </div>
+
+  <h2>Warnings</h2>
+  <div id="warn"></div>
+
+  <h2>Keys</h2>
+  <div class="help">
+    <p><kbd>drag</kbd> move, handles resize, <kbd>shift</kbd>+click adds to selection.</p>
+    <p><kbd>arrows</kbd> nudge 0.05 m (<kbd>shift</kbd> 0.25 m). <kbd>Del</kbd> delete. <kbd>⌘/Ctrl Z</kbd> undo, <kbd>⇧⌘Z</kbd> redo, <kbd>⌘/Ctrl D</kbd> duplicate, <kbd>⌘/Ctrl S</kbd> save, <kbd>⌘/Ctrl A</kbd> all.</p>
+    <p>The view is as a visitor sees it entering: +x wall on the left, entrance at the bottom. After saving, run <code>node scripts/blueprint.ts</code> so the drawings match.</p>
+  </div>
+</aside>
+
+<script>
+"use strict";
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("svg");
+const $ = (id) => document.getElementById(id);
+
+let ctx = null;          // fixed parts of the shop, from the server
+let state = null;        // { tables, benches, stools }
+let selected = new Set();// "t:ID" / "b:ID" / "s:ID"
+let undoStack = [], redoStack = [];
+let savedJson = "";
+let view = { S: 70, cx: 0, top: 0 };
+
+// ---------- helpers
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const key = (kind, it) => kind + ":" + it.id;
+const items = (kind) => ({ t: state.tables, b: state.benches, s: state.stools })[kind];
+const all = () => [
+  ...state.tables.map((it) => ["t", it]),
+  ...state.benches.map((it) => ["b", it]),
+  ...state.stools.map((it) => ["s", it]),
+];
+const find = (k) => { const [kind, id] = [k[0], k.slice(2)]; const it = items(kind).find((x) => x.id === id); return it ? [kind, it] : null; };
+const grid = () => Number($("grid").value);
+const snap = (v) => { const g = grid(); return g ? Math.round(v / g) * g : v; };
+const r3 = (n) => Math.round(n * 1000) / 1000;
+const half = (kind, it) => kind === "s" ? [0.2, 0.2] : [it.w / 2, it.d / 2];
+
+// x is mirrored: +x is on the left, as in the blueprint
+const sx = (x) => view.cx - x * view.S;
+const sy = (z) => view.top + (view.zMax - z) * view.S;
+const wx = (px) => (view.cx - px) / view.S;
+const wz = (py) => view.zMax - (py - view.top) / view.S;
+
+function commit(label) {
+  undoStack.push(snapshotBefore);
+  if (undoStack.length > 100) undoStack.shift();
+  redoStack = [];
+  render();
+}
+let snapshotBefore = null;
+const begin = () => { snapshotBefore = JSON.stringify(state); };
+function mutate(fn) { begin(); fn(); if (JSON.stringify(state) === snapshotBefore) return; commit(); }
+function undo() {
+  if (!undoStack.length) return;
+  redoStack.push(JSON.stringify(state));
+  state = JSON.parse(undoStack.pop()); pruneSelection(); render();
+}
+function redo() {
+  if (!redoStack.length) return;
+  undoStack.push(JSON.stringify(state));
+  state = JSON.parse(redoStack.pop()); pruneSelection(); render();
+}
+function pruneSelection() { selected = new Set([...selected].filter((k) => find(k))); }
+
+function nextId(prefix, list) {
+  let n = list.length + 1;
+  while (list.some((x) => x.id === prefix + n)) n++;
+  return prefix + n;
+}
+
+// ---------- geometry checks
+function rectOf(kind, it) { const [hw, hd] = half(kind, it); return { x0: it.x - hw, x1: it.x + hw, z0: it.z - hd, z1: it.z + hd }; }
+const overlap = (a, b, pad = 0) => a.x0 < b.x1 - pad && a.x1 > b.x0 + pad && a.z0 < b.z1 - pad && a.z1 > b.z0 + pad;
+function fixedRects() {
+  const c = ctx.counter, out = [{ name: "the bar", r: { x0: c.x - c.w / 2, x1: c.x + c.w / 2, z0: c.z - c.d / 2, z1: c.z + c.d / 2 } }];
+  ctx.partitions.forEach((p, i) => out.push({ name: "partition " + (i + 1), r: { x0: p.x - p.w / 2, x1: p.x + p.w / 2, z0: p.z - p.d / 2, z1: p.z + p.d / 2 } }));
+  return out;
+}
+const MIN_GAP = 0.35; // person-width walkway between tables (SCOPE.md, still [TK])
+function warnings() {
+  const w = [], bad = new Set();
+  const f = ctx.floor;
+  const list = all();
+  for (const [kind, it] of list) {
+    const r = rectOf(kind, it), k = key(kind, it);
+    if (r.x0 < f.minX - 1e-6 || r.x1 > f.maxX + 1e-6 || r.z0 < f.minZ - 1e-6 || r.z1 > f.maxZ + 1e-6) { w.push(`${it.id} sticks out of the floor`); bad.add(k); }
+    for (const fr of fixedRects()) if (kind !== "b" && overlap(r, fr.r)) { w.push(`${it.id} overlaps ${fr.name}`); bad.add(k); }
+  }
+  const solid = list.filter(([kind]) => kind !== "s");
+  for (let i = 0; i < solid.length; i++) for (let j = i + 1; j < solid.length; j++) {
+    const [ka, a] = solid[i], [kb, b] = solid[j];
+    if (ka === "b" || kb === "b") continue; // benches sit on the walls; tables are checked against them below
+    const ra = rectOf(ka, a), rb = rectOf(kb, b);
+    if (overlap(ra, rb)) { w.push(`${a.id} overlaps ${b.id}`); bad.add(key(ka, a)); bad.add(key(kb, b)); }
+    else if (overlap({ x0: ra.x0 - MIN_GAP + 0.002, x1: ra.x1 + MIN_GAP - 0.002, z0: ra.z0 - MIN_GAP + 0.002, z1: ra.z1 + MIN_GAP - 0.002 }, rb))
+      { w.push(`${a.id} and ${b.id} are closer than ${MIN_GAP} m`); }
+  }
+  for (const [kind, it] of list) if (kind === "t") for (const [, b] of list.filter(([k]) => k === "b")) {
+    if (overlap(rectOf("t", it), rectOf("b", b))) { w.push(`${it.id} overlaps bench ${b.id}`); bad.add(key("t", it)); }
+  }
+  for (const [, s] of list.filter(([k]) => k === "s")) for (const [, t] of list.filter(([k]) => k === "t")) {
+    if (overlap(rectOf("s", s), rectOf("t", t))) { w.push(`stool ${s.id} is inside table ${t.id}`); bad.add(key("s", s)); }
+  }
+  // service tables want a stool each side; say so, it is a rule, not a hard stop
+  for (const t of state.tables.filter((t) => t.service)) {
+    const near = state.stools.filter((s) => s.kind === "table" && Math.abs(s.z - t.z) < t.d / 2 + 0.01 && Math.abs(s.x - t.x) < t.w / 2 + 0.7);
+    if (near.length !== 2) w.push(`service table ${t.id} has ${near.length} stools beside it (the brief says one each side)`);
+  }
+  return { w: [...new Set(w)], bad };
+}
+
+// ---------- drawing
+function el(name, attrs = {}, parent = svg) {
+  const e = document.createElementNS(NS, name);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  parent.appendChild(e);
+  return e;
+}
+function rectEl(x0, x1, z0, z1, cls, parent = svg, extra = {}) {
+  const X = Math.min(sx(x0), sx(x1)), Y = Math.min(sy(z0), sy(z1));
+  return el("rect", { x: X, y: Y, width: Math.abs(sx(x1) - sx(x0)), height: Math.abs(sy(z1) - sy(z0)), class: cls, "stroke-width": 1.5, ...extra }, parent);
+}
+
+function fit() {
+  const f = ctx.floor, r = svg.getBoundingClientRect();
+  const wm = (f.maxX - f.minX) + 3.2, hm = (f.maxZ - f.minZ) + 2.4;
+  view.S = Math.max(20, Math.min((r.width - 40) / wm, (r.height - 40) / hm));
+  view.cx = r.width / 2;
+  view.zMax = f.maxZ + 0.9;
+  view.top = (r.height - hm * view.S) / 2 + 0.3 * view.S;
+}
+
+function render() {
+  svg.innerHTML = "";
+  fit();
+  const f = ctx.floor;
+  const { w, bad } = warnings();
+
+  // floor, grid of whole metres
+  rectEl(f.minX, f.maxX, f.minZ, f.maxZ, "", svg, { fill: "#f6f7f8", stroke: "#999", "stroke-width": 1 });
+  for (let x = Math.ceil(f.minX); x <= f.maxX; x++) el("line", { x1: sx(x), x2: sx(x), y1: sy(f.minZ), y2: sy(f.maxZ), stroke: "#0001" });
+  for (let z = Math.ceil(f.minZ); z <= f.maxZ; z++) el("line", { x1: sx(f.minX), x2: sx(f.maxX), y1: sy(z), y2: sy(z), stroke: "#0001" });
+  // entrance span on the glass at the bottom, spawn
+  el("line", { x1: sx(ctx.entranceX[0]), x2: sx(ctx.entranceX[1]), y1: sy(f.minZ), y2: sy(f.minZ), stroke: "#2a9d5c", "stroke-width": 5 });
+  const lb = (x, z, t) => { const e = el("text", { x: sx(x), y: sy(z), class: "lbl" }); e.textContent = t; return e; };
+  lb(0, f.minZ - 0.35, "entrance (glass)");
+  el("circle", { cx: sx(ctx.spawn.x), cy: sy(ctx.spawn.z), r: 5, fill: "#2a9d5c" });
+  lb(ctx.spawn.x, ctx.spawn.z + 0.3, "spawn");
+  // fixed: bar, partitions, door
+  for (const fr of fixedRects()) rectEl(fr.r.x0, fr.r.x1, fr.r.z0, fr.r.z1, "fixed");
+  lb(ctx.counter.x, ctx.counter.z, "service bar");
+  const d = ctx.door;
+  if (d) {
+    const doorZ = f.maxZ + 0.4;
+    el("line", { x1: sx(d.minX), x2: sx(d.maxX), y1: sy(doorZ), y2: sy(doorZ), stroke: "#6b45d6", "stroke-width": 4 });
+    lb((d.minX + d.maxX) / 2, doorZ + 0.25, "staff door");
+  }
+  // side-wall labels
+  lb(f.maxX + 0.5, (f.minZ + f.maxZ) / 2, "+x wall");
+  lb(f.minX - 0.5, (f.minZ + f.maxZ) / 2, "-x wall");
+
+  // editable pieces: benches, tables, stools (stools on top)
+  const order = [...state.benches.map((it) => ["b", it]), ...state.tables.map((it) => ["t", it]), ...state.stools.map((it) => ["s", it])];
+  for (const [kind, it] of order) {
+    const k = key(kind, it), r = rectOf(kind, it);
+    const cls = (kind === "t" ? (it.service ? "t-serv" : "t-prod") : kind === "b" ? "bench" : it.kind === "bar" ? "stool-bar" : "stool-table")
+      + (selected.has(k) ? " sel" : "") + (bad.has(k) ? " bad" : "");
+    let e;
+    if (kind === "s") e = el("circle", { cx: sx(it.x), cy: sy(it.z), r: 0.2 * view.S, class: cls, "stroke-width": 1.5, "data-k": k });
+    else e = rectEl(r.x0, r.x1, r.z0, r.z1, cls, svg, { "data-k": k });
+    e.style.cursor = "move";
+    if (kind !== "s") lb(it.x, it.z, it.id);
+    if (kind === "t" && !it.service) {
+      // product dots, one per side, so the orientation is readable
+      const dots = [[r.x0 + 0.12, it.z, 0], [r.x1 - 0.12, it.z, 1], [it.x, r.z0 + 0.12, 2], [it.x, r.z1 - 0.12, 3]];
+      for (const [px, pz, i] of dots) el("circle", { cx: sx(px), cy: sy(pz), r: 4, fill: "#e8a98c", stroke: "#8a5a46", "pointer-events": "none" });
+    }
+  }
+  // resize handles for a single selected rectangle
+  if (selected.size === 1) {
+    const [kind, it] = find([...selected][0]) ?? [];
+    if (it && kind !== "s") {
+      const r = rectOf(kind, it);
+      const hs = [["x0", "z0"], ["x1", "z0"], ["x0", "z1"], ["x1", "z1"], ["x0", null], ["x1", null], [null, "z0"], [null, "z1"]];
+      for (const [hx, hz] of hs) {
+        const x = hx ? r[hx] : it.x, z = hz ? r[hz] : it.z;
+        el("rect", { x: sx(x) - 5, y: sy(z) - 5, width: 10, height: 10, fill: "#fff", stroke: "var(--acc)", "stroke-width": 1.5, "data-h": (hx || "") + "|" + (hz || ""), style: "cursor:" + (hx && hz ? "nwse-resize" : hx ? "ew-resize" : "ns-resize") });
+      }
+    }
+  }
+  if (marquee) el("rect", { x: Math.min(marquee.x0, marquee.x1), y: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0), fill: "#1a4fb822", stroke: "var(--acc)", "stroke-dasharray": "4 3" });
+
+  renderPanel(w);
+}
+
+function renderPanel(w) {
+  $("warn").innerHTML = w.length ? w.map((m) => `<div>${m}</div>`).join("") : '<span class="help">None.</span>';
+  const insp = $("insp");
+  const sel = [...selected].map(find).filter(Boolean);
+  const dirty = JSON.stringify(state) !== savedJson;
+  $("status").textContent = (dirty ? "Unsaved changes. " : "Saved. ") + `${state.tables.length} tables, ${state.benches.length} benches, ${state.stools.length} stools.`;
+  if (sel.length === 0) { insp.innerHTML = "Nothing selected. Click a piece, or drag on empty floor to select several."; return; }
+  if (sel.length > 1) { insp.textContent = `${sel.length} pieces selected. Drag to move together, or use the align buttons.`; return; }
+  const [kind, it] = sel[0];
+  const num = (name, v, step = 0.05) => `<label class="f">${name}<input data-f="${name}" type="number" step="${step}" value="${r3(v)}"></label>`;
+  let html = `<div class="row"><label class="f">id<input data-f="id" value="${it.id}"></label>`
+    + (kind === "t" ? `<label class="f">type<select data-f="service"><option value="0"${it.service ? "" : " selected"}>product</option><option value="1"${it.service ? " selected" : ""}>service</option></select></label>` : "")
+    + (kind === "s" ? `<label class="f">kind<select data-f="kind"><option${it.kind === "bar" ? " selected" : ""}>bar</option><option${it.kind === "table" ? " selected" : ""}>table</option></select></label>` : "")
+    + `</div><div class="row">${num("x", it.x)}${num("z", it.z)}</div>`;
+  if (kind !== "s") html += `<div class="row">${num("w", it.w)}${num("d", it.d)}</div><div class="help">w is across the shop (x), d is front to back (z), metres.</div>`;
+  if (kind === "t" && !it.service) {
+    const names = ["−x side (visitor's right)", "+x side (visitor's left)", "−z side (towards entrance)", "+z side (towards bar)"];
+    html += `<div class="row">` + it.products.map((p, i) => `<label class="f">${names[i]}<select data-p="${i}">${ctx.kinds.map((k) => `<option${k === p ? " selected" : ""}>${k}</option>`).join("")}</select></label>`).join("") + `</div>`;
+  }
+  insp.innerHTML = html;
+  insp.querySelectorAll("[data-f]").forEach((inp) => inp.addEventListener("change", () => onField(kind, it, inp)));
+  insp.querySelectorAll("[data-p]").forEach((inp) => inp.addEventListener("change", () => mutate(() => { it.products[Number(inp.dataset.p)] = inp.value; })));
+}
+
+function onField(kind, it, inp) {
+  const f = inp.dataset.f, v = inp.value;
+  mutate(() => {
+    if (f === "id") {
+      if (!/^[A-Za-z0-9_-]{1,12}$/.test(v) || all().some(([, o]) => o !== it && o.id === v)) return;
+      const was = key(kind, it); it.id = v; selected.delete(was); selected.add(key(kind, it));
+    } else if (f === "service") {
+      it.service = v === "1";
+      if (it.service) it.products = []; else if (it.products.length !== 4) it.products = ["phone", "phone", "watch", "earbuds"];
+    } else if (f === "kind") it.kind = v;
+    else { const n = Number(v); if (Number.isFinite(n)) it[f] = (f === "w" || f === "d") ? Math.max(0.2, n) : n; }
+  });
+}
+
+// ---------- pointer interaction
+let drag = null, marquee = null;
+function pt(e) { const r = svg.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+
+svg.addEventListener("pointerdown", (e) => {
+  const p = pt(e);
+  const h = e.target.closest?.("[data-h]");
+  const k = e.target.closest?.("[data-k]")?.dataset.k;
+  svg.setPointerCapture(e.pointerId);
+  begin();
+  if (h) {
+    const [hx, hz] = h.dataset.h.split("|");
+    const [kind, it] = find([...selected][0]);
+    drag = { type: "resize", hx, hz, kind, it, r0: rectOf(kind, it) };
+  } else if (k) {
+    if (e.shiftKey) { selected.has(k) ? selected.delete(k) : selected.add(k); }
+    else if (!selected.has(k)) selected = new Set([k]);
+    drag = { type: "move", start: { x: wx(p.x), z: wz(p.y) }, orig: new Map([...selected].map((s) => [s, clone(find(s)[1])])) };
+    render();
+  } else {
+    if (!e.shiftKey) selected = new Set();
+    marquee = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, base: new Set(selected) };
+    drag = { type: "marquee" };
+    render();
+  }
+});
+
+svg.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const p = pt(e);
+  if (drag.type === "marquee") {
+    marquee.x1 = p.x; marquee.y1 = p.y;
+    const xa = wx(Math.max(marquee.x0, marquee.x1)), xb = wx(Math.min(marquee.x0, marquee.x1));
+    const za = wz(Math.max(marquee.y0, marquee.y1)), zb = wz(Math.min(marquee.y0, marquee.y1));
+    selected = new Set(marquee.base);
+    for (const [kind, it] of all()) { const r = rectOf(kind, it); if (r.x0 >= xa && r.x1 <= xb && r.z0 >= za && r.z1 <= zb) selected.add(key(kind, it)); }
+    render(); return;
+  }
+  if (drag.type === "move") {
+    let dx = wx(p.x) - drag.start.x, dz = wz(p.y) - drag.start.z;
+    // snap the first piece's position; everyone shifts by the same amount
+    const [firstKey, first] = [...drag.orig][0];
+    dx = snap(first.x + dx) - first.x; dz = snap(first.z + dz) - first.z;
+    for (const [k, o] of drag.orig) { const t = find(k)[1]; t.x = r3(o.x + dx); t.z = r3(o.z + dz); }
+    render(); return;
+  }
+  if (drag.type === "resize") {
+    const x = snap(wx(p.x)), z = snap(wz(p.y)), r = { ...drag.r0 }, it = drag.it, min = 0.2;
+    if (drag.hx) r[drag.hx] = x;
+    if (drag.hz) r[drag.hz] = z;
+    const x0 = Math.min(r.x0, r.x1), x1 = Math.max(r.x0, r.x1), z0 = Math.min(r.z0, r.z1), z1 = Math.max(r.z0, r.z1);
+    if (x1 - x0 >= min) { it.x = r3((x0 + x1) / 2); it.w = r3(x1 - x0); }
+    if (z1 - z0 >= min) { it.z = r3((z0 + z1) / 2); it.d = r3(z1 - z0); }
+    render();
+  }
+});
+
+svg.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const was = drag.type;
+  drag = null; marquee = null;
+  if (JSON.stringify(state) !== snapshotBefore) { undoStack.push(snapshotBefore); redoStack = []; }
+  render();
+});
+
+// ---------- actions
+function addAt(kind, make) {
+  mutate(() => {
+    const it = make();
+    items(kind).push(it);
+    selected = new Set([key(kind, it)]);
+  });
+}
+$("addProduct").onclick = () => addAt("t", () => ({ id: nextId("T", state.tables), x: 0, z: 0, w: 1, d: 1.2, service: false, products: ["phone", "phone", "watch", "earbuds"] }));
+$("addService").onclick = () => addAt("t", () => ({ id: nextId("S", state.tables), x: 0, z: 0, w: 1.2, d: 1.2, service: true, products: [] }));
+$("addBench").onclick = () => addAt("b", () => ({ id: nextId("B", state.benches), x: 4.6, z: 0, w: 0.6, d: 4 }));
+$("addStool").onclick = () => addAt("s", () => ({ id: nextId("Q", state.stools), x: 0, z: 0, kind: "table" }));
+$("del").onclick = deleteSel;
+$("dup").onclick = dupSel;
+$("undo").onclick = undo;
+$("redo").onclick = redo;
+$("save").onclick = save;
+
+function deleteSel() {
+  if (!selected.size) return;
+  mutate(() => {
+    for (const k of selected) { const [kind, it] = find(k) ?? []; if (it) items(kind).splice(items(kind).indexOf(it), 1); }
+    selected = new Set();
+  });
+}
+function dupSel() {
+  if (!selected.size) return;
+  mutate(() => {
+    const next = new Set();
+    for (const k of [...selected]) {
+      const [kind, it] = find(k) ?? []; if (!it) continue;
+      const c = clone(it);
+      c.id = nextId(it.id.replace(/\d+$/, "") || "X", items(kind));
+      c.x = r3(c.x + 0.25); c.z = r3(c.z - 0.25);
+      items(kind).push(c); next.add(key(kind, c));
+    }
+    selected = next;
+  });
+}
+
+document.querySelectorAll("[data-al]").forEach((b) => b.addEventListener("click", () => align(b.dataset.al)));
+function align(how) {
+  const sel = [...selected].map(find).filter(Boolean);
+  if (sel.length < 2) return;
+  mutate(() => {
+    const rs = sel.map(([kind, it]) => ({ kind, it, r: rectOf(kind, it) }));
+    const minX = Math.min(...rs.map((o) => o.r.x0)), maxX = Math.max(...rs.map((o) => o.r.x1));
+    const minZ = Math.min(...rs.map((o) => o.r.z0)), maxZ = Math.max(...rs.map((o) => o.r.z1));
+    // "left" is the visitor's left, which is +x
+    for (const o of rs) {
+      const [hw, hd] = half(o.kind, o.it);
+      if (how === "left") o.it.x = r3(maxX - hw);
+      if (how === "right") o.it.x = r3(minX + hw);
+      if (how === "front") o.it.z = r3(minZ + hd);
+      if (how === "back") o.it.z = r3(maxZ - hd);
+      if (how === "cx") o.it.x = r3((minX + maxX) / 2);
+      if (how === "cz") o.it.z = r3((minZ + maxZ) / 2);
+    }
+    if (how === "dx" || how === "dz") {
+      // equal gaps between pieces, keeping the outermost two where they are
+      const ax = how === "dx" ? "x" : "z";
+      const lo = ax === "x" ? "x0" : "z0", hi = ax === "x" ? "x1" : "z1";
+      const sorted = [...rs].sort((a, b) => a.r[lo] - b.r[lo]);
+      const span = sorted[sorted.length - 1].r[hi] - sorted[0].r[lo];
+      const total = sorted.reduce((s, o) => s + (o.r[hi] - o.r[lo]), 0);
+      const gap = (span - total) / (sorted.length - 1);
+      let cur = sorted[0].r[lo];
+      for (const o of sorted) { const len = o.r[hi] - o.r[lo]; o.it[ax] = r3(cur + len / 2); cur += len + gap; }
+    }
+  });
+}
+
+async function save() {
+  const w = warnings();
+  $("status").textContent = "Saving…";
+  const res = await fetch("/api/layout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(state) });
+  const out = await res.json().catch(() => ({ ok: false, error: "no answer" }));
+  if (out.ok) { savedJson = JSON.stringify(state); renderPanel(w.w); $("status").textContent = "Saved to src/shared/layout.json. Now run: node scripts/blueprint.ts"; }
+  else $("status").textContent = "Not saved: " + out.error;
+}
+
+addEventListener("keydown", (e) => {
+  if (e.target.matches?.("input, select, textarea")) return;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); save(); return; }
+  if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); dupSel(); return; }
+  if (mod && e.key.toLowerCase() === "a") { e.preventDefault(); selected = new Set(all().map(([k, it]) => key(k, it))); render(); return; }
+  if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSel(); return; }
+  const step = e.shiftKey ? 0.25 : 0.05;
+  const mv = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key]; // left on screen is +x
+  if (mv && selected.size) {
+    e.preventDefault();
+    mutate(() => { for (const k of selected) { const it = find(k)?.[1]; if (it) { it.x = r3(it.x + mv[0] * step); it.z = r3(it.z + mv[1] * step); } } });
+  }
+});
+addEventListener("resize", () => ctx && render());
+addEventListener("beforeunload", (e) => { if (state && JSON.stringify(state) !== savedJson) { e.preventDefault(); e.returnValue = ""; } });
+
+// ---------- start
+fetch("/api/layout").then((r) => r.json()).then((d) => {
+  ctx = d.context; state = d.layout; savedJson = JSON.stringify(state);
+  render();
+}).catch((err) => { $("status").textContent = "Could not load the layout: " + err; });
+</script>
+</body>
+</html>

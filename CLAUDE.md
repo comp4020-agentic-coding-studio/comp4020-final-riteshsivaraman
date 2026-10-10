@@ -156,6 +156,9 @@ find every resource by reading this file, not by discovering it mid-task.
   sweep below; run it before shipping public.
 - `.claude/skills/mutation-check/` — the defect-loop mutation check below,
   on demand for code built unwatched (timers, draft-visibility).
+- `tools/layout/index.html` + `scripts/layout-server.ts` (`pnpm layout`, port 8124) —
+  the floor-plan editor for tables, benches and stools; writes only
+  `src/shared/layout.json`. After saving run `node scripts/blueprint.ts`.
 - *(add further ADRs here as they're created — don't let this list go stale.)*
 
 ## How we work
