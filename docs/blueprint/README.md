@@ -30,7 +30,7 @@ absolute sizes are assumptions, because a photo has no scale.
 | 9 | Service bar | 8 m x 0.9, 5 stools | Photo showed about three quarters of the back wall; shortened to half at your request | Your call | [ ] |
 | 10 | Staff space behind bar | 1.65 m deep, closed by partitions | Your description | Medium | [ ] |
 | 10b | Back wall above the bar | three black screens with a service mark between them | Photo and your note | Medium | [ ] |
-| 11 | Staff door | 1.3 m wide, immediately left of the bar | Your description | Medium | [ ] |
+| 11 | Staff door | 1.3 m wide, immediately to the left of the bar as you face it (the +x side), flush with the wall | Your description; corrected after drawing from the visitor's side | Medium | [ ] |
 | 12 | Side-wall lightboxes | three per wall: 3.2, 2.0, 0.9 m wide | Close-up photo | Medium | [ ] |
 | 13 | Product bays | four per wall, 1.1 m wide, recessed 0.3 m between full-height piers (floor to ceiling) | Second close-up photo | Medium | [ ] |
 | 14 | Back room | 17 x 15 m, 2 shelving rows, 2 repair benches | Your instruction: same footprint as the shop | Design choice | [ ] |
