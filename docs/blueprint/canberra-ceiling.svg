@@ -1,92 +1,133 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="840" height="890" viewBox="0 0 840 890">
-<rect width="840" height="890" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1214" viewBox="0 0 900 1214">
+<rect width="900" height="1214" fill="#ffffff"/>
 <text x="60.0" y="28.0" font-size="16" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">Ceiling and lights, looking up from inside: +x wall on the LEFT, entrance at the bottom (metres)</text>
-<rect x="120.0" y="90.0" width="600.0" height="600.0" fill="#eceef0" stroke="#111" stroke-width="3" />
-<line x1="120.0" y1="675.0" x2="720.0" y2="675.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="660.0" x2="720.0" y2="660.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="645.0" x2="720.0" y2="645.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="630.0" x2="720.0" y2="630.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="615.0" x2="720.0" y2="615.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="600.0" x2="720.0" y2="600.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="585.0" x2="720.0" y2="585.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="570.0" x2="720.0" y2="570.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="555.0" x2="720.0" y2="555.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="540.0" x2="720.0" y2="540.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="525.0" x2="720.0" y2="525.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="510.0" x2="720.0" y2="510.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="495.0" x2="720.0" y2="495.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="480.0" x2="720.0" y2="480.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="465.0" x2="720.0" y2="465.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="450.0" x2="720.0" y2="450.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="435.0" x2="720.0" y2="435.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="420.0" x2="720.0" y2="420.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="405.0" x2="720.0" y2="405.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="390.0" x2="720.0" y2="390.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="375.0" x2="720.0" y2="375.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="360.0" x2="720.0" y2="360.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="345.0" x2="720.0" y2="345.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="330.0" x2="720.0" y2="330.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="315.0" x2="720.0" y2="315.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="300.0" x2="720.0" y2="300.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="285.0" x2="720.0" y2="285.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="270.0" x2="720.0" y2="270.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="255.0" x2="720.0" y2="255.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="240.0" x2="720.0" y2="240.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="225.0" x2="720.0" y2="225.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="210.0" x2="720.0" y2="210.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="195.0" x2="720.0" y2="195.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="180.0" x2="720.0" y2="180.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="165.0" x2="720.0" y2="165.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="150.0" x2="720.0" y2="150.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="135.0" x2="720.0" y2="135.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="120.0" x2="720.0" y2="120.0" stroke="#b9bec4" stroke-width="1" />
-<line x1="120.0" y1="105.0" x2="720.0" y2="105.0" stroke="#b9bec4" stroke-width="1" />
-<rect x="504.0" y="594.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="228.0" y="594.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="504.0" y="510.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="228.0" y="510.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="504.0" y="426.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="228.0" y="426.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="504.0" y="342.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="228.0" y="342.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="504.0" y="258.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="228.0" y="258.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="504.0" y="174.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<rect x="228.0" y="174.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
-<line x1="132.0" y1="660.0" x2="708.0" y2="660.0" stroke="#23262b" stroke-width="3" />
-<circle cx="165.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="231.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="297.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="363.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="429.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="495.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="561.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="627.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="693.0" cy="660.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<line x1="150.0" y1="660.0" x2="150.0" y2="102.0" stroke="#23262b" stroke-width="3" />
-<circle cx="150.0" cy="627.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="150.0" cy="561.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="150.0" cy="495.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="150.0" cy="429.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="150.0" cy="363.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="150.0" cy="297.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="150.0" cy="231.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="150.0" cy="165.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<line x1="690.0" y1="660.0" x2="690.0" y2="102.0" stroke="#23262b" stroke-width="3" />
-<circle cx="690.0" cy="627.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="690.0" cy="561.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="690.0" cy="495.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="690.0" cy="429.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="690.0" cy="363.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="690.0" cy="297.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="690.0" cy="231.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<circle cx="690.0" cy="165.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
-<rect x="399.0" y="645.0" width="42.0" height="6.0" fill="#1f2430" stroke="#000" stroke-width="1" />
-<text x="420.0" y="636.0" font-size="10" text-anchor="middle" fill="#1f2430" font-weight="700" font-family="system-ui, sans-serif">hanging mark</text>
-<line x1="606.0" y1="606.0" x2="606.0" y2="522.0" stroke="#1f6feb" stroke-width="1" />
-<text x="612.0" y="568.0" font-size="10" text-anchor="start" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.4 m row pitch</text>
-<text x="420.0" y="156.0" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">panels 1.8 x 0.4 m, centred 2.3 m either side of the middle</text>
-<text x="60.0" y="830.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Slats run across the room (along x) every 0.25 m. Spots every 1.1 m on rails 0.5 m in from the walls.</text>
-<text x="60.0" y="846.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Ceiling height 3 m; the rails sit at 2.96 m. Panel rows read from the front-on photograph; the exact count is an estimate.</text>
-<text x="60.0" y="862.0" font-size="11" text-anchor="start" fill="#a33" font-weight="400" font-family="system-ui, sans-serif">The hanging mark is an original service mark, not anyone's logo.</text>
+<rect x="120.0" y="90.0" width="660.0" height="924.0" fill="#eceef0" stroke="#111" stroke-width="3" />
+<line x1="120.0" y1="999.0" x2="780.0" y2="999.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="984.0" x2="780.0" y2="984.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="969.0" x2="780.0" y2="969.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="954.0" x2="780.0" y2="954.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="939.0" x2="780.0" y2="939.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="924.0" x2="780.0" y2="924.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="909.0" x2="780.0" y2="909.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="894.0" x2="780.0" y2="894.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="879.0" x2="780.0" y2="879.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="864.0" x2="780.0" y2="864.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="849.0" x2="780.0" y2="849.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="834.0" x2="780.0" y2="834.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="819.0" x2="780.0" y2="819.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="804.0" x2="780.0" y2="804.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="789.0" x2="780.0" y2="789.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="774.0" x2="780.0" y2="774.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="759.0" x2="780.0" y2="759.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="744.0" x2="780.0" y2="744.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="729.0" x2="780.0" y2="729.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="714.0" x2="780.0" y2="714.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="699.0" x2="780.0" y2="699.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="684.0" x2="780.0" y2="684.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="669.0" x2="780.0" y2="669.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="654.0" x2="780.0" y2="654.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="639.0" x2="780.0" y2="639.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="624.0" x2="780.0" y2="624.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="609.0" x2="780.0" y2="609.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="594.0" x2="780.0" y2="594.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="579.0" x2="780.0" y2="579.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="564.0" x2="780.0" y2="564.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="549.0" x2="780.0" y2="549.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="534.0" x2="780.0" y2="534.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="519.0" x2="780.0" y2="519.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="504.0" x2="780.0" y2="504.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="489.0" x2="780.0" y2="489.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="474.0" x2="780.0" y2="474.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="459.0" x2="780.0" y2="459.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="444.0" x2="780.0" y2="444.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="429.0" x2="780.0" y2="429.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="414.0" x2="780.0" y2="414.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="399.0" x2="780.0" y2="399.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="384.0" x2="780.0" y2="384.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="369.0" x2="780.0" y2="369.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="354.0" x2="780.0" y2="354.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="339.0" x2="780.0" y2="339.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="324.0" x2="780.0" y2="324.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="309.0" x2="780.0" y2="309.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="294.0" x2="780.0" y2="294.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="279.0" x2="780.0" y2="279.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="264.0" x2="780.0" y2="264.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="249.0" x2="780.0" y2="249.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="234.0" x2="780.0" y2="234.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="219.0" x2="780.0" y2="219.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="204.0" x2="780.0" y2="204.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="189.0" x2="780.0" y2="189.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="174.0" x2="780.0" y2="174.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="159.0" x2="780.0" y2="159.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="144.0" x2="780.0" y2="144.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="129.0" x2="780.0" y2="129.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="114.0" x2="780.0" y2="114.0" stroke="#b9bec4" stroke-width="1" />
+<line x1="120.0" y1="99.0" x2="780.0" y2="99.0" stroke="#b9bec4" stroke-width="1" />
+<rect x="564.0" y="936.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="936.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="852.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="852.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="768.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="768.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="684.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="684.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="600.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="600.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="516.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="516.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="432.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="432.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="348.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="348.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="264.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="264.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="564.0" y="180.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<rect x="228.0" y="180.0" width="108.0" height="24.0" fill="#ffffff" stroke="#1f6feb" stroke-width="1.2" />
+<line x1="132.0" y1="984.0" x2="768.0" y2="984.0" stroke="#23262b" stroke-width="3" />
+<circle cx="165.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="231.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="297.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="363.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="429.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="495.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="561.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="627.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="693.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="759.0" cy="984.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<line x1="150.0" y1="984.0" x2="150.0" y2="102.0" stroke="#23262b" stroke-width="3" />
+<circle cx="150.0" cy="951.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="885.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="819.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="753.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="687.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="621.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="555.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="489.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="423.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="357.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="291.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="225.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="150.0" cy="159.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<line x1="750.0" y1="984.0" x2="750.0" y2="102.0" stroke="#23262b" stroke-width="3" />
+<circle cx="750.0" cy="951.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="885.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="819.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="753.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="687.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="621.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="555.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="489.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="423.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="357.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="291.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="225.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<circle cx="750.0" cy="159.0" r="4.0" fill="#ffcc33" stroke="#23262b"/>
+<rect x="429.0" y="969.0" width="42.0" height="6.0" fill="#1f2430" stroke="#000" stroke-width="1" />
+<text x="450.0" y="960.0" font-size="10" text-anchor="middle" fill="#1f2430" font-weight="700" font-family="system-ui, sans-serif">hanging mark</text>
+<line x1="666.0" y1="948.0" x2="666.0" y2="864.0" stroke="#1f6feb" stroke-width="1" />
+<text x="672.0" y="910.0" font-size="10" text-anchor="start" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.4 m row pitch</text>
+<text x="450.0" y="498.0" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">panels 1.8 x 0.4 m, centred 2.8 m either side of the middle</text>
+<text x="60.0" y="1154.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Slats run across the room (along x) every 0.25 m. Spots every 1.1 m on rails 0.5 m in from the walls.</text>
+<text x="60.0" y="1170.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Ceiling height 3 m; the rails sit at 2.96 m. Panel rows read from the front-on photograph; the exact count is an estimate.</text>
+<text x="60.0" y="1186.0" font-size="11" text-anchor="start" fill="#a33" font-weight="400" font-family="system-ui, sans-serif">The hanging mark is an original service mark, not anyone's logo.</text>
 </svg>
