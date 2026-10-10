@@ -159,6 +159,12 @@ find every resource by reading this file, not by discovering it mid-task.
 - `tools/layout/index.html` + `scripts/layout-server.ts` (`pnpm layout`, port 8124) —
   the floor-plan editor for tables, benches and stools; writes only
   `src/shared/layout.json`. After saving run `node scripts/blueprint.ts`.
+- `docs/graphics-brief.md` — the brief the four graphics specialists work to:
+  fixed sizes, budget, ownership of `src/client/src/gfx/*`, how to check a look.
+- `pnpm dev` (`scripts/dev.ts`) — server on 8080 plus the client on 5173 with
+  hot reload; open http://localhost:5173.
+- `references/table-map.md` — my reading of what stands on each table in the
+  Canberra photo, for Ritesh to correct.
 - *(add further ADRs here as they're created — don't let this list go stale.)*
 
 ## How we work

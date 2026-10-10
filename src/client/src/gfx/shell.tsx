@@ -1,0 +1,718 @@
+import { useFrame } from "@react-three/fiber";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import {
+  CanvasTexture,
+  Color,
+  DoubleSide,
+  type Group,
+  InstancedMesh,
+  Object3D,
+  RepeatWrapping,
+  SRGBColorSpace,
+} from "three";
+import { NPCS, isStaff, npcPose } from "../../../shared/npcs.ts";
+import { CEILING, FLOOR } from "../../../shared/protocol.ts";
+import {
+  BACK_ROOM_Z0,
+  BACK_ROOM_Z1,
+  BACK_AREAS,
+  BACK_DOOR,
+  BACK_FURNITURE,
+  BACK_SHELVES,
+  BACK_WALLS,
+  BACK_SHELF_ROW_Z,
+  BACK_SHELF_UNIT_X,
+  BAY_COUNT,
+  BAY_W,
+  BENCHES,
+  COLUMN_X,
+  COUNTER,
+  DOOR,
+  PARTITIONS,
+  PIER_W,
+  SERVICE_DESKS,
+  TABLES,
+  BAR_STOOLS,
+  TABLE_STOOLS,
+  WALL_FACE_Z,
+  bayCentre,
+  type Box,
+  type Table as TableSpec,
+} from "../../../shared/world.ts";
+import {
+  BACK_WALL,
+  BAY_LEDGES,
+  BAY_SHELVES,
+  LEDGE_DEPTH,
+  BAY_SIGN_Y,
+  CEILING_SPEC,
+  DOOR_H as PLAN_DOOR_H,
+  GLASS,
+  LIGHTBOX_BOTTOM,
+  LIGHTBOX_H,
+  SIDE_WALL,
+  STOOL_SEAT_H,
+  WALL_BANDS,
+} from "../../../shared/plan.ts";
+import { net } from "../net.ts";
+import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W, DOOR_X, DOOR_H, BENCH_X, BENCH_HALF, FACE_X, canvasTexture, labelTexture, BoxField, Sign, std, BlobShadow, type Cuboid, type Kind } from "./common.tsx";
+import { Device } from "./Device.tsx";
+import { Desktop, Monitor } from "./computers.tsx";
+import { BackFurniture, RepairBenches, StorageRacks, Stools, bayFrames } from "./furniture.tsx";
+import { bayStock } from "./phones.tsx";
+
+
+// Invented abstract poster art. "light" is a soft two-colour gradient; "dark"
+// is a black panel with bright rounded shapes, like the ones in the reference.
+export const POSTER_PAIRS: Array<[string, string]> = [
+  ["#ff7a59", "#7a5cff"],
+  ["#2dd4bf", "#3b82f6"],
+  ["#f6d365", "#fda085"],
+  ["#a18cd1", "#fbc2eb"],
+];
+
+
+export function posterTexture(a: string, b: string, dark: boolean): CanvasTexture {
+  return canvasTexture(256, dark ? 128 : 256, (g) => {
+    const h = dark ? 128 : 256;
+    if (dark) {
+      g.fillStyle = "#101216";
+      g.fillRect(0, 0, 256, h);
+      const shapes: Array<[number, number, number, number, number, string]> = [
+        [30, 80, 90, 22, -0.5, "#f5b700"],
+        [110, 60, 70, 14, -0.7, "#00bbf9"],
+        [140, 95, 80, 26, 0.2, "#9b5de5"],
+        [190, 50, 40, 16, 0.6, "#f15bb5"],
+        [215, 100, 26, 26, 0, "#ee6c4d"],
+      ];
+      for (const [x, y, w, hh, rot, c] of shapes) {
+        g.save();
+        g.translate(x + w / 2, y);
+        g.rotate(rot);
+        g.fillStyle = c;
+        g.beginPath();
+        g.roundRect(-w / 2, -hh / 2, w, hh, hh / 2);
+        g.fill();
+        g.restore();
+      }
+    } else {
+      const grad = g.createLinearGradient(0, 0, 256, 256);
+      grad.addColorStop(0, a);
+      grad.addColorStop(1, b);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 256, 256);
+      g.globalAlpha = 0.25;
+      g.fillStyle = "#ffffff";
+      g.beginPath();
+      g.arc(80, 90, 60, 0, Math.PI * 2);
+      g.fill();
+      g.beginPath();
+      g.arc(170, 180, 80, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+}
+
+
+export function floorTexture(w: number, d: number, base: string, joint: string): CanvasTexture {
+  const tex = canvasTexture(256, 256, (g) => {
+    g.fillStyle = base;
+    g.fillRect(0, 0, 256, 256);
+    // polished stone: a soft cloudy variation and fine speckle, so the floor
+    // is not one flat grey
+    let seed = 12345;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 38; i++) {
+      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "70,76,84"},${0.025 + rnd() * 0.035})`;
+      g.beginPath();
+      g.ellipse(rnd() * 256, rnd() * 256, 20 + rnd() * 60, 10 + rnd() * 30, rnd() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+    for (let i = 0; i < 260; i++) {
+      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "60,66,74"},${0.05 + rnd() * 0.08})`;
+      g.fillRect(rnd() * 256, rnd() * 256, 1.5, 1.5);
+    }
+    g.strokeStyle = joint;
+    g.lineWidth = 3;
+    g.strokeRect(0, 0, 256, 256);
+  });
+  tex.wrapS = tex.wrapT = RepeatWrapping;
+  tex.repeat.set(w / 2, d / 2);
+  return tex;
+}
+
+
+// Brushed grey wall panels with fine vertical seams every metre.
+export function wallTexture(lengthM: number): CanvasTexture {
+  const tex = canvasTexture(128, 128, (g) => {
+    g.fillStyle = WALL;
+    g.fillRect(0, 0, 128, 128);
+    g.fillStyle = "#b4b8bd";
+    g.fillRect(0, 0, 2, 128);
+  });
+  tex.wrapS = tex.wrapT = RepeatWrapping;
+  tex.repeat.set(lengthM, 1);
+  return tex;
+}
+
+
+// Grey ceiling slats running across the room, like the reference.
+export function ceilingTexture(w: number, d: number): CanvasTexture {
+  const tex = canvasTexture(64, 64, (g) => {
+    g.fillStyle = "#eceef0";
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle = "#a3a8ae";
+    g.fillRect(0, 0, 64, 7);
+  });
+  tex.wrapS = tex.wrapT = RepeatWrapping;
+  tex.repeat.set(1, d / CEILING_SPEC.slatPitch);
+  void w;
+  return tex;
+}
+
+export function Poster({
+  position,
+  rotY,
+  pair,
+  dark = false,
+  w = 2.2,
+  h = 2,
+}: {
+  position: [number, number, number];
+  rotY: number;
+  pair: [string, string];
+  dark?: boolean;
+  w?: number;
+  h?: number;
+}) {
+  const map = useMemo(() => posterTexture(pair[0], pair[1], dark), [pair, dark]);
+  return (
+    <group position={position} rotation={[0, rotY, 0]}>
+      <mesh>
+        <boxGeometry args={[w + 0.12, h + 0.12, 0.06]} />
+        <meshBasicMaterial color={dark ? "#2a2d33" : "#ffffff"} />
+      </mesh>
+      <mesh position={[0, 0, 0.035]}>
+        <planeGeometry args={[w, h]} />
+        <meshBasicMaterial map={map} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+
+// An original service mark (a ring with teeth around a dot), not anyone's logo.
+export function ServiceMark({ position }: { position: [number, number, number] }) {
+  const map = useMemo(
+    () =>
+      canvasTexture(128, 128, (g) => {
+        g.fillStyle = "#101216";
+        g.fillRect(0, 0, 128, 128);
+        g.strokeStyle = "#ffffff";
+        g.fillStyle = "#ffffff";
+        g.lineWidth = 8;
+        g.beginPath();
+        g.arc(64, 64, 26, 0, Math.PI * 2);
+        g.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4;
+          g.save();
+          g.translate(64 + Math.cos(a) * 40, 64 + Math.sin(a) * 40);
+          g.rotate(a);
+          g.fillRect(-7, -5, 14, 10);
+          g.restore();
+        }
+        g.beginPath();
+        g.arc(64, 64, 9, 0, Math.PI * 2);
+        g.fill();
+      }),
+    [],
+  );
+  return (
+    <mesh position={position} rotation={[0, Math.PI, 0]}>
+      <planeGeometry args={[0.9, 0.9]} />
+      <meshBasicMaterial map={map} toneMapped={false} />
+    </mesh>
+  );
+}
+
+
+// The same original service mark, hung from the ceiling so it reads from both
+// sides (outside the glass and inside).
+export function HangingMark({ size }: { size: number }) {
+  const map = useMemo(
+    () =>
+      canvasTexture(128, 128, (g) => {
+        g.fillStyle = "#ffffff";
+        g.fillRect(0, 0, 128, 128);
+        g.strokeStyle = "#1f2430";
+        g.fillStyle = "#1f2430";
+        g.lineWidth = 8;
+        g.beginPath();
+        g.arc(64, 64, 26, 0, Math.PI * 2);
+        g.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4;
+          g.save();
+          g.translate(64 + Math.cos(a) * 40, 64 + Math.sin(a) * 40);
+          g.rotate(a);
+          g.fillRect(-7, -5, 14, 10);
+          g.restore();
+        }
+        g.beginPath();
+        g.arc(64, 64, 9, 0, Math.PI * 2);
+        g.fill();
+      }),
+    [],
+  );
+  return (
+    <mesh>
+      <planeGeometry args={[size, size]} />
+      <meshBasicMaterial map={map} toneMapped={false} side={DoubleSide} />
+    </mesh>
+  );
+}
+
+
+export function lightboxTexture(kind: "phones" | "laptops" | "card"): CanvasTexture {
+  return canvasTexture(512, 256, (g) => {
+    g.fillStyle = "#ffffff";
+    g.fillRect(0, 0, 512, 256);
+    if (kind === "card") {
+      g.fillStyle = "#dfe3ea";
+      g.fillRect(170, 40, 172, 190);
+      g.fillStyle = "#9aa3b2";
+      for (let i = 0; i < 3; i++) g.fillRect(200 + i * 50, 170, 34, 34);
+      return;
+    }
+    for (let i = 0; i < 4; i++) {
+      const x = 28 + i * 122;
+      const grad = g.createLinearGradient(x, 30, x + 100, 250);
+      if (kind === "phones") {
+        grad.addColorStop(0, "#1f3b3a");
+        grad.addColorStop(1, "#6fb6a8");
+      } else {
+        grad.addColorStop(0, "#2a2f52");
+        grad.addColorStop(1, "#b07cf2");
+      }
+      g.fillStyle = grad;
+      g.beginPath();
+      g.roundRect(x, 30, 100, 220, 16);
+      g.fill();
+      g.fillStyle = "rgba(255,255,255,0.35)";
+      g.beginPath();
+      g.arc(x + 32, 70, 15, 0, Math.PI * 2);
+      g.arc(x + 32, 108, 15, 0, Math.PI * 2);
+      g.fill();
+    }
+  });
+}
+
+
+// A recessed lightbox: the whole panel glows white, the picture sits low in it.
+export function LightBox({
+  side,
+  z,
+  w,
+  kind,
+}: {
+  side: -1 | 1;
+  z: number;
+  w: number;
+  kind: "phones" | "laptops" | "card";
+}) {
+  const map = useMemo(() => lightboxTexture(kind), [kind]);
+  const h = LIGHTBOX_H;
+  const y = LIGHTBOX_BOTTOM + h / 2;
+  return (
+    <group position={[side * (FACE_X - 0.03), y, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+      <mesh>
+        <planeGeometry args={[w, h]} />
+        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+      </mesh>
+      <mesh position={[0, -h * 0.08, 0.002]}>
+        <planeGeometry args={[w * 0.92, h * 0.78]} />
+        <meshBasicMaterial map={map} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
+
+export const BAY_LABELS: Record<number, string[]> = {
+  [-1]: ["AUDIO", "CHARGING", "CASES"],
+  [1]: ["WATCH BANDS", "KEYBOARDS", "SMART HOME"],
+};
+
+const BAND_LOW = WALL_BANDS.low; // top of the dark lower band: the bench height
+const BAND_MID = WALL_BANDS.mid; // top of the mid band: bottom of the lightboxes
+
+export function WallSections() {
+  const frames = useMemo(() => bayFrames(), []);
+  const { stock, flats } = useMemo(() => bayStock(), []);
+  const bandTex = useMemo(() => wallTexture(15), []);
+  const faceRot = (side: -1 | 1): number => (side === -1 ? Math.PI / 2 : -Math.PI / 2);
+  return (
+    <group>
+      {/* three tones of grey: dark lower band, mid band, light upper wall,
+          with a dark reveal where the panels meet the floor */}
+      {[-1, 1].flatMap((side) =>
+        [
+          { y0: 0, y1: BAND_LOW, c: "#8c9096" },
+          { y0: BAND_LOW, y1: BAND_MID, c: "#a8acb1" },
+          { y0: BAND_MID, y1: CEILING, c: "#cdd0d4" },
+        ].map((b) => (
+          <mesh key={`${side}:${b.y0}`} position={[side * (FACE_X - 0.01), (b.y0 + b.y1) / 2, 0]}>
+            <boxGeometry args={[0.02, b.y1 - b.y0, FLOOR.maxZ - FLOOR.minZ + 1]} />
+            <meshStandardMaterial map={bandTex} color={b.c} emissive="#ffffff" emissiveIntensity={0.12} />
+          </mesh>
+        )),
+      )}
+      <BoxField boxes={frames} roughness={0.5} />
+      <BoxField boxes={stock} />
+      <BoxField boxes={flats} roughness={0.35} />
+      {([-1, 1] as const).map((side) => (
+        <group key={side}>
+          {SIDE_WALL[side === 1 ? "+x" : "-x"].map((f, i) => {
+            if (f.kind === "lightbox") {
+              return <LightBox key={i} side={side} z={f.z} w={f.w} kind={f.art} />;
+            }
+            if (f.kind === "display") {
+              return (
+                <Poster
+                  key={i}
+                  position={[side * (FACE_X - 0.05), LIGHTBOX_BOTTOM + f.h / 2, f.z]}
+                  rotY={faceRot(side)}
+                  pair={POSTER_PAIRS[1]}
+                  dark
+                  w={f.w}
+                  h={f.h}
+                />
+              );
+            }
+            if (f.kind === "monitors") {
+              return f.zs.map((mz) => <Monitor key={`m${mz}`} x={side * BENCH_X} z={mz} side={side} />);
+            }
+            if (f.kind === "desktops") {
+              return Array.from({ length: f.count }, (_, k) => (
+                <Desktop key={`d${k}`} x={side * BENCH_X} z={f.z0 + k * f.pitch} side={side} />
+              ));
+            }
+            return Array.from({ length: f.count }, (_, k) => (
+              <Device
+                key={`h${k}`}
+                kind="headphones"
+                x={side * BENCH_X}
+                y={0.95}
+                z={f.z0 + k * f.pitch}
+                rotY={faceRot(side)}
+                colour={["#e8a98c", "#c9ced3", "#d8cfe8"][k % 3]}
+              />
+            ));
+          })}
+          {BAY_LABELS[side].slice(0, BAY_COUNT).map((label, i) => (
+            <Sign
+              key={label}
+              text={label}
+              position={[side * (FACE_X - 0.04), BAY_SIGN_Y, bayCentre(i)]}
+              rotY={faceRot(side)}
+              w={1.2}
+            />
+          ))}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+
+// The areas behind the shop and what is in them: partition walls with
+// doorways, a sign over each area, a desk and computers, lockers, restrooms,
+// pallets and the roller door of the loading dock.
+export function BackAreas() {
+  const slats = useMemo(() => {
+    const t = canvasTexture(64, 64, (g) => {
+      g.fillStyle = "#b8bec5";
+      g.fillRect(0, 0, 64, 64);
+      g.fillStyle = "#8e959d";
+      for (let y = 0; y < 64; y += 8) g.fillRect(0, y, 64, 2);
+    });
+    t.wrapS = t.wrapT = RepeatWrapping;
+    t.repeat.set(2, 3);
+    return t;
+  }, []);
+  const rz = BACK_ROOM_Z1;
+  return (
+    <group>
+      {BACK_WALLS.map((w, i) => (
+        <mesh key={i} position={[w.x, w.h / 2, w.z]}>
+          <boxGeometry args={[w.w, w.h, w.d]} />
+          <meshStandardMaterial color="#e2e6ea" roughness={0.8} />
+        </mesh>
+      ))}
+      {BACK_AREAS.filter((a) => a.id !== "storage").map((a) => (
+        <Sign
+          key={a.id}
+          text={a.name.split(":")[0].split("(")[0].trim()}
+          position={[(a.x0 + a.x1) / 2, 2.35, a.z0 + 0.09]}
+          rotY={Math.PI}
+          w={2.4}
+          fg="#ffffff"
+          bg="#2f3a4a"
+        />
+      ))}
+      {/* the back door onto the loading dock: a roller door and a sign */}
+      <mesh position={[(BACK_DOOR.minX + BACK_DOOR.maxX) / 2, 1.3, rz - 0.04]}>
+        <boxGeometry args={[BACK_DOOR.maxX - BACK_DOOR.minX, 2.6, 0.06]} />
+        <meshStandardMaterial map={slats} roughness={0.6} metalness={0.3} />
+      </mesh>
+      <Sign text="DELIVERIES" position={[0, 2.85, rz - 0.1]} rotY={Math.PI} w={2.2} fg="#111111" bg="#ffd23f" />
+    </group>
+  );
+}
+
+
+export function BackRoom() {
+
+
+  const w = HALF_W * 2;
+  const depth = BACK_ROOM_Z1 - BACK_ROOM_Z0;
+  const floor = useMemo(() => floorTexture(w, depth, "#c9ccd0", "#b3b7bc"), [w, depth]);
+  const zc = (BACK_ROOM_Z0 + BACK_ROOM_Z1) / 2;
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, zc]}>
+        <planeGeometry args={[w, depth]} />
+        <meshStandardMaterial map={floor} roughness={0.9} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, CEILING, zc]}>
+        <planeGeometry args={[w, depth]} />
+        <meshStandardMaterial color="#eef0f2" emissive="#ffffff" emissiveIntensity={0.45} />
+      </mesh>
+      <mesh position={[0, CEILING / 2, BACK_ROOM_Z1 + 0.1]}>
+        <boxGeometry args={[w, CEILING, 0.2]} />
+        <meshStandardMaterial color="#e2e6ea" emissive="#ffffff" emissiveIntensity={0.3} />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (HALF_W + 0.1), CEILING / 2, zc]}>
+          <boxGeometry args={[0.2, CEILING, depth]} />
+          <meshStandardMaterial color="#e2e6ea" emissive="#ffffff" emissiveIntensity={0.3} />
+        </mesh>
+      ))}
+      <StorageRacks />
+      <BackFurniture />
+      <RepairBenches />
+
+      {/* walls between the areas (with doorways), area signs, furniture, the dock door */}
+      <BackAreas />
+
+      <Sign
+        text="SERVICE"
+        position={[0, 2.5, SERVICE_DESKS[0].z + 0.6]}
+        rotY={Math.PI}
+        w={2}
+        fg="#ffffff"
+        bg="#1f5f99"
+      />
+    </group>
+  );
+}
+
+
+
+// The staff door: flush with the wall, the same finish, outlined by hairline
+// gaps. It slides into the wall when staff (NPC or a visitor acting as staff)
+// come within reach, and closes again behind them.
+export function StaffDoor() {
+  const slide = useRef<Group>(null);
+  const open = useRef(0);
+  useFrame((_, delta) => {
+    const now = net.serverNow();
+    const near = (x: number, z: number) => Math.hypot(x - DOOR_X, z - WALL_FACE_Z) < 2.2;
+    let want = false;
+    for (const n of NPCS) {
+      if (!isStaff(n)) continue;
+      const p = npcPose(n, now);
+      if (near(p.x, p.z)) want = true;
+    }
+    for (const r of net.remotes.values()) if (r.role === "staff" && near(r.x, r.z)) want = true;
+    if (net.role === "staff" && near(net.me.x, net.me.z)) want = true;
+    open.current += ((want ? 1 : 0) - open.current) * Math.min(1, delta * 6);
+    if (slide.current) slide.current.position.x = -open.current * (DOOR_W + 0.1);
+  });
+  const wall = useMemo(() => wallTexture(DOOR_W), []);
+  const z = WALL_FACE_Z + 0.1; // middle of the wall's thickness
+  return (
+    <group>
+      <group ref={slide}>
+        <mesh position={[DOOR_X, DOOR_H / 2, z]}>
+          <boxGeometry args={[DOOR_W - 0.03, DOOR_H - 0.03, 0.1]} />
+          <meshStandardMaterial map={wall} emissive="#ffffff" emissiveIntensity={0.3} />
+        </mesh>
+      </group>
+      {/* hairline gaps around the door */}
+      <mesh position={[DOOR.minX, DOOR_H / 2, WALL_FACE_Z - 0.005]}>
+        <boxGeometry args={[0.012, DOOR_H, 0.01]} />
+        <meshBasicMaterial color="#8d9399" />
+      </mesh>
+      <mesh position={[DOOR.maxX, DOOR_H / 2, WALL_FACE_Z - 0.005]}>
+        <boxGeometry args={[0.012, DOOR_H, 0.01]} />
+        <meshBasicMaterial color="#8d9399" />
+      </mesh>
+      {/* a small card reader beside it is the only tell */}
+      <mesh position={[DOOR.maxX + 0.25, 1.2, WALL_FACE_Z - 0.02]}>
+        <boxGeometry args={[0.08, 0.12, 0.03]} />
+        <meshStandardMaterial color="#2a2d33" roughness={0.5} />
+      </mesh>
+    </group>
+  );
+}
+
+
+export function ShopShell() {
+  const w = FLOOR.maxX - FLOOR.minX + 1;
+  const d = FLOOR.maxZ - FLOOR.minZ + 1;
+  const floor = useMemo(() => floorTexture(w, d, "#d9dcdf", "#c3c7cb"), [w, d]);
+  const backWall = useMemo(() => wallTexture(w), [w]);
+  const sideWall = useMemo(() => wallTexture(d), [d]);
+  const ceilingMap = useMemo(() => ceilingTexture(w, d), [w, d]);
+  const fullW = w + 0.2;
+  const wallMat = (map: CanvasTexture) => (
+    <meshStandardMaterial map={map} emissive="#ffffff" emissiveIntensity={0.3} />
+  );
+
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[w, d]} />
+        <meshStandardMaterial map={floor} roughness={0.42} metalness={0.05} />
+      </mesh>
+
+      {/* ceiling: grey slats running across the room, long light panels in
+          paired rows either side of the centre, track rails with spots down
+          the sides and along the front, and a mark hanging near the front */}
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, CEILING, 0]}>
+        <planeGeometry args={[w, d]} />
+        <meshStandardMaterial map={ceilingMap} emissive="#ffffff" emissiveIntensity={0.35} />
+      </mesh>
+      {CEILING_SPEC.panelRowsZ.flatMap((z) =>
+        CEILING_SPEC.panelX.map((x) => (
+          <mesh key={`${x}:${z}`} position={[x, CEILING - 0.02, z]} rotation={[Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[CEILING_SPEC.panelW, CEILING_SPEC.panelD]} />
+            <meshBasicMaterial color="#ffffff" />
+          </mesh>
+        )),
+      )}
+      {[
+        { x: 0, z: FLOOR.minZ + CEILING_SPEC.trackInset, len: w - 1, alongX: true },
+        { x: FLOOR.minX + CEILING_SPEC.trackInset, z: 0, len: d - 1, alongX: false },
+        { x: FLOOR.maxX - CEILING_SPEC.trackInset, z: 0, len: d - 1, alongX: false },
+      ].map((r, i) => (
+        <group key={i}>
+          <mesh position={[r.x, CEILING - 0.04, r.z]}>
+            <boxGeometry args={r.alongX ? [r.len, 0.04, 0.05] : [0.05, 0.04, r.len]} />
+            <meshStandardMaterial color="#23262b" />
+          </mesh>
+          {Array.from({ length: Math.floor(r.len / CEILING_SPEC.spotPitch) }, (_, k) => {
+            const off = -r.len / 2 + CEILING_SPEC.spotPitch / 2 + k * CEILING_SPEC.spotPitch;
+            const px = r.alongX ? r.x + off : r.x;
+            const pz = r.alongX ? r.z : r.z + off;
+            return (
+              <group key={k} position={[px, CEILING - 0.12, pz]}>
+                <mesh>
+                  <cylinderGeometry args={[0.05, 0.05, 0.14, 10]} />
+                  <meshStandardMaterial color="#23262b" />
+                </mesh>
+                <mesh position={[0, -0.075, 0]}>
+                  <cylinderGeometry args={[0.04, 0.04, 0.01, 10]} />
+                  <meshBasicMaterial color="#fff6dd" />
+                </mesh>
+              </group>
+            );
+          })}
+        </group>
+      ))}
+      <group position={[CEILING_SPEC.hangingMark.x, CEILING_SPEC.hangingMark.y, CEILING_SPEC.hangingMark.z]}>
+        <mesh position={[0, (CEILING - CEILING_SPEC.hangingMark.y) / 2 + CEILING_SPEC.hangingMark.size / 2, 0]}>
+          <boxGeometry args={[0.02, CEILING - CEILING_SPEC.hangingMark.y, 0.02]} />
+          <meshStandardMaterial color="#23262b" />
+        </mesh>
+        <HangingMark size={CEILING_SPEC.hangingMark.size} />
+      </group>
+
+      {/* back wall, with the flush staff door set into it */}
+      <mesh position={[(-fullW / 2 + DOOR.minX) / 2, CEILING / 2, FLOOR.maxZ + 0.5]}>
+        <boxGeometry args={[DOOR.minX + fullW / 2, CEILING, 0.2]} />
+        {wallMat(backWall)}
+      </mesh>
+      <mesh position={[(DOOR.maxX + fullW / 2) / 2, CEILING / 2, FLOOR.maxZ + 0.5]}>
+        <boxGeometry args={[fullW / 2 - DOOR.maxX, CEILING, 0.2]} />
+        {wallMat(backWall)}
+      </mesh>
+      <mesh position={[DOOR_X, (CEILING + DOOR_H) / 2, FLOOR.maxZ + 0.5]}>
+        <boxGeometry args={[DOOR_W, CEILING - DOOR_H, 0.2]} />
+        {wallMat(backWall)}
+      </mesh>
+      <StaffDoor />
+
+      {/* side walls */}
+      <mesh position={[FLOOR.minX - 0.5, CEILING / 2, 0]}>
+        <boxGeometry args={[0.2, CEILING, d]} />
+        {wallMat(sideWall)}
+      </mesh>
+      <mesh position={[FLOOR.maxX + 0.5, CEILING / 2, 0]}>
+        <boxGeometry args={[0.2, CEILING, d]} />
+        {wallMat(sideWall)}
+      </mesh>
+
+      {/* glass front with mullions, a header band and the entrance opening */}
+      {[
+        [-w / 2, GLASS.entranceX[0]],
+        [GLASS.entranceX[1], w / 2],
+      ].map(([a, b]) => (
+        <mesh key={a} position={[(a + b) / 2, CEILING / 2, FLOOR.minZ - 0.5]}>
+          <boxGeometry args={[b - a, CEILING, 0.05]} />
+          <meshPhysicalMaterial color="#cfe6f0" transparent opacity={0.16} roughness={0.05} />
+        </mesh>
+      ))}
+      {[...GLASS.mullionX, ...GLASS.entranceX]
+        .filter((x) => !(x > GLASS.entranceX[0] && x < GLASS.entranceX[1]))
+        .map((x) => (
+          <mesh key={x} position={[x, CEILING / 2, FLOOR.minZ - 0.5]}>
+            <boxGeometry args={[0.06, CEILING, 0.08]} />
+            <meshStandardMaterial color="#9aa1a8" metalness={0.5} roughness={0.4} />
+          </mesh>
+        ))}
+      <mesh position={[0, CEILING - 0.3, FLOOR.minZ - 0.5]}>
+        <boxGeometry args={[w, 0.6, 0.1]} />
+        <meshStandardMaterial color="#b9bec4" />
+      </mesh>
+
+      {/* the bar's back wall: three screens and a service mark between them */}
+      {BACK_WALL.screenX.map((x, i) => (
+        <Poster
+          key={x}
+          position={[x, BACK_WALL.screenY, WALL_FACE_Z - 0.03]}
+          rotY={Math.PI}
+          pair={POSTER_PAIRS[i]}
+          dark
+          w={BACK_WALL.screenW}
+          h={BACK_WALL.screenH}
+        />
+      ))}
+      {BACK_WALL.markX.map((x) => (
+        <ServiceMark key={x} position={[x, BACK_WALL.screenY, WALL_FACE_Z - 0.03]} />
+      ))}
+      <Sign
+        text="SERVICE BAR"
+        position={[0, BACK_WALL.signY, WALL_FACE_Z - 0.03]}
+        rotY={Math.PI}
+        w={BACK_WALL.signW}
+        fg="#ffffff"
+        bg="#1f2430"
+      />
+
+      <WallSections />
+    </group>
+  );
+}
