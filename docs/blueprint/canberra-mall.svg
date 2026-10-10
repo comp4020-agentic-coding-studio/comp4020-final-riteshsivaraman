@@ -62,10 +62,10 @@
 <circle cx="192.0" cy="150.2" r="3.0" fill="#4a8f7a" stroke="none"/>
 <line x1="1512.0" y1="174.4" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="824.5" y1="174.4" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="824.5" y1="112.8" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="824.5" y1="77.6" x2="824.5" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="824.5" y1="60.0" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="824.5" y1="77.6" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="112.8" x2="824.5" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="88.6" x2="824.5" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="60.0" x2="824.5" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="88.6" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="824.5" y1="112.8" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="824.5" y1="174.4" x2="192.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="192.0" y1="174.4" x2="192.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
@@ -74,10 +74,10 @@
 <circle cx="1512.0" cy="174.4" r="3.0" fill="#d1495b" stroke="none"/>
 <line x1="1512.0" y1="174.4" x2="879.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="879.5" y1="174.4" x2="879.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="879.5" y1="112.8" x2="879.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="879.5" y1="77.6" x2="879.5" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="879.5" y1="60.0" x2="879.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="879.5" y1="77.6" x2="879.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="112.8" x2="879.5" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="88.6" x2="879.5" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="60.0" x2="879.5" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="88.6" x2="879.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="879.5" y1="112.8" x2="879.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="879.5" y1="174.4" x2="192.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="192.0" y1="174.4" x2="192.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
@@ -86,12 +86,12 @@
 <circle cx="1512.0" cy="174.4" r="3.0" fill="#d1495b" stroke="none"/>
 <line x1="1512.0" y1="174.4" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="824.5" y1="174.4" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="824.5" y1="112.8" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="824.5" y1="77.6" x2="768.4" y2="83.1" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="768.4" y1="83.1" x2="768.4" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="768.4" y1="60.0" x2="768.4" y2="83.1" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="768.4" y1="83.1" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
-<line x1="824.5" y1="77.6" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="112.8" x2="824.5" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="88.6" x2="768.4" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="768.4" y1="88.6" x2="768.4" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="768.4" y1="60.0" x2="768.4" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="768.4" y1="88.6" x2="824.5" y2="88.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="88.6" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="824.5" y1="112.8" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="824.5" y1="174.4" x2="192.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
 <line x1="192.0" y1="174.4" x2="192.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>

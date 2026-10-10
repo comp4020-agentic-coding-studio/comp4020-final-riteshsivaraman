@@ -45,8 +45,9 @@ absolute scale; the photographs give proportions only.
 |---|---|---|---|---|---|
 | 1 | Shop width x depth x height | 10 x 10 x 3 m | Wall ratios 3.3 and 3.35 at your 3 m wall height | Medium | [ ] |
 | 2 | Table columns | x = -2.5, 0, +2.5 | About a quarter of the width either side (photo) | Medium | [ ] |
-| 3 | Tables | 1.05 wide x 1.9 long, three down each side column, two down the middle, long side front to back | About a tenth of the width across (photo); length assumed | Low | [ ] |
-| 4 | Products | four to a table, 1.3 m apart, facing outward | Your instruction: room for one person each | Design choice | [ ] |
+| 3 | Product tables | 1.0 wide x 1.2 long (almost square), four in each side column and three in the middle | Your description; width about a tenth of the shop's (photo) | Medium | [ ] |
+| 3b | Service tables | 1.2 m square (the long edge of a product table), one nearest the bar in each side column and one in the middle column, a stool left and right of each, no products | Your description | Medium | [ ] |
+| 4 | Products | one on each side of a product table, facing outward | Your instruction: room for one person each | Design choice | [ ] |
 | 5 | Wall benches | 0.56 deep, 8.6 long, 0.95 m high, open underneath | Photo; bench top at about 0.3 of the wall height | Medium | [ ] |
 | 6 | Service bar | 5 m x 0.8, 1.05 m high, 5 stools | Shortened to half the back wall at your request | Your call | [ ] |
 | 7 | Staff space behind the bar | 0.6 m deep, closed by partitions | Your description | Medium | [ ] |
