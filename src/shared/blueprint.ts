@@ -12,13 +12,15 @@ import {
   BAY_SHELVES,
   BAY_SIGN_Y,
   CARD_READER,
+  CEILING_SPEC,
+  DESKTOP,
   DOOR_H,
+  FLOOR_REVEAL,
   GLASS,
-  LIGHTBOXES,
   LIGHTBOX_BOTTOM,
   LIGHTBOX_H,
   MONITOR,
-  MONITORS_Z,
+  SIDE_WALL,
   STOOLS,
   TRACK_LIGHT_Y,
   WALL_BANDS,
@@ -136,13 +138,19 @@ export function renderPlan(): string {
   for (const b of BENCHES) R(b.x, b.z, b.w, b.d, "#e6cfa8", "#8a6a2f", 1.2);
   for (const side of [-1, 1]) {
     const x = side * (FLOOR.maxX + 0.35);
-    for (const lb of LIGHTBOXES) R(x, lb.z, 0.12, lb.w, "#ffffff", "#8aa", 1.2);
+    for (const f of SIDE_WALL[side === 1 ? "+x" : "-x"]) {
+      if (f.kind === "lightbox") R(x, f.z, 0.12, f.w, "#ffffff", "#8aa", 1.2);
+      else if (f.kind === "display") R(x, f.z, 0.12, f.w, "#101216", "#000", 1.2);
+      else if (f.kind === "monitors") for (const z of f.zs) R(side * 7.55, z, 0.12, MONITOR.w, "#1a4fb8", "#0b2a6b");
+      else if (f.kind === "desktops")
+        for (let k = 0; k < f.count; k++) R(side * 7.55, f.z0 + k * f.pitch, 0.12, DESKTOP.w, "#6b45d6", "#3a2a8a");
+      else for (let k = 0; k < f.count; k++) g.circle(px(side * 7.55), py(f.z0 + k * f.pitch), 0.12 * S, "#e8a98c", "#8a5a46");
+    }
     for (let i = 0; i <= BAY_COUNT; i++) {
       const zp = bayCentre(0) - BAY_W / 2 - PIER_W / 2 + i * (BAY_W + PIER_W);
       R(side * (FLOOR.maxX + 0.25), zp, 0.3, PIER_W, "#b4b8bd", "#555");
     }
     for (let i = 0; i < BAY_COUNT; i++) R(side * (FLOOR.maxX + 0.38), bayCentre(i), 0.04, BAY_W, "#3b3f45", "#222");
-    for (const z of MONITORS_Z) R(side * 7.55, z, 0.12, MONITOR.w, "#1a4fb8", "#0b2a6b");
   }
   g.text(px(8.55), py(-3.3), "lightboxes", 9, "middle", "#678");
   g.text(px(8.55), py(7.5), "recessed bays", 9, "middle", "#555");
@@ -164,9 +172,11 @@ export function renderPlan(): string {
   g.text(px(0), py(6.85) + 4, "staff space behind the bar", 10, "middle", "#555");
 
   // walls and glass
-  L(FLOOR.maxX + 0.5, FLOOR.minZ - 0.5, FLOOR.minX - 0.5, FLOOR.minZ - 0.5, "#5aa9d6", 4);
+  L(FLOOR.maxX + 0.5, FLOOR.minZ - 0.5, GLASS.entranceX[1], FLOOR.minZ - 0.5, "#5aa9d6", 4);
+  L(GLASS.entranceX[0], FLOOR.minZ - 0.5, FLOOR.minX - 0.5, FLOOR.minZ - 0.5, "#5aa9d6", 4);
+  g.text(px(0), py(FLOOR.minZ - 0.5) - 6, "entrance opening (3 m, assumed)", 10, "middle", "#2a6a95");
   for (const x of GLASS.mullionX) g.line(px(x), py(FLOOR.minZ - 0.7), px(x), py(FLOOR.minZ - 0.3), "#3a7ca5", 3);
-  g.text(px(0), py(FLOOR.minZ - 0.5) + 18, "GLASS FRONT / ENTRANCE", 11, "middle", "#2a6a95", "700");
+  g.text(px(0), py(FLOOR.minZ - 0.5) + 18, "GLASS FRONT", 11, "middle", "#2a6a95", "700");
   L(FLOOR.minX - 0.5, FLOOR.minZ - 0.5, FLOOR.minX - 0.5, WALL_FACE_Z + 0.2, "#111", 3);
   L(FLOOR.maxX + 0.5, FLOOR.minZ - 0.5, FLOOR.maxX + 0.5, WALL_FACE_Z + 0.2, "#111", 3);
   L(FLOOR.minX - 0.5, WALL_FACE_Z + 0.1, DOOR.minX, WALL_FACE_Z + 0.1, "#111", 3);
@@ -217,7 +227,7 @@ export function renderWalls(): string {
 
   // a side wall: z runs along the horizontal axis; `dir` 1 puts the glass
   // front on the left (the +x wall), -1 puts it on the right (the -x wall)
-  function sideWall(panel: number, title: string, dir: 1 | -1): void {
+  function sideWall(panel: number, title: string, dir: 1 | -1, wall: "+x" | "-x"): void {
     const top = 110 + panel * PANEL_H;
     const base = top + CEILING * ES; // floor line
     const z0 = FLOOR.minZ - 0.5;
@@ -231,38 +241,59 @@ export function renderWalls(): string {
     };
     g.text(MX, top - 46, title, 13, "start", "#111", "700");
     for (const b of BAND) wRect(z0, z1, b.y0, b.y1, b.c);
-    // piers, then recessed bays between them
+    // piers from the bench up; below the bench the grey panel runs unbroken
+    // to the floor, with a dark reveal at the bottom
     for (let i = 0; i <= BAY_COUNT; i++) {
       const zc = bayCentre(0) - BAY_W / 2 - PIER_W / 2 + i * (BAY_W + PIER_W);
-      wRect(zc - PIER_W / 2, zc + PIER_W / 2, 0, CEILING, "#b9bdc2", "#7b8087");
+      wRect(zc - PIER_W / 2, zc + PIER_W / 2, BAY_SHELVES.panelBottom, CEILING, "#b9bdc2", "#7b8087");
     }
+    wRect(z0, z1, 0, FLOOR_REVEAL, "#15171a");
     for (let i = 0; i < BAY_COUNT; i++) {
       const zc = bayCentre(i);
-      wRect(zc - BAY_W / 2, zc + BAY_W / 2, 0, BAY_SHELVES.panelH, "#3b3f45", "#222");
+      wRect(zc - BAY_W / 2, zc + BAY_W / 2, BAY_SHELVES.panelBottom, BAY_SHELVES.panelTop, "#3b3f45", "#222");
       for (let k = 0; k < BAY_SHELVES.count; k++) {
         const y = BAY_SHELVES.first + k * BAY_SHELVES.step;
         wRect(zc - BAY_W / 2 + 0.03, zc + BAY_W / 2 - 0.03, y, y + 0.025, "#8b9096");
         const style = i % 3;
-        const cols = style === 0 ? 7 : style === 1 ? 4 : 0;
+        const cols = style === 0 ? 9 : style === 1 ? 5 : 0;
         for (let j = 0; j < cols; j++) {
-          const bz = zc - BAY_W / 2 + 0.1 + j * (BAY_W - 0.2) / Math.max(1, cols - 1);
-          wRect(bz - 0.04, bz + 0.04, y + 0.025, y + 0.025 + (style === 0 ? 0.22 : 0.26), style === 0 ? "#f4f4f2" : j % 2 ? "#2f4c7a" : "#c0392b");
+          const bz = zc - BAY_W / 2 + 0.1 + (j * (BAY_W - 0.2)) / Math.max(1, cols - 1);
+          wRect(bz - 0.04, bz + 0.04, y + 0.025, y + 0.025 + (style === 0 ? 0.22 : 0.24), style === 0 ? "#f4f4f2" : j % 2 ? "#2f4c7a" : "#c0392b");
         }
       }
-      // sign above the bay
-      wRect(zc - 0.5, zc + 0.5, BAY_SIGN_Y - 0.13, BAY_SIGN_Y + 0.13, "#ffffff", "#999");
+      wRect(zc - 0.55, zc + 0.55, BAY_SIGN_Y - 0.13, BAY_SIGN_Y + 0.13, "#ffffff", "#999");
     }
-    // lightboxes
-    for (const lb of LIGHTBOXES) {
-      wRect(lb.z - lb.w / 2, lb.z + lb.w / 2, LIGHTBOX_BOTTOM, LIGHTBOX_BOTTOM + LIGHTBOX_H, "#ffffff", "#9ab", 1.5);
+    // what hangs on this wall, front to back
+    for (const f of SIDE_WALL[wall]) {
+      if (f.kind === "lightbox") {
+        wRect(f.z - f.w / 2, f.z + f.w / 2, LIGHTBOX_BOTTOM, LIGHTBOX_BOTTOM + LIGHTBOX_H, "#ffffff", "#9ab", 1.5);
+      } else if (f.kind === "display") {
+        wRect(f.z - f.w / 2, f.z + f.w / 2, LIGHTBOX_BOTTOM, LIGHTBOX_BOTTOM + f.h, "#101216", "#000", 2);
+        g.text(hx(f.z), hy(LIGHTBOX_BOTTOM + f.h / 2) + 4, "large display", 10, "middle", "#fff");
+      }
     }
     // bench slab (open underneath), devices laid on it, two monitors
     const bench = BENCHES[0];
     wRect(-bench.d / 2, bench.d / 2, bench.h - 0.12, bench.h, "#e6cfa8", "#8a6a2f", 1.2);
     for (let z = -6.0; z <= 6.0; z += 0.26) wRect(z - 0.075, z + 0.075, bench.h, bench.h + 0.012, "#2d3f66");
-    for (const mz of MONITORS_Z) {
-      wRect(mz - 0.03, mz + 0.03, bench.h, bench.h + MONITOR.standH, "#2a2d33");
-      wRect(mz - MONITOR.w / 2, mz + MONITOR.w / 2, bench.h + MONITOR.standH - MONITOR.h / 2, bench.h + MONITOR.standH + MONITOR.h / 2, "#1a4fb8", "#0b2a6b");
+    for (const f of SIDE_WALL[wall]) {
+      if (f.kind === "monitors") {
+        for (const mz of f.zs) {
+          wRect(mz - 0.03, mz + 0.03, bench.h, bench.h + MONITOR.standH, "#2a2d33");
+          wRect(mz - MONITOR.w / 2, mz + MONITOR.w / 2, bench.h + MONITOR.standH - MONITOR.h / 2, bench.h + MONITOR.standH + MONITOR.h / 2, "#1a4fb8", "#0b2a6b");
+        }
+      } else if (f.kind === "desktops") {
+        for (let k = 0; k < f.count; k++) {
+          const dz = f.z0 + k * f.pitch;
+          wRect(dz - 0.02, dz + 0.02, bench.h, bench.h + DESKTOP.standH, "#c9ced3");
+          wRect(dz - DESKTOP.w / 2, dz + DESKTOP.w / 2, bench.h + DESKTOP.standH - DESKTOP.h / 2 + 0.1, bench.h + DESKTOP.standH + DESKTOP.h / 2 + 0.1, "#6b45d6", "#3a2a8a");
+        }
+      } else if (f.kind === "headphones") {
+        for (let k = 0; k < f.count; k++) {
+          const hz = f.z0 + k * f.pitch;
+          wRect(hz - 0.12, hz + 0.12, bench.h, bench.h + 0.2, "#e8a98c", "#8a5a46");
+        }
+      }
     }
     // ceiling, track rail, floor
     g.line(MX, hy(CEILING), MX + len * ES, hy(CEILING), "#111", 2);
@@ -275,8 +306,11 @@ export function renderWalls(): string {
     vDim(g, hy(0), hy(CEILING), MX - 10, `${CEILING} m ceiling`);
     vDim(g, hy(0), hy(WALL_BANDS.low), MX + len * ES + 22, `${WALL_BANDS.low} m: bench top`);
     vDim(g, hy(WALL_BANDS.low), hy(WALL_BANDS.mid), MX + len * ES + 52, `to ${WALL_BANDS.mid} m: mid band`);
-    const lb = LIGHTBOXES[0];
-    hDim(g, hx(lb.z - lb.w / 2), hx(lb.z + lb.w / 2), hy(LIGHTBOX_BOTTOM + LIGHTBOX_H) - 8, `${lb.w} m x ${LIGHTBOX_H} m lightbox`);
+    const lb = SIDE_WALL[wall].find((f) => f.kind === "lightbox");
+    if (lb && lb.kind === "lightbox") {
+      hDim(g, hx(lb.z - lb.w / 2), hx(lb.z + lb.w / 2), hy(LIGHTBOX_BOTTOM + LIGHTBOX_H) - 8, `${lb.w} m x ${LIGHTBOX_H} m lightbox`);
+    }
+    vDim(g, hy(BAY_SHELVES.panelBottom), hy(BAY_SHELVES.panelTop), MX - 38, `bays ${BAY_SHELVES.panelBottom} to ${BAY_SHELVES.panelTop} m`);
     const b0 = bayCentre(0);
     hDim(g, hx(b0 - BAY_W / 2), hx(b0 + BAY_W / 2), hy(CEILING) - 10, `bay ${BAY_W} m`);
     const pz = b0 + BAY_W / 2 + PIER_W / 2;
@@ -284,8 +318,8 @@ export function renderWalls(): string {
     hDim(g, hx(z0), hx(z1), base + 26, `${len.toFixed(1)} m wall`);
   }
 
-  sideWall(0, "1. LEFT WALL as you enter (the +x wall). Glass front on the left, back wall on the right.", 1);
-  sideWall(1, "2. RIGHT WALL as you enter (the -x wall). Glass front on the right, back wall on the left.", -1);
+  sideWall(0, "1. LEFT WALL as you enter (the +x wall). Glass front on the left, back wall on the right.", 1, "+x");
+  sideWall(1, "2. RIGHT WALL as you enter (the -x wall). Glass front on the right, back wall on the left.", -1, "-x");
 
   // ---- back wall, store side. Facing +z, +x is on your left.
   {
@@ -342,9 +376,13 @@ export function renderWalls(): string {
     const hy = (y: number): number => base - y * ES;
     g.text(MX, top - 46, "4. FRONT GLASS WALL (z = -8), seen from inside facing it. The +x side is on the right.", 13, "start", "#111", "700");
     g.rect(hx(-x0), hy(CEILING), 2 * x0 * ES, CEILING * ES, "#e6f2f8", "#5aa9d6", 2);
+    // the entrance opening: no glass
+    g.rect(hx(GLASS.entranceX[0]), hy(CEILING) + GLASS.headerH * ES, (GLASS.entranceX[1] - GLASS.entranceX[0]) * ES, (CEILING - GLASS.headerH) * ES, "#ffffff", "#2a6a95", 1.5, 'stroke-dasharray="5 3"');
     g.rect(hx(-x0), hy(CEILING), 2 * x0 * ES, GLASS.headerH * ES, "#b9bec4", "#7b8087", 1);
-    for (const mx of GLASS.mullionX) g.line(hx(mx), hy(CEILING), hx(mx), base, "#7b8087", 3);
-    g.text(hx(0), hy(CEILING / 2), "full-height glass (entrance door position not yet modelled: [TK])", 11, "middle", "#2a6a95", "600");
+    for (const mx of GLASS.mullionX.filter((m) => m < GLASS.entranceX[0] || m > GLASS.entranceX[1])) g.line(hx(mx), hy(CEILING), hx(mx), base, "#7b8087", 3);
+    for (const ex of GLASS.entranceX) g.line(hx(ex), hy(CEILING), hx(ex), base, "#2a6a95", 3);
+    g.text(hx(0), hy(CEILING / 2), "entrance opening", 11, "middle", "#2a6a95", "700");
+    g.text(hx(0), hy(CEILING / 2) + 14, `${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, assumed [TK]`, 10, "middle", "#2a6a95");
     g.text(hx(0), hy(CEILING) + 22, "header band", 9, "middle", "#444");
     g.line(MX, base, MX + 2 * x0 * ES, base, "#111", 2);
     vDim(g, hy(0), hy(CEILING), MX - 10, `${CEILING} m`);
@@ -353,5 +391,62 @@ export function renderWalls(): string {
   }
 
   g.text(MX, H - 22, "Not drawn: back-room walls (the shelving rows and repair benches are on the plan). Wall colours are the three tones in the first elevation.", 11, "start", "#a33");
+  return g.done();
+}
+
+// =====================================================================
+// Ceiling, looking up. Entrance at the bottom; the +x wall on the LEFT.
+// =====================================================================
+export function renderCeiling(): string {
+  const S = 52;
+  const W = Math.round(17.4 * S + 120);
+  const H = Math.round(16.5 * S + 200);
+  const cx = 60 + 8.7 * S;
+  const px = (x: number): number => cx - x * S;
+  const py = (z: number): number => 90 + (FLOOR.maxZ - z) * S;
+  const g = new Svg();
+  g.head(W, H);
+  g.text(60, 28, "Ceiling and lights, looking up from inside: +x wall on the LEFT, entrance at the bottom (metres)", 16, "start", "#111", "700");
+  const w = FLOOR.maxX - FLOOR.minX;
+  const d = FLOOR.maxZ - FLOOR.minZ;
+  g.rect(px(FLOOR.maxX), py(FLOOR.maxZ), w * S, d * S, "#eceef0", "#111", 3);
+  // slats run across the room, every slatPitch
+  for (let z = FLOOR.minZ + CEILING_SPEC.slatPitch; z < FLOOR.maxZ; z += CEILING_SPEC.slatPitch) {
+    g.line(px(FLOOR.maxX), py(z), px(FLOOR.minX), py(z), "#b9bec4", 1);
+  }
+  // light panels in paired rows either side of the centre
+  for (const z of CEILING_SPEC.panelRowsZ) {
+    for (const x of CEILING_SPEC.panelX) {
+      g.rect(px(x + CEILING_SPEC.panelW / 2), py(z + CEILING_SPEC.panelD / 2), CEILING_SPEC.panelW * S, CEILING_SPEC.panelD * S, "#ffffff", "#1f6feb", 1.2);
+    }
+  }
+  // track rails with spots: along the front and down both sides
+  const inset = CEILING_SPEC.trackInset;
+  const rails = [
+    { x1: FLOOR.maxX - 0.2, z1: FLOOR.minZ + inset, x2: FLOOR.minX + 0.2, z2: FLOOR.minZ + inset },
+    { x1: FLOOR.maxX - inset, z1: FLOOR.minZ + inset, x2: FLOOR.maxX - inset, z2: FLOOR.maxZ - 0.2 },
+    { x1: FLOOR.minX + inset, z1: FLOOR.minZ + inset, x2: FLOOR.minX + inset, z2: FLOOR.maxZ - 0.2 },
+  ];
+  for (const r of rails) {
+    g.line(px(r.x1), py(r.z1), px(r.x2), py(r.z2), "#23262b", 3);
+    const len = Math.hypot(r.x2 - r.x1, r.z2 - r.z1);
+    for (let t = CEILING_SPEC.spotPitch / 2; t < len; t += CEILING_SPEC.spotPitch) {
+      const f = t / len;
+      g.circle(px(r.x1 + (r.x2 - r.x1) * f), py(r.z1 + (r.z2 - r.z1) * f), 4, "#ffcc33", "#23262b");
+    }
+  }
+  // the hanging mark
+  const m = CEILING_SPEC.hangingMark;
+  g.rect(px(m.x + m.size / 2), py(m.z + 0.05), m.size * S, 0.1 * S, "#1f2430", "#000", 1);
+  g.text(px(m.x), py(m.z) - 12, "hanging mark", 10, "middle", "#1f2430", "700");
+  // dimensions
+  const p0 = CEILING_SPEC.panelRowsZ[0];
+  const p1 = CEILING_SPEC.panelRowsZ[1];
+  g.line(px(CEILING_SPEC.panelX[0]) + 0.8 * S, py(p0), px(CEILING_SPEC.panelX[0]) + 0.8 * S, py(p1), "#1f6feb");
+  g.text(px(CEILING_SPEC.panelX[0]) + 0.8 * S + 6, py((p0 + p1) / 2) + 4, `${(p1 - p0).toFixed(1)} m row pitch`, 10, "start", "#1f6feb", "600");
+  g.text(px(0), py(CEILING_SPEC.panelRowsZ[5]) - 30, `panels ${CEILING_SPEC.panelW} x ${CEILING_SPEC.panelD} m, centred ${CEILING_SPEC.panelX[1]} m either side of the middle`, 11, "middle", "#1f6feb", "600");
+  g.text(60, H - 60, `Slats run across the room (along x) every ${CEILING_SPEC.slatPitch} m. Spots every ${CEILING_SPEC.spotPitch} m on rails ${CEILING_SPEC.trackInset} m in from the walls.`, 11, "start", "#333");
+  g.text(60, H - 44, `Ceiling height ${CEILING} m; the rails sit at ${TRACK_LIGHT_Y} m. Panel rows read from the front-on photograph; the exact count is an estimate.`, 11, "start", "#333");
+  g.text(60, H - 28, "The hanging mark is an original service mark, not anyone's logo.", 11, "start", "#a33");
   return g.done();
 }

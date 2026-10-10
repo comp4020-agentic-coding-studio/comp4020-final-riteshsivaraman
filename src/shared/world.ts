@@ -80,8 +80,8 @@ export const DOOR = { minX: 4.5, maxX: 5.8 } as const;
 
 // Product walls on both side walls: four recessed bays between full-height
 // piers, toward the back of the shop. The bays are indented into the wall.
-export const BAY_COUNT = 4;
-export const BAY_W = 1.1;
+export const BAY_COUNT = 3;
+export const BAY_W = 1.4;
 export const PIER_W = 0.3;
 export const BAY_START_Z = 1.4;
 export function bayCentre(i: number): number {

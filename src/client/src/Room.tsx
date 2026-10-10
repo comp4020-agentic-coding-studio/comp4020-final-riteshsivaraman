@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from "react";
 import {
   CanvasTexture,
   Color,
+  DoubleSide,
   type Group,
   InstancedMesh,
   Object3D,
@@ -35,12 +36,12 @@ import {
   BACK_WALL,
   BAY_SHELVES,
   BAY_SIGN_Y,
+  CEILING_SPEC,
   DOOR_H as PLAN_DOOR_H,
   GLASS,
-  LIGHTBOXES,
   LIGHTBOX_BOTTOM,
   LIGHTBOX_H,
-  MONITORS_Z,
+  SIDE_WALL,
   STOOLS,
   WALL_BANDS,
 } from "../../shared/plan.ts";
@@ -165,11 +166,11 @@ function ceilingTexture(w: number, d: number): CanvasTexture {
     g.fillStyle = "#eceef0";
     g.fillRect(0, 0, 64, 64);
     g.fillStyle = "#a3a8ae";
-    g.fillRect(0, 0, 7, 64);
+    g.fillRect(0, 0, 64, 7);
   });
   tex.wrapS = tex.wrapT = RepeatWrapping;
-  tex.repeat.set(w / 0.3, 1);
-  void d;
+  tex.repeat.set(1, d / CEILING_SPEC.slatPitch);
+  void w;
   return tex;
 }
 
@@ -270,6 +271,42 @@ function ServiceMark({ position }: { position: [number, number, number] }) {
     <mesh position={position} rotation={[0, Math.PI, 0]}>
       <planeGeometry args={[0.9, 0.9]} />
       <meshBasicMaterial map={map} toneMapped={false} />
+    </mesh>
+  );
+}
+
+// The same original service mark, hung from the ceiling so it reads from both
+// sides (outside the glass and inside).
+function HangingMark({ size }: { size: number }) {
+  const map = useMemo(
+    () =>
+      canvasTexture(128, 128, (g) => {
+        g.fillStyle = "#ffffff";
+        g.fillRect(0, 0, 128, 128);
+        g.strokeStyle = "#1f2430";
+        g.fillStyle = "#1f2430";
+        g.lineWidth = 8;
+        g.beginPath();
+        g.arc(64, 64, 26, 0, Math.PI * 2);
+        g.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4;
+          g.save();
+          g.translate(64 + Math.cos(a) * 40, 64 + Math.sin(a) * 40);
+          g.rotate(a);
+          g.fillRect(-7, -5, 14, 10);
+          g.restore();
+        }
+        g.beginPath();
+        g.arc(64, 64, 9, 0, Math.PI * 2);
+        g.fill();
+      }),
+    [],
+  );
+  return (
+    <mesh>
+      <planeGeometry args={[size, size]} />
+      <meshBasicMaterial map={map} toneMapped={false} side={DoubleSide} />
     </mesh>
   );
 }
@@ -512,8 +549,8 @@ function WallBench({ box, side }: { box: Box; side: -1 | 1 }) {
 // devices laid flat, and a couple of monitors.
 const FACE_X = FLOOR.maxX + 0.4; // inner face of the side walls
 const BAY_LABELS: Record<number, string[]> = {
-  [-1]: ["AUDIO", "CHARGING", "CASES", "TRACKERS"],
-  [1]: ["WATCH BANDS", "KEYBOARDS", "SMART HOME", "CREATIVE"],
+  [-1]: ["AUDIO", "CHARGING", "CASES"],
+  [1]: ["WATCH BANDS", "KEYBOARDS", "SMART HOME"],
 };
 const BAND_LOW = WALL_BANDS.low; // top of the dark lower band: the bench height
 const BAND_MID = WALL_BANDS.mid; // top of the mid band: bottom of the lightboxes
@@ -523,56 +560,55 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
   const stock: Cuboid[] = [];
   const flats: Cuboid[] = [];
   const tints = ["#eef3f8", "#f6efe6", "#eaf1ea", "#f3eaf3"];
+  const bottom = BAY_SHELVES.panelBottom;
+  const top = BAY_SHELVES.panelTop;
   for (const side of [-1, 1]) {
-    // full-height piers: the bays between them read as indented into the wall
+    // piers: lighter strips from the bench to the ceiling, so the bays read as
+    // indented between them; below the bench the grey panel runs unbroken
     for (let i = 0; i <= BAY_COUNT; i++) {
       const zc = bayCentre(0) - BAY_W / 2 - PIER_W / 2 + i * (BAY_W + PIER_W);
       frames.push({
         x: side * (FACE_X - 0.15),
-        y: CEILING / 2,
+        y: (bottom + CEILING) / 2,
         z: zc,
         w: 0.3,
-        h: CEILING,
+        h: CEILING - bottom,
         d: PIER_W,
         colour: "#b4b8bd",
       });
     }
     for (let i = 0; i < BAY_COUNT; i++) {
       const zc = bayCentre(i);
-      // dark back panel, flush with the wall, floor to near the ceiling
-      frames.push({ x: side * (FACE_X - 0.02), y: BAY_SHELVES.panelH / 2, z: zc, w: 0.04, h: BAY_SHELVES.panelH, d: BAY_W, colour: "#3b3f45" });
+      frames.push({ x: side * (FACE_X - 0.02), y: (bottom + top) / 2, z: zc, w: 0.04, h: top - bottom, d: BAY_W, colour: "#3b3f45" });
       const style = i % 3;
       for (let k = 0; k < BAY_SHELVES.count; k++) {
         const y = BAY_SHELVES.first + k * BAY_SHELVES.step;
         frames.push({ x: side * (FACE_X - 0.14), y, z: zc, w: 0.24, h: 0.025, d: BAY_W - 0.04, colour: "#8b9096" });
         if (style === 0) {
-          // slim white boxes lined up along each shelf
-          for (let j = 0; j < 7; j++) {
+          for (let j = 0; j < 9; j++) {
             stock.push({
               x: side * (FACE_X - 0.14),
-              y: y + 0.0125 + 0.12,
+              y: y + 0.0125 + 0.11,
               z: zc - BAY_W / 2 + 0.1 + j * 0.15,
               w: 0.16,
-              h: 0.24,
+              h: 0.22,
               d: 0.09,
               colour: (j + k) % 5 === 4 ? tints[(i + k) % 4] : "#f4f4f2",
             });
           }
         } else if (style === 1) {
-          // dark boxes with the odd coloured one, standing apart
-          for (let j = 0; j < 4; j++) {
+          for (let j = 0; j < 5; j++) {
             stock.push({
               x: side * (FACE_X - 0.14),
-              y: y + 0.0125 + 0.14,
-              z: zc - BAY_W / 2 + 0.16 + j * 0.26,
+              y: y + 0.0125 + 0.12,
+              z: zc - BAY_W / 2 + 0.17 + j * 0.27,
               w: 0.18,
-              h: 0.28,
+              h: 0.24,
               d: 0.15,
               colour: (j + k) % 4 === 0 ? "#c0392b" : (j + k) % 4 === 1 ? "#2f4c7a" : "#22262c",
             });
           }
         } else if (k % 2 === 0) {
-          // flat packages stacked on every other shelf
           for (let j = 0; j < 3; j++) {
             stock.push({
               x: side * (FACE_X - 0.14),
@@ -587,9 +623,11 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
         }
       }
     }
-    // devices laid flat in two rows along the bench, as in the reference
+    // devices laid flat in two rows along the bench, except where desktops
+    // and headphones stand (the -x wall)
     const benchX = side * 7.55;
     for (let z = -6.0; z <= 6.0; z += 0.26) {
+      if (side === -1 && ((z > 1.2 && z < 4.8) || z < -4.5)) continue;
       for (const dx of [-0.17, 0.17]) {
         flats.push({
           x: benchX + dx,
@@ -709,22 +747,56 @@ function Monitor({ x, z, side }: { x: number; z: number; side: -1 | 1 }) {
   );
 }
 
+function desktopTexture(): CanvasTexture {
+  return canvasTexture(64, 48, (g) => {
+    const grad = g.createLinearGradient(0, 0, 64, 48);
+    grad.addColorStop(0, "#5b3fd4");
+    grad.addColorStop(1, "#e04ab8");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 48);
+  });
+}
+
+// A desktop display on the bench: slim screen on a stand.
+function Desktop({ x, z, side }: { x: number; z: number; side: -1 | 1 }) {
+  const map = useMemo(() => desktopTexture(), []);
+  return (
+    <group position={[x, 0.95, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+      <mesh position={[0, 0.01, 0]}>
+        <boxGeometry args={[0.22, 0.02, 0.16]} />
+        <meshStandardMaterial color="#c9ced3" />
+      </mesh>
+      <mesh position={[0, 0.17, 0]}>
+        <boxGeometry args={[0.04, 0.3, 0.03]} />
+        <meshStandardMaterial color="#c9ced3" />
+      </mesh>
+      <mesh position={[0, 0.4, 0]}>
+        <boxGeometry args={[0.5, 0.34, 0.03]} />
+        <meshStandardMaterial color="#d9dce0" />
+      </mesh>
+      <mesh position={[0, 0.4, 0.017]}>
+        <planeGeometry args={[0.46, 0.3]} />
+        <meshBasicMaterial map={map} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
 function WallSections() {
   const { frames, stock, flats } = useMemo(() => wallProducts(), []);
   const bandTex = useMemo(() => wallTexture(15), []);
+  const faceRot = (side: -1 | 1): number => (side === -1 ? Math.PI / 2 : -Math.PI / 2);
   return (
     <group>
-      {/* three tones of grey: dark lower band, mid band, light upper wall */}
+      {/* three tones of grey: dark lower band, mid band, light upper wall,
+          with a dark reveal where the panels meet the floor */}
       {[-1, 1].flatMap((side) =>
         [
           { y0: 0, y1: BAND_LOW, c: "#8c9096" },
           { y0: BAND_LOW, y1: BAND_MID, c: "#a8acb1" },
           { y0: BAND_MID, y1: CEILING, c: "#cdd0d4" },
         ].map((b) => (
-          <mesh
-            key={`${side}:${b.y0}`}
-            position={[side * (FACE_X - 0.01), (b.y0 + b.y1) / 2, 0]}
-          >
+          <mesh key={`${side}:${b.y0}`} position={[side * (FACE_X - 0.01), (b.y0 + b.y1) / 2, 0]}>
             <boxGeometry args={[0.02, b.y1 - b.y0, FLOOR.maxZ - FLOOR.minZ + 1]} />
             <meshStandardMaterial map={bandTex} color={b.c} emissive="#ffffff" emissiveIntensity={0.12} />
           </mesh>
@@ -735,25 +807,50 @@ function WallSections() {
       <BoxField boxes={flats} roughness={0.35} />
       {([-1, 1] as const).map((side) => (
         <group key={side}>
-          {LIGHTBOXES.map((lb, i) => (
-            <LightBox
-              key={lb.z}
-              side={side}
-              z={lb.z}
-              w={lb.w}
-              kind={i === 2 ? "card" : (i + (side === -1 ? 0 : 1)) % 2 === 0 ? "phones" : "laptops"}
-            />
-          ))}
-          {MONITORS_Z.map((mz) => (
-            <Monitor key={mz} x={side * 7.55} z={mz} side={side} />
-          ))}
-          {BAY_LABELS[side].map((label, i) => (
+          {SIDE_WALL[side === 1 ? "+x" : "-x"].map((f, i) => {
+            if (f.kind === "lightbox") {
+              return <LightBox key={i} side={side} z={f.z} w={f.w} kind={f.art} />;
+            }
+            if (f.kind === "display") {
+              return (
+                <Poster
+                  key={i}
+                  position={[side * (FACE_X - 0.05), LIGHTBOX_BOTTOM + f.h / 2, f.z]}
+                  rotY={faceRot(side)}
+                  pair={POSTER_PAIRS[1]}
+                  dark
+                  w={f.w}
+                  h={f.h}
+                />
+              );
+            }
+            if (f.kind === "monitors") {
+              return f.zs.map((mz) => <Monitor key={`m${mz}`} x={side * 7.55} z={mz} side={side} />);
+            }
+            if (f.kind === "desktops") {
+              return Array.from({ length: f.count }, (_, k) => (
+                <Desktop key={`d${k}`} x={side * 7.55} z={f.z0 + k * f.pitch} side={side} />
+              ));
+            }
+            return Array.from({ length: f.count }, (_, k) => (
+              <Device
+                key={`h${k}`}
+                kind="headphones"
+                x={side * 7.55}
+                y={0.95}
+                z={f.z0 + k * f.pitch}
+                rotY={faceRot(side)}
+                colour={["#e8a98c", "#c9ced3", "#d8cfe8"][k % 3]}
+              />
+            ));
+          })}
+          {BAY_LABELS[side].slice(0, BAY_COUNT).map((label, i) => (
             <Sign
               key={label}
               text={label}
               position={[side * (FACE_X - 0.04), BAY_SIGN_Y, bayCentre(i)]}
-              rotY={side === -1 ? Math.PI / 2 : -Math.PI / 2}
-              w={1.1}
+              rotY={faceRot(side)}
+              w={1.2}
             />
           ))}
         </group>
@@ -966,33 +1063,33 @@ export function Room() {
         <meshStandardMaterial map={floor} roughness={0.8} />
       </mesh>
 
-      {/* ceiling: grey slats with rows of bright light panels, and track
-          lights along the edges, as in the reference */}
+      {/* ceiling: grey slats running across the room, long light panels in
+          paired rows either side of the centre, track rails with spots down
+          the sides and along the front, and a mark hanging near the front */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, CEILING, 0]}>
         <planeGeometry args={[w, d]} />
         <meshStandardMaterial map={ceilingMap} emissive="#ffffff" emissiveIntensity={0.35} />
       </mesh>
-      {[-4.4, 0, 4.4].flatMap((z) =>
-        [-6, -3, 0, 3, 6].map((x) => (
+      {CEILING_SPEC.panelRowsZ.flatMap((z) =>
+        CEILING_SPEC.panelX.map((x) => (
           <mesh key={`${x}:${z}`} position={[x, CEILING - 0.02, z]} rotation={[Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[0.8, 2.6]} />
+            <planeGeometry args={[CEILING_SPEC.panelW, CEILING_SPEC.panelD]} />
             <meshBasicMaterial color="#ffffff" />
           </mesh>
         )),
       )}
-      {/* track rails and spots: along the front and down both side walls */}
       {[
-        { x: 0, z: FLOOR.minZ + 0.6, len: w - 1, alongX: true },
-        { x: FLOOR.minX + 0.6, z: 0, len: d - 1, alongX: false },
-        { x: FLOOR.maxX - 0.6, z: 0, len: d - 1, alongX: false },
+        { x: 0, z: FLOOR.minZ + CEILING_SPEC.trackInset, len: w - 1, alongX: true },
+        { x: FLOOR.minX + CEILING_SPEC.trackInset, z: 0, len: d - 1, alongX: false },
+        { x: FLOOR.maxX - CEILING_SPEC.trackInset, z: 0, len: d - 1, alongX: false },
       ].map((r, i) => (
         <group key={i}>
           <mesh position={[r.x, CEILING - 0.04, r.z]}>
             <boxGeometry args={r.alongX ? [r.len, 0.04, 0.05] : [0.05, 0.04, r.len]} />
             <meshStandardMaterial color="#23262b" />
           </mesh>
-          {Array.from({ length: Math.floor(r.len / 1.5) }, (_, k) => {
-            const off = -r.len / 2 + 0.75 + k * 1.5;
+          {Array.from({ length: Math.floor(r.len / CEILING_SPEC.spotPitch) }, (_, k) => {
+            const off = -r.len / 2 + CEILING_SPEC.spotPitch / 2 + k * CEILING_SPEC.spotPitch;
             const px = r.alongX ? r.x + off : r.x;
             const pz = r.alongX ? r.z : r.z + off;
             return (
@@ -1010,6 +1107,13 @@ export function Room() {
           })}
         </group>
       ))}
+      <group position={[CEILING_SPEC.hangingMark.x, CEILING_SPEC.hangingMark.y, CEILING_SPEC.hangingMark.z]}>
+        <mesh position={[0, (CEILING - CEILING_SPEC.hangingMark.y) / 2 + CEILING_SPEC.hangingMark.size / 2, 0]}>
+          <boxGeometry args={[0.02, CEILING - CEILING_SPEC.hangingMark.y, 0.02]} />
+          <meshStandardMaterial color="#23262b" />
+        </mesh>
+        <HangingMark size={CEILING_SPEC.hangingMark.size} />
+      </group>
 
       {/* back wall, with the flush staff door set into it */}
       <mesh position={[(-fullW / 2 + DOOR.minX) / 2, CEILING / 2, FLOOR.maxZ + 0.5]}>
@@ -1036,17 +1140,24 @@ export function Room() {
         {wallMat(sideWall)}
       </mesh>
 
-      {/* glass front with mullions and a header band */}
-      <mesh position={[0, CEILING / 2, FLOOR.minZ - 0.5]}>
-        <boxGeometry args={[w, CEILING, 0.05]} />
-        <meshPhysicalMaterial color="#cfe6f0" transparent opacity={0.16} roughness={0.05} />
-      </mesh>
-      {GLASS.mullionX.map((x) => (
-        <mesh key={x} position={[x, CEILING / 2, FLOOR.minZ - 0.5]}>
-          <boxGeometry args={[0.06, CEILING, 0.08]} />
-          <meshStandardMaterial color="#9aa1a8" metalness={0.5} roughness={0.4} />
+      {/* glass front with mullions, a header band and the entrance opening */}
+      {[
+        [-w / 2, GLASS.entranceX[0]],
+        [GLASS.entranceX[1], w / 2],
+      ].map(([a, b]) => (
+        <mesh key={a} position={[(a + b) / 2, CEILING / 2, FLOOR.minZ - 0.5]}>
+          <boxGeometry args={[b - a, CEILING, 0.05]} />
+          <meshPhysicalMaterial color="#cfe6f0" transparent opacity={0.16} roughness={0.05} />
         </mesh>
       ))}
+      {[...GLASS.mullionX, ...GLASS.entranceX]
+        .filter((x) => !(x > GLASS.entranceX[0] && x < GLASS.entranceX[1]))
+        .map((x) => (
+          <mesh key={x} position={[x, CEILING / 2, FLOOR.minZ - 0.5]}>
+            <boxGeometry args={[0.06, CEILING, 0.08]} />
+            <meshStandardMaterial color="#9aa1a8" metalness={0.5} roughness={0.4} />
+          </mesh>
+        ))}
       <mesh position={[0, CEILING - 0.3, FLOOR.minZ - 0.5]}>
         <boxGeometry args={[w, 0.6, 0.1]} />
         <meshStandardMaterial color="#b9bec4" />
