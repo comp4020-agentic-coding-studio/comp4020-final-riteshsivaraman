@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1704" height="738" viewBox="0 0 1704 738">
+<rect width="1704" height="738" fill="#ffffff"/>
+<text x="60.0" y="28.0" font-size="16" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">The mall around the store: concourse, shops, mezzanine and routes (metres; +x on the LEFT)</text>
+<rect x="104.0" y="108.4" width="1496.0" height="451.0" fill="#eef0f2" stroke="#b0b5ba" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="852.0" y="134.8" font-size="12" text-anchor="middle" fill="#555" font-weight="600" font-family="system-ui, sans-serif">CONCOURSE: 68 m long, 20.5 m wide, roof at 7.4 m</text>
+<rect x="104.0" y="416.4" width="1496.0" height="143.0" fill="#e4e0d4" stroke="#9a9484" stroke-width="1.2" stroke-dasharray="6 3"/>
+<text x="852.0" y="491.9" font-size="11" text-anchor="middle" fill="#6b6556" font-weight="400" font-family="system-ui, sans-serif">MEZZANINE walkway above (floor at 4.4 m), glass balustrade on the concourse side</text>
+<text x="852.0" y="575.4" font-size="11" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">opposite shopfronts: ground level and upstairs</text>
+<rect x="731.0" y="60.0" width="242.0" height="48.4" fill="#f6f7f8" stroke="#111" stroke-width="2" />
+<text x="852.0" y="82.0" font-size="12" text-anchor="middle" fill="#111" font-weight="700" font-family="system-ui, sans-serif">THE STORE</text>
+<text x="852.0" y="69.9" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">(see the shop plan)</text>
+<rect x="975.2" y="87.5" width="198.0" height="13.2" fill="#d3d6da" stroke="#888" stroke-width="1" />
+<text x="1074.2" y="83.4" font-size="9" text-anchor="middle" fill="#777" font-weight="400" font-family="system-ui, sans-serif">shop</text>
+<rect x="1173.2" y="87.5" width="198.0" height="13.2" fill="#d3d6da" stroke="#888" stroke-width="1" />
+<text x="1272.2" y="83.4" font-size="9" text-anchor="middle" fill="#777" font-weight="400" font-family="system-ui, sans-serif">shop</text>
+<rect x="1371.2" y="87.5" width="198.0" height="13.2" fill="#d3d6da" stroke="#888" stroke-width="1" />
+<text x="1470.2" y="83.4" font-size="9" text-anchor="middle" fill="#777" font-weight="400" font-family="system-ui, sans-serif">shop</text>
+<rect x="530.8" y="87.5" width="198.0" height="13.2" fill="#d3d6da" stroke="#888" stroke-width="1" />
+<text x="629.8" y="83.4" font-size="9" text-anchor="middle" fill="#777" font-weight="400" font-family="system-ui, sans-serif">shop</text>
+<rect x="332.8" y="87.5" width="198.0" height="13.2" fill="#d3d6da" stroke="#888" stroke-width="1" />
+<text x="431.8" y="83.4" font-size="9" text-anchor="middle" fill="#777" font-weight="400" font-family="system-ui, sans-serif">shop</text>
+<rect x="134.8" y="87.5" width="198.0" height="13.2" fill="#d3d6da" stroke="#888" stroke-width="1" />
+<text x="233.8" y="83.4" font-size="9" text-anchor="middle" fill="#777" font-weight="400" font-family="system-ui, sans-serif">shop</text>
+<rect x="819.0" y="95.2" width="66.0" height="11.0" fill="#ffffff" stroke="#2a6a95" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="852.0" y="120.4" font-size="10" text-anchor="middle" fill="#2a6a95" font-weight="700" font-family="system-ui, sans-serif">entrance opening</text>
+<circle cx="1556.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="1380.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="1204.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="1028.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="852.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="676.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="500.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="324.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<circle cx="148.0" cy="409.8" r="6.2" fill="#b9bdc2" stroke="#6b7076"/>
+<line x1="1512.0" y1="196.4" x2="192.0" y2="196.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="196.4" x2="192.0" y2="218.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="218.4" x2="1512.0" y2="218.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="218.4" x2="1512.0" y2="196.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="1512.0" cy="196.4" r="3.0" fill="#4a8f7a" stroke="none"/>
+<line x1="192.0" y1="163.4" x2="1512.0" y2="163.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="163.4" x2="1512.0" y2="240.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="240.4" x2="192.0" y2="240.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="240.4" x2="192.0" y2="163.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="192.0" cy="163.4" r="3.0" fill="#4a8f7a" stroke="none"/>
+<line x1="1512.0" y1="284.4" x2="192.0" y2="284.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="284.4" x2="192.0" y2="306.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="306.4" x2="1512.0" y2="306.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="306.4" x2="1512.0" y2="284.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="1512.0" cy="284.4" r="3.0" fill="#4a8f7a" stroke="none"/>
+<line x1="1512.0" y1="154.6" x2="929.0" y2="154.6" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="929.0" y1="154.6" x2="775.0" y2="154.6" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="775.0" y1="154.6" x2="192.0" y2="154.6" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="154.6" x2="192.0" y2="262.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="262.4" x2="1512.0" y2="262.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="262.4" x2="1512.0" y2="154.6" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="1512.0" cy="154.6" r="3.0" fill="#4a8f7a" stroke="none"/>
+<line x1="192.0" y1="150.2" x2="698.0" y2="150.2" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="698.0" y1="150.2" x2="1512.0" y2="150.2" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="150.2" x2="1512.0" y2="251.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="251.4" x2="192.0" y2="251.4" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="251.4" x2="192.0" y2="150.2" stroke="#4a8f7a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="192.0" cy="150.2" r="3.0" fill="#4a8f7a" stroke="none"/>
+<line x1="1512.0" y1="174.4" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="174.4" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="112.8" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="77.6" x2="824.5" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="60.0" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="77.6" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="112.8" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="174.4" x2="192.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="174.4" x2="192.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="205.2" x2="1512.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="205.2" x2="1512.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<circle cx="1512.0" cy="174.4" r="3.0" fill="#d1495b" stroke="none"/>
+<line x1="1512.0" y1="174.4" x2="879.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="174.4" x2="879.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="112.8" x2="879.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="77.6" x2="879.5" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="60.0" x2="879.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="77.6" x2="879.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="112.8" x2="879.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="879.5" y1="174.4" x2="192.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="174.4" x2="192.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="205.2" x2="1512.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="205.2" x2="1512.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<circle cx="1512.0" cy="174.4" r="3.0" fill="#d1495b" stroke="none"/>
+<line x1="1512.0" y1="174.4" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="174.4" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="112.8" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="77.6" x2="768.4" y2="83.1" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="768.4" y1="83.1" x2="768.4" y2="60.0" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="768.4" y1="60.0" x2="768.4" y2="83.1" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="768.4" y1="83.1" x2="824.5" y2="77.6" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="77.6" x2="824.5" y2="112.8" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="112.8" x2="824.5" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="824.5" y1="174.4" x2="192.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="174.4" x2="192.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="192.0" y1="205.2" x2="1512.0" y2="205.2" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<line x1="1512.0" y1="205.2" x2="1512.0" y2="174.4" stroke="#d1495b" stroke-width="2" stroke-dasharray="6 4"/>
+<circle cx="1512.0" cy="174.4" r="3.0" fill="#d1495b" stroke="none"/>
+<line x1="1468.0" y1="467.0" x2="236.0" y2="467.0" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="236.0" y1="467.0" x2="236.0" y2="440.6" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="236.0" y1="440.6" x2="1468.0" y2="440.6" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1468.0" y1="440.6" x2="1468.0" y2="467.0" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="1468.0" cy="467.0" r="3.0" fill="#7a6a3a" stroke="none"/>
+<line x1="236.0" y1="440.6" x2="720.0" y2="431.8" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="720.0" y1="431.8" x2="1468.0" y2="440.6" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1468.0" y1="440.6" x2="1468.0" y2="467.0" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1468.0" y1="467.0" x2="236.0" y2="467.0" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="236.0" y1="467.0" x2="236.0" y2="440.6" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="236.0" cy="440.6" r="3.0" fill="#7a6a3a" stroke="none"/>
+<line x1="1292.0" y1="431.8" x2="412.0" y2="431.8" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="412.0" y1="431.8" x2="412.0" y2="467.0" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="412.0" y1="467.0" x2="1292.0" y2="467.0" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<line x1="1292.0" y1="467.0" x2="1292.0" y2="431.8" stroke="#7a6a3a" stroke-width="1.2" stroke-dasharray="6 4"/>
+<circle cx="1292.0" cy="431.8" r="3.0" fill="#7a6a3a" stroke="none"/>
+<text x="60.0" y="668.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Green: people walking past (two stop to window-shop). Red: customers who come in through the opening, look at tables and leave. Olive: people on the mezzanine.</text>
+<text x="60.0" y="684.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Everyone is placed by the shared server clock, so all visitors see the same people in the same places. The mezzanine and neighbouring shops are not enterable.</text>
+<text x="60.0" y="700.0" font-size="11" text-anchor="start" fill="#a33" font-weight="400" font-family="system-ui, sans-serif">Sizes of the concourse, the neighbours and the mezzanine are assumed; only the store itself comes from the reference photographs.</text>
+</svg>

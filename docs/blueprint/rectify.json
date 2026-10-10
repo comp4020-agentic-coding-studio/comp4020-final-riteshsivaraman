@@ -1,0 +1,276 @@
+{
+ "note": "Candidate corners, in the photo's own pixel coordinates, order TL, TR, BR, BL. Rough: drag them to fit.",
+ "images": {
+  "canberra-store.png": {
+   "quads": [
+    {
+     "id": "left-wall",
+     "label": "Left wall (+x), glass front to back corner",
+     "colour": "#e6194b",
+     "pts": [
+      [
+       112.58085813226722,
+       377.3197059852992
+      ],
+      [
+       811.9329373011627,
+       541.9861758305307
+      ],
+      [
+       811.1501403042388,
+       667.4785619465998
+      ],
+      [
+       115.1567470931051,
+       866.819497496614
+      ]
+     ],
+     "ratioMode": "manual",
+     "ratio": 3.35,
+     "matchOf": null
+    },
+    {
+     "id": "right-wall",
+     "label": "Right wall (-x)",
+     "colour": "#3cb44b",
+     "pts": [
+      [
+       1235.9219572623103,
+       543.9697645751853
+      ],
+      [
+       1922.9694529688336,
+       377.25821856310205
+      ],
+      [
+       1925.77200934711,
+       859.4063216204288
+      ],
+      [
+       1238.1850840395282,
+       664.7789228591864
+      ]
+     ],
+     "realHeight": 3,
+     "matchOf": null,
+     "ratioMode": "manual",
+     "ratio": 3.4
+    },
+    {
+     "id": "back-wall",
+     "label": "Back wall, ceiling to floor",
+     "colour": "#4363d8",
+     "pts": [
+      [
+       812,
+       541
+      ],
+      [
+       1237,
+       541
+      ],
+      [
+       1238.646358287114,
+       671.395239761988
+      ],
+      [
+       813.8079337819196,
+       669.406020301015
+      ]
+     ],
+     "realHeight": 3.8
+    },
+    {
+     "id": "ceiling",
+     "label": "Ceiling, glass front to back wall",
+     "colour": "#f58231",
+     "pts": [
+      [
+       120.17155606858302,
+       378.0670146550806
+      ],
+      [
+       1928.2801880683578,
+       381.1470164812589
+      ],
+      [
+       1239,
+       539
+      ],
+      [
+       809,
+       539
+      ]
+     ],
+     "realWidth": 16,
+     "ratioMode": "manual",
+     "ratio": 1,
+     "matchOf": null
+    },
+    {
+     "id": "floor",
+     "label": "Floor, back wall to glass front",
+     "colour": "#911eb4",
+     "pts": [
+      [
+       812.4144823897069,
+       667.1092511147298
+      ],
+      [
+       1238.905825051381,
+       666.3117164553881
+      ],
+      [
+       1905,
+       850
+      ],
+      [
+       143,
+       850
+      ]
+     ],
+     "realWidth": 16,
+     "ratioMode": "manual",
+     "ratio": 1.35,
+     "matchOf": null
+    }
+   ]
+  },
+  "canberra-left-wall.png": {
+   "quads": [
+    {
+     "id": "left-band",
+     "label": "Left wall: lightbox tops to floor",
+     "colour": "#e6194b",
+     "pts": [
+      [
+       292,
+       185
+      ],
+      [
+       1485,
+       385
+      ],
+      [
+       1485,
+       1075
+      ],
+      [
+       292,
+       1245
+      ]
+     ],
+     "realHeight": 3.35
+    },
+    {
+     "id": "left-bench",
+     "label": "Left wall: bench top to ceiling edge",
+     "colour": "#3cb44b",
+     "pts": [
+      [
+       292,
+       850
+      ],
+      [
+       1485,
+       690
+      ],
+      [
+       1485,
+       380
+      ],
+      [
+       292,
+       185
+      ]
+     ],
+     "realHeight": 2.4
+    }
+   ]
+  },
+  "canberra-right-wall.png": {
+   "quads": [
+    {
+     "id": "right-band",
+     "label": "Right wall: lightbox tops to floor",
+     "colour": "#3cb44b",
+     "pts": [
+      [
+       560,
+       235
+      ],
+      [
+       1855,
+       55
+      ],
+      [
+       1855,
+       830
+      ],
+      [
+       560,
+       745
+      ]
+     ],
+     "realHeight": 3.35
+    }
+   ]
+  },
+  "canberra-bays.png": {
+   "quads": [
+    {
+     "id": "bay-1",
+     "label": "First bay (recess)",
+     "colour": "#4363d8",
+     "pts": [
+      [
+       165,
+       75
+      ],
+      [
+       330,
+       85
+      ],
+      [
+       330,
+       495
+      ],
+      [
+       165,
+       500
+      ]
+     ],
+     "realHeight": 2.2
+    }
+   ]
+  },
+  "canberra-front-ceiling.png": {
+   "quads": [
+    {
+     "id": "ceiling-front",
+     "label": "Ceiling, near edge to far panels",
+     "colour": "#f58231",
+     "pts": [
+      [
+       300,
+       150
+      ],
+      [
+       1700,
+       150
+      ],
+      [
+       1280,
+       285
+      ],
+      [
+       720,
+       285
+      ]
+     ],
+     "realWidth": 16
+    }
+   ]
+  }
+ }
+}
