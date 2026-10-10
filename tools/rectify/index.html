@@ -5,22 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Rectify a wall</title>
     <style>
-      :root {
-        --bg: #f4f5f7;
-        --fg: #15181d;
-        --muted: #5b6370;
-        --line: #d5d9e0;
-        --accent: #1f6feb;
-      }
+      :root { --bg: #f4f5f7; --fg: #15181d; --muted: #5b6370; --line: #d5d9e0; --accent: #1f6feb; }
       * { box-sizing: border-box; }
       body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--fg); }
-      header { padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+      header { padding: 10px 16px; background: #fff; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
       header h1 { font-size: 15px; margin: 0; }
       select, input[type="number"], button { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--fg); }
-      input[type="number"] { width: 74px; }
+      input[type="number"] { width: 82px; }
       button { cursor: pointer; }
       button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-      label { color: var(--muted); }
+      label { color: var(--muted); white-space: nowrap; }
       main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; padding: 14px 16px; align-items: start; }
       @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
       section { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
@@ -29,20 +23,21 @@
       #quads { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
       .q { padding: 3px 9px; border-radius: 999px; border: 2px solid; cursor: pointer; background: #fff; font-size: 13px; }
       .q.on { color: #fff; }
-      #info { margin-top: 8px; color: var(--muted); }
+      .row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); margin-top: 8px; }
+      input[type="range"] { width: 200px; vertical-align: middle; }
+      #info { margin-top: 6px; color: var(--muted); }
       #info b { color: var(--fg); }
       #measures { margin: 6px 0 0; padding-left: 18px; }
       .warn { color: #a33; }
-      kbd { background: #eef0f3; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
     </style>
   </head>
   <body>
     <header>
       <h1>Rectify a wall</h1>
       <label>Photo <select id="image"></select></label>
-      <label><input type="checkbox" id="auto" checked /> estimate the true shape from the perspective</label>
-      <label>Real height (m) <input type="number" id="realH" step="0.05" min="0" /></label>
-      <label>Real width (m) <input type="number" id="realW" step="0.05" min="0" /></label>
+      <label>Camera focal length (px) <input type="number" id="focal" step="50" min="100" max="20000" /></label>
+      <label><input type="checkbox" id="focalAuto" checked /> auto (from the corners of this photo)</label>
+      <span id="fov" style="color: var(--muted)"></span>
       <button id="save" class="primary">Save corners</button>
       <button id="reset">Reset this photo to candidates</button>
       <span id="status" style="color: var(--muted)"></span>
@@ -56,20 +51,34 @@
       </section>
       <section>
         <h2>Straightened: click two points to measure</h2>
+        <div class="row" style="border-top: 0; margin-top: 0; padding-top: 0">
+          <label><input type="radio" name="mode" value="auto" id="modeAuto" checked /> ratio from the camera</label>
+          <label><input type="radio" name="mode" value="manual" id="modeManual" /> set the ratio by hand</label>
+          <label>wide : high <input type="number" id="ratio" step="0.05" min="0.1" max="30" /></label>
+          <input type="range" id="ratioSlider" min="0.2" max="12" step="0.05" />
+          <label>or match <select id="match"></select></label>
+        </div>
+        <div class="row" style="margin-top: 0">
+          <label>Real height (m) <input type="number" id="realH" step="0.05" min="0" /></label>
+          <label>Real width (m) <input type="number" id="realW" step="0.05" min="0" /></label>
+          <label><input type="checkbox" id="grid" checked /> 0.5 m grid</label>
+          <button id="calibrate" title="Give both real sizes for this wall, then click: the camera is solved from them and applies to every wall in this photo">Calibrate the camera from this wall</button>
+          <button id="clearM">Clear measurements</button>
+        </div>
         <canvas id="out"></canvas>
         <ol id="measures"></ol>
-        <div style="margin-top: 6px"><button id="clearM">Clear measurements</button></div>
         <p style="color: var(--muted); margin-top: 8px">
-          Corners go top-left, top-right, bottom-right, bottom-left. Enter one real size you trust
-          (for instance floor to ceiling is 3.8 m); the other follows from the perspective.
-          This assumes square pixels and a camera centred on the photo, so treat the result as
-          an estimate, not a survey. Crops and wide-angle lenses will throw it off.
+          Corners go top-left, top-right, bottom-right, bottom-left. Walls of one photo share one
+          camera, so they share one focal length; if two walls that should be the same give
+          different ratios, set one by hand or use "match". Enter one real size you trust (for
+          instance floor to ceiling is 3.8 m) and the other follows from the ratio. Estimates, not
+          a survey: crops and wide-angle lenses throw the camera assumptions off.
         </p>
       </section>
     </main>
 
     <script type="module">
-      import { estimateAspect, rectify } from "/lib/homography.js";
+      import { aspectFromFocal, rectify, sharedFocal, solveFocal } from "/lib/homography.js";
 
       const $ = (id) => document.getElementById(id);
       const srcCanvas = $("src");
@@ -78,27 +87,33 @@
       let imageName = null;
       let quadIdx = 0;
       let img = null;
-      let pixels = null; // full-size RGBA of the photo
+      let pixels = null;
       let scale = 1;
-      let measures = []; // points on the rectified view (output pixels)
-      let ppm = 100; // output pixels per metre
-      let outW = 0;
-      let outH = 0;
+      let measures = [];
+      let ppm = 100;
       let dragging = null;
 
       const status = (t) => {
         $("status").textContent = t;
-        if (t) setTimeout(() => ($("status").textContent === t ? ($("status").textContent = "") : 0), 2500);
+        setTimeout(() => ($("status").textContent === t ? ($("status").textContent = "") : 0), 2500);
       };
+      const entry = () => state.images[imageName];
+      const quads = () => entry().quads;
+      const cur = () => quads()[quadIdx];
 
       async function boot() {
         const [list, st] = await Promise.all([fetch("/ref-list").then((r) => r.json()), fetch("/api/state").then((r) => r.json())]);
         state = st;
         state.images ??= {};
-        // photos that already have corners first, in the order they were saved
         const names = Object.keys(state.images).filter((n) => list.includes(n));
         const rest = list.filter((n) => !state.images[n]);
         for (const n of rest) state.images[n] = { quads: [] };
+        // the two walls of the store are mirror images: say so unless told otherwise
+        for (const v of Object.values(state.images)) {
+          for (const q of v.quads) {
+            if (q.id === "right-wall" && q.matchOf === undefined && q.ratioMode === undefined) q.matchOf = "left-wall";
+          }
+        }
         $("image").innerHTML = [...names, ...rest].map((n) => `<option>${n}</option>`).join("");
         $("image").onchange = () => loadImage($("image").value);
         await loadImage($("image").value);
@@ -122,12 +137,9 @@
         srcCanvas.width = Math.round(img.naturalWidth * scale);
         srcCanvas.height = Math.round(img.naturalHeight * scale);
         renderQuadButtons();
-        syncInputs();
+        syncControls();
         draw();
       }
-
-      const quads = () => state.images[imageName].quads;
-      const cur = () => quads()[quadIdx];
 
       function renderQuadButtons() {
         const box = $("quads");
@@ -142,21 +154,65 @@
             quadIdx = i;
             measures = [];
             renderQuadButtons();
-            syncInputs();
+            syncControls();
             draw();
           };
           box.appendChild(b);
         });
-        if (!quads().length) box.textContent = "No corners for this photo yet: use Reset to start from candidates, or ask for some.";
+        if (!quads().length) box.textContent = "No corners for this photo yet: use Reset, or ask for some.";
       }
 
-      function syncInputs() {
+      // --- camera and ratio ------------------------------------------------
+      const centre = () => [img.naturalWidth / 2, img.naturalHeight / 2];
+
+      function cameraFocal() {
+        const [cx, cy] = centre();
+        const manual = entry().focal;
+        const auto = sharedFocal(quads().map((q) => q.pts), cx, cy);
+        return { f: manual ?? auto ?? 0.95 * img.naturalWidth, auto, manual: manual ?? null, guessed: manual == null && auto == null };
+      }
+
+      // the ratio (wide : high) of a quad and where it came from
+      function ratioOf(q, seen = new Set()) {
+        if (q.matchOf && !seen.has(q.id)) {
+          const other = quads().find((x) => x.id === q.matchOf);
+          if (other) {
+            seen.add(q.id);
+            const r = ratioOf(other, seen);
+            return { ratio: r.ratio, how: `matched to "${other.label}"` };
+          }
+        }
+        if (q.ratioMode === "manual" && q.ratio > 0) return { ratio: q.ratio, how: "set by hand" };
+        if (q.realHeight > 0 && q.realWidth > 0) return { ratio: q.realWidth / q.realHeight, how: "from the two real sizes you gave" };
+        const [cx, cy] = centre();
+        const cam = cameraFocal();
+        const a = aspectFromFocal(q.pts, cam.f, cx, cy);
+        if (a) return { ratio: a, how: `from the camera (focal length ${Math.round(cam.f)} px)` };
+        return { ratio: 1.5, how: "no valid shape: set it by hand" };
+      }
+
+      function syncControls() {
         const q = cur();
-        $("realH").value = q?.realHeight ?? "";
-        $("realW").value = q?.realWidth ?? "";
+        const cam = cameraFocal();
+        $("focalAuto").checked = cam.manual === null;
+        $("focal").value = Math.round(cam.f);
+        $("focal").disabled = cam.manual === null;
+        const hfov = (2 * Math.atan(img.naturalWidth / 2 / cam.f) * 180) / Math.PI;
+        $("fov").textContent = `≈ ${hfov.toFixed(0)}° across the photo` + (cam.guessed ? " (no quad gave an estimate; a typical lens is assumed)" : "");
+        $("match").innerHTML = `<option value="">(none)</option>` + quads().filter((o) => o !== q).map((o) => `<option value="${o.id}">${o.label}</option>`).join("");
+        if (!q) return;
+        $("match").value = q.matchOf ?? "";
+        const manual = q.ratioMode === "manual";
+        $("modeAuto").checked = !manual;
+        $("modeManual").checked = manual;
+        const r = ratioOf(q).ratio;
+        $("ratio").value = (manual && q.ratio ? q.ratio : r).toFixed(2);
+        $("ratioSlider").value = Math.min(12, Math.max(0.2, manual && q.ratio ? q.ratio : r));
+        $("realH").value = q.realHeight ?? "";
+        $("realW").value = q.realWidth ?? "";
       }
 
-      // --- the source view -------------------------------------------------
+      // --- the photo -------------------------------------------------------
       function draw() {
         const g = srcCanvas.getContext("2d");
         g.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
@@ -218,21 +274,21 @@
       srcCanvas.addEventListener("pointermove", (e) => {
         if (dragging === null) return;
         const [px, py] = pointerPos(e);
-        const q = cur();
-        q.pts[dragging] = [Math.max(0, Math.min(img.naturalWidth, px / scale)), Math.max(0, Math.min(img.naturalHeight, py / scale))];
+        cur().pts[dragging] = [Math.max(0, Math.min(img.naturalWidth, px / scale)), Math.max(0, Math.min(img.naturalHeight, py / scale))];
         draw();
       });
       const endDrag = () => {
         if (dragging !== null) {
           dragging = null;
           measures = [];
+          syncControls();
           save(true);
         }
       };
       srcCanvas.addEventListener("pointerup", endDrag);
       srcCanvas.addEventListener("pointercancel", endDrag);
 
-      // --- the straightened view ------------------------------------------
+      // --- the straightened view --------------------------------------------
       function update() {
         const q = cur();
         const info = $("info");
@@ -242,37 +298,45 @@
           info.textContent = "";
           return;
         }
-        const quad = q.pts;
-        const est = estimateAspect(quad, img.naturalWidth / 2, img.naturalHeight / 2);
-        const useAuto = $("auto").checked && est;
-        const rh = parseFloat($("realH").value) || null;
-        const rw = parseFloat($("realW").value) || null;
-        let aspect;
-        if (useAuto) aspect = est.aspect;
-        else if (rh && rw) aspect = rw / rh;
-        else aspect = est?.aspect ?? 1.5;
-        // one real size is enough; the other follows from the aspect
-        let heightM = rh;
-        let widthM = rw;
-        if (heightM && (useAuto || !widthM)) widthM = heightM * aspect;
-        else if (widthM && (useAuto || !heightM)) heightM = widthM / aspect;
-        // output size
+        const { ratio, how } = ratioOf(q);
+        let heightM = q.realHeight ?? null;
+        let widthM = q.realWidth ?? null;
+        if (heightM) widthM = heightM * ratio;
+        else if (widthM) heightM = widthM / ratio;
         const unitsH = heightM ?? 3;
-        ppm = Math.min(160, 520 / unitsH, 900 / (unitsH * aspect));
-        outH = Math.max(40, Math.round(unitsH * ppm));
-        outW = Math.max(40, Math.round(outH * aspect));
+        ppm = Math.min(160, 520 / unitsH, 900 / (unitsH * ratio));
+        const outH = Math.max(40, Math.round(unitsH * ppm));
+        const outW = Math.max(40, Math.round(outH * ratio));
         outCanvas.width = outW;
         outCanvas.height = outH;
         try {
-          const data = rectify(pixels, img.naturalWidth, img.naturalHeight, quad, outW, outH);
+          const data = rectify(pixels, img.naturalWidth, img.naturalHeight, q.pts, outW, outH);
           octx.putImageData(new ImageData(data, outW, outH), 0, 0);
         } catch (e) {
           octx.clearRect(0, 0, outW, outH);
           info.innerHTML = `<span class="warn">Cannot straighten this shape: ${e.message}</span>`;
           return;
         }
-        // measurements
-        octx.lineWidth = 2;
+        if ($("grid").checked && heightM) {
+          octx.strokeStyle = "rgba(255,255,255,0.55)";
+          octx.lineWidth = 1;
+          octx.font = "10px system-ui";
+          octx.fillStyle = "rgba(255,255,255,0.9)";
+          for (let m = 0.5; m * ppm < outW; m += 0.5) {
+            octx.beginPath();
+            octx.moveTo(m * ppm, 0);
+            octx.lineTo(m * ppm, outH);
+            octx.stroke();
+            if (Number.isInteger(m)) octx.fillText(m + " m", m * ppm + 2, 11);
+          }
+          for (let m = 0.5; m * ppm < outH; m += 0.5) {
+            octx.beginPath();
+            octx.moveTo(0, outH - m * ppm);
+            octx.lineTo(outW, outH - m * ppm);
+            octx.stroke();
+            if (Number.isInteger(m)) octx.fillText(m + " m", 2, outH - m * ppm - 2);
+          }
+        }
         measures.forEach((m, i) => {
           octx.fillStyle = "#e6194b";
           octx.beginPath();
@@ -281,6 +345,7 @@
           if (i % 2 === 1) {
             const a = measures[i - 1];
             octx.strokeStyle = "#e6194b";
+            octx.lineWidth = 2;
             octx.beginPath();
             octx.moveTo(a[0], a[1]);
             octx.lineTo(m[0], m[1]);
@@ -296,20 +361,35 @@
           lines.push(`${Math.hypot(dx, dy).toFixed(2)} m  (across ${Math.abs(dx).toFixed(2)}, up ${Math.abs(dy).toFixed(2)})`);
         }
         $("measures").innerHTML = lines.map((l) => `<li>${l}</li>`).join("");
-        const parts = [];
-        parts.push(est ? `Perspective says the true shape is <b>${est.aspect.toFixed(2)} : 1</b> (wide : high), camera focal length about ${Math.round(est.focal)} px.` : `<span class="warn">No usable perspective in this quad (it is close to a parallelogram), so the shape cannot be recovered: enter both real sizes.</span>`);
-        if (heightM && widthM) parts.push(`Real size used: <b>${widthM.toFixed(2)} m wide</b> by <b>${heightM.toFixed(2)} m high</b>, drawn at ${Math.round(ppm)} px per metre.`);
+
+        const parts = [`Ratio <b>${ratio.toFixed(2)} : 1</b> (wide : high), ${how}.`];
+        if (heightM && widthM) parts.push(`Real size used: <b>${widthM.toFixed(2)} m wide</b> by <b>${heightM.toFixed(2)} m high</b>.`);
         else parts.push("Enter a real height or width to get measurements in metres.");
+        if (ratio > 9 || ratio < 0.25) parts.push(`<span class="warn">That ratio is extreme, so the corners or the camera are probably off: try the focal length, or set the ratio by hand.</span>`);
+        // walls that should agree
+        const twin = quads().find((o) => o !== q && o.id === q.id.replace("left", "right").replace("right", o.id.includes("left") ? "right" : "left"));
+        const pair = pairOf(q);
+        if (pair) {
+          const r2 = ratioOf(pair).ratio;
+          if (Math.abs(r2 - ratio) / Math.max(ratio, r2) > 0.15) {
+            parts.push(`<span class="warn">"${pair.label}" reads ${r2.toFixed(2)} : 1 but this one reads ${ratio.toFixed(2)} : 1. The two walls should match: use "match" on one, or set both by hand.</span>`);
+          } else parts.push(`Agrees with "${pair.label}" (${r2.toFixed(2)} : 1).`);
+        }
+        void twin;
         info.innerHTML = parts.join("<br>");
-        if (useAuto && widthM) $("realW").value = widthM.toFixed(2);
-        if (useAuto && heightM) $("realH").value = heightM.toFixed(2);
+      }
+
+      // the mirror wall of a wall, by id: left-wall / right-wall, left-band / right-band
+      function pairOf(q) {
+        const swap = q.id.includes("left") ? q.id.replace("left", "right") : q.id.includes("right") ? q.id.replace("right", "left") : null;
+        return swap ? quads().find((o) => o.id === swap) : null;
       }
 
       outCanvas.addEventListener("click", (e) => {
         const r = outCanvas.getBoundingClientRect();
         const x = ((e.clientX - r.left) / r.width) * outCanvas.width;
         const y = ((e.clientY - r.top) / r.height) * outCanvas.height;
-        if (measures.length % 2 === 0 && measures.length >= 6) measures = [];
+        if (measures.length >= 6) measures = [];
         measures.push([x, y]);
         update();
       });
@@ -318,23 +398,102 @@
         update();
       };
 
-      // --- inputs and saving ----------------------------------------------
-      function readInputs(which) {
-        const q = cur();
-        if (!q) return;
-        const v = parseFloat($(which).value);
-        const key = which === "realH" ? "realHeight" : "realWidth";
-        if (Number.isFinite(v) && v > 0) q[key] = v;
-        else delete q[key];
-        // the other one is derived while the estimate is on; keep what was typed
-        if ($("auto").checked) delete q[key === "realHeight" ? "realWidth" : "realHeight"];
+      // --- inputs -----------------------------------------------------------
+      const changed = () => {
         measures = [];
-        syncInputs();
+        syncControls();
         update();
-      }
-      $("realH").oninput = () => readInputs("realH");
-      $("realW").oninput = () => readInputs("realW");
-      $("auto").onchange = () => update();
+        save(true);
+      };
+      $("focalAuto").onchange = () => {
+        entry().focal = $("focalAuto").checked ? null : Math.round(cameraFocal().f);
+        changed();
+      };
+      $("focal").oninput = () => {
+        const v = parseFloat($("focal").value);
+        if (v > 0) {
+          entry().focal = v;
+          measures = [];
+          update();
+        }
+      };
+      $("focal").onchange = changed;
+      const setManual = (v) => {
+        const q = cur();
+        if (!q || !(v > 0)) return;
+        q.ratioMode = "manual";
+        q.ratio = v;
+        q.matchOf = null;
+        changed();
+      };
+      $("ratio").onchange = () => setManual(parseFloat($("ratio").value));
+      $("ratioSlider").oninput = () => {
+        const v = parseFloat($("ratioSlider").value);
+        const q = cur();
+        q.ratioMode = "manual";
+        q.ratio = v;
+        q.matchOf = null;
+        $("ratio").value = v.toFixed(2);
+        $("modeManual").checked = true;
+        measures = [];
+        update();
+      };
+      $("ratioSlider").onchange = changed;
+      $("modeAuto").onchange = () => {
+        const q = cur();
+        q.ratioMode = "auto";
+        changed();
+      };
+      $("modeManual").onchange = () => {
+        const q = cur();
+        q.ratioMode = "manual";
+        q.ratio = q.ratio || ratioOf(q).ratio;
+        q.matchOf = null;
+        changed();
+      };
+      $("match").onchange = () => {
+        const q = cur();
+        q.matchOf = $("match").value || null;
+        changed();
+      };
+      const sizeInput = (id, key, other) => () => {
+        const q = cur();
+        const v = parseFloat($(id).value);
+        if (v > 0) q[key] = v;
+        else delete q[key];
+        // one real size is enough (the ratio gives the other); give both and
+        // they set the ratio themselves and can calibrate the camera
+        measures = [];
+        syncControls();
+        update();
+      };
+      $("realH").oninput = sizeInput("realH", "realHeight", "realWidth");
+      $("realW").oninput = sizeInput("realW", "realWidth", "realHeight");
+      $("realH").onchange = () => save(true);
+      $("realW").onchange = () => save(true);
+      $("grid").onchange = () => update();
+      $("calibrate").onclick = () => {
+        const q = cur();
+        if (!(q?.realHeight > 0 && q?.realWidth > 0)) {
+          status("Give both the real height and the real width of this wall first");
+          return;
+        }
+        const [cx, cy] = centre();
+        const f = solveFocal(q.pts, q.realWidth / q.realHeight, cx, cy);
+        if (f === null) {
+          status("These corners cannot make that shape at any camera: check the corners or the sizes");
+          return;
+        }
+        entry().focal = Math.round(f);
+        // other walls of this photo now read from the calibrated camera
+        for (const o of quads()) {
+          if (o !== q && o.ratioMode !== "manual") {
+            delete o.realWidth;
+          }
+        }
+        status(`Camera calibrated: focal length ${Math.round(f)} px`);
+        changed();
+      };
 
       async function save(quiet) {
         const r = await fetch("/api/state", { method: "POST", body: JSON.stringify(state, null, 1) });
@@ -344,10 +503,13 @@
       $("reset").onclick = async () => {
         const c = await fetch("/api/candidates").then((r) => r.json());
         if (c.images[imageName]) state.images[imageName] = structuredClone(c.images[imageName]);
+        for (const q of state.images[imageName].quads) {
+          if (q.id === "right-wall" && q.matchOf === undefined && q.ratioMode === undefined) q.matchOf = "left-wall";
+        }
         quadIdx = 0;
         measures = [];
         renderQuadButtons();
-        syncInputs();
+        syncControls();
         draw();
         save(true);
       };

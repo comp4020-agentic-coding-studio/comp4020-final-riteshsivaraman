@@ -25,7 +25,9 @@
        827
       ]
      ],
-     "realHeight": 3.8
+     "realHeight": 3.8,
+     "realWidth": 15.9,
+     "note": "15.9 x 3.8 m is the model's own number, not independent evidence; use it to calibrate the camera, then read the other walls"
     },
     {
      "id": "right-wall",

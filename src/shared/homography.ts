@@ -134,3 +134,72 @@ export function rectify(
   }
   return out;
 }
+
+// The true width / height of a rectangle seen as `q`, given the camera's focal
+// length (pixels) and principal point. Unlike estimateAspect this needs no
+// second vanishing point, so it works for a wall seen straight on from a level
+// camera (vertical edges parallel), which is the usual case for a shopfront.
+// Returns null if the quad cannot be a rectangle in front of the camera.
+export function aspectFromFocal(q: Quad, focal: number, cx: number, cy: number): number | null {
+  if (!(focal > 0)) return null;
+  const unit: Quad = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+  ];
+  let h: H;
+  try {
+    h = solveHomography(unit, q);
+  } catch {
+    return null;
+  }
+  // columns of H for u and v, mapped through the inverse camera matrix
+  const col = (a: number, b: number, c: number): V3 => [(a - cx * c) / focal, (b - cy * c) / focal, c];
+  const c1 = col(h[0], h[3], h[6]);
+  const c2 = col(h[1], h[4], h[7]);
+  const n2 = Math.hypot(c2[0], c2[1], c2[2]);
+  if (n2 < 1e-12) return null;
+  const a = Math.hypot(c1[0], c1[1], c1[2]) / n2;
+  return Number.isFinite(a) && a > 0 ? a : null;
+}
+
+// One focal length for several quads taken from the same photograph: the
+// median of every quad that gives a usable estimate, or null if none does.
+export function sharedFocal(quads: readonly Quad[], cx: number, cy: number): number | null {
+  const fs: number[] = [];
+  for (const q of quads) {
+    const e = estimateAspect(q, cx, cy);
+    // a plausible lens: roughly 14 to 125 degrees across the photo
+    if (e && e.focal > 0.3 * (2 * cx) && e.focal < 4 * (2 * cx)) fs.push(e.focal);
+  }
+  if (!fs.length) return null;
+  fs.sort((a, b) => a - b);
+  return fs[Math.floor(fs.length / 2)];
+}
+
+// The focal length (pixels) at which the quad reads as a rectangle of the
+// given true width / height: how you calibrate the camera from one wall whose
+// real size you know. Scans log-spaced candidates and keeps the best; returns
+// null when nothing comes within 5 percent (the corners cannot be that shape).
+export function solveFocal(q: Quad, ratio: number, cx: number, cy: number): number | null {
+  if (!(ratio > 0)) return null;
+  let best: number | null = null;
+  let bestErr = Infinity;
+  // plausible lenses only: from about 120 degrees across the photo down to
+  // about 14 degrees. Beyond that the formula stops meaning anything physical.
+  const width = 2 * cx;
+  const lo = 0.3 * width;
+  const hi = 4 * width;
+  for (let i = 0; i <= 800; i++) {
+    const f = lo * Math.pow(hi / lo, i / 800);
+    const a = aspectFromFocal(q, f, cx, cy);
+    if (a === null) continue;
+    const err = Math.abs(Math.log(a / ratio));
+    if (err < bestErr) {
+      bestErr = err;
+      best = f;
+    }
+  }
+  return best !== null && bestErr < 0.05 ? best : null;
+}

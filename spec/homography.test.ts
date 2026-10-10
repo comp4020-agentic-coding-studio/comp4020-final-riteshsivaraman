@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { applyH, estimateAspect, rectify, solveHomography, type Quad } from "../src/shared/homography.ts";
+import { applyH, aspectFromFocal, estimateAspect, rectify, sharedFocal, solveFocal, solveHomography, type Quad } from "../src/shared/homography.ts";
 
 // Promise: the rectification maths behind tools/rectify is right, checked
 // against a synthetic pinhole camera where the true answer is known.
@@ -110,4 +110,45 @@ it("rectifies a photo: a tilted bright square becomes an upright one", () => {
   let minV = 255;
   for (let y = 3; y < 47; y++) for (let x = 3; x < 47; x++) minV = Math.min(minV, out[(y * 50 + x) * 4]);
   expect(minV).toBeGreaterThan(240);
+});
+
+it("reads the ratio from a known focal length, even for a level camera", () => {
+  // no pitch: vertical edges stay parallel, the case estimateAspect cannot use
+  for (const [w, h] of [
+    [15.9, 3.8],
+    [3.2, 1.4],
+  ]) {
+    const q = project(w, h, 0.6, 0, 1100, 1000, 600);
+    const a = aspectFromFocal(q, 1100, 1000, 600);
+    expect(a, `${w}x${h}`).not.toBeNull();
+    expect(a! / (w / h)).toBeGreaterThan(0.98);
+    expect(a! / (w / h)).toBeLessThan(1.02);
+  }
+});
+
+it("gives two mirror-image walls the same ratio when they share a camera", () => {
+  const left = project(15.9, 3.8, 0.7, 0, 1000, 640, 360);
+  const right = project(15.9, 3.8, -0.7, 0, 1000, 640, 360);
+  const f = 1000;
+  const a = aspectFromFocal(left, f, 640, 360)!;
+  const b = aspectFromFocal(right, f, 640, 360)!;
+  expect(Math.abs(a - b) / a).toBeLessThan(0.01);
+});
+
+it("finds one focal length from several tilted quads of the same camera", () => {
+  const quads = [project(4, 3, 0.5, 0.15, 900, 640, 360), project(5, 2, -0.4, -0.12, 900, 640, 360), project(3, 3, 0.2, 0.3, 900, 640, 360)];
+  const f = sharedFocal(quads, 640, 360);
+  expect(f).not.toBeNull();
+  expect(f! / 900).toBeGreaterThan(0.9);
+  expect(f! / 900).toBeLessThan(1.1);
+});
+
+it("calibrates the camera from one wall of known size", () => {
+  const q = project(15.9, 3.8, 0.6, 0, 1100, 1000, 600);
+  const f = solveFocal(q, 15.9 / 3.8, 1000, 600);
+  expect(f).not.toBeNull();
+  expect(f! / 1100).toBeGreaterThan(0.95);
+  expect(f! / 1100).toBeLessThan(1.05);
+  // and a ratio the corners cannot make is refused, not forced
+  expect(solveFocal(q, 60, 1000, 600)).toBeNull();
 });
