@@ -8,16 +8,20 @@ import {
   BACK_ROOM_Z0,
   BACK_ROOM_Z1,
   BACK_SHELVES,
+  BAY_COUNT,
+  BAY_W,
   BENCHES,
   COLUMN_X,
   COUNTER,
   DOOR,
   PARTITIONS,
+  PIER_W,
   SERVICE_DESKS,
   TABLES,
   TABLE_D,
   TABLE_W,
   WALL_FACE_Z,
+  bayCentre,
 } from "../src/shared/world.ts";
 
 const S = 48; // pixels per metre
@@ -95,16 +99,19 @@ for (const side of [-1, 1]) {
   ]) {
     rect(x, z, 0.12, w, "#ffffff", "#8aa", 1.2);
   }
-  // dark shelving bays
-  for (let i = 0; i < 4; i++) {
-    const zc = 1.4 + 1.2 / 2 + i * 1.28;
-    rect(x, zc, 0.2, 1.2, "#3b3f45", "#222", 1);
+  // product bays: dark recesses between full-height piers
+  for (let i = 0; i <= BAY_COUNT; i++) {
+    const zp = bayCentre(0) - BAY_W / 2 - PIER_W / 2 + i * (BAY_W + PIER_W);
+    rect(side * (FLOOR.maxX + 0.25), zp, 0.3, PIER_W, "#b4b8bd", "#555", 1);
+  }
+  for (let i = 0; i < BAY_COUNT; i++) {
+    rect(side * (FLOOR.maxX + 0.38), bayCentre(i), 0.04, BAY_W, "#3b3f45", "#222", 1);
   }
   // two monitors on each bench
   for (const z of [-2.4, -1.4]) rect(side * 7.55, z, 0.12, 0.7, "#1a4fb8", "#0b2a6b", 1);
 }
 text(px(-8.55), py(-5.0), "lightbox", 9, "middle", "#678");
-text(px(-8.55), py(3.7), "dark bays", 9, "middle", "#fff");
+text(px(-8.55), py(7.45), "recessed bays", 9, "middle", "#555");
 
 // tables
 TABLES.forEach((t, i) => {
@@ -118,9 +125,9 @@ text(px(COLUMN_X[2]), py(-6.0), "audio / trackers", 10, "middle", "#555");
 
 // bar, stools, staff partitions
 rect(COUNTER.x, COUNTER.z, COUNTER.w, COUNTER.d, "#d9b98c", "#8a6a2f", 1.5);
-text(px(0), py(COUNTER.z) + 4, "SERVICE BAR (Genius Bar / checkout)", 11, "middle", "#4a3510", "700");
-for (let k = 0; k < 7; k++) {
-  const x = -4.5 + k * 1.5;
+text(px(0), py(COUNTER.z) + 4, "SERVICE BAR (checkout / repair desk)", 11, "middle", "#4a3510", "700");
+for (let k = 0; k < 5; k++) {
+  const x = -3 + k * 1.5;
   add(`<circle cx="${px(x).toFixed(1)}" cy="${py(COUNTER.z - 0.95).toFixed(1)}" r="${bw(0.2).toFixed(1)}" fill="#e6cfa8" stroke="#8a6a2f"/>`);
 }
 for (const p of PARTITIONS) rect(p.x, p.z, p.w, p.d, "#8a6a2f", "#5a4210", 1);
@@ -157,7 +164,7 @@ dimZ(TABLES[0].z + TABLE_D / 2, TABLES[1].z - TABLE_D / 2, COLUMN_X[0] - TABLE_W
 // ---- legend / notes
 const ly = H - 62;
 text(60, ly, `Ceiling ${CEILING} m. Tables ${TABLE_W} x ${TABLE_D} m, four products each. Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
-text(60, ly + 16, "From the photos: three table columns, five rows each side and three in the middle, wall benches, bar about 3/4 of the back wall, glass front about 3.8x as wide as it is tall.", 11, "start", "#333");
+text(60, ly + 16, "From the photos: three table columns, five rows each side and three in the middle, wall benches, bar about half the back wall (shortened at your request), glass front about 3.8x as wide as it is tall.", 11, "start", "#333");
 text(60, ly + 32, "Assumed, not measurable: shop depth (15 m), back-room size (your instruction: same as the shop), door position (your note: left of the bar), real table sizes.", 11, "start", "#a33");
 add("</svg>");
 

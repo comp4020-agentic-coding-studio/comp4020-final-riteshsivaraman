@@ -19,7 +19,8 @@ import {
 //     table column, wall bench, so columns sit at about +-1/4 of the width
 //   - a table is about 0.1 of the room width across
 //   - five short rows down each side column, about three down the centre
-//   - the service counter is about three quarters of the back wall's width
+//   - the service counter looked about three quarters of the back wall in the
+//     photo, but Ritesh asked for it shorter (2026-10-11): about half
 const ROOM_W = FLOOR.maxX - FLOOR.minX;
 
 it("has three table columns at 0 and about +-1/4 of the room width", () => {
@@ -48,9 +49,9 @@ it("puts about five tables in each side column and about three down the middle",
   expect(count(COLUMN_X[1])).toBe(3);
 });
 
-it("makes the service counter about three quarters of the wall width", () => {
-  expect(COUNTER.w / ROOM_W).toBeGreaterThan(0.6);
-  expect(COUNTER.w / ROOM_W).toBeLessThan(0.8);
+it("makes the service bar about half the wall width (shorter than the photo, by request)", () => {
+  expect(COUNTER.w / ROOM_W).toBeGreaterThan(0.4);
+  expect(COUNTER.w / ROOM_W).toBeLessThan(0.6);
 });
 
 it("keeps at least 2 m of clear aisle between table columns", () => {

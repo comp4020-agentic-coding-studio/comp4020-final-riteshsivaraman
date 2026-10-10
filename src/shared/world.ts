@@ -49,10 +49,10 @@ export const BENCHES: Box[] = [
 
 // The service bar along the back and the partitions that close off the staff
 // space behind it.
-export const COUNTER: Box = { x: 0, z: 5.8, w: 12, d: 0.9, h: 1.05 };
+export const COUNTER: Box = { x: 0, z: 5.8, w: 8, d: 0.9, h: 1.05 };
 export const PARTITIONS: Box[] = [
-  { x: -6, z: 6.875, w: 0.15, d: 1.25, h: 1.05 },
-  { x: 6, z: 6.875, w: 0.15, d: 1.25, h: 1.05 },
+  { x: -4, z: 6.875, w: 0.15, d: 1.25, h: 1.05 },
+  { x: 4, z: 6.875, w: 0.15, d: 1.25, h: 1.05 },
 ];
 
 // The back room: same footprint as the store, behind the back wall. Its first
@@ -74,7 +74,17 @@ export const SERVICE_DESKS: Box[] = [
 ];
 
 // The flush staff door in the back wall, left of the bar.
-export const DOOR = { minX: -7.8, maxX: -6.5 } as const;
+export const DOOR = { minX: -5.8, maxX: -4.5 } as const;
+
+// Product walls on both side walls: four recessed bays between full-height
+// piers, toward the back of the shop. The bays are indented into the wall.
+export const BAY_COUNT = 4;
+export const BAY_W = 1.1;
+export const PIER_W = 0.3;
+export const BAY_START_Z = 1.4;
+export function bayCentre(i: number): number {
+  return BAY_START_Z + PIER_W + BAY_W / 2 + i * (BAY_W + PIER_W);
+}
 
 // Everything solid. Customers are also stopped by the bar partitions (they
 // cannot get behind the bar); staff can pass them.

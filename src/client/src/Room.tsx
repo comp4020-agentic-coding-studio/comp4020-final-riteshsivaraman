@@ -17,14 +17,18 @@ import {
   BACK_SHELVES,
   BACK_SHELF_ROW_Z,
   BACK_SHELF_UNIT_X,
+  BAY_COUNT,
+  BAY_W,
   BENCHES,
   COLUMN_X,
   COUNTER,
   DOOR,
   PARTITIONS,
+  PIER_W,
   SERVICE_DESKS,
   TABLES,
   WALL_FACE_Z,
+  bayCentre,
   type Box,
 } from "../../shared/world.ts";
 import { net } from "./net.ts";
@@ -219,6 +223,41 @@ function Poster({
         <meshBasicMaterial map={map} toneMapped={false} />
       </mesh>
     </group>
+  );
+}
+
+// An original service mark (a ring with teeth around a dot), not anyone's logo.
+function ServiceMark({ position }: { position: [number, number, number] }) {
+  const map = useMemo(
+    () =>
+      canvasTexture(128, 128, (g) => {
+        g.fillStyle = "#101216";
+        g.fillRect(0, 0, 128, 128);
+        g.strokeStyle = "#ffffff";
+        g.fillStyle = "#ffffff";
+        g.lineWidth = 8;
+        g.beginPath();
+        g.arc(64, 64, 26, 0, Math.PI * 2);
+        g.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = (i * Math.PI) / 4;
+          g.save();
+          g.translate(64 + Math.cos(a) * 40, 64 + Math.sin(a) * 40);
+          g.rotate(a);
+          g.fillRect(-7, -5, 14, 10);
+          g.restore();
+        }
+        g.beginPath();
+        g.arc(64, 64, 9, 0, Math.PI * 2);
+        g.fill();
+      }),
+    [],
+  );
+  return (
+    <mesh position={position} rotation={[0, Math.PI, 0]}>
+      <planeGeometry args={[0.9, 0.9]} />
+      <meshBasicMaterial map={map} toneMapped={false} />
+    </mesh>
   );
 }
 
@@ -462,15 +501,8 @@ const BAY_LABELS: Record<number, string[]> = {
   [-1]: ["AUDIO", "CHARGING", "CASES", "TRACKERS"],
   [1]: ["WATCH BANDS", "KEYBOARDS", "SMART HOME", "CREATIVE"],
 };
-const BAY_Z0 = 1.4;
-const BAY_W = 1.2;
-const BAY_GAP = 0.08;
 const BAND_LOW = 0.95; // top of the dark lower band: the bench height
 const BAND_MID = 1.9; // top of the mid band: bottom of the lightboxes
-
-function bayCentre(i: number): number {
-  return BAY_Z0 + BAY_W / 2 + i * (BAY_W + BAY_GAP);
-}
 
 function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } {
   const frames: Cuboid[] = [];
@@ -478,23 +510,66 @@ function wallProducts(): { frames: Cuboid[]; stock: Cuboid[]; flats: Cuboid[] } 
   const flats: Cuboid[] = [];
   const tints = ["#eef3f8", "#f6efe6", "#eaf1ea", "#f3eaf3"];
   for (const side of [-1, 1]) {
-    for (let i = 0; i < 4; i++) {
+    // full-height piers: the bays between them read as indented into the wall
+    for (let i = 0; i <= BAY_COUNT; i++) {
+      const zc = bayCentre(0) - BAY_W / 2 - PIER_W / 2 + i * (BAY_W + PIER_W);
+      frames.push({
+        x: side * (FACE_X - 0.15),
+        y: CEILING / 2,
+        z: zc,
+        w: 0.3,
+        h: CEILING,
+        d: PIER_W,
+        colour: "#b4b8bd",
+      });
+    }
+    for (let i = 0; i < BAY_COUNT; i++) {
       const zc = bayCentre(i);
-      // dark back panel of the bay
-      frames.push({ x: side * (FACE_X - 0.03), y: 2.2, z: zc, w: 0.05, h: 2.5, d: BAY_W, colour: "#383c42" });
-      for (let k = 0; k < 7; k++) {
-        const y = 1.05 + k * 0.36;
-        frames.push({ x: side * (FACE_X - 0.13), y, z: zc, w: 0.22, h: 0.025, d: BAY_W, colour: "#8b9096" });
-        for (let j = 0; j < 8; j++) {
-          stock.push({
-            x: side * (FACE_X - 0.13),
-            y: y + 0.0125 + 0.11,
-            z: zc - BAY_W / 2 + 0.09 + j * 0.147,
-            w: 0.14,
-            h: 0.22,
-            d: 0.11,
-            colour: (j + k + i) % 5 === 4 ? tints[(i + k) % 4] : "#f4f4f2",
-          });
+      // dark back panel, flush with the wall, floor to near the ceiling
+      frames.push({ x: side * (FACE_X - 0.02), y: 1.7, z: zc, w: 0.04, h: 3.4, d: BAY_W, colour: "#3b3f45" });
+      const style = i % 3;
+      for (let k = 0; k < 9; k++) {
+        const y = 0.45 + k * 0.33;
+        frames.push({ x: side * (FACE_X - 0.14), y, z: zc, w: 0.24, h: 0.025, d: BAY_W - 0.04, colour: "#8b9096" });
+        if (style === 0) {
+          // slim white boxes lined up along each shelf
+          for (let j = 0; j < 7; j++) {
+            stock.push({
+              x: side * (FACE_X - 0.14),
+              y: y + 0.0125 + 0.12,
+              z: zc - BAY_W / 2 + 0.1 + j * 0.15,
+              w: 0.16,
+              h: 0.24,
+              d: 0.09,
+              colour: (j + k) % 5 === 4 ? tints[(i + k) % 4] : "#f4f4f2",
+            });
+          }
+        } else if (style === 1) {
+          // dark boxes with the odd coloured one, standing apart
+          for (let j = 0; j < 4; j++) {
+            stock.push({
+              x: side * (FACE_X - 0.14),
+              y: y + 0.0125 + 0.14,
+              z: zc - BAY_W / 2 + 0.16 + j * 0.26,
+              w: 0.18,
+              h: 0.28,
+              d: 0.15,
+              colour: (j + k) % 4 === 0 ? "#c0392b" : (j + k) % 4 === 1 ? "#2f4c7a" : "#22262c",
+            });
+          }
+        } else if (k % 2 === 0) {
+          // flat packages stacked on every other shelf
+          for (let j = 0; j < 3; j++) {
+            stock.push({
+              x: side * (FACE_X - 0.14),
+              y: y + 0.0125 + 0.03 + j * 0.06,
+              z: zc,
+              w: 0.2,
+              h: 0.05,
+              d: BAY_W - 0.2,
+              colour: j % 2 === 0 ? "#f4f4f2" : "#dde3ea",
+            });
+          }
         }
       }
     }
@@ -785,9 +860,9 @@ function BackRoom() {
 
 function Stools() {
   const stools = [];
-  for (let k = 0; k < 7; k++) {
+  for (let k = 0; k < 5; k++) {
     stools.push(
-      <group key={k} position={[-4.5 + k * 1.5, 0, COUNTER.z - 0.95]}>
+      <group key={k} position={[-3 + k * 1.5, 0, COUNTER.z - 0.95]}>
         <mesh position={[0, 0.34, 0]}>
           <cylinderGeometry args={[0.03, 0.03, 0.68, 8]} />
           <meshStandardMaterial color="#8d9399" metalness={0.5} roughness={0.4} />
@@ -955,18 +1030,28 @@ export function Room() {
         <meshStandardMaterial color="#b9bec4" />
       </mesh>
 
-      {/* dark display panels along the back wall, above the bar */}
-      {[-3.8, 0, 3.8].map((x, i) => (
+      {/* the bar's back wall: three screens and a service mark between them */}
+      {[-3, 0, 3].map((x, i) => (
         <Poster
           key={x}
-          position={[x, 2.55, WALL_FACE_Z - 0.03]}
+          position={[x, 2.6, WALL_FACE_Z - 0.03]}
           rotY={Math.PI}
           pair={POSTER_PAIRS[i]}
           dark
-          w={2.4}
-          h={1.3}
+          w={1.9}
+          h={1.1}
         />
       ))}
+      <ServiceMark position={[-1.5, 2.6, WALL_FACE_Z - 0.03]} />
+      <ServiceMark position={[1.5, 2.6, WALL_FACE_Z - 0.03]} />
+      <Sign
+        text="SERVICE BAR"
+        position={[0, 3.5, WALL_FACE_Z - 0.03]}
+        rotY={Math.PI}
+        w={2.0}
+        fg="#ffffff"
+        bg="#1f2430"
+      />
 
       <WallSections />
 

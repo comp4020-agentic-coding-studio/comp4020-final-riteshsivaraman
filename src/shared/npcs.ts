@@ -86,15 +86,15 @@ export const NPCS: NpcDef[] = [
   staff("spec-tablets", "specialist", [{ ...LANE.b, ...SHOP_Z }], 12000, 3000, 4),
   staff("spec-audio", "specialist", [{ ...LANE.outerR, ...SHOP_Z }], 12000, 9000, 5),
   // behind the service bar
-  staff("genius-1", "genius", [{ minX: -5.5, maxX: -1.0, minZ: 6.4, maxZ: 7.3 }], 9000, 0, 6),
-  staff("genius-2", "genius", [{ minX: 1.0, maxX: 5.5, minZ: 6.4, maxZ: 7.3 }], 10000, 3500, 7),
+  staff("genius-1", "genius", [{ minX: -3.6, maxX: -0.8, minZ: 6.4, maxZ: 7.3 }], 9000, 0, 6),
+  staff("genius-2", "genius", [{ minX: 0.8, maxX: 3.6, minZ: 6.4, maxZ: 7.3 }], 10000, 3500, 7),
   // fetches stock: out of the door, along the aisle, back again
   staff(
     "stock-runner",
     "stock",
     [
-      { minX: -7.5, maxX: -6.7, minZ: 6.6, maxZ: 7.2 },
-      { minX: -7.5, maxX: -6.7, minZ: 8.8, maxZ: 10.3 },
+      { minX: -5.6, maxX: -4.7, minZ: 5.7, maxZ: 7.2 },
+      { minX: -5.6, maxX: -4.7, minZ: 8.8, maxZ: 10.3 },
     ],
     11000,
     2000,
