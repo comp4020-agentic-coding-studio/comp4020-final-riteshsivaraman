@@ -27,11 +27,12 @@ absolute sizes are assumptions, because a photo has no scale.
 | 6 | Table size | 1.7 x 1.0 m | About a tenth of the width across (photo); depth assumed | Low | [ ] |
 | 7 | Products per table | 4 (2 each long side), 1.7 m apart | Your instruction: room for one person per product | Design choice | [ ] |
 | 8 | Wall benches | 0.9 deep, 13 m long, both side walls | Photo | Medium | [ ] |
-| 9 | Service bar | 12 m x 0.9, 7 stools | Photo: about three quarters of the back wall | Medium | [ ] |
+| 9 | Service bar | 8 m x 0.9, 5 stools | Photo showed about three quarters of the back wall; shortened to half at your request | Your call | [ ] |
 | 10 | Staff space behind bar | 1.65 m deep, closed by partitions | Your description | Medium | [ ] |
-| 11 | Staff door | 1.3 m wide, left of the bar | Your description | Medium | [ ] |
+| 10b | Back wall above the bar | three black screens with a service mark between them | Photo and your note | Medium | [ ] |
+| 11 | Staff door | 1.3 m wide, immediately left of the bar | Your description | Medium | [ ] |
 | 12 | Side-wall lightboxes | three per wall: 3.2, 2.0, 0.9 m wide | Close-up photo | Medium | [ ] |
-| 13 | Dark product bays | four per wall, 1.2 m wide each | Close-up photo | Medium | [ ] |
+| 13 | Product bays | four per wall, 1.1 m wide, recessed 0.3 m between full-height piers (floor to ceiling) | Second close-up photo | Medium | [ ] |
 | 14 | Back room | 17 x 15 m, 2 shelving rows, 2 repair benches | Your instruction: same footprint as the shop | Design choice | [ ] |
 
 When this is approved the checks become dimension checks against these rows
