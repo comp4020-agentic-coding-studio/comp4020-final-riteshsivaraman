@@ -25,53 +25,63 @@ export interface Rect {
   maxZ: number;
 }
 
-// Three columns of tables at -1/4, 0 and +1/4 of the room width, as in the
-// reference photo (Ritesh, 2026-10-11):
-//   - the two side columns each have four product tables and, nearest the bar,
-//     a fifth table: a larger SQUARE service table (its side is the long edge
-//     of a product table) with a stool on its left and right, where a customer
-//     sits down to talk with staff. Nothing is displayed on it.
-//   - the middle column has three product tables and one square service table.
-// Product tables are almost square (1.0 across by 1.2 long), with one product
-// on each of their four sides, each facing outward.
-export const COLUMN_X = [-2.5, 0, 2.5] as const;
-export const TABLE_W = 1.0; // product table, across the room (x)
-export const TABLE_LEN = 1.2; // product table, front to back (z): the long edge
-export const SERVICE_SIDE = TABLE_LEN; // a service table is a square of this side
-export const SIDE_ROW_Z = [-3.45, -1.9, -0.35, 1.2, 2.75] as const; // 4 product, then service
-export const CENTRE_ROW_Z = [-3.45, -1.9, -0.35, 1.2] as const; // 3 product, then service
-export const TABLE_H = 0.9;
+// Where the tables, benches and stools stand is DATA, in layout.json, so it
+// can be edited with the layout tool (tools/layout) and everything that reads
+// it (the 3D scene, the server, the drawings, the checks) follows.
+//
+// What the layout says, as Ritesh described it (2026-10-11): three columns of
+// tables at -1/4, 0 and +1/4 of the room width. The two side columns each have
+// four almost-square product tables and, nearest the bar, a larger SQUARE
+// service table (its side is the long edge of a product table) with a stool on
+// its left and right, where a customer sits down to talk with staff. The
+// middle column has three product tables and one service table. Product tables
+// carry one product on each side, each facing outward.
+import layoutData from "./layout.json" with { type: "json" };
+import type { ProductKind } from "./plan.ts";
 
 export interface Table extends Box {
+  id: string;
   service: boolean; // a service table: square, no products, stools either side
+  // one product per side, in the order -x side, +x side, -z side, +z side
+  products: readonly ProductKind[];
 }
 
-const columnTables = (x: number, rows: readonly number[], products: number): Table[] =>
-  rows.map((z, i) =>
-    i < products
-      ? { x, z, w: TABLE_W, d: TABLE_LEN, h: TABLE_H, service: false }
-      : { x, z, w: SERVICE_SIDE, d: SERVICE_SIDE, h: TABLE_H, service: true },
-  );
+export interface Stool {
+  id: string;
+  x: number;
+  z: number;
+  kind: "bar" | "table"; // at the service bar, or beside a service table
+}
 
-export const TABLES: Table[] = [
-  ...columnTables(COLUMN_X[0], SIDE_ROW_Z, 4),
-  ...columnTables(COLUMN_X[1], CENTRE_ROW_Z, 3),
-  ...columnTables(COLUMN_X[2], SIDE_ROW_Z, 4),
-];
+interface LayoutFile {
+  tables: Array<{ id: string; x: number; z: number; w: number; d: number; service: boolean; products: ProductKind[] }>;
+  benches: Array<{ id: string; x: number; z: number; w: number; d: number }>;
+  stools: Stool[];
+}
+const LAYOUT = layoutData as LayoutFile;
 
-// Two stools beside each service table, one to its left and one to its right.
-// (Small and not solid, like the stools at the bar.)
-export const SERVICE_STOOL_GAP = 0.32; // from the table edge to the stool's centre
-export const TABLE_STOOLS: Array<{ x: number; z: number }> = TABLES.filter((t) => t.service).flatMap((t) => [
-  { x: t.x - t.w / 2 - SERVICE_STOOL_GAP, z: t.z },
-  { x: t.x + t.w / 2 + SERVICE_STOOL_GAP, z: t.z },
-]);
+// The reference columns (a quarter of the shop's width either side of the
+// middle). Tables sit near these but are free to move.
+export const COLUMN_X = [-2.5, 0, 2.5] as const;
+export const TABLE_H = 0.9;
+
+export const TABLES: Table[] = LAYOUT.tables.map((t) => ({ ...t, h: TABLE_H }));
+
+// Product table size: the first product table's (they are all the same size
+// unless edited). A service table is a square; its side is the long edge.
+const firstProduct = TABLES.find((t) => !t.service) ?? TABLES[0];
+const firstService = TABLES.find((t) => t.service) ?? TABLES[0];
+export const TABLE_W = firstProduct.w; // across the room (x)
+export const TABLE_LEN = firstProduct.d; // front to back (z)
+export const SERVICE_SIDE = firstService.w;
 
 // Long benches along both side walls, carrying devices.
-export const BENCHES: Box[] = [
-  { x: -4.72, z: 0, w: 0.56, d: 8.6, h: 0.95 },
-  { x: 4.72, z: 0, w: 0.56, d: 8.6, h: 0.95 },
-];
+export const BENCHES: Box[] = LAYOUT.benches.map((b) => ({ ...b, h: 0.95 }));
+
+export const STOOL_LIST: Stool[] = LAYOUT.stools;
+export const BAR_STOOLS: Stool[] = STOOL_LIST.filter((s) => s.kind === "bar");
+// Stools beside the service tables. (Small and not solid, like the bar's.)
+export const TABLE_STOOLS: Stool[] = STOOL_LIST.filter((s) => s.kind === "table");
 
 // The service bar along the back and the partitions that close off the staff
 // space behind it.

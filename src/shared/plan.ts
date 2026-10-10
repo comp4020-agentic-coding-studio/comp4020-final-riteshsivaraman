@@ -71,9 +71,8 @@ export const DOOR_H = 2.3;
 // to the door's outer edge, so it is positive in +x).
 export const CARD_READER = { dx: 0.2, y: 1.1, w: 0.07, h: 0.1 } as const;
 
-// Bar stools: five, drawn in so they stay clear of the stools beside the side
-// columns' service tables (at about x = +-3.4 and +-1.6, a little further back).
-export const STOOLS = { x: [-1.2, -0.6, 0, 0.6, 1.2], seatH: 0.7 } as const;
+// Stool positions live in layout.json; the seat height is a fact about stools.
+export const STOOL_SEAT_H = 0.7;
 
 // Ceiling and lights, from the front-on photograph and the close-ups: grey
 // slats run ACROSS the room (along x), long light panels sit in paired rows
@@ -91,9 +90,7 @@ export const CEILING_SPEC = {
 } as const;
 export const TRACK_LIGHT_Y = 2.96;
 
-// What stands on each column of product tables (by the column's x): one
-// product on each side of a table, in the order -x side, +x side, -z side
-// (facing the glass), +z side (facing the bar). Service tables carry none.
+// The kinds of product that can stand on a product table (one per side).
 export type ProductKind =
   | "phone"
   | "tablet"
@@ -104,9 +101,3 @@ export type ProductKind =
   | "headphones"
   | "speaker"
   | "airtag";
-
-export const COLUMN_PRODUCTS: Record<string, readonly ProductKind[]> = {
-  "-2.5": ["phone", "phone", "watch", "earbuds"],
-  "0": ["laptop", "laptop", "tablet", "tabletKb"],
-  "2.5": ["headphones", "speaker", "airtag", "earbuds"],
-};

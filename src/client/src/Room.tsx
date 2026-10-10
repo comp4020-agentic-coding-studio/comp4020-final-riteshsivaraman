@@ -28,6 +28,7 @@ import {
   PIER_W,
   SERVICE_DESKS,
   TABLES,
+  BAR_STOOLS,
   TABLE_STOOLS,
   WALL_FACE_Z,
   bayCentre,
@@ -39,13 +40,12 @@ import {
   BAY_SHELVES,
   BAY_SIGN_Y,
   CEILING_SPEC,
-  COLUMN_PRODUCTS,
   DOOR_H as PLAN_DOOR_H,
   GLASS,
   LIGHTBOX_BOTTOM,
   LIGHTBOX_H,
   SIDE_WALL,
-  STOOLS,
+  STOOL_SEAT_H,
   WALL_BANDS,
 } from "../../shared/plan.ts";
 import { net } from "./net.ts";
@@ -472,14 +472,13 @@ function Device({
 
 // Which products stand on each column of tables: phones, watches and earbuds,
 // laptops, tablets, then audio and trackers.
-const COLUMN_KINDS: Record<number, readonly Kind[]> = Object.fromEntries(
-  Object.entries(COLUMN_PRODUCTS).map(([x, kinds]) => [Number(x), kinds]),
-);
+
 
 // A product table: a top on four legs, one product on each side facing
 // outward, so a person standing at any side sees their own product.
 // A service table is the same without products, with a stool either side.
-function Table({ box, kinds }: { box: TableSpec; kinds: readonly Kind[] }) {
+function Table({ box }: { box: TableSpec }) {
+  const kinds = box.products as readonly Kind[];
   const inset = 0.2; // a product stands this far in from its edge
   const items = box.service
     ? []
@@ -991,23 +990,22 @@ function BackRoom() {
 }
 
 function Stools() {
-  const stools = [];
-  for (const sx of STOOLS.x) {
-    const k = sx;
-    stools.push(
-      <group key={k} position={[sx, 0, COUNTER.z - 0.95]}>
-        <mesh position={[0, 0.34, 0]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.68, 8]} />
-          <meshStandardMaterial color="#8d9399" metalness={0.5} roughness={0.4} />
-        </mesh>
-        <mesh position={[0, 0.7, 0]}>
-          <cylinderGeometry args={[0.2, 0.2, 0.05, 20]} />
-          <meshStandardMaterial color={WOOD} roughness={0.6} />
-        </mesh>
-      </group>,
-    );
-  }
-  return <group>{stools}</group>;
+  return (
+    <group>
+      {BAR_STOOLS.map((st) => (
+        <group key={st.id} position={[st.x, 0, st.z]}>
+          <mesh position={[0, 0.34, 0]}>
+            <cylinderGeometry args={[0.03, 0.03, STOOL_SEAT_H - 0.02, 8]} />
+            <meshStandardMaterial color="#8d9399" metalness={0.5} roughness={0.4} />
+          </mesh>
+          <mesh position={[0, STOOL_SEAT_H, 0]}>
+            <cylinderGeometry args={[0.2, 0.2, 0.05, 20]} />
+            <meshStandardMaterial color={WOOD} roughness={0.6} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
 }
 
 // The staff door: flush with the wall, the same finish, outlined by hairline
@@ -1205,10 +1203,10 @@ export function Room() {
 
       {/* tables, one product family per column; service tables have stools */}
       {TABLES.map((t, i) => (
-        <Table key={i} box={t} kinds={COLUMN_KINDS[t.x]} />
+        <Table key={i} box={t} />
       ))}
       {TABLE_STOOLS.map((st, i) => (
-        <TableStool key={i} x={st.x} z={st.z} />
+        <TableStool key={st.id} x={st.x} z={st.z} />
       ))}
       <WallBench box={BENCHES[0]} side={-1} />
       <WallBench box={BENCHES[1]} side={1} />

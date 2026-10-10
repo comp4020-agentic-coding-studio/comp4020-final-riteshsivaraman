@@ -14,7 +14,8 @@
     "skipLibCheck": true,
     "moduleDetection": "force",
     "verbatimModuleSyntax": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "resolveJsonModule": true
   },
   "include": ["*.ts", "spec", "scripts", "src"]
 }

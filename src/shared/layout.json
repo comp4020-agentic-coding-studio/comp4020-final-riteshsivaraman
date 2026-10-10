@@ -1,0 +1,269 @@
+{
+ "tables": [
+  {
+   "id": "T1",
+   "x": -2.5,
+   "z": -3.45,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "phone",
+    "phone",
+    "watch",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "T2",
+   "x": -2.5,
+   "z": -1.9,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "phone",
+    "phone",
+    "watch",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "T3",
+   "x": -2.5,
+   "z": -0.35,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "phone",
+    "phone",
+    "watch",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "T4",
+   "x": -2.5,
+   "z": 1.2,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "phone",
+    "phone",
+    "watch",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "S1",
+   "x": -2.5,
+   "z": 2.75,
+   "w": 1.2,
+   "d": 1.2,
+   "service": true,
+   "products": []
+  },
+  {
+   "id": "T5",
+   "x": 0,
+   "z": -3.45,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "laptop",
+    "laptop",
+    "tablet",
+    "tabletKb"
+   ]
+  },
+  {
+   "id": "T6",
+   "x": 0,
+   "z": -1.9,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "laptop",
+    "laptop",
+    "tablet",
+    "tabletKb"
+   ]
+  },
+  {
+   "id": "T7",
+   "x": 0,
+   "z": -0.35,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "laptop",
+    "laptop",
+    "tablet",
+    "tabletKb"
+   ]
+  },
+  {
+   "id": "S2",
+   "x": 0,
+   "z": 1.2,
+   "w": 1.2,
+   "d": 1.2,
+   "service": true,
+   "products": []
+  },
+  {
+   "id": "T8",
+   "x": 2.5,
+   "z": -3.45,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "headphones",
+    "speaker",
+    "airtag",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "T9",
+   "x": 2.5,
+   "z": -1.9,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "headphones",
+    "speaker",
+    "airtag",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "T10",
+   "x": 2.5,
+   "z": -0.35,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "headphones",
+    "speaker",
+    "airtag",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "T11",
+   "x": 2.5,
+   "z": 1.2,
+   "w": 1,
+   "d": 1.2,
+   "service": false,
+   "products": [
+    "headphones",
+    "speaker",
+    "airtag",
+    "earbuds"
+   ]
+  },
+  {
+   "id": "S3",
+   "x": 2.5,
+   "z": 2.75,
+   "w": 1.2,
+   "d": 1.2,
+   "service": true,
+   "products": []
+  }
+ ],
+ "benches": [
+  {
+   "id": "B1",
+   "x": -4.72,
+   "z": 0,
+   "w": 0.56,
+   "d": 8.6
+  },
+  {
+   "id": "B2",
+   "x": 4.72,
+   "z": 0,
+   "w": 0.56,
+   "d": 8.6
+  }
+ ],
+ "stools": [
+  {
+   "id": "K1",
+   "x": -1.2,
+   "z": 3.1,
+   "kind": "bar"
+  },
+  {
+   "id": "K2",
+   "x": -0.6,
+   "z": 3.1,
+   "kind": "bar"
+  },
+  {
+   "id": "K3",
+   "x": 0,
+   "z": 3.1,
+   "kind": "bar"
+  },
+  {
+   "id": "K4",
+   "x": 0.6,
+   "z": 3.1,
+   "kind": "bar"
+  },
+  {
+   "id": "K5",
+   "x": 1.2,
+   "z": 3.1,
+   "kind": "bar"
+  },
+  {
+   "id": "Q1",
+   "x": -3.42,
+   "z": 2.75,
+   "kind": "table"
+  },
+  {
+   "id": "Q2",
+   "x": -1.58,
+   "z": 2.75,
+   "kind": "table"
+  },
+  {
+   "id": "Q3",
+   "x": -0.92,
+   "z": 1.2,
+   "kind": "table"
+  },
+  {
+   "id": "Q4",
+   "x": 0.92,
+   "z": 1.2,
+   "kind": "table"
+  },
+  {
+   "id": "Q5",
+   "x": 1.58,
+   "z": 2.75,
+   "kind": "table"
+  },
+  {
+   "id": "Q6",
+   "x": 3.42,
+   "z": 2.75,
+   "kind": "table"
+  }
+ ]
+}

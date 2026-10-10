@@ -7,7 +7,6 @@
 // Everything is drawn as a visitor standing at the entrance, facing in, would
 // see it: the +x wall is on the visitor's LEFT, the -x wall on their right.
 import { MALL, ROUTES } from "./mall.ts";
-import { COLUMN_PRODUCTS } from "./plan.ts";
 import { CEILING, FLOOR, SPAWN } from "./protocol.ts";
 import {
   BACK_WALL,
@@ -23,7 +22,7 @@ import {
   LIGHTBOX_H,
   MONITOR,
   SIDE_WALL,
-  STOOLS,
+  STOOL_SEAT_H,
   TRACK_LIGHT_Y,
   WALL_BANDS,
 } from "./plan.ts";
@@ -43,6 +42,7 @@ import {
   TABLES,
   SERVICE_SIDE,
   TABLE_LEN,
+  BAR_STOOLS,
   TABLE_STOOLS,
   TABLE_W,
   WALL_FACE_Z,
@@ -193,7 +193,7 @@ export function renderPlan(): string {
   // bar, stools, staff partitions
   R(COUNTER.x, COUNTER.z, COUNTER.w, COUNTER.d, "#d9b98c", "#8a6a2f", 1.5);
   g.text(px(0), py(COUNTER.z) + 4, "SERVICE BAR", 11, "middle", "#4a3510", "700");
-  for (const sx of STOOLS.x) g.circle(px(sx), py(COUNTER.z - 0.9), 0.18 * S, "#e6cfa8", "#8a6a2f");
+  for (const st of BAR_STOOLS) g.circle(px(st.x), py(st.z), 0.18 * S, "#e6cfa8", "#8a6a2f");
   for (const p of PARTITIONS) R(p.x, p.z, p.w, p.d, "#8a6a2f", "#5a4210");
   g.text(px(0), py(COUNTER.z + COUNTER.d / 2 + 0.3) + 4, "staff space behind the bar", 10, "middle", "#555");
 
@@ -436,9 +436,10 @@ export function renderWalls(): string {
     // the bar stands in front of the wall
     wRect(COUNTER.x - COUNTER.w / 2, COUNTER.x + COUNTER.w / 2, 0, COUNTER.h, "#e6cfa8", "#8a6a2f", 1.5);
     for (const p of PARTITIONS) wRect(p.x - 0.08, p.x + 0.08, 0, p.h, "#8a6a2f", "#5a4210");
-    for (const sx of STOOLS.x) {
-      wRect(sx - 0.2, sx + 0.2, STOOLS.seatH - 0.05, STOOLS.seatH, "#e6cfa8", "#8a6a2f");
-      wRect(sx - 0.02, sx + 0.02, 0, STOOLS.seatH - 0.05, "#8d9399");
+    for (const st of BAR_STOOLS) {
+      const sx = st.x;
+      wRect(sx - 0.2, sx + 0.2, STOOL_SEAT_H - 0.05, STOOL_SEAT_H, "#e6cfa8", "#8a6a2f");
+      wRect(sx - 0.02, sx + 0.02, 0, STOOL_SEAT_H - 0.05, "#8d9399");
     }
     g.text(hx(0), hy(COUNTER.h / 2), "service bar in front of the wall", 10, "middle", "#4a3510");
     // screens, marks, sign
@@ -591,7 +592,7 @@ export function renderDocument(): string {
   const sideName = (x: number): string =>
     Math.abs(x) < 0.01 ? "centre" : x > 0 ? "left column (the +x side, as you enter)" : "right column (the -x side)";
   const rows = TABLES.map((t, i) => {
-    const kinds = COLUMN_PRODUCTS[String(t.x)] ?? [];
+    const kinds = t.products;
     const words = t.service
       ? "nothing: a table to sit and talk with staff, a stool each side"
       : [...new Set(kinds.map((k) => PRODUCT_WORDS[k] ?? k))].join(", ");
@@ -636,7 +637,7 @@ export function renderDocument(): string {
     <tr><td>Product tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long (almost square), four in each side column and three in the middle, one product on each side</td><td>Your description; width about a tenth of the shop's (photo)</td></tr>
     <tr><td>Service tables</td><td>${SERVICE_SIDE} m square (the long edge of a product table), one nearest the bar in each side column and one in the middle column, a stool to the left and right of each, no products</td><td>Your description</td></tr>
     <tr><td>Bench along each side wall</td><td>${BENCHES[0].w} m deep, ${BENCHES[0].d} m long, ${BENCHES[0].h} m high</td><td>Photo; the bench sits at about 0.3 of the wall height</td></tr>
-    <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${STOOLS.x.length} stools</td><td>Shortened to half the back wall at your request</td></tr>
+    <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${BAR_STOOLS.length} stools</td><td>Shortened to half the back wall at your request</td></tr>
     <tr><td>Staff door</td><td>${(DOOR.maxX - DOOR.minX).toFixed(1)} m wide, left of the bar as you face it (+x)</td><td>Your description</td></tr>
     <tr><td>Entrance opening</td><td>${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, middle of the glass front</td><td class="warn">Assumed [TK]</td></tr>
     <tr><td>Back room</td><td>${D} m deep, same footprint, two shelving rows, two repair benches</td><td>Your instruction</td></tr>
