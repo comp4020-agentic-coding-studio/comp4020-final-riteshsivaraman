@@ -7,7 +7,7 @@
 // Everything is drawn as a visitor standing at the entrance, facing in, would
 // see it: the +x wall is on the visitor's LEFT, the -x wall on their right.
 import { MALL, ROUTES } from "./mall.ts";
-import { CEILING, FLOOR, SPAWN } from "./protocol.ts";
+import { CEILING, FLOOR, SPAWN, STORE_Y, WALKWAY_DEPTH } from "./protocol.ts";
 import {
   BACK_WALL,
   BAY_LEDGES,
@@ -246,9 +246,9 @@ export function renderPlan(): string {
   }
 
   const ly = H - 62;
-  g.text(60, ly, `Ceiling ${CEILING} m. T = product table (${TABLE_W} x ${TABLE_LEN} m, one product per side). S = square service table (${TABLE_LEN} m side, no products, two stools each side, tucked under). Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
+  g.text(60, ly, `Ceiling ${CEILING} m. T = product table (${TABLE_W} x ${TABLE_LEN} m, one product per side). S = square service table (${SERVICE_SIDE} m side, no products, two stools each side, tucked under). Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
   g.text(60, ly + 16, "The 3 m wall height is from the references; the width and depth were enlarged on request (option A) so there is room to move between tables.", 11, "start", "#333");
-  g.text(60, ly + 32, "Assumed, not measurable: table length, the entrance opening, the back-room layout (your instruction: same footprint), the door width.", 11, "start", "#a33");
+  g.text(60, ly + 32, "Assumed, not measurable: the entrance opening, the back-room layout (your instruction: same footprint), the door width. The store stands on the first floor of a mall atrium; see the mall drawing.", 11, "start", "#a33");
   return g.done();
 }
 
@@ -273,12 +273,16 @@ export function renderMallPlan(): string {
   const R = (x: number, z: number, w: number, d: number, fill: string, stroke = "#888", sw = 1, extra = ""): void =>
     g.rect(px(x + w / 2), py(z + d / 2), w * S, d * S, fill, stroke, sw, extra);
   // concourse
-  R(0, (MALL.frontZ + MALL.farZ) / 2, MALL.maxX - MALL.minX, MALL.frontZ - MALL.farZ, "#eef0f2", "#b0b5ba", 1, 'stroke-dasharray="4 3"');
-  g.text(px(0), py(MALL.frontZ - 1.2), `CONCOURSE: ${MALL.maxX - MALL.minX} m long, ${(MALL.frontZ - MALL.farZ).toFixed(1)} m wide, roof at ${MALL.ceilingY} m`, 12, "middle", "#555", "600");
+  R(0, (MALL.walkwayZ + MALL.farZ) / 2, MALL.maxX - MALL.minX, MALL.walkwayZ - MALL.farZ, "#eef0f2", "#b0b5ba", 1, 'stroke-dasharray="4 3"');
+  g.text(px(0), py(MALL.walkwayZ - 1.4), `GROUND-FLOOR CONCOURSE: the atrium floor, ${MALL.maxX - MALL.minX} m long, ${(MALL.walkwayZ - MALL.farZ).toFixed(1)} m wide, roof at ${MALL.ceilingY} m`, 12, "middle", "#555", "600");
+  // the first-floor walkway outside the glass, with its balustrade
+  R(0, (MALL.frontZ + MALL.walkwayZ) / 2, MALL.maxX - MALL.minX, MALL.frontZ - MALL.walkwayZ, "#e9e5d8", "#9a9484", 1.2, 'stroke-dasharray="6 3"');
+  g.line(px(MALL.minX), py(MALL.walkwayZ), px(MALL.maxX), py(MALL.walkwayZ), "#2a6a95", 3);
+  g.text(px(0), py((MALL.frontZ + MALL.walkwayZ) / 2) + 4, `FIRST-FLOOR WALKWAY outside the glass (floor at ${STORE_Y} m); glass balustrade at its edge, you can step out and look down`, 11, "middle", "#6b6556");
   // mezzanine strip above the far shopfronts
   R(0, (MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2, MALL.maxX - MALL.minX, MALL.mezzanineZ1 - MALL.mezzanineZ0, "#e4e0d4", "#9a9484", 1.2, 'stroke-dasharray="6 3"');
-  g.text(px(0), py((MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2) + 4, `MEZZANINE walkway above (floor at ${MALL.mezzanineY} m), glass balustrade on the concourse side`, 11, "middle", "#6b6556");
-  g.text(px(0), py(MALL.farZ) + 16, "opposite shopfronts: ground level and upstairs", 11, "middle", "#555");
+  g.text(px(0), py((MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2) + 4, `FIRST-FLOOR walkway opposite (floor at ${MALL.mezzanineY} m, level with the store), glass balustrade on the atrium side`, 11, "middle", "#6b6556");
+  g.text(px(0), py(MALL.farZ) + 16, "opposite shopfronts: ground floor and first floor", 11, "middle", "#555");
   // the store and its neighbours along the near side
   const storeD = zTop - (FLOOR.minZ - 0.5);
   R(0, (zTop + (FLOOR.minZ - 0.5)) / 2, FLOOR.maxX - FLOOR.minX + 1, storeD, "#f6f7f8", "#111", 2);
@@ -311,8 +315,8 @@ export function renderMallPlan(): string {
     if (p0.z <= zTop) g.circle(px(p0.x), py(p0.z), 3, colours[r.kind]);
   }
   const ly = H - 70;
-  g.text(60, ly, "Green: people walking past (two stop to window-shop). Red: customers who come in through the opening, look at tables and leave. Olive: people on the mezzanine.", 11, "start", "#333");
-  g.text(60, ly + 16, "Everyone is placed by the shared server clock, so all visitors see the same people in the same places. The mezzanine and neighbouring shops are not enterable.", 11, "start", "#333");
+  g.text(60, ly, "Green: people on the ground floor below, and two window-shoppers on the walkway. Red: customers who come along the walkway, in through the opening, look at tables and leave. Olive: people on the opposite first-floor walkway.", 11, "start", "#333");
+  g.text(60, ly + 16, "Everyone is placed by the shared server clock, so all visitors see the same people in the same places. The opposite walkway and neighbouring shops are not enterable.", 11, "start", "#333");
   g.text(60, ly + 32, `Sizes of the concourse, the neighbours and the mezzanine are assumed; only the store itself comes from the reference photographs.`, 11, "start", "#a33");
   return g.done();
 }
@@ -664,10 +668,11 @@ export function renderDocument(): string {
     <tr><th>Part</th><th>Value</th><th>Source</th></tr>
     <tr><td>Shop width x depth x height</td><td>${W} x ${D} x ${CEILING} m</td><td>Your choice (option A): more room than the 10 x 10 m the references gave</td></tr>
     <tr><td>Table columns</td><td>x = ${COLUMN_X.join(", ")}</td><td>About a quarter of the width either side of the middle (photo)</td></tr>
-    <tr><td>Product tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long (almost square), four in each side column and three in the middle, one product on each side, ${CLEAR_GAP.toFixed(1)} m clear between them front to back</td><td>Your description</td></tr>
-    <tr><td>Service tables</td><td>${SERVICE_SIDE} m square (the long edge of a product table), one nearest the bar in each side column and one in the middle column, two stools tucked under each of its left and right sides, no products</td><td>Your description</td></tr>
+    <tr><td>Product tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long (elongated, front to back), four in each side column and three in the middle, one product on each side, ${CLEAR_GAP.toFixed(1)} m clear between them front to back</td><td>Your description</td></tr>
+    <tr><td>Service tables</td><td>${SERVICE_SIDE} m square (1.5 times the earlier 1.2 m side, on your request), one nearest the bar in each side column and one in the middle column, two stools tucked under each of its left and right sides, no products</td><td>Your description</td></tr>
     <tr><td>Bench along each side wall</td><td>${BENCHES[0].w} m deep, ${BENCHES[0].d} m long (it stops where the indented bays start), ${BENCHES[0].h} m high</td><td>Your instruction, from the references</td></tr>
     <tr><td>Ledges in front of the bays</td><td>one short ledge on the ${BAY_LEDGES["+x"][0].half} half of each of the three bays on each side, ${LEDGE_DEPTH} m out from the wall, one product on each</td><td class="warn">Which half and which product are [TK]: working defaults</td></tr>
+    <tr><td>Where the store is</td><td>On the <b>first floor</b> of a mall atrium: a ${WALKWAY_DEPTH} m walkway outside the glass with a glass balustrade, the void down to the ground-floor concourse, and opposite shopfronts on both floors. Visitors can step out through the entrance and look down.</td><td>Your instruction and picture (2026-10-11)</td></tr>
     <tr><td>Entrance clear zone</td><td>${CLEAR_ZONE.toFixed(1)} m from the glass to the first table, kept empty: customers are received here</td><td>Your instruction</td></tr>
     <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${BAR_STOOLS.length} stools tucked under the overhang</td><td>Almost from the far end of one service table to the far end of the other; 13 stools by your instruction</td></tr>
     <tr><td>Staff door</td><td>${(DOOR.maxX - DOOR.minX).toFixed(1)} m wide, left of the bar as you face it (+x)</td><td>Your description</td></tr>
@@ -683,7 +688,7 @@ export function renderDocument(): string {
 </section>
 <section>
   <h1>Tables: position and orientation</h1>
-  <p>Three columns across (the left column, the centre column and the right column as you enter). The <b>left and right columns</b> each have <b>four almost-square product tables</b> and, nearest the bar, a larger <b>square service table</b> with two stools on its left and two on its right, tucked under the table, where a customer can sit and talk with staff. The <b>centre column</b> has <b>three product tables and one square service table</b>. Product tables carry a product on each of their four sides, facing outward; service tables carry nothing. There is no true top-down photograph of the tables, so positions come from your description and the proportions of the reference photographs.</p>
+  <p>Three columns across (the left column, the centre column and the right column as you enter). The <b>left and right columns</b> each have <b>four long product tables</b> and, nearest the bar, a larger <b>square service table</b> with two stools on its left and two on its right, tucked under the table, where a customer can sit and talk with staff. The <b>centre column</b> has <b>three product tables and one square service table</b>. Product tables carry a product on each of their four sides, facing outward; service tables carry nothing. There is no true top-down photograph of the tables, so positions come from your description and the proportions of the reference photographs.</p>
   <table>
     <tr><th>Table</th><th>Column</th><th>Kind</th><th>Centre x</th><th>Centre z</th><th>Size (x by z)</th><th>On it</th></tr>
     ${rows}

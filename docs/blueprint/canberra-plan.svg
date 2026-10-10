@@ -1,225 +1,225 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1075" height="2270" viewBox="0 0 1075 2270">
-<rect width="1075" height="2270" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1137" height="2618" viewBox="0 0 1137 2618">
+<rect width="1137" height="2618" fill="#ffffff"/>
 <text x="60.0" y="28.0" font-size="16" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">Floor plan, as a visitor sees it entering: +x wall on the LEFT, entrance at the bottom (metres)</text>
-<rect x="159.2" y="105.8" width="756.4" height="954.8" fill="#f4f1e8" stroke="#9a9484" stroke-width="1.5" stroke-dasharray="6 4"/>
-<text x="537.4" y="123.8" font-size="12" text-anchor="middle" fill="#6b6556" font-weight="600" font-family="system-ui, sans-serif">BACK ROOM (staff only): same footprint as the shop</text>
-<rect x="676.9" y="917.4" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
-<rect x="453.7" y="917.4" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
-<rect x="230.5" y="917.4" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
-<rect x="676.9" y="756.2" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
-<rect x="453.7" y="756.2" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
-<rect x="230.5" y="756.2" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
-<text x="537.4" y="940.6" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">labelled shelving rows</text>
-<rect x="599.4" y="589.4" width="148.8" height="49.6" fill="#b7c4d0" stroke="#355a7a" stroke-width="1.2" />
-<rect x="326.6" y="589.4" width="148.8" height="49.6" fill="#b7c4d0" stroke="#355a7a" stroke-width="1.2" />
-<text x="537.4" y="618.2" font-size="10" text-anchor="middle" fill="#355a7a" font-weight="400" font-family="system-ui, sans-serif">REPAIR BENCHES</text>
-<text x="537.4" y="632.2" font-size="9" text-anchor="middle" fill="#355a7a" font-weight="400" font-family="system-ui, sans-serif">(technicians stand behind)</text>
-<rect x="208.8" y="115.1" width="657.2" height="24.8" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
-<text x="537.4" y="130.5" font-size="9" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">parts wall</text>
-<rect x="196.4" y="1097.8" width="682.0" height="954.8" fill="#f6f7f8" stroke="none" stroke-width="0" />
-<rect x="843.7" y="1364.4" width="34.7" height="644.8" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<rect x="196.4" y="1364.4" width="34.7" height="644.8" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<rect x="896.4" y="1809.6" width="7.4" height="186.0" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
-<rect x="896.4" y="1576.1" width="7.4" height="139.5" fill="#101216" stroke="#000" stroke-width="1.2" />
-<rect x="896.4" y="1440.0" width="7.4" height="74.4" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
-<rect x="857.9" y="1508.2" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
-<rect x="857.9" y="1477.2" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
-<rect x="857.9" y="1446.2" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
-<rect x="857.9" y="1415.2" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
-<rect x="857.9" y="1384.2" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
-<circle cx="861.0" cy="1977.6" r="6.2" fill="#e8a98c" stroke="#8a5a46"/>
-<circle cx="861.0" cy="1959.0" r="6.2" fill="#e8a98c" stroke="#8a5a46"/>
-<circle cx="861.0" cy="1940.4" r="6.2" fill="#e8a98c" stroke="#8a5a46"/>
-<rect x="884.6" y="1352.0" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="884.6" y="1283.8" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="884.6" y="1215.6" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="884.6" y="1147.4" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="900.7" y="1296.2" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
-<rect x="900.7" y="1228.0" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
-<rect x="900.7" y="1159.8" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
-<rect x="171.0" y="1809.6" width="7.4" height="186.0" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
-<rect x="171.0" y="1587.6" width="7.4" height="116.6" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
-<rect x="171.0" y="1449.3" width="7.4" height="55.8" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
-<rect x="210.7" y="1668.2" width="6.2" height="31.0" fill="#1a4fb8" stroke="#0b2a6b" stroke-width="1" />
-<rect x="210.7" y="1593.2" width="6.2" height="31.0" fill="#1a4fb8" stroke="#0b2a6b" stroke-width="1" />
-<rect x="171.6" y="1352.0" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="171.6" y="1283.8" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="171.6" y="1215.6" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="171.6" y="1147.4" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
-<rect x="171.6" y="1296.2" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
-<rect x="171.6" y="1228.0" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
-<rect x="171.6" y="1159.8" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
-<rect x="881.5" y="1324.1" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<circle cx="892.4" cy="1338.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="881.5" y="1255.9" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<circle cx="892.4" cy="1269.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="881.5" y="1187.7" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<circle cx="892.4" cy="1201.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="171.6" y="1324.1" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<circle cx="182.5" cy="1338.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="171.6" y="1255.9" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<circle cx="182.5" cy="1269.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="171.6" y="1187.7" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<circle cx="182.5" cy="1201.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<text x="149.9" y="1928.6" font-size="10" text-anchor="end" fill="#678" font-weight="400" font-family="system-ui, sans-serif">lightboxes</text>
-<text x="149.9" y="1255.9" font-size="10" text-anchor="end" fill="#555" font-weight="400" font-family="system-ui, sans-serif">product bays</text>
-<text x="924.9" y="1255.9" font-size="10" text-anchor="start" fill="#555" font-weight="400" font-family="system-ui, sans-serif">product bays</text>
-<rect x="680.0" y="1823.2" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="711.0" y="1864.4" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T1</text>
-<circle cx="729.6" cy="1860.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="692.4" cy="1860.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1885.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1835.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="680.0" y="1686.8" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="711.0" y="1728.0" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T2</text>
-<circle cx="729.6" cy="1724.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="692.4" cy="1724.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1748.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1699.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="680.0" y="1550.4" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="711.0" y="1591.6" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T3</text>
-<circle cx="729.6" cy="1587.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="692.4" cy="1587.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1612.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1562.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="680.0" y="1414.0" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="711.0" y="1455.2" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T4</text>
-<circle cx="729.6" cy="1451.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="692.4" cy="1451.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1476.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="711.0" cy="1426.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="673.8" y="1277.6" width="74.4" height="74.4" fill="#d9c196" stroke="#5a4210" stroke-width="2" stroke-dasharray="5 3"/>
-<text x="711.0" y="1318.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">S1</text>
-<rect x="506.4" y="1686.8" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="537.4" y="1728.0" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T5</text>
-<circle cx="556.0" cy="1724.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="518.8" cy="1724.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="537.4" cy="1748.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="537.4" cy="1699.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="506.4" y="1550.4" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="537.4" y="1591.6" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T6</text>
-<circle cx="556.0" cy="1587.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="518.8" cy="1587.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="537.4" cy="1612.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="537.4" cy="1562.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="506.4" y="1414.0" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="537.4" y="1455.2" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T7</text>
-<circle cx="556.0" cy="1451.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="518.8" cy="1451.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="537.4" cy="1476.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="537.4" cy="1426.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="500.2" y="1277.6" width="74.4" height="74.4" fill="#d9c196" stroke="#5a4210" stroke-width="2" stroke-dasharray="5 3"/>
-<text x="537.4" y="1318.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">S2</text>
-<rect x="332.8" y="1823.2" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="363.8" y="1864.4" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T8</text>
-<circle cx="382.4" cy="1860.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="345.2" cy="1860.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1885.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1835.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="332.8" y="1686.8" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="363.8" y="1728.0" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T9</text>
-<circle cx="382.4" cy="1724.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="345.2" cy="1724.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1748.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1699.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="332.8" y="1550.4" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="363.8" y="1591.6" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T10</text>
-<circle cx="382.4" cy="1587.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="345.2" cy="1587.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1612.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1562.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="332.8" y="1414.0" width="62.0" height="74.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
-<text x="363.8" y="1455.2" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T11</text>
-<circle cx="382.4" cy="1451.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="345.2" cy="1451.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1476.0" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<circle cx="363.8" cy="1426.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
-<rect x="326.6" y="1277.6" width="74.4" height="74.4" fill="#d9c196" stroke="#5a4210" stroke-width="2" stroke-dasharray="5 3"/>
-<text x="363.8" y="1318.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">S3</text>
-<circle cx="751.3" cy="1333.4" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="751.3" cy="1296.2" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="670.7" cy="1333.4" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="670.7" cy="1296.2" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="577.7" cy="1333.4" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="577.7" cy="1296.2" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="497.1" cy="1333.4" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="497.1" cy="1296.2" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="404.1" cy="1333.4" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="404.1" cy="1296.2" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="323.5" cy="1333.4" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="323.5" cy="1296.2" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
-<text x="711.0" y="2014.2" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">phones / watches / earbuds</text>
-<text x="537.4" y="2014.2" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">laptops / tablets</text>
-<text x="363.8" y="2014.2" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">audio / trackers</text>
-<rect x="332.8" y="1138.1" width="409.2" height="49.6" fill="#d9b98c" stroke="#8a6a2f" stroke-width="1.5" />
-<text x="537.4" y="1166.9" font-size="11" text-anchor="middle" fill="#4a3510" font-weight="700" font-family="system-ui, sans-serif">SERVICE BAR</text>
-<circle cx="723.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="692.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="661.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="630.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="599.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="568.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="537.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="506.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="475.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="444.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="413.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="382.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<circle cx="351.4" cy="1187.7" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
-<rect x="734.6" y="1097.8" width="7.4" height="40.3" fill="#8a6a2f" stroke="#5a4210" stroke-width="1" />
-<rect x="332.8" y="1097.8" width="7.4" height="40.3" fill="#8a6a2f" stroke="#5a4210" stroke-width="1" />
-<text x="537.4" y="1123.5" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">staff space behind the bar</text>
-<line x1="165.4" y1="2083.6" x2="444.4" y2="2083.6" stroke="#5aa9d6" stroke-width="4" />
-<line x1="630.4" y1="2083.6" x2="909.4" y2="2083.6" stroke="#5aa9d6" stroke-width="4" />
-<text x="537.4" y="2075.6" font-size="10" text-anchor="middle" fill="#2a6a95" font-weight="400" font-family="system-ui, sans-serif">entrance opening, 3 m (assumed)</text>
-<text x="537.4" y="2109.6" font-size="10" text-anchor="middle" fill="#2a6a95" font-weight="400" font-family="system-ui, sans-serif">to the mall concourse (see the mall drawing)</text>
-<line x1="791.6" y1="2096.0" x2="791.6" y2="2071.2" stroke="#3a7ca5" stroke-width="3" />
-<line x1="283.2" y1="2096.0" x2="283.2" y2="2071.2" stroke="#3a7ca5" stroke-width="3" />
-<line x1="909.4" y1="2083.6" x2="909.4" y2="1060.6" stroke="#111" stroke-width="3" />
-<line x1="165.4" y1="2083.6" x2="165.4" y2="1060.6" stroke="#111" stroke-width="3" />
-<line x1="909.4" y1="1066.8" x2="308.0" y2="1066.8" stroke="#111" stroke-width="3" />
-<line x1="246.0" y1="1066.8" x2="165.4" y2="1066.8" stroke="#111" stroke-width="3" />
-<line x1="308.0" y1="1066.8" x2="246.0" y2="1066.8" stroke="#c0392b" stroke-width="4" stroke-dasharray="4 3"/>
-<text x="277.0" y="1058.8" font-size="10" text-anchor="start" fill="#c0392b" font-weight="700" font-family="system-ui, sans-serif">staff door (flush), left of the bar as you face it</text>
-<circle cx="537.4" cy="2027.8" r="6.0" fill="#2a9d8f" stroke="none"/>
-<text x="527.4" y="2031.8" font-size="10" text-anchor="end" fill="#2a9d8f" font-weight="600" font-family="system-ui, sans-serif">visitor spawn (faces the shop)</text>
-<line x1="196.4" y1="2139.4" x2="878.4" y2="2139.4" stroke="#1f6feb" stroke-width="1" />
-<line x1="196.4" y1="2134.4" x2="196.4" y2="2144.4" stroke="#1f6feb" stroke-width="1" />
-<line x1="878.4" y1="2134.4" x2="878.4" y2="2144.4" stroke="#1f6feb" stroke-width="1" />
-<text x="537.4" y="2134.4" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">11 m wide</text>
-<line x1="134.4" y1="1097.8" x2="134.4" y2="2052.6" stroke="#1f6feb" stroke-width="1" />
-<line x1="129.4" y1="1097.8" x2="139.4" y2="1097.8" stroke="#1f6feb" stroke-width="1" />
-<line x1="129.4" y1="2052.6" x2="139.4" y2="2052.6" stroke="#1f6feb" stroke-width="1" />
-<text transform="translate(128.4 1575.2) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">15.4 m deep</text>
-<line x1="134.4" y1="105.8" x2="134.4" y2="1060.6" stroke="#1f6feb" stroke-width="1" />
+<rect x="159.2" y="105.8" width="818.4" height="1128.4" fill="#f4f1e8" stroke="#9a9484" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="568.4" y="123.8" font-size="12" text-anchor="middle" fill="#6b6556" font-weight="600" font-family="system-ui, sans-serif">BACK ROOM (staff only): same footprint as the shop</text>
+<rect x="707.9" y="1091.0" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
+<rect x="484.7" y="1091.0" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
+<rect x="261.5" y="1091.0" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
+<rect x="707.9" y="929.8" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
+<rect x="484.7" y="929.8" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
+<rect x="261.5" y="929.8" width="167.4" height="38.4" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
+<text x="568.4" y="1114.2" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">labelled shelving rows</text>
+<rect x="630.4" y="763.0" width="148.8" height="49.6" fill="#b7c4d0" stroke="#355a7a" stroke-width="1.2" />
+<rect x="357.6" y="763.0" width="148.8" height="49.6" fill="#b7c4d0" stroke="#355a7a" stroke-width="1.2" />
+<text x="568.4" y="791.8" font-size="10" text-anchor="middle" fill="#355a7a" font-weight="400" font-family="system-ui, sans-serif">REPAIR BENCHES</text>
+<text x="568.4" y="805.8" font-size="9" text-anchor="middle" fill="#355a7a" font-weight="400" font-family="system-ui, sans-serif">(technicians stand behind)</text>
+<rect x="208.8" y="115.1" width="719.2" height="24.8" fill="#cfd3d8" stroke="#6b7280" stroke-width="1" />
+<text x="568.4" y="130.5" font-size="9" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">parts wall</text>
+<rect x="196.4" y="1271.4" width="744.0" height="1128.4" fill="#f6f7f8" stroke="none" stroke-width="0" />
+<rect x="905.7" y="1538.0" width="34.7" height="818.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<rect x="196.4" y="1538.0" width="34.7" height="818.4" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<rect x="958.4" y="2106.8" width="7.4" height="220.1" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
+<rect x="958.4" y="1810.8" width="7.4" height="164.9" fill="#101216" stroke="#000" stroke-width="1.2" />
+<rect x="958.4" y="1636.0" width="7.4" height="88.0" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
+<rect x="919.9" y="1681.8" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
+<rect x="919.9" y="1650.8" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
+<rect x="919.9" y="1619.8" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
+<rect x="919.9" y="1588.8" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
+<rect x="919.9" y="1557.8" width="6.2" height="22.3" fill="#6b45d6" stroke="#3a2a8a" stroke-width="1" />
+<circle cx="923.0" cy="2311.8" r="6.2" fill="#e8a98c" stroke="#8a5a46"/>
+<circle cx="923.0" cy="2293.2" r="6.2" fill="#e8a98c" stroke="#8a5a46"/>
+<circle cx="923.0" cy="2274.6" r="6.2" fill="#e8a98c" stroke="#8a5a46"/>
+<rect x="946.6" y="1525.6" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="946.6" y="1457.4" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="946.6" y="1389.2" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="946.6" y="1321.0" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="962.7" y="1469.8" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
+<rect x="962.7" y="1401.6" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
+<rect x="962.7" y="1333.4" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
+<rect x="171.0" y="2106.8" width="7.4" height="220.1" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
+<rect x="171.0" y="1824.4" width="7.4" height="137.6" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
+<rect x="171.0" y="1647.1" width="7.4" height="65.7" fill="#ffffff" stroke="#8aa" stroke-width="1.2" />
+<rect x="210.7" y="1925.5" width="6.2" height="31.0" fill="#1a4fb8" stroke="#0b2a6b" stroke-width="1" />
+<rect x="210.7" y="1830.6" width="6.2" height="31.0" fill="#1a4fb8" stroke="#0b2a6b" stroke-width="1" />
+<rect x="171.6" y="1525.6" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="171.6" y="1457.4" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="171.6" y="1389.2" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="171.6" y="1321.0" width="18.6" height="12.4" fill="#b4b8bd" stroke="#555" stroke-width="1" />
+<rect x="171.6" y="1469.8" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
+<rect x="171.6" y="1401.6" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
+<rect x="171.6" y="1333.4" width="2.5" height="55.8" fill="#3b3f45" stroke="#222" stroke-width="1" />
+<rect x="943.5" y="1497.7" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<circle cx="954.4" cy="1511.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="943.5" y="1429.5" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<circle cx="954.4" cy="1443.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="943.5" y="1361.3" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<circle cx="954.4" cy="1375.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="171.6" y="1497.7" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<circle cx="182.4" cy="1511.6" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="171.6" y="1429.5" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<circle cx="182.4" cy="1443.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="171.6" y="1361.3" width="21.7" height="27.9" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<circle cx="182.4" cy="1375.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<text x="149.9" y="2275.8" font-size="10" text-anchor="end" fill="#678" font-weight="400" font-family="system-ui, sans-serif">lightboxes</text>
+<text x="149.9" y="1429.5" font-size="10" text-anchor="end" fill="#555" font-weight="400" font-family="system-ui, sans-serif">product bays</text>
+<text x="986.9" y="1429.5" font-size="10" text-anchor="start" fill="#555" font-weight="400" font-family="system-ui, sans-serif">product bays</text>
+<rect x="729.6" y="2182.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="766.8" y="2248.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T1</text>
+<circle cx="791.6" cy="2244.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="742.0" cy="2244.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="2294.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="2195.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="729.6" y="1996.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="766.8" y="2062.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T2</text>
+<circle cx="791.6" cy="2058.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="742.0" cy="2058.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="2108.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="2009.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="729.6" y="1810.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="766.8" y="1876.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T3</text>
+<circle cx="791.6" cy="1872.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="742.0" cy="1872.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="1922.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="1823.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="729.6" y="1624.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="766.8" y="1690.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T4</text>
+<circle cx="791.6" cy="1686.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="742.0" cy="1686.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="1736.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="766.8" cy="1637.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="711.0" y="1451.2" width="111.6" height="111.6" fill="#d9c196" stroke="#5a4210" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="766.8" y="1511.0" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">S1</text>
+<rect x="531.2" y="1996.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="568.4" y="2062.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T5</text>
+<circle cx="593.2" cy="2058.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="543.6" cy="2058.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="568.4" cy="2108.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="568.4" cy="2009.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="531.2" y="1810.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="568.4" y="1876.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T6</text>
+<circle cx="593.2" cy="1872.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="543.6" cy="1872.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="568.4" cy="1922.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="568.4" cy="1823.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="531.2" y="1624.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="568.4" y="1690.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T7</text>
+<circle cx="593.2" cy="1686.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="543.6" cy="1686.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="568.4" cy="1736.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="568.4" cy="1637.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="512.6" y="1451.2" width="111.6" height="111.6" fill="#d9c196" stroke="#5a4210" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="568.4" y="1511.0" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">S2</text>
+<rect x="332.8" y="2182.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="370.0" y="2248.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T8</text>
+<circle cx="394.8" cy="2244.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="345.2" cy="2244.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="2294.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="2195.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="332.8" y="1996.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="370.0" y="2062.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T9</text>
+<circle cx="394.8" cy="2058.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="345.2" cy="2058.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="2108.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="2009.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="332.8" y="1810.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="370.0" y="1876.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T10</text>
+<circle cx="394.8" cy="1872.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="345.2" cy="1872.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="1922.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="1823.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="332.8" y="1624.8" width="74.4" height="124.0" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.2" />
+<text x="370.0" y="1690.8" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">T11</text>
+<circle cx="394.8" cy="1686.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="345.2" cy="1686.8" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="1736.4" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<circle cx="370.0" cy="1637.2" r="4.3" fill="#2d3f66" stroke="#0b1530"/>
+<rect x="314.2" y="1451.2" width="111.6" height="111.6" fill="#d9c196" stroke="#5a4210" stroke-width="2" stroke-dasharray="5 3"/>
+<text x="370.0" y="1511.0" font-size="11" text-anchor="middle" fill="#5a4210" font-weight="700" font-family="system-ui, sans-serif">S3</text>
+<circle cx="825.7" cy="1534.9" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="825.7" cy="1479.1" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="707.9" cy="1534.9" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="707.9" cy="1479.1" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="627.3" cy="1534.9" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="627.3" cy="1479.1" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="509.5" cy="1534.9" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="509.5" cy="1479.1" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="428.9" cy="1534.9" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="428.9" cy="1479.1" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="311.1" cy="1534.9" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="311.1" cy="1479.1" r="9.9" fill="#e6cfa8" stroke="#8a6a2f"/>
+<text x="766.8" y="2361.4" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">phones / watches / earbuds</text>
+<text x="568.4" y="2361.4" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">laptops / tablets</text>
+<text x="370.0" y="2361.4" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">audio / trackers</text>
+<rect x="320.4" y="1311.7" width="496.0" height="49.6" fill="#d9b98c" stroke="#8a6a2f" stroke-width="1.5" />
+<text x="568.4" y="1340.5" font-size="11" text-anchor="middle" fill="#4a3510" font-weight="700" font-family="system-ui, sans-serif">SERVICE BAR</text>
+<circle cx="791.6" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="754.4" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="717.2" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="680.0" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="642.8" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="605.6" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="568.4" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="531.2" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="494.0" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="456.8" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="419.6" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="382.4" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<circle cx="345.2" cy="1361.3" r="11.2" fill="#e6cfa8" stroke="#8a6a2f"/>
+<rect x="809.0" y="1271.4" width="7.4" height="40.3" fill="#8a6a2f" stroke="#5a4210" stroke-width="1" />
+<rect x="320.4" y="1271.4" width="7.4" height="40.3" fill="#8a6a2f" stroke="#5a4210" stroke-width="1" />
+<text x="568.4" y="1297.1" font-size="10" text-anchor="middle" fill="#555" font-weight="400" font-family="system-ui, sans-serif">staff space behind the bar</text>
+<line x1="165.4" y1="2430.8" x2="475.4" y2="2430.8" stroke="#5aa9d6" stroke-width="4" />
+<line x1="661.4" y1="2430.8" x2="971.4" y2="2430.8" stroke="#5aa9d6" stroke-width="4" />
+<text x="568.4" y="2422.8" font-size="10" text-anchor="middle" fill="#2a6a95" font-weight="400" font-family="system-ui, sans-serif">entrance opening, 3 m (assumed)</text>
+<text x="568.4" y="2456.8" font-size="10" text-anchor="middle" fill="#2a6a95" font-weight="400" font-family="system-ui, sans-serif">to the mall concourse (see the mall drawing)</text>
+<line x1="847.4" y1="2443.2" x2="847.4" y2="2418.4" stroke="#3a7ca5" stroke-width="3" />
+<line x1="289.4" y1="2443.2" x2="289.4" y2="2418.4" stroke="#3a7ca5" stroke-width="3" />
+<line x1="971.4" y1="2430.8" x2="971.4" y2="1234.2" stroke="#111" stroke-width="3" />
+<line x1="165.4" y1="2430.8" x2="165.4" y2="1234.2" stroke="#111" stroke-width="3" />
+<line x1="971.4" y1="1240.4" x2="295.6" y2="1240.4" stroke="#111" stroke-width="3" />
+<line x1="233.6" y1="1240.4" x2="165.4" y2="1240.4" stroke="#111" stroke-width="3" />
+<line x1="295.6" y1="1240.4" x2="233.6" y2="1240.4" stroke="#c0392b" stroke-width="4" stroke-dasharray="4 3"/>
+<text x="264.6" y="1232.4" font-size="10" text-anchor="start" fill="#c0392b" font-weight="700" font-family="system-ui, sans-serif">staff door (flush), left of the bar as you face it</text>
+<circle cx="568.4" cy="2375.0" r="6.0" fill="#2a9d8f" stroke="none"/>
+<text x="558.4" y="2379.0" font-size="10" text-anchor="end" fill="#2a9d8f" font-weight="600" font-family="system-ui, sans-serif">visitor spawn (faces the shop)</text>
+<line x1="196.4" y1="2486.6" x2="940.4" y2="2486.6" stroke="#1f6feb" stroke-width="1" />
+<line x1="196.4" y1="2481.6" x2="196.4" y2="2491.6" stroke="#1f6feb" stroke-width="1" />
+<line x1="940.4" y1="2481.6" x2="940.4" y2="2491.6" stroke="#1f6feb" stroke-width="1" />
+<text x="568.4" y="2481.6" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">12 m wide</text>
+<line x1="134.4" y1="1271.4" x2="134.4" y2="2399.8" stroke="#1f6feb" stroke-width="1" />
+<line x1="129.4" y1="1271.4" x2="139.4" y2="1271.4" stroke="#1f6feb" stroke-width="1" />
+<line x1="129.4" y1="2399.8" x2="139.4" y2="2399.8" stroke="#1f6feb" stroke-width="1" />
+<text transform="translate(128.4 1835.6) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">18.2 m deep</text>
+<line x1="134.4" y1="105.8" x2="134.4" y2="1234.2" stroke="#1f6feb" stroke-width="1" />
 <line x1="129.4" y1="105.8" x2="139.4" y2="105.8" stroke="#1f6feb" stroke-width="1" />
-<line x1="129.4" y1="1060.6" x2="139.4" y2="1060.6" stroke="#1f6feb" stroke-width="1" />
-<text transform="translate(128.4 583.2) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">15 m deep</text>
-<line x1="680.0" y1="2034.0" x2="742.0" y2="2034.0" stroke="#1f6feb" stroke-width="1" />
-<line x1="680.0" y1="2029.0" x2="680.0" y2="2039.0" stroke="#1f6feb" stroke-width="1" />
-<line x1="742.0" y1="2029.0" x2="742.0" y2="2039.0" stroke="#1f6feb" stroke-width="1" />
-<text x="711.0" y="2029.0" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1 m</text>
-<line x1="506.4" y1="2034.0" x2="680.0" y2="2034.0" stroke="#1f6feb" stroke-width="1" />
-<line x1="506.4" y1="2029.0" x2="506.4" y2="2039.0" stroke="#1f6feb" stroke-width="1" />
-<line x1="680.0" y1="2029.0" x2="680.0" y2="2039.0" stroke="#1f6feb" stroke-width="1" />
-<text x="593.2" y="2029.0" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.80 m aisle</text>
-<line x1="766.8" y1="1823.2" x2="766.8" y2="1897.6" stroke="#1f6feb" stroke-width="1" />
-<line x1="761.8" y1="1823.2" x2="771.8" y2="1823.2" stroke="#1f6feb" stroke-width="1" />
-<line x1="761.8" y1="1897.6" x2="771.8" y2="1897.6" stroke="#1f6feb" stroke-width="1" />
-<text transform="translate(760.8 1860.4) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.2 m</text>
-<line x1="332.8" y1="1032.7" x2="742.0" y2="1032.7" stroke="#1f6feb" stroke-width="1" />
-<line x1="332.8" y1="1027.7" x2="332.8" y2="1037.7" stroke="#1f6feb" stroke-width="1" />
-<line x1="742.0" y1="1027.7" x2="742.0" y2="1037.7" stroke="#1f6feb" stroke-width="1" />
-<text x="537.4" y="1027.7" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">bar 6.6 m</text>
-<line x1="283.2" y1="2052.6" x2="283.2" y2="1897.6" stroke="#1f6feb" stroke-width="1" />
-<line x1="278.2" y1="2052.6" x2="288.2" y2="2052.6" stroke="#1f6feb" stroke-width="1" />
-<line x1="278.2" y1="1897.6" x2="288.2" y2="1897.6" stroke="#1f6feb" stroke-width="1" />
-<text transform="translate(277.2 1975.1) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">2.5 m clear: customers are received here</text>
-<line x1="652.1" y1="1761.2" x2="652.1" y2="1823.2" stroke="#1f6feb" stroke-width="1" />
-<line x1="647.1" y1="1761.2" x2="657.1" y2="1761.2" stroke="#1f6feb" stroke-width="1" />
-<line x1="647.1" y1="1823.2" x2="657.1" y2="1823.2" stroke="#1f6feb" stroke-width="1" />
-<text transform="translate(646.1 1792.2) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.00 m clear</text>
-<text x="60.0" y="2208.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Ceiling 3 m. T = product table (1 x 1.2 m, one product per side). S = square service table (1.2 m side, no products, two stools each side, tucked under). Columns at x = -2.8, 0, 2.8.</text>
-<text x="60.0" y="2224.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">The 3 m wall height is from the references; the width and depth were enlarged on request (option A) so there is room to move between tables.</text>
-<text x="60.0" y="2240.0" font-size="11" text-anchor="start" fill="#a33" font-weight="400" font-family="system-ui, sans-serif">Assumed, not measurable: table length, the entrance opening, the back-room layout (your instruction: same footprint), the door width.</text>
+<line x1="129.4" y1="1234.2" x2="139.4" y2="1234.2" stroke="#1f6feb" stroke-width="1" />
+<text transform="translate(128.4 670.0) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">18 m deep</text>
+<line x1="729.6" y1="2381.2" x2="804.0" y2="2381.2" stroke="#1f6feb" stroke-width="1" />
+<line x1="729.6" y1="2376.2" x2="729.6" y2="2386.2" stroke="#1f6feb" stroke-width="1" />
+<line x1="804.0" y1="2376.2" x2="804.0" y2="2386.2" stroke="#1f6feb" stroke-width="1" />
+<text x="766.8" y="2376.2" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.2 m</text>
+<line x1="531.2" y1="2381.2" x2="729.6" y2="2381.2" stroke="#1f6feb" stroke-width="1" />
+<line x1="531.2" y1="2376.2" x2="531.2" y2="2386.2" stroke="#1f6feb" stroke-width="1" />
+<line x1="729.6" y1="2376.2" x2="729.6" y2="2386.2" stroke="#1f6feb" stroke-width="1" />
+<text x="630.4" y="2376.2" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">2.00 m aisle</text>
+<line x1="828.8" y1="2182.8" x2="828.8" y2="2306.8" stroke="#1f6feb" stroke-width="1" />
+<line x1="823.8" y1="2182.8" x2="833.8" y2="2182.8" stroke="#1f6feb" stroke-width="1" />
+<line x1="823.8" y1="2306.8" x2="833.8" y2="2306.8" stroke="#1f6feb" stroke-width="1" />
+<text transform="translate(822.8 2244.8) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">2 m</text>
+<line x1="320.4" y1="1206.3" x2="816.4" y2="1206.3" stroke="#1f6feb" stroke-width="1" />
+<line x1="320.4" y1="1201.3" x2="320.4" y2="1211.3" stroke="#1f6feb" stroke-width="1" />
+<line x1="816.4" y1="1201.3" x2="816.4" y2="1211.3" stroke="#1f6feb" stroke-width="1" />
+<text x="568.4" y="1201.3" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">bar 8 m</text>
+<line x1="314.2" y1="2399.8" x2="314.2" y2="2306.8" stroke="#1f6feb" stroke-width="1" />
+<line x1="309.2" y1="2399.8" x2="319.2" y2="2399.8" stroke="#1f6feb" stroke-width="1" />
+<line x1="309.2" y1="2306.8" x2="319.2" y2="2306.8" stroke="#1f6feb" stroke-width="1" />
+<text transform="translate(308.2 2353.3) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.5 m clear: customers are received here</text>
+<line x1="701.7" y1="2120.8" x2="701.7" y2="2182.8" stroke="#1f6feb" stroke-width="1" />
+<line x1="696.7" y1="2120.8" x2="706.7" y2="2120.8" stroke="#1f6feb" stroke-width="1" />
+<line x1="696.7" y1="2182.8" x2="706.7" y2="2182.8" stroke="#1f6feb" stroke-width="1" />
+<text transform="translate(695.7 2151.8) rotate(-90)" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">1.00 m clear</text>
+<text x="60.0" y="2556.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">Ceiling 3 m. T = product table (1.2 x 2 m, one product per side). S = square service table (1.8 m side, no products, two stools each side, tucked under). Columns at x = -3.2, 0, 3.2.</text>
+<text x="60.0" y="2572.0" font-size="11" text-anchor="start" fill="#333" font-weight="400" font-family="system-ui, sans-serif">The 3 m wall height is from the references; the width and depth were enlarged on request (option A) so there is room to move between tables.</text>
+<text x="60.0" y="2588.0" font-size="11" text-anchor="start" fill="#a33" font-weight="400" font-family="system-ui, sans-serif">Assumed, not measurable: the entrance opening, the back-room layout (your instruction: same footprint), the door width. The store stands on the first floor of a mall atrium; see the mall drawing.</text>
 </svg>
