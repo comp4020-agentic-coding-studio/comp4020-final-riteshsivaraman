@@ -6,6 +6,7 @@
 //
 // Everything is drawn as a visitor standing at the entrance, facing in, would
 // see it: the +x wall is on the visitor's LEFT, the -x wall on their right.
+import { MALL, ROUTES } from "./mall.ts";
 import { CEILING, FLOOR, SPAWN } from "./protocol.ts";
 import {
   BACK_WALL,
@@ -107,7 +108,7 @@ function vDim(g: Svg, y1: number, y2: number, x: number, label: string): void {
 export function renderPlan(): string {
   const S = 48;
   const zTop = BACK_ROOM_Z1 + 0.9;
-  const zBottom = FLOOR.minZ - 1.3;
+  const zBottom = MALL.farZ - 1.6;
   const W = Math.round(9.4 * 2 * S + 120);
   const H = Math.round((zTop - zBottom) * S + 150);
   const cx = 60 + 9.4 * S;
@@ -132,6 +133,27 @@ export function renderPlan(): string {
   g.text(px(0), py(SERVICE_DESKS[0].z) + 4, "REPAIR BENCHES (technicians stand behind)", 10, "middle", "#355a7a");
   R(0, BACK_ROOM_Z1 - 0.35, 15, 0.4, "#cfd3d8", "#6b7280");
   g.text(px(0), py(BACK_ROOM_Z1 - 0.35) + 3, "parts wall", 9, "middle", "#555");
+
+  // the mall: concourse, the mezzanine across the way, and the routes people
+  // take (drawn clipped to this page; they carry on along the concourse)
+  const clipX = (x: number): number => Math.max(-9.2, Math.min(9.2, x));
+  R(0, (MALL.frontZ + MALL.farZ) / 2, 18.4, MALL.frontZ - MALL.farZ, "#eef0f2", "#b0b5ba", 1, 'stroke-dasharray="4 3"');
+  g.text(px(0), py(MALL.frontZ - 1.5), "MALL CONCOURSE (carries on both ways, 68 m)", 12, "middle", "#555", "600");
+  R(0, (MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2, 18.4, MALL.mezzanineZ1 - MALL.mezzanineZ0, "#e4e0d4", "#9a9484", 1.2, 'stroke-dasharray="6 3"');
+  g.text(px(0), py((MALL.mezzanineZ0 + MALL.mezzanineZ1) / 2) + 4, `MEZZANINE walkway above (y = ${MALL.mezzanineY} m), glass balustrade on the concourse side`, 11, "middle", "#6b6556");
+  g.text(px(0), py(MALL.farZ) + 16, "opposite shopfronts (ground level and upstairs)", 11, "middle", "#555");
+  g.text(px(0), py(MALL.frontZ) + 14, "neighbouring shops either side of the store", 10, "middle", "#555");
+  for (const route of ROUTES) {
+    const col = route.kind === "shopper" ? "#d1495b" : route.kind === "upper" ? "#7a6a3a" : "#4a8f7a";
+    const pts = route.points;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if ((a.x < -9.2 && b.x < -9.2) || (a.x > 9.2 && b.x > 9.2)) continue;
+      g.line(px(clipX(a.x)), py(a.z), px(clipX(b.x)), py(b.z), col, route.kind === "shopper" ? 1.8 : 1, 'stroke-dasharray="5 4"');
+    }
+  }
+  g.text(px(-5.5), py(-17), "walkers (green) pass along the concourse; shoppers (red) come in through the opening and out again; upstairs (olive)", 10, "start", "#444");
 
   // shop floor
   R(0, (FLOOR.minZ + FLOOR.maxZ) / 2, FLOOR.maxX - FLOOR.minX, FLOOR.maxZ - FLOOR.minZ, "#f6f7f8", "none", 0);

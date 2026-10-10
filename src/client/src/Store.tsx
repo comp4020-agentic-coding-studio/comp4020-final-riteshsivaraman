@@ -5,6 +5,7 @@ import type { Group } from "three";
 import { poseChanged } from "../../shared/pose.ts";
 import { SPAWN, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions } from "../../shared/world.ts";
+import { Mall, MallPeople } from "./Mall.tsx";
 import { Npcs } from "./Npcs.tsx";
 import { Person, type PersonState } from "./Person.tsx";
 import { Room } from "./Room.tsx";
@@ -170,6 +171,9 @@ export function Store() {
       {/* daylight through the glass front */}
       <directionalLight position={[0, 6, -14]} intensity={0.5} />
       <Room />
+      <Mall />
+      <MallPeople />
+      <fog attach="fog" args={["#dfe3e7", 28, 85]} />
       <Remotes />
       <Npcs />
       <Player />
