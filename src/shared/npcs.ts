@@ -65,15 +65,16 @@ function customer(id: string, colour: string, zone: Zone, period: number, phase:
   return { id, role: "customer", colour, zones: [zone], period, phase, seed };
 }
 
-// Lanes between the three table columns (tables are 1.05 m wide, centred at
-// x = -2.5, 0 and 2.5), and the outer lanes beside the wall benches.
+// Lanes between the three table columns (product tables 1.0 wide, service
+// tables 1.2, centred at x = -2.5, 0 and 2.5), kept clear of the service-table
+// stools, and the outer lanes beside the wall benches.
 const LANE = {
-  outerL: { minX: -4.2, maxX: -3.35 },
-  a: { minX: -1.75, maxX: -0.8 },
-  b: { minX: 0.8, maxX: 1.75 },
-  outerR: { minX: 3.35, maxX: 4.2 },
+  outerL: { minX: -4.25, maxX: -3.65 },
+  a: { minX: -1.75, maxX: -1.15 },
+  b: { minX: 1.15, maxX: 1.75 },
+  outerR: { minX: 3.65, maxX: 4.25 },
 };
-const SHOP_Z = { minZ: -4.3, maxZ: 3.35 };
+const SHOP_Z = { minZ: -4.3, maxZ: 2.3 };
 
 // Zones are rectangles that contain no table, bench, bar or shelf, so a
 // straight line between two points in a zone never crosses one.

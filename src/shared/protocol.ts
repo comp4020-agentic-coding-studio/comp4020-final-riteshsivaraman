@@ -56,4 +56,4 @@ export const FLOOR = { minX: -5, maxX: 5, minZ: -5, maxZ: 5 } as const;
 export const CEILING = 3.0;
 
 // Where a visitor appears: just inside the glass front, facing into the store.
-export const SPAWN: Pose = { x: 0, z: -4.0, ry: Math.PI };
+export const SPAWN: Pose = { x: 0, z: -4.6, ry: Math.PI };

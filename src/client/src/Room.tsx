@@ -28,9 +28,11 @@ import {
   PIER_W,
   SERVICE_DESKS,
   TABLES,
+  TABLE_STOOLS,
   WALL_FACE_Z,
   bayCentre,
   type Box,
+  type Table as TableSpec,
 } from "../../shared/world.ts";
 import {
   BACK_WALL,
@@ -474,59 +476,64 @@ const COLUMN_KINDS: Record<number, readonly Kind[]> = Object.fromEntries(
   Object.entries(COLUMN_PRODUCTS).map(([x, kinds]) => [Number(x), kinds]),
 );
 
-function Table({ box, kinds }: { box: Box; kinds: readonly Kind[] }) {
-  // products along each long side, facing outward and far enough apart that
-  // each has room for a person standing at it
-  const alongX = box.w >= box.d;
-  const len = alongX ? box.w : box.d;
-  const short = alongX ? box.d : box.w;
-  const n = len >= 2.6 ? 3 : 2;
-  const step = (len - 0.6) / (n - 1);
-  const items: Array<{ x: number; z: number; rotY: number; i: number; kind: Kind }> = [];
-  for (let side = 0; side < 2; side++) {
-    for (let k = 0; k < n; k++) {
-      const along = -(len - 0.6) / 2 + k * step;
-      const off = (side === 0 ? -1 : 1) * (short / 2 - 0.3);
-      const i = side * n + k;
-      items.push({
-        x: alongX ? box.x + along : box.x + off,
-        z: alongX ? box.z + off : box.z + along,
-        // facing outward: the front side (-z / -x) faces -z / -x
-        rotY: alongX ? (side === 0 ? Math.PI : 0) : side === 0 ? -Math.PI / 2 : Math.PI / 2,
-        i,
-        kind: kinds[i % kinds.length],
-      });
-    }
-  }
+// A product table: a top on four legs, one product on each side facing
+// outward, so a person standing at any side sees their own product.
+// A service table is the same without products, with a stool either side.
+function Table({ box, kinds }: { box: TableSpec; kinds: readonly Kind[] }) {
+  const inset = 0.2; // a product stands this far in from its edge
+  const items = box.service
+    ? []
+    : [
+        { x: box.x - (box.w / 2 - inset), z: box.z, rotY: -Math.PI / 2, kind: kinds[0] },
+        { x: box.x + (box.w / 2 - inset), z: box.z, rotY: Math.PI / 2, kind: kinds[1] },
+        { x: box.x, z: box.z - (box.d / 2 - inset), rotY: Math.PI, kind: kinds[2] },
+        { x: box.x, z: box.z + (box.d / 2 - inset), rotY: 0, kind: kinds[3] },
+      ];
   return (
     <group>
       {/* a top on four legs, so you can see under it like the real ones */}
       <mesh position={[box.x, box.h - 0.04, box.z]}>
         <boxGeometry args={[box.w, 0.08, box.d]} />
-        <meshStandardMaterial color="#e6cfa8" roughness={0.5} />
+        <meshStandardMaterial color={box.service ? "#d9c196" : "#e6cfa8"} roughness={0.5} />
       </mesh>
       {[-1, 1].flatMap((sx) =>
         [-1, 1].map((sz) => (
           <mesh
             key={`${sx}:${sz}`}
-            position={[box.x + sx * (box.w / 2 - 0.1), (box.h - 0.08) / 2, box.z + sz * (box.d / 2 - 0.1)]}
+            position={[box.x + sx * (box.w / 2 - 0.08), (box.h - 0.08) / 2, box.z + sz * (box.d / 2 - 0.08)]}
           >
-            <boxGeometry args={[0.1, box.h - 0.08, 0.1]} />
+            <boxGeometry args={[0.08, box.h - 0.08, 0.08]} />
             <meshStandardMaterial color={WOOD} roughness={0.55} />
           </mesh>
         )),
       )}
-      {items.map((it) => (
+      {items.map((it, i) => (
         <Device
-          key={it.i}
+          key={i}
           kind={it.kind}
           x={it.x}
           y={box.h}
           z={it.z}
           rotY={it.rotY}
-          colour={DEVICE_COLOURS[(it.i + Math.round(box.z)) % DEVICE_COLOURS.length]}
+          colour={DEVICE_COLOURS[(i + Math.round(box.z * 3) + 6) % DEVICE_COLOURS.length]}
         />
       ))}
+    </group>
+  );
+}
+
+// A plain stool, for the service tables.
+function TableStool({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.6, 8]} />
+        <meshStandardMaterial color="#8d9399" metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.62, 0]}>
+        <cylinderGeometry args={[0.18, 0.18, 0.05, 20]} />
+        <meshStandardMaterial color={WOOD} roughness={0.6} />
+      </mesh>
     </group>
   );
 }
@@ -1196,9 +1203,12 @@ export function Room() {
 
       <WallSections />
 
-      {/* tables, one product family per column */}
+      {/* tables, one product family per column; service tables have stools */}
       {TABLES.map((t, i) => (
         <Table key={i} box={t} kinds={COLUMN_KINDS[t.x]} />
+      ))}
+      {TABLE_STOOLS.map((st, i) => (
+        <TableStool key={i} x={st.x} z={st.z} />
       ))}
       <WallBench box={BENCHES[0]} side={-1} />
       <WallBench box={BENCHES[1]} side={1} />

@@ -9,6 +9,7 @@ import {
   SOLIDS,
   TABLES,
   TABLE_LEN,
+  TABLE_W,
   clampToWalkable,
   resolveCollisions,
   solidsFor,
@@ -40,11 +41,13 @@ it("pushes a visitor out of a table instead of letting them stand in it", () => 
   expect(stillInside).toBe(false);
 });
 
-it("leaves room for a person at each product: 1 m or more between neighbours", () => {
-  // products stand along each long side of a table: two on a short table,
-  // three on a long one; spacing = (length - 0.6) / (n - 1)
-  const n = TABLE_LEN >= 2.6 ? 3 : 2;
-  expect((TABLE_LEN - 0.6) / (n - 1)).toBeGreaterThanOrEqual(1.0);
+it("gives each side of a product table its own product, with neighbouring people over a metre apart", () => {
+  // a person stands half a metre beyond the middle of a side; adjacent sides
+  // are across a corner, so they are the closest pair
+  const stand = 0.5;
+  const dx = TABLE_W / 2 + stand;
+  const dz = TABLE_LEN / 2 + stand;
+  expect(Math.hypot(dx, dz)).toBeGreaterThanOrEqual(1.0);
 });
 
 it("keeps customers out of the back room and behind the bar", () => {

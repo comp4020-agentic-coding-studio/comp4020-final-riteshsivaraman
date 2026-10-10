@@ -54,7 +54,7 @@ const passer = (id: string, colour: string, speed: number, phase: number, points
 // then up an aisle between the tables. Positions follow the store's own edges.
 const OUT = FLOOR.minZ - 3.5; // on the concourse, in front of the store
 const DOOR_Z = FLOOR.minZ - 0.7; // just outside the glass
-const IN_Z = FLOOR.minZ + 0.9; // just inside
+const IN_Z = FLOOR.minZ + 0.4; // just inside, in the lane before the first tables
 
 const shopper = (id: string, colour: string, phase: number, laneX: number, stops: RoutePoint[]): Route => ({
   id,
@@ -117,17 +117,17 @@ export const ROUTES: Route[] = [
   // customers: come in through the opening, look at a table or two, leave
   shopper("shopper-1", "#e07a5f", 4000, 1.25, [
     { x: 1.25, z: -1.9, pause: 9000 },
-    { x: 1.25, z: 1.2, pause: 6000 },
+    { x: 1.25, z: 0.45, pause: 6000 },
   ]),
   shopper("shopper-2", "#81b29a", 61000, -1.25, [
     { x: -1.25, z: -1.4, pause: 8000 },
-    { x: -1.25, z: 1.7, pause: 7000 },
+    { x: -1.25, z: 0.3, pause: 7000 },
   ]),
   shopper("shopper-3", "#f2cc8f", 98000, 1.25, [
-    { x: 3.8, z: -4.35 },
+    { x: 3.8, z: IN_Z },
     { x: 3.8, z: -1.2, pause: 10000 },
-    { x: 3.8, z: 2.0, pause: 6000 },
-    { x: 3.8, z: -4.35 },
+    { x: 3.8, z: 1.4, pause: 6000 },
+    { x: 3.8, z: IN_Z },
   ]),
   // up on the mezzanine, across the way
   {

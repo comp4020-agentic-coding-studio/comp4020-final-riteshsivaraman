@@ -41,7 +41,9 @@ import {
   PIER_W,
   SERVICE_DESKS,
   TABLES,
+  SERVICE_SIDE,
   TABLE_LEN,
+  TABLE_STOOLS,
   TABLE_W,
   WALL_FACE_Z,
   bayCentre,
@@ -164,9 +166,25 @@ export function renderPlan(): string {
 
   // tables run front to back
   TABLES.forEach((t, i) => {
-    R(t.x, t.z, TABLE_W, TABLE_LEN, "#e6cfa8", "#8a6a2f", 1.2);
-    g.text(px(t.x), py(t.z) + 4, `T${i + 1}`, 11, "middle", "#5a4210", "700");
+    if (t.service) {
+      R(t.x, t.z, t.w, t.d, "#d9c196", "#5a4210", 2, 'stroke-dasharray="5 3"');
+      g.text(px(t.x), py(t.z) + 4, `S${i + 1}`, 11, "middle", "#5a4210", "700");
+    } else {
+      R(t.x, t.z, t.w, t.d, "#e6cfa8", "#8a6a2f", 1.2);
+      g.text(px(t.x), py(t.z) + 4, `T${i + 1}`, 11, "middle", "#5a4210", "700");
+      // one product on each side, facing outward
+      const m = 0.2;
+      for (const [dx, dz] of [
+        [-(t.w / 2 - m), 0],
+        [t.w / 2 - m, 0],
+        [0, -(t.d / 2 - m)],
+        [0, t.d / 2 - m],
+      ]) {
+        g.circle(px(t.x + dx), py(t.z + dz), 0.07 * S, "#2d3f66", "#0b1530");
+      }
+    }
   });
+  for (const st of TABLE_STOOLS) g.circle(px(st.x), py(st.z), 0.16 * S, "#e6cfa8", "#8a6a2f");
   const labelZ = FLOOR.minZ + 0.62;
   g.text(px(COLUMN_X[0]), py(labelZ), "phones / watches / earbuds", 10, "middle", "#555");
   g.text(px(COLUMN_X[1]), py(labelZ), "laptops / tablets", 10, "middle", "#555");
@@ -204,11 +222,12 @@ export function renderPlan(): string {
   const t0 = TABLES[0];
   hDim(g, px(t0.x + TABLE_W / 2), px(t0.x - TABLE_W / 2), py(FLOOR.minZ + 0.3), `${TABLE_W} m`);
   hDim(g, px(COLUMN_X[1] + TABLE_W / 2), px(COLUMN_X[0] + TABLE_W / 2), py(FLOOR.minZ + 0.3), `${(COLUMN_X[1] - COLUMN_X[0] - TABLE_W).toFixed(2)} m aisle`);
-  vDim(g, py(t0.z + TABLE_LEN / 2), py(t0.z - TABLE_LEN / 2), px(t0.x - TABLE_W / 2) + 0.4 * S, `${TABLE_LEN} m long`);
+  vDim(g, py(t0.z + TABLE_LEN / 2), py(t0.z - TABLE_LEN / 2), px(t0.x - TABLE_W / 2) + 0.4 * S, `${TABLE_LEN} m`);
+
   hDim(g, px(COUNTER.x + COUNTER.w / 2), px(COUNTER.x - COUNTER.w / 2), py(BACK_ROOM_Z0 + 0.45), `bar ${COUNTER.w} m`);
 
   const ly = H - 62;
-  g.text(60, ly, `Ceiling ${CEILING} m. Tables ${TABLE_W} wide x ${TABLE_LEN} long, four products each. Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
+  g.text(60, ly, `Ceiling ${CEILING} m. T = product table (${TABLE_W} x ${TABLE_LEN} m, one product per side). S = square service table (${TABLE_LEN} m side, no products, a stool each side). Columns at x = ${COLUMN_X.join(", ")}.`, 11, "start", "#333");
   g.text(60, ly + 16, "Proportions from the rectified reference photographs (back wall 3.3 : 1, side walls 3.35 : 1); the 3 m wall height gives the metres.", 11, "start", "#333");
   g.text(60, ly + 32, "Assumed, not measurable: table length, the entrance opening, the back-room layout (your instruction: same footprint), the door width.", 11, "start", "#a33");
   return g.done();
@@ -573,9 +592,11 @@ export function renderDocument(): string {
     Math.abs(x) < 0.01 ? "centre" : x > 0 ? "left column (the +x side, as you enter)" : "right column (the -x side)";
   const rows = TABLES.map((t, i) => {
     const kinds = COLUMN_PRODUCTS[String(t.x)] ?? [];
-    const words = [...new Set(kinds.map((k) => PRODUCT_WORDS[k] ?? k))].join(", ");
-    const long = t.d >= t.w ? "front to back (along z)" : "side to side (along x)";
-    return `<tr><td>T${i + 1}</td><td>${sideName(t.x)}</td><td>${t.x.toFixed(2)}</td><td>${t.z.toFixed(2)}</td><td>${t.w.toFixed(2)} x ${t.d.toFixed(2)}</td><td>${long}</td><td>${words}</td></tr>`;
+    const words = t.service
+      ? "nothing: a table to sit and talk with staff, a stool each side"
+      : [...new Set(kinds.map((k) => PRODUCT_WORDS[k] ?? k))].join(", ");
+    const kind = t.service ? "service (square)" : "product";
+    return `<tr><td>${t.service ? "S" : "T"}${i + 1}</td><td>${sideName(t.x)}</td><td>${kind}</td><td>${t.x.toFixed(2)}</td><td>${t.z.toFixed(2)}</td><td>${t.w.toFixed(2)} x ${t.d.toFixed(2)}</td><td>${words}</td></tr>`;
   }).join("\n");
   const css = `
     @page { size: A3 portrait; margin: 12mm; }
@@ -612,7 +633,8 @@ export function renderDocument(): string {
     <tr><th>Part</th><th>Value</th><th>Source</th></tr>
     <tr><td>Shop width x depth x height</td><td>${W} x ${D} x ${CEILING} m</td><td>Wall ratios 3.3 and 3.35 at your 3 m wall height</td></tr>
     <tr><td>Table columns</td><td>x = ${COLUMN_X.join(", ")}</td><td>About a quarter of the width either side of the middle (photo)</td></tr>
-    <tr><td>Tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long, three down each side column, two down the middle</td><td>About a tenth of the width across (photo); length assumed</td></tr>
+    <tr><td>Product tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long (almost square), four in each side column and three in the middle, one product on each side</td><td>Your description; width about a tenth of the shop's (photo)</td></tr>
+    <tr><td>Service tables</td><td>${SERVICE_SIDE} m square (the long edge of a product table), one nearest the bar in each side column and one in the middle column, a stool to the left and right of each, no products</td><td>Your description</td></tr>
     <tr><td>Bench along each side wall</td><td>${BENCHES[0].w} m deep, ${BENCHES[0].d} m long, ${BENCHES[0].h} m high</td><td>Photo; the bench sits at about 0.3 of the wall height</td></tr>
     <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${STOOLS.x.length} stools</td><td>Shortened to half the back wall at your request</td></tr>
     <tr><td>Staff door</td><td>${(DOOR.maxX - DOOR.minX).toFixed(1)} m wide, left of the bar as you face it (+x)</td><td>Your description</td></tr>
@@ -628,12 +650,12 @@ export function renderDocument(): string {
 </section>
 <section>
   <h1>Tables: position and orientation</h1>
-  <p>Every table runs <b>front to back</b> (long side parallel to the side walls, standing like rows in a column), three columns across: the left column, the centre column and the right column as you enter. There is no true top-down photograph of the tables, so positions come from the proportions of the reference photographs and the plan on the next page; orientation is the one thing the photographs show directly.</p>
+  <p>Three columns across (the left column, the centre column and the right column as you enter). The <b>left and right columns</b> each have <b>four almost-square product tables</b> and, nearest the bar, a larger <b>square service table</b> with a stool on its left and right where a customer can sit and talk with staff. The <b>centre column</b> has <b>three product tables and one square service table</b>. Product tables carry a product on each of their four sides, facing outward; service tables carry nothing. There is no true top-down photograph of the tables, so positions come from your description and the proportions of the reference photographs.</p>
   <table>
-    <tr><th>Table</th><th>Column</th><th>Centre x</th><th>Centre z</th><th>Size (across x long)</th><th>Long side runs</th><th>Stands on it</th></tr>
+    <tr><th>Table</th><th>Column</th><th>Kind</th><th>Centre x</th><th>Centre z</th><th>Size (x by z)</th><th>On it</th></tr>
     ${rows}
   </table>
-  <p class="small">z is negative towards the glass front and positive towards the bar. Products stand along both long sides of each table, facing outward, spaced at least 1 m apart so one person fits at each.</p>
+  <p class="small">z is negative towards the glass front and positive towards the bar. A person standing at any side of a product table has a product in front of them; neighbouring sides are more than a metre apart.</p>
 </section>
 <section>
   <h1>Top-down plan: the shop and the staff-only back room</h1>

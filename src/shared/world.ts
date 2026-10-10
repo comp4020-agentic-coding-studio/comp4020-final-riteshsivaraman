@@ -26,20 +26,46 @@ export interface Rect {
 }
 
 // Three columns of tables at -1/4, 0 and +1/4 of the room width, as in the
-// reference photo. Tables run front to back (Ritesh: vertical on the plan),
-// about a tenth of the room's width across; products stand along both long
-// sides. Three tables down each side column, two down the middle.
+// reference photo (Ritesh, 2026-10-11):
+//   - the two side columns each have four product tables and, nearest the bar,
+//     a fifth table: a larger SQUARE service table (its side is the long edge
+//     of a product table) with a stool on its left and right, where a customer
+//     sits down to talk with staff. Nothing is displayed on it.
+//   - the middle column has three product tables and one square service table.
+// Product tables are almost square (1.0 across by 1.2 long), with one product
+// on each of their four sides, each facing outward.
 export const COLUMN_X = [-2.5, 0, 2.5] as const;
-export const SIDE_ROW_Z = [-2.85, -0.35, 2.15] as const;
-export const CENTRE_ROW_Z = [-2.1, 1.4] as const;
-export const TABLE_W = 1.05; // across the room (x)
-export const TABLE_LEN = 1.9; // front to back (z)
-export const TABLES: Box[] = [
-  ...[COLUMN_X[0], COLUMN_X[2]].flatMap((x) =>
-    SIDE_ROW_Z.map((z) => ({ x, z, w: TABLE_W, d: TABLE_LEN, h: 0.9 })),
-  ),
-  ...CENTRE_ROW_Z.map((z) => ({ x: COLUMN_X[1], z, w: TABLE_W, d: TABLE_LEN, h: 0.9 })),
+export const TABLE_W = 1.0; // product table, across the room (x)
+export const TABLE_LEN = 1.2; // product table, front to back (z): the long edge
+export const SERVICE_SIDE = TABLE_LEN; // a service table is a square of this side
+export const SIDE_ROW_Z = [-3.45, -1.9, -0.35, 1.2, 2.75] as const; // 4 product, then service
+export const CENTRE_ROW_Z = [-3.45, -1.9, -0.35, 1.2] as const; // 3 product, then service
+export const TABLE_H = 0.9;
+
+export interface Table extends Box {
+  service: boolean; // a service table: square, no products, stools either side
+}
+
+const columnTables = (x: number, rows: readonly number[], products: number): Table[] =>
+  rows.map((z, i) =>
+    i < products
+      ? { x, z, w: TABLE_W, d: TABLE_LEN, h: TABLE_H, service: false }
+      : { x, z, w: SERVICE_SIDE, d: SERVICE_SIDE, h: TABLE_H, service: true },
+  );
+
+export const TABLES: Table[] = [
+  ...columnTables(COLUMN_X[0], SIDE_ROW_Z, 4),
+  ...columnTables(COLUMN_X[1], CENTRE_ROW_Z, 3),
+  ...columnTables(COLUMN_X[2], SIDE_ROW_Z, 4),
 ];
+
+// Two stools beside each service table, one to its left and one to its right.
+// (Small and not solid, like the stools at the bar.)
+export const SERVICE_STOOL_GAP = 0.32; // from the table edge to the stool's centre
+export const TABLE_STOOLS: Array<{ x: number; z: number }> = TABLES.filter((t) => t.service).flatMap((t) => [
+  { x: t.x - t.w / 2 - SERVICE_STOOL_GAP, z: t.z },
+  { x: t.x + t.w / 2 + SERVICE_STOOL_GAP, z: t.z },
+]);
 
 // Long benches along both side walls, carrying devices.
 export const BENCHES: Box[] = [

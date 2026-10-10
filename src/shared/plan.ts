@@ -71,7 +71,9 @@ export const DOOR_H = 2.3;
 // to the door's outer edge, so it is positive in +x).
 export const CARD_READER = { dx: 0.2, y: 1.1, w: 0.07, h: 0.1 } as const;
 
-export const STOOLS = { x: [-1.6, -0.8, 0, 0.8, 1.6], seatH: 0.7 } as const;
+// Bar stools: five, drawn in so they stay clear of the stools beside the side
+// columns' service tables (at about x = +-3.4 and +-1.6, a little further back).
+export const STOOLS = { x: [-1.2, -0.6, 0, 0.6, 1.2], seatH: 0.7 } as const;
 
 // Ceiling and lights, from the front-on photograph and the close-ups: grey
 // slats run ACROSS the room (along x), long light panels sit in paired rows
@@ -89,8 +91,9 @@ export const CEILING_SPEC = {
 } as const;
 export const TRACK_LIGHT_Y = 2.96;
 
-// What stands on each column of tables (by the column's x), one entry per
-// product position around a table (side one first, then the other side).
+// What stands on each column of product tables (by the column's x): one
+// product on each side of a table, in the order -x side, +x side, -z side
+// (facing the glass), +z side (facing the bar). Service tables carry none.
 export type ProductKind =
   | "phone"
   | "tablet"

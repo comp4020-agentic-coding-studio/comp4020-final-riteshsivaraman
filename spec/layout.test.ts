@@ -4,8 +4,10 @@ import {
   BENCHES,
   COLUMN_X,
   COUNTER,
+  SERVICE_SIDE,
   TABLES,
   TABLE_LEN,
+  TABLE_STOOLS,
   TABLE_W,
 } from "../src/shared/world.ts";
 
@@ -44,16 +46,57 @@ it("makes a table about a tenth of the room width", () => {
   expect(TABLE_W / ROOM_W).toBeLessThan(0.13);
 });
 
-it("runs tables front to back: longer in z than in x", () => {
-  expect(TABLE_LEN).toBeGreaterThan(TABLE_W);
-  for (const t of TABLES) expect(t.d).toBeGreaterThan(t.w);
+// Ritesh's description of the tables (2026-10-11): each side column has four
+// almost-square product tables and, nearest the bar, a larger square service
+// table with a stool each side; the middle column has three product tables and
+// one square service table.
+it("makes product tables almost square, the long edge running front to back", () => {
+  const products = TABLES.filter((t) => !t.service);
+  for (const t of products) {
+    expect(t.d).toBeGreaterThan(t.w);
+    expect(t.d / t.w).toBeGreaterThan(1.05); // not quite square
+    expect(t.d / t.w).toBeLessThan(1.4); // but almost
+  }
 });
 
-it("puts three tables in each side column and two down the middle", () => {
-  const count = (x: number) => TABLES.filter((t) => t.x === x).length;
-  expect(count(COLUMN_X[0])).toBe(3);
-  expect(count(COLUMN_X[2])).toBe(3);
-  expect(count(COLUMN_X[1])).toBe(2);
+it("makes each service table a square whose side is the long edge of a product table", () => {
+  const service = TABLES.filter((t) => t.service);
+  expect(service).toHaveLength(3);
+  for (const t of service) {
+    expect(t.w).toBeCloseTo(t.d, 9);
+    expect(t.w).toBeCloseTo(TABLE_LEN, 9);
+    expect(t.w).toBeGreaterThan(TABLE_W); // slightly larger than a product table's width
+  }
+  expect(SERVICE_SIDE).toBe(TABLE_LEN);
+});
+
+it("puts four product tables and a service table in each side column, three and one in the middle", () => {
+  const col = (x: number) => TABLES.filter((t) => t.x === x);
+  for (const x of [COLUMN_X[0], COLUMN_X[2]]) {
+    expect(col(x).filter((t) => !t.service)).toHaveLength(4);
+    expect(col(x).filter((t) => t.service)).toHaveLength(1);
+  }
+  expect(col(COLUMN_X[1]).filter((t) => !t.service)).toHaveLength(3);
+  expect(col(COLUMN_X[1]).filter((t) => t.service)).toHaveLength(1);
+});
+
+it("puts a service table nearest the bar in each side column", () => {
+  for (const x of [COLUMN_X[0], COLUMN_X[2]]) {
+    const col = TABLES.filter((t) => t.x === x);
+    const last = col.reduce((a, b) => (b.z > a.z ? b : a));
+    expect(last.service).toBe(true);
+  }
+});
+
+it("gives every service table a stool on its left and its right, and none on product tables", () => {
+  const service = TABLES.filter((t) => t.service);
+  expect(TABLE_STOOLS).toHaveLength(service.length * 2);
+  for (const t of service) {
+    const mine = TABLE_STOOLS.filter((s) => Math.abs(s.z - t.z) < 1e-9 && Math.abs(s.x - t.x) < t.w / 2 + 0.6);
+    expect(mine).toHaveLength(2);
+    expect(mine.some((s) => s.x < t.x)).toBe(true);
+    expect(mine.some((s) => s.x > t.x)).toBe(true);
+  }
 });
 
 it("makes the service bar about half the wall width (shorter than the photo, by request)", () => {
@@ -62,9 +105,10 @@ it("makes the service bar about half the wall width (shorter than the photo, by 
 });
 
 it("keeps at least 1.3 m of clear aisle between table columns and beside the benches", () => {
-  const aisle = COLUMN_X[1] - TABLE_W / 2 - (COLUMN_X[0] + TABLE_W / 2);
-  expect(aisle).toBeGreaterThanOrEqual(1.3);
-  const outer = Math.abs(BENCHES[0].x) - BENCHES[0].w / 2 - (Math.abs(COLUMN_X[0]) + TABLE_W / 2);
+  // measured from the wider service tables, which are the tightest
+  const aisle = COLUMN_X[1] - SERVICE_SIDE / 2 - (COLUMN_X[0] + SERVICE_SIDE / 2);
+  expect(aisle).toBeGreaterThanOrEqual(1.29);
+  const outer = Math.abs(BENCHES[0].x) - BENCHES[0].w / 2 - (Math.abs(COLUMN_X[0]) + SERVICE_SIDE / 2);
   expect(outer).toBeGreaterThanOrEqual(1.2);
 });
 

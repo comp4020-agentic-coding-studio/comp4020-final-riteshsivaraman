@@ -61,10 +61,11 @@ it("never puts anyone inside a table, bench or the bar", () => {
 
 it("has shoppers who really come in and leave through the opening", () => {
   for (const r of ROUTES.filter((x) => x.kind === "shopper")) {
-    let wasInside = false;
+    // start from where they are at the first sample, not from "outside"
+    let wasInside = routePose(r, T0).z > FLOOR.minZ;
     let wentIn = false;
     let cameOut = false;
-    for (let t = 0; t < 600_000; t += 500) {
+    for (let t = 500; t < 600_000; t += 500) {
       const p = routePose(r, T0 + t);
       const inside = p.z > FLOOR.minZ;
       if (inside && !wasInside) wentIn = true;
