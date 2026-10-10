@@ -2,6 +2,7 @@ import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import type { Group } from "three";
 import { NPCS, isStaff, npcPose } from "../../shared/npcs.ts";
+import { STORE_Y } from "../../shared/protocol.ts";
 import { TABLES } from "../../shared/world.ts";
 import { Person, type PersonState } from "./Person.tsx";
 import { net } from "./net.ts";
@@ -38,7 +39,7 @@ export function Npcs() {
         ry = Math.atan2(-(best.x - p.x), -(best.z - p.z));
         mode = "observe";
       }
-      child.position.set(p.x, 0, p.z);
+      child.position.set(p.x, STORE_Y, p.z);
       child.rotation.y = ry;
       states.current[i] = { speed, mode };
     });

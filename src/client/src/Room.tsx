@@ -145,6 +145,20 @@ function floorTexture(w: number, d: number, base: string, joint: string): Canvas
   const tex = canvasTexture(256, 256, (g) => {
     g.fillStyle = base;
     g.fillRect(0, 0, 256, 256);
+    // polished stone: a soft cloudy variation and fine speckle, so the floor
+    // is not one flat grey
+    let seed = 12345;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 38; i++) {
+      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "70,76,84"},${0.025 + rnd() * 0.035})`;
+      g.beginPath();
+      g.ellipse(rnd() * 256, rnd() * 256, 20 + rnd() * 60, 10 + rnd() * 30, rnd() * Math.PI, 0, Math.PI * 2);
+      g.fill();
+    }
+    for (let i = 0; i < 260; i++) {
+      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "60,66,74"},${0.05 + rnd() * 0.08})`;
+      g.fillRect(rnd() * 256, rnd() * 256, 1.5, 1.5);
+    }
     g.strokeStyle = joint;
     g.lineWidth = 3;
     g.strokeRect(0, 0, 256, 256);
@@ -353,6 +367,134 @@ type Kind =
   | "speaker"
   | "airtag";
 
+// Original screen artwork for the products: wallpapers, app tiles, a clock
+// face. Drawn once per kind and colour variant and shared by every device.
+const SCREEN_WALLPAPERS: Array<[string, string, string]> = [
+  ["#ff7a59", "#7a5cff", "#ffe29a"],
+  ["#2dd4bf", "#3b82f6", "#c8f7ff"],
+  ["#f6d365", "#fda085", "#fff3d6"],
+  ["#a18cd1", "#fbc2eb", "#ffffff"],
+];
+const screenCache = new Map<string, CanvasTexture>();
+function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" | "watch", variant: number): CanvasTexture {
+  const key = `${kind}:${variant}`;
+  let tex = screenCache.get(key);
+  if (tex) return tex;
+  const [a, b, c] = SCREEN_WALLPAPERS[variant % SCREEN_WALLPAPERS.length];
+  const portrait = kind === "phone";
+  const W = portrait ? 128 : kind === "watch" ? 128 : 192;
+  const H = portrait ? 256 : kind === "watch" ? 128 : 128;
+  tex = canvasTexture(W, H, (g) => {
+    const grad = g.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, a);
+    grad.addColorStop(1, b);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, W, H);
+    // soft shapes, like a wallpaper
+    g.globalAlpha = 0.28;
+    g.fillStyle = c;
+    g.beginPath();
+    g.arc(W * 0.3, H * 0.35, H * 0.28, 0, Math.PI * 2);
+    g.fill();
+    g.beginPath();
+    g.arc(W * 0.72, H * 0.7, H * 0.34, 0, Math.PI * 2);
+    g.fill();
+    g.globalAlpha = 1;
+    if (kind === "watch") {
+      g.fillStyle = "#0c0d10";
+      g.fillRect(0, 0, W, H);
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(W / 2, H / 2, 46, 0, Math.PI * 2);
+      g.stroke();
+      for (let i = 0; i < 12; i++) {
+        const t = (i * Math.PI) / 6;
+        g.beginPath();
+        g.moveTo(W / 2 + Math.cos(t) * 40, H / 2 + Math.sin(t) * 40);
+        g.lineTo(W / 2 + Math.cos(t) * 46, H / 2 + Math.sin(t) * 46);
+        g.stroke();
+      }
+      g.strokeStyle = b;
+      g.lineWidth = 5;
+      g.beginPath();
+      g.moveTo(W / 2, H / 2);
+      g.lineTo(W / 2 + 22, H / 2 - 18);
+      g.stroke();
+      g.strokeStyle = "#ffffff";
+      g.beginPath();
+      g.moveTo(W / 2, H / 2);
+      g.lineTo(W / 2 - 6, H / 2 - 34);
+      g.stroke();
+      return;
+    }
+    // status bar and a grid of app tiles
+    g.fillStyle = "rgba(0,0,0,0.35)";
+    g.fillRect(0, 0, W, 12);
+    const cols = portrait ? 4 : 6;
+    const rows = portrait ? 5 : 3;
+    const tw = (W - 16) / cols;
+    const th = portrait ? tw : (H - 40) / rows;
+    for (let r = 0; r < rows; r++) {
+      for (let k = 0; k < cols; k++) {
+        g.fillStyle = `hsl(${(variant * 50 + r * 40 + k * 30) % 360},70%,${55 + ((r + k) % 3) * 8}%)`;
+        g.beginPath();
+        g.roundRect(8 + k * tw + 3, 22 + r * (th + 8), tw - 6, th - 2, 6);
+        g.fill();
+      }
+    }
+    if (kind === "laptop" || kind === "tabletKb") {
+      g.fillStyle = "rgba(255,255,255,0.85)";
+      g.fillRect(W * 0.2, H - 14, W * 0.6, 8); // a dock
+    }
+  });
+  screenCache.set(key, tex);
+  return tex;
+}
+
+let grilleTex: CanvasTexture | null = null;
+function grilleTexture(): CanvasTexture {
+  if (grilleTex) return grilleTex;
+  const t = canvasTexture(64, 64, (g) => {
+    g.fillStyle = "#2a2d33";
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle = "#4a4f58";
+    for (let y = 2; y < 64; y += 6) for (let x = (y / 6) % 2 ? 2 : 5; x < 64; x += 6) g.fillRect(x, y, 2, 2);
+  });
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.repeat.set(4, 2);
+  grilleTex = t;
+  return t;
+}
+
+// A soft dark blob on the floor, in place of real shadows (cheap on phones).
+let blobTex: CanvasTexture | null = null;
+function blobTexture(): CanvasTexture {
+  if (blobTex) return blobTex;
+  blobTex = canvasTexture(64, 64, (g) => {
+    const r = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+    r.addColorStop(0, "rgba(20,24,30,0.32)");
+    r.addColorStop(1, "rgba(20,24,30,0)");
+    g.fillStyle = r;
+    g.fillRect(0, 0, 64, 64);
+  });
+  return blobTex;
+}
+function BlobShadow({ w, d, y = 0.006 }: { w: number; d: number; y?: number }) {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]}>
+      <planeGeometry args={[w, d]} />
+      <meshBasicMaterial map={blobTexture()} transparent depthWrite={false} />
+    </mesh>
+  );
+}
+
+const SCREEN_VARIANT = (colour: string): number => {
+  let h = 0;
+  for (let i = 0; i < colour.length; i++) h = (h * 31 + colour.charCodeAt(i)) | 0;
+  return Math.abs(h) % SCREEN_WALLPAPERS.length;
+};
+
 const std = (c: string, r = 0.4, m = 0.3) => <meshStandardMaterial color={c} roughness={r} metalness={m} />;
 
 // One product on a surface at height `y`, facing along `rotY` (0 faces +z).
@@ -380,10 +522,16 @@ function Device({
             <boxGeometry args={[0.36, 0.018, 0.25]} />
             {std(SILVER)}
           </mesh>
-          <mesh position={[0, 0.13, -0.11]} rotation={[-0.2, 0, 0]}>
-            <boxGeometry args={[0.36, 0.24, 0.012]} />
-            {std(colour, 0.35)}
-          </mesh>
+          <group position={[0, 0.13, -0.11]} rotation={[-0.2, 0, 0]}>
+            <mesh>
+              <boxGeometry args={[0.36, 0.24, 0.012]} />
+              {std(colour, 0.35)}
+            </mesh>
+            <mesh position={[0, 0, 0.0065]}>
+              <planeGeometry args={[0.33, 0.21]} />
+              <meshBasicMaterial map={screenTexture("laptop", SCREEN_VARIANT(colour))} toneMapped={false} />
+            </mesh>
+          </group>
         </>
       )}
       {kind === "tabletKb" && (
@@ -392,10 +540,16 @@ function Device({
             <boxGeometry args={[0.27, 0.016, 0.19]} />
             {std("#3a3f47", 0.6, 0.1)}
           </mesh>
-          <mesh position={[0, 0.115, -0.08]} rotation={[-0.25, 0, 0]}>
-            <boxGeometry args={[0.27, 0.2, 0.012]} />
-            {std(colour, 0.35, 0.4)}
-          </mesh>
+          <group position={[0, 0.115, -0.08]} rotation={[-0.25, 0, 0]}>
+            <mesh>
+              <boxGeometry args={[0.27, 0.2, 0.012]} />
+              {std(colour, 0.35, 0.4)}
+            </mesh>
+            <mesh position={[0, 0, 0.0065]}>
+              <planeGeometry args={[0.245, 0.175]} />
+              <meshBasicMaterial map={screenTexture("tabletKb", SCREEN_VARIANT(colour))} toneMapped={false} />
+            </mesh>
+          </group>
         </>
       )}
       {(kind === "phone" || kind === "tablet") && (
@@ -404,10 +558,16 @@ function Device({
             <boxGeometry args={[kind === "tablet" ? 0.2 : 0.11, 0.02, 0.11]} />
             {std(STAND, 0.5, 0.4)}
           </mesh>
-          <mesh position={[0, kind === "tablet" ? 0.14 : 0.12, -0.02]} rotation={[-0.3, 0, 0]}>
-            <boxGeometry args={kind === "tablet" ? [0.26, 0.2, 0.012] : [0.1, 0.2, 0.01]} />
-            {std(colour, 0.3, 0.4)}
-          </mesh>
+          <group position={[0, kind === "tablet" ? 0.14 : 0.12, -0.02]} rotation={[-0.3, 0, 0]}>
+            <mesh>
+              <boxGeometry args={kind === "tablet" ? [0.26, 0.2, 0.012] : [0.1, 0.2, 0.01]} />
+              {std(colour, 0.3, 0.4)}
+            </mesh>
+            <mesh position={[0, 0, kind === "tablet" ? 0.0065 : 0.0055]}>
+              <planeGeometry args={kind === "tablet" ? [0.235, 0.175] : [0.088, 0.184]} />
+              <meshBasicMaterial map={screenTexture(kind, SCREEN_VARIANT(colour))} toneMapped={false} />
+            </mesh>
+          </group>
         </>
       )}
       {kind === "watch" && (
@@ -419,6 +579,10 @@ function Device({
           <mesh position={[0, 0.1, 0]}>
             <boxGeometry args={[0.09, 0.1, 0.03]} />
             {std("#1c1f26", 0.3, 0.4)}
+          </mesh>
+          <mesh position={[0, 0.1, 0.0155]}>
+            <planeGeometry args={[0.075, 0.085]} />
+            <meshBasicMaterial map={screenTexture("watch", SCREEN_VARIANT(colour))} toneMapped={false} />
           </mesh>
           <mesh position={[0, 0.1, 0.01]}>
             <boxGeometry args={[0.05, 0.2, 0.025]} />
@@ -435,6 +599,14 @@ function Device({
           <mesh position={[0, 0.06, 0]}>
             <boxGeometry args={[0.1, 0.07, 0.04]} />
             {std("#f4f4f2", 0.4, 0.1)}
+          </mesh>
+          <mesh position={[0, 0.07, 0.0205]}>
+            <boxGeometry args={[0.1, 0.004, 0.002]} />
+            {std("#c9ccd1", 0.5, 0.1)}
+          </mesh>
+          <mesh position={[0, 0.05, 0.0205]}>
+            <cylinderGeometry args={[0.006, 0.006, 0.002, 10]} />
+            {std("#33d17a", 0.4, 0.1)}
           </mesh>
         </>
       )}
@@ -459,7 +631,7 @@ function Device({
       {kind === "speaker" && (
         <mesh position={[0, 0.1, 0]}>
           <cylinderGeometry args={[0.09, 0.1, 0.2, 20]} />
-          {std(colour, 0.7, 0.05)}
+          <meshStandardMaterial color={colour} map={grilleTexture()} roughness={0.7} metalness={0.05} />
         </mesh>
       )}
       {kind === "airtag" && (
@@ -482,16 +654,33 @@ function Device({
 function Table({ box }: { box: TableSpec }) {
   const kinds = box.products as readonly Kind[];
   const inset = 0.2; // a product stands this far in from its edge
+  // The long sides carry a row of the same product (a real table is long, with
+  // a product every half metre or so); the two ends carry one product each.
+  const perSide = Math.max(1, Math.floor((box.d - 0.5) / 0.55) + 1);
+  const along = (i: number): number => (perSide === 1 ? 0 : (i / (perSide - 1) - 0.5) * (box.d - 0.7));
   const items = box.service
     ? []
     : [
-        { x: box.x - (box.w / 2 - inset), z: box.z, rotY: -Math.PI / 2, kind: kinds[0] },
-        { x: box.x + (box.w / 2 - inset), z: box.z, rotY: Math.PI / 2, kind: kinds[1] },
+        ...Array.from({ length: perSide }, (_, i) => ({
+          x: box.x - (box.w / 2 - inset),
+          z: box.z + along(i),
+          rotY: -Math.PI / 2,
+          kind: kinds[0],
+        })),
+        ...Array.from({ length: perSide }, (_, i) => ({
+          x: box.x + (box.w / 2 - inset),
+          z: box.z + along(i),
+          rotY: Math.PI / 2,
+          kind: kinds[1],
+        })),
         { x: box.x, z: box.z - (box.d / 2 - inset), rotY: Math.PI, kind: kinds[2] },
         { x: box.x, z: box.z + (box.d / 2 - inset), rotY: 0, kind: kinds[3] },
       ];
   return (
     <group>
+      <group position={[box.x, 0, box.z]}>
+        <BlobShadow w={box.w + 0.9} d={box.d + 0.9} />
+      </group>
       {/* a top on four legs, so you can see under it like the real ones */}
       <mesh position={[box.x, box.h - 0.04, box.z]}>
         <boxGeometry args={[box.w, 0.08, box.d]} />
@@ -516,7 +705,7 @@ function Table({ box }: { box: TableSpec }) {
           y={box.h}
           z={it.z}
           rotY={it.rotY}
-          colour={DEVICE_COLOURS[(i + Math.round(box.z * 3) + 6) % DEVICE_COLOURS.length]}
+          colour={DEVICE_COLOURS[(((i + Math.round(box.z * 3) + 6) % DEVICE_COLOURS.length) + DEVICE_COLOURS.length) % DEVICE_COLOURS.length]}
         />
       ))}
     </group>
@@ -1102,7 +1291,7 @@ export function Room() {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial map={floor} roughness={0.8} />
+        <meshStandardMaterial map={floor} roughness={0.42} metalness={0.05} />
       </mesh>
 
       {/* ceiling: grey slats running across the room, long light panels in

@@ -1,9 +1,12 @@
 import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
+import { PMREMGenerator } from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Group } from "three";
 import { poseChanged } from "../../shared/pose.ts";
-import { SPAWN, type Pose } from "../../shared/protocol.ts";
+import { avoidPeople } from "../../shared/people.ts";
+import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions } from "../../shared/world.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
 import { Npcs } from "./Npcs.tsx";
@@ -38,10 +41,11 @@ function Player() {
     // checks. It only moves your own view: the server still clamps and relays
     // whatever pose you then send.
     const at = new URLSearchParams(location.search).get("at")?.split(",").map(Number);
-    const start = at && at.length === 3 && at.every(Number.isFinite) ? at : null;
-    camera.position.set(start ? start[0] : SPAWN.x, EYE_HEIGHT, start ? start[1] : SPAWN.z);
+    // a fourth number is the pitch in degrees (negative looks down)
+    const start = at && (at.length === 3 || at.length === 4) && at.every(Number.isFinite) ? at : null;
+    camera.position.set(start ? start[0] : SPAWN.x, STORE_Y + EYE_HEIGHT, start ? start[1] : SPAWN.z);
     camera.rotation.order = "YXZ";
-    camera.rotation.set(0, start ? (start[2] * Math.PI) / 180 : SPAWN.ry, 0);
+    camera.rotation.set(start && start.length === 4 ? (start[3] * Math.PI) / 180 : 0, start ? (start[2] * Math.PI) / 180 : SPAWN.ry, 0);
     const down = (e: KeyboardEvent) => keys.add(e.code);
     const up = (e: KeyboardEvent) => keys.delete(e.code);
     const blur = () => keys.clear();
@@ -90,7 +94,10 @@ function Player() {
     if (SHOT) return;
     ({ x, z } = clampToWalkable(net.role, x, z));
     ({ x, z } = resolveCollisions(x, z, net.role));
-    camera.position.set(x, EYE_HEIGHT, z);
+    // people are solid too: other visitors, staff, customers, walkers
+    ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow()));
+    ({ x, z } = clampToWalkable(net.role, x, z));
+    camera.position.set(x, STORE_Y + EYE_HEIGHT, z);
     net.me.x = x;
     net.me.z = z;
 
@@ -135,7 +142,7 @@ function Remotes() {
     root.current?.children.forEach((child) => {
       const r = net.remotes.get(child.name);
       if (r) {
-        child.position.set(r.x, 0, r.z);
+        child.position.set(r.x, STORE_Y, r.z);
         child.rotation.y = r.ry;
       }
     });
@@ -144,7 +151,7 @@ function Remotes() {
   return (
     <group ref={root}>
       {[...live.remotes.values()].map((r) => (
-        <group key={r.info.id} name={r.info.id} position={[r.x, 0, r.z]}>
+        <group key={r.info.id} name={r.info.id} position={[r.x, STORE_Y, r.z]}>
           <Person
             id={r.info.id}
             shirt={r.info.colour}
@@ -157,6 +164,24 @@ function Remotes() {
   );
 }
 
+// Soft reflections on glass, metal and the polished floor, from a small
+// procedural room (no image download, so it costs nothing to load).
+function Reflections() {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pmrem = new PMREMGenerator(gl);
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    scene.environmentIntensity = 0.45;
+    return () => {
+      scene.environment = null;
+      env.dispose();
+      pmrem.dispose();
+    };
+  }, [gl, scene]);
+  return null;
+}
+
 export function Store() {
   return (
     <Canvas
@@ -166,11 +191,14 @@ export function Store() {
       style={{ position: "fixed", inset: 0 }}
     >
       <color attach="background" args={["#dfe3e7"]} />
+      <Reflections />
       <hemisphereLight args={["#ffffff", "#f1f3f5", 1.9]} />
       <directionalLight position={[4, 8, -3]} intensity={0.8} />
       {/* daylight through the glass front */}
       <directionalLight position={[0, 6, -14]} intensity={0.5} />
-      <Room />
+      <group position={[0, STORE_Y, 0]}>
+        <Room />
+      </group>
       <Mall />
       <MallPeople />
       <fog attach="fog" args={["#dfe3e7", 28, 85]} />

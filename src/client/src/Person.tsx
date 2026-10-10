@@ -1,5 +1,6 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
+import { CanvasTexture } from "three";
 import type { Group } from "three";
 
 // A simple, lean, human-shaped figure built from primitives, with a walk
@@ -9,10 +10,36 @@ import type { Group } from "three";
 
 export type Mode = "idle" | "observe" | "work";
 
+export type Mood = "neutral" | "smile" | "curious" | "focused" | "surprised" | "worried";
+
 export interface PersonState {
   speed: number; // metres per second
   mode: Mode;
+  mood?: Mood; // face; if left out it follows what they are doing
 }
+
+// What each expression does to the face. brow: height (m) and the tilt of
+// each brow (radians, positive raises the outer end... see below); curve is
+// the mouth corners (positive up, a smile; negative down); open is how far the
+// mouth is open.
+interface Face {
+  browY: number;
+  browL: number;
+  browR: number;
+  browLY: number;
+  browRY: number;
+  curve: number;
+  open: number;
+  width: number;
+}
+const FACES: Record<Mood, Face> = {
+  neutral: { browY: 0, browL: 0, browR: 0, browLY: 0, browRY: 0, curve: 0.05, open: 0, width: 1 },
+  smile: { browY: 0.004, browL: -0.12, browR: 0.12, browLY: 0, browRY: 0, curve: 0.55, open: 0.0, width: 1.25 },
+  curious: { browY: 0.004, browL: 0, browR: 0, browLY: 0.01, browRY: -0.004, curve: 0.12, open: 0, width: 0.8 },
+  focused: { browY: -0.008, browL: 0.35, browR: -0.35, browLY: 0, browRY: 0, curve: 0, open: 0, width: 0.7 },
+  surprised: { browY: 0.016, browL: 0, browR: 0, browLY: 0, browRY: 0, curve: 0, open: 1, width: 0.5 },
+  worried: { browY: 0.006, browL: -0.45, browR: 0.45, browLY: 0, browRY: 0, curve: -0.4, open: 0, width: 0.9 },
+};
 
 const SKIN_TONES = ["#f1c9a5", "#d9a679", "#b9835a", "#8d5a3b", "#5e3b27"];
 const PANTS = ["#2b2f3a", "#3a3d45", "#4a4036", "#2f3e52"];
@@ -22,6 +49,21 @@ function hashPick<T>(s: string, list: T[], salt = 0): T {
   let h = salt;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return list[Math.abs(h) % list.length];
+}
+
+let blob: CanvasTexture | null = null;
+function personBlob(): CanvasTexture {
+  if (blob) return blob;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 64;
+  const g = canvas.getContext("2d")!;
+  const r = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+  r.addColorStop(0, "rgba(15,18,24,0.5)");
+  r.addColorStop(1, "rgba(15,18,24,0)");
+  g.fillStyle = r;
+  g.fillRect(0, 0, 64, 64);
+  blob = new CanvasTexture(canvas);
+  return blob;
 }
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
@@ -44,6 +86,14 @@ export function Person({
   const torso = useRef<Group>(null);
   const head = useRef<Group>(null);
   const root = useRef<Group>(null);
+  const browL = useRef<Group>(null);
+  const browR = useRef<Group>(null);
+  const mouthL = useRef<Group>(null);
+  const mouthR = useRef<Group>(null);
+  const mouthMid = useRef<Group>(null);
+  const eyes = useRef<Group>(null);
+  const face = useRef<Face>({ ...FACES.neutral });
+  const blinkAt = useRef(2 + (id.length % 5));
   const phase = useRef(0);
   const clock = useRef(0);
   const skin = hashPick(id, SKIN_TONES);
@@ -94,6 +144,42 @@ export function Person({
         aR = 0.12;
       }
     }
+    // expression: the mood asked for, else one that fits what they are doing
+    const wanted: Mood =
+      getState().mood ??
+      (walk > 0.05 ? "neutral" : mode === "observe" ? "curious" : mode === "work" ? "focused" : cap ? "smile" : "neutral");
+    const target = FACES[wanted];
+    const f = face.current;
+    const k = 1 - Math.exp(-8 * dt);
+    for (const key of Object.keys(target) as Array<keyof Face>) f[key] += (target[key] - f[key]) * k;
+    // a slow, small smile now and then keeps a still person from looking painted
+    const idleSmile = walk < 0.05 && wanted === "neutral" ? Math.max(0, Math.sin(t * 0.3 + id.length)) * 0.35 : 0;
+    const curve = f.curve + idleSmile;
+    if (browL.current) {
+      browL.current.rotation.z = f.browL;
+      browL.current.position.y = 0.052 + f.browY + f.browLY;
+    }
+    if (browR.current) {
+      browR.current.rotation.z = f.browR;
+      browR.current.position.y = 0.052 + f.browY + f.browRY;
+    }
+    if (mouthL.current) {
+      mouthL.current.rotation.z = -curve;
+      mouthL.current.position.y = -0.047 + curve * 0.006;
+      mouthL.current.scale.x = f.width * (1 - f.open * 0.9);
+    }
+    if (mouthR.current) {
+      mouthR.current.rotation.z = curve;
+      mouthR.current.position.y = -0.047 + curve * 0.006;
+      mouthR.current.scale.x = f.width * (1 - f.open * 0.9);
+    }
+    if (mouthMid.current) mouthMid.current.scale.set(0.4 + f.open * 0.9, 0.2 + f.open * 2.4, 1);
+    // blink: eyes close for a moment every few seconds
+    if (t > blinkAt.current) {
+      if (t > blinkAt.current + 0.12) blinkAt.current = t + 2.5 + ((id.charCodeAt(0) + Math.floor(t)) % 4);
+      if (eyes.current) eyes.current.scale.y = 0.1;
+    } else if (eyes.current) eyes.current.scale.y = 1;
+
     if (armL.current) armL.current.rotation.x = aL;
     if (armR.current) armR.current.rotation.x = aR;
     if (torso.current) torso.current.rotation.x += (lean - torso.current.rotation.x) * 0.15;
@@ -105,6 +191,11 @@ export function Person({
 
   return (
     <group ref={root}>
+      {/* a soft shadow on the floor under them */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
+        <circleGeometry args={[0.42, 20]} />
+        <meshBasicMaterial map={personBlob()} transparent depthWrite={false} />
+      </mesh>
       {/* legs, pivoting at the hips */}
       {[
         { ref: legL, x: -0.09 },
@@ -153,8 +244,47 @@ export function Person({
             <sphereGeometry args={[0.115, 16, 12]} />
             <meshStandardMaterial color={skin} roughness={0.65} />
           </mesh>
+          {/* face: eyes, brows and mouth, which change with the expression */}
+          <group ref={eyes} position={[0, 0.022, -0.104]}>
+            {[-0.04, 0.04].map((x) => (
+              <mesh key={x} position={[x, 0, 0]}>
+                <sphereGeometry args={[0.0155, 8, 6]} />
+                <meshStandardMaterial color="#1b1b1f" roughness={0.3} />
+              </mesh>
+            ))}
+          </group>
+          <group ref={browL} position={[-0.04, 0.052, -0.103]}>
+            <mesh>
+              <boxGeometry args={[0.04, 0.008, 0.01]} />
+              <meshStandardMaterial color="#3a2a1f" roughness={0.8} />
+            </mesh>
+          </group>
+          <group ref={browR} position={[0.04, 0.052, -0.103]}>
+            <mesh>
+              <boxGeometry args={[0.04, 0.008, 0.01]} />
+              <meshStandardMaterial color="#3a2a1f" roughness={0.8} />
+            </mesh>
+          </group>
+          <group ref={mouthL} position={[-0.016, -0.047, -0.105]}>
+            <mesh>
+              <boxGeometry args={[0.03, 0.007, 0.008]} />
+              <meshStandardMaterial color="#7a2f2f" roughness={0.6} />
+            </mesh>
+          </group>
+          <group ref={mouthR} position={[0.016, -0.047, -0.105]}>
+            <mesh>
+              <boxGeometry args={[0.03, 0.007, 0.008]} />
+              <meshStandardMaterial color="#7a2f2f" roughness={0.6} />
+            </mesh>
+          </group>
+          <group ref={mouthMid} position={[0, -0.047, -0.106]} scale={[0.4, 0.2, 1]}>
+            <mesh>
+              <boxGeometry args={[0.03, 0.012, 0.008]} />
+              <meshStandardMaterial color="#4a1a1a" roughness={0.6} />
+            </mesh>
+          </group>
           {/* nose, so you can tell which way they are looking */}
-          <mesh position={[0, -0.01, -0.12]}>
+          <mesh position={[0, 0.0, -0.118]}>
             <boxGeometry args={[0.04, 0.05, 0.04]} />
             <meshStandardMaterial color={skin} roughness={0.65} />
           </mesh>
