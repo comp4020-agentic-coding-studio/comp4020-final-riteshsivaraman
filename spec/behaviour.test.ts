@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BEHAVIOURS, DURATION, MOODS, WEIGHTS, avoidanceTurn, durationFor, pickBehaviour, pickMood } from "../src/shared/behaviour.ts";
+import { BEHAVIOURS, BETWEEN_INTERACTIONS, DURATION, MOODS, WEIGHTS, avoidanceTurn, durationFor, pickBehaviour, pickMood } from "../src/shared/behaviour.ts";
 
 // Promise: a crowd of people each choosing for themselves is varied, nobody
 // repeats the same thing back to back, and every behaviour has a mood and a
@@ -13,6 +13,14 @@ describe("behaviour", () => {
     expect([...seen].sort()).toEqual([...solo].sort());
     // and none that only make sense with a partner
     for (const b of ["listen", "handshake", "clap", "bow"] as const) expect(seen.has(b)).toBe(false);
+  });
+
+  it("can be limited to a set, for a crowd that only interacts", () => {
+    const only = BETWEEN_INTERACTIONS;
+    const seen = new Set(Array.from({ length: 500 }, (_, i) => pickBehaviour(i / 500, undefined, only)));
+    expect([...seen].sort()).toEqual([...only].sort());
+    // and still never repeats back to back within the set
+    for (const b of only) for (let i = 0; i < 100; i++) expect(pickBehaviour(i / 100, b, only)).not.toBe(b);
   });
 
   it("never repeats the one it was asked to skip", () => {

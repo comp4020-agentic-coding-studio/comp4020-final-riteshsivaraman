@@ -82,11 +82,17 @@ export const MOODS: Record<Behaviour, string[]> = {
   bow: ["smile", "neutral"],
 };
 
-// Picks one by weight from r in [0, 1). `not` is skipped, so a person never
+// What a person does on their own when the crowd is "interactions only": they
+// stand about and wander between conversations, with no gestures to nobody.
+export const BETWEEN_INTERACTIONS: Behaviour[] = ["idle", "walk"];
+
+// Picks one by weight from r in [0, 1). `only`, if given, limits the choice.
+// `not` is skipped, so a person never
 // repeats the same thing back to back. Weight 0 is never picked: those are only
 // ever part of an interaction.
-export function pickBehaviour(r: number, not?: Behaviour): Behaviour {
-  const pool = BEHAVIOURS.filter((b) => b !== not && WEIGHTS[b] > 0);
+export function pickBehaviour(r: number, not?: Behaviour, only?: ReadonlyArray<Behaviour>): Behaviour {
+  const pool = BEHAVIOURS.filter((b) => b !== not && WEIGHTS[b] > 0 && (!only || only.includes(b)));
+  if (pool.length === 0) return only?.[0] ?? "idle";
   const total = pool.reduce((a, b) => a + WEIGHTS[b], 0);
   let x = Math.min(0.999999, Math.max(0, r)) * total;
   for (const b of pool) {

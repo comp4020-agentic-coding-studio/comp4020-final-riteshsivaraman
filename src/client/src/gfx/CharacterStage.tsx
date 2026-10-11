@@ -2,7 +2,7 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appearanceFor } from "../../../shared/appearance.ts";
-import { BEHAVIOURS, durationFor, pickBehaviour, pickMood, type Behaviour } from "../../../shared/behaviour.ts";
+import { BEHAVIOURS, BETWEEN_INTERACTIONS, durationFor, pickBehaviour, pickMood, type Behaviour } from "../../../shared/behaviour.ts";
 import { KINDS, layout, stepInteractions, zoneOf, type Active, type SimAgent } from "../../../shared/interaction.ts";
 import { freePoint, goalBlocked, headingTo, pushOutOfHard, stepWalker, type Obstacle, type Walker } from "../../../shared/steering.ts";
 import { separateFromPeople } from "../../../shared/world.ts";
@@ -27,6 +27,15 @@ const STATIC_OBSTACLES: Obstacle[] = [
   { kind: "rect", minX: -2.2, maxX: 2.2, minZ: 7.0, maxZ: 7.8, hard: true },
 ];
 const PERSON_R = 0.32;
+
+type CrowdMode = "all" | "social" | "solo" | "off";
+const CROWD_MODES: CrowdMode[] = ["all", "social", "solo", "off"];
+const CROWD_LABEL: Record<CrowdMode, string> = {
+  all: "everything",
+  social: "interactions only",
+  solo: "solo behaviours only",
+  off: "nothing (standing)",
+};
 
 // `?speed=8` runs the crowd faster than real time, to see a long run quickly.
 const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 1);
@@ -61,13 +70,14 @@ interface PersonProps {
   walking: boolean;
   auto: boolean; // each person picks their own behaviours on their own timer
   independent: boolean; // each person changes their own expression
+  socialOnly: boolean; // between interactions they only stand about and wander
   roam: boolean; // walking moves them about the stage
   agents: AgentState[]; // everyone on the stage (the crowd), to walk round
   agent?: AgentState; // present in the crowd: an interaction can direct this person
   count: number; // how many of the pool are on the stage
 }
 
-function Person({ char, seed, offset = 0, expr, manual, walking, auto, independent, roam, agents, agent, count }: PersonProps) {
+function Person({ char, seed, offset = 0, expr, manual, walking, auto, independent, socialOnly, roam, agents, agent, count }: PersonProps) {
   const rnd = useRef(rng(seed * 7919 + offset * 104729 + 13));
   const mood = useRef<Mood>({ ...expr });
   // `?phase=1.2` freezes a mid-stride, so a still picture can show the walk
@@ -97,7 +107,7 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
     }
     if (auto) {
       if (nextBehaviour.current < 0 || t.current >= nextBehaviour.current) {
-        const b = pickBehaviour(r(), mode.current);
+        const b = pickBehaviour(r(), mode.current, socialOnly ? BETWEEN_INTERACTIONS : undefined);
         mode.current = b;
         nextBehaviour.current = t.current + durationFor(b, r());
         const name = pickMood(b, r());
@@ -321,7 +331,20 @@ export function CharacterStage() {
   const [walking, setWalking] = useState(() => new URLSearchParams(location.search).has("walk"));
   const [crowd, setCrowd] = useState(() => new URLSearchParams(location.search).has("crowd"));
   const [stats, setStats] = useState("");
-  const [interact, setInteract] = useState(() => new URLSearchParams(location.search).has("interact"));
+  // What the crowd does: everything, only things with each other, only things
+  // alone, or nothing. (The old ?auto and ?interact flags still pick one.)
+  const [crowdMode, setCrowdMode] = useState<CrowdMode>(() => {
+    const q = new URLSearchParams(location.search);
+    const m = q.get("mode") as CrowdMode | null;
+    if (m && CROWD_MODES.includes(m)) return m;
+    if (q.has("auto") && q.has("interact")) return "all";
+    if (q.has("interact")) return "social";
+    if (q.has("auto")) return "solo";
+    return "off";
+  });
+  const auto = crowdMode !== "off";
+  const interact = crowdMode === "all" || crowdMode === "social";
+  const socialOnly = crowdMode === "social";
   const [summary, setSummary] = useState("none right now");
   const scene = new URLSearchParams(location.search).get("scene");
   const [count, setCount] = useState(() => Math.max(1, Math.min(MAX_PEOPLE, Number(new URLSearchParams(location.search).get("n") ?? 24))));
@@ -329,7 +352,6 @@ export function CharacterStage() {
   const near = new URLSearchParams(location.search).has("near");
   const playAt = Number(new URLSearchParams(location.search).get("playt") ?? 1.5);
   const [behaveIx, setBehaveIx] = useState(() => Number(new URLSearchParams(location.search).get("behave") ?? 0));
-  const [auto, setAuto] = useState(() => new URLSearchParams(location.search).has("auto"));
   const [independent, setIndependent] = useState(() => new URLSearchParams(location.search).has("indep"));
   const behaviour = BEHAVIOURS[behaveIx % BEHAVIOURS.length];
   const [eyeIx, setEyeIx] = useState(() => Number(new URLSearchParams(location.search).get("eyes") ?? EYE_STYLES.indexOf("round")));
@@ -418,9 +440,8 @@ export function CharacterStage() {
       if (e.key === "t") setShadeIx((i) => i + 1);
       if (e.key === "g") setBeardIx((i) => i + 1);
       if (e.key === "v") setBehaveIx((i) => i + 1);
-      if (e.key === "p") setAuto((v) => !v);
+      if (e.key === "m") setCrowdMode((m) => CROWD_MODES[(CROWD_MODES.indexOf(m) + 1) % CROWD_MODES.length]);
       if (e.key === "x") setIndependent((v) => !v);
-      if (e.key === "i") setInteract((v) => !v);
       if (e.key === "+" || e.key === "=") setCount((c) => Math.min(MAX_PEOPLE, c + 4));
       if (e.key === "-" || e.key === "_") setCount((c) => Math.max(1, c - 4));
     };
@@ -441,10 +462,10 @@ export function CharacterStage() {
         </mesh>
         {crowd ? (
           people.map((c, i) => (
-            <Person key={`${seed}-${i}`} char={c} seed={seed} offset={i} expr={EXPRESSIONS[i % 2 === 0 ? 0 : 1]} manual="idle" walking={walking} auto={auto} independent={independent} roam agents={agents} agent={agents[i]} count={count} />
+            <Person key={`${seed}-${i}`} char={c} seed={seed} offset={i} expr={EXPRESSIONS[i % 2 === 0 ? 0 : 1]} manual="idle" walking={walking} auto={auto} independent={independent} socialOnly={socialOnly} roam agents={agents} agent={agents[i]} count={count} />
           ))
         ) : (
-          <Person key={id} char={single} seed={seed} expr={expr} manual={behaviour} walking={walking} auto={false} independent={false} roam={false} agents={[]} count={MAX_PEOPLE} />
+          <Person key={id} char={single} seed={seed} expr={expr} manual={behaviour} walking={walking} auto={false} independent={false} socialOnly={false} roam={false} agents={[]} count={MAX_PEOPLE} />
         )}
         {crowd && <Interactions agents={agents} count={count} zonesRef={zonesRef} enabled={interact} scene={scene} playAt={playAt} onSummary={setSummary} />}
         {crowd && <Collision people={people} count={count} />}
@@ -469,9 +490,8 @@ export function CharacterStage() {
         <button style={btn} onClick={() => setCrowd((v) => !v)}>{crowd ? "Single (C)" : "Crowd of 40 (C)"}</button>
         {crowd ? (
           <>
-            <button style={btn} onClick={() => setAuto((v) => !v)}>Behaviours: {auto ? "each their own" : "off"} (P)</button>
+            <button style={btn} onClick={() => setCrowdMode((m) => CROWD_MODES[(CROWD_MODES.indexOf(m) + 1) % CROWD_MODES.length])}>Crowd does: {CROWD_LABEL[crowdMode]} (M)</button>
             <button style={btn} onClick={() => setIndependent((v) => !v)}>Expressions: {independent || auto ? "independent" : "shared"} (X)</button>
-            <button style={btn} onClick={() => setInteract((v) => !v)}>Interactions: {interact ? "on" : "off"} (I)</button>
             <label style={{ ...btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "default" }}>
               People
               <input type="range" min={1} max={MAX_PEOPLE} value={count} onChange={(e) => setCount(Number(e.target.value))} style={{ width: 160 }} />
@@ -491,7 +511,7 @@ export function CharacterStage() {
       <div style={{ position: "fixed", left: 16, bottom: 16, fontSize: 13, color: "#111", lineHeight: 1.5, zIndex: 5 }}>
         {crowd ? (
           <div>
-            <strong>{count} people</strong> · interactions {interact ? "on" : "off"}: <strong>{summary}</strong> · behaviours {auto ? "each their own" : "off"} · expressions {independent || auto ? "independent" : "shared"} · {stats} · {(people[0]?.triangles ?? 0).toFixed(0)} triangles each, 1 mesh each
+            <strong>{count} people</strong> · crowd does <strong>{CROWD_LABEL[crowdMode]}</strong> · interactions now: <strong>{summary}</strong> · expressions {independent || auto ? "independent" : "shared"} · {stats} · {(people[0]?.triangles ?? 0).toFixed(0)} triangles each, 1 mesh each
           </div>
         ) : (
           <>
