@@ -250,6 +250,13 @@ Ritesh's app to understand and defend at a crit, not just to have built. A
 status update that only says what changed is a missed opportunity if the
 underlying structure is new to him.
 
+When a report's "what I need from you" list involves reading something (a
+file, a diff, a commit, a drawing, a running page), open all of it for him
+before sending the list: `code <path>` in VS Code, `open <path>` otherwise,
+the diff written to a scratch file and opened, the dev server's URL if it
+needs a browser. Never hand him a path or hash to go and find. Say in the
+report what was opened.
+
 End every response with one or two lessons from the COMP4020 lecture notes
 relevant to whatever comes next — not necessarily the most recent lecture,
 whichever week's content actually applies (e.g. drawing on persistence or
