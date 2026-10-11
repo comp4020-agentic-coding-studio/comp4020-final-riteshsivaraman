@@ -63,6 +63,7 @@ import {
   LAPTOP_MODELS,
   TABLET_MODELS,
   bodyMaterial,
+  keyboardMaterial,
   desktopGeo,
   displayGeo,
   laptopGeo,
@@ -92,6 +93,8 @@ function ModelMeshes({ geo, colour, model, screenMode }: { geo: DeviceGeo; colou
     <>
       <mesh geometry={geo.body} material={bodyMaterial(colour)} />
       {geo.screen && <mesh geometry={geo.screen} material={screenMaterial(screenDesign(colour + model, screenMode), geo.format)} />}
+      {/* a tablet's keyboard: its own white or black, never the tablet's colour */}
+      {geo.accessory && <mesh geometry={geo.accessory.geo} material={keyboardMaterial(geo.accessory.finish)} />}
     </>
   );
 }

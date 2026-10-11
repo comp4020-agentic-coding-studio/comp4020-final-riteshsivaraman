@@ -160,12 +160,14 @@ function drawAtlas(g: G) {
     const kh = keyboard(g, x + (w - kw) / 2, y + 7, kw, "#cfcfcf", "#e4e4e4");
     trackpad(g, x + w / 2, y + 7 + kh + 8, w * 0.4, h - kh - 22, "#f7f7f7");
   }
-  // tablet keyboard folio: keys, a function row, a small trackpad
+  // tablet keyboard folio: keys, a function row, a small trackpad. Light greys
+  // on white, so the keyboard's own white or black finish tints it (white keys
+  // on white, black keys on black, as the real ones are).
   {
     const [x, y, w, h] = R_FOLIO;
     const kw = w * 0.92;
-    const kh = keyboard(g, x + (w - kw) / 2, y + 10, kw, "#101012", null);
-    trackpad(g, x + w / 2, y + 10 + kh + 10, w * 0.38, h - kh - 34);
+    const kh = keyboard(g, x + (w - kw) / 2, y + 10, kw, "#e4e4e6", "#a8a8aa");
+    trackpad(g, x + w / 2, y + 10 + kh + 10, w * 0.38, h - kh - 34, "#f6f6f6");
   }
   // desktop keyboard: light keys on a frame of the finish colour
   {
@@ -221,6 +223,19 @@ export function bodyMaterial(colour: string): MeshStandardMaterial {
     roughness: 0.3,
   });
   bodyMats.set(colour, m);
+  return m;
+}
+
+// The iPad keyboards' own finish (white or black, matte), shared by every
+// keyboard of that finish. The atlas folio deck is drawn in light greys so
+// the finish colour carries onto the keys.
+const KB_COLOUR: Record<KeyboardFinish, string> = { white: "#f2f2ef", black: "#36363a" };
+const kbMats = new Map<KeyboardFinish, MeshStandardMaterial>();
+export function keyboardMaterial(finish: KeyboardFinish): MeshStandardMaterial {
+  let m = kbMats.get(finish);
+  if (m) return m;
+  m = new MeshStandardMaterial({ color: new Color(KB_COLOUR[finish]), map: atlas(), vertexColors: true, metalness: 0, roughness: 0.75 });
+  kbMats.set(finish, m);
   return m;
 }
 
@@ -362,7 +377,14 @@ export function displaySize(res: readonly [number, number], ppi: number): [numbe
   return [(res[0] / ppi) * IN, (res[1] / ppi) * IN];
 }
 
-export type DeviceGeo = { body: BufferGeometry; screen: BufferGeometry | null; format: ScreenFormat };
+// `accessory`: a keyboard (and the case it holds the tablet in) drawn in its
+// own white or black finish, not the device's colour.
+export type DeviceGeo = {
+  body: BufferGeometry;
+  screen: BufferGeometry | null;
+  format: ScreenFormat;
+  accessory?: { geo: BufferGeometry; finish: KeyboardFinish };
+};
 
 const geoCache = new Map<string, DeviceGeo>();
 function cached(key: string, build: () => DeviceGeo): DeviceGeo {
@@ -376,8 +398,11 @@ function cached(key: string, build: () => DeviceGeo): DeviceGeo {
 
 // ---------- laptops ----------
 
-export type PortType = "usbc" | "magsafe" | "hdmi" | "sd" | "jack";
-// z: m from the BACK edge toward the front (estimate: no photo checked)
+export type PortType = "usbc" | "magsafe" | "hdmi" | "sd" | "jack" | "usba" | "ethernet" | "power" | "powerRound" | "button";
+// drawn as a round hole (or, for the button, a silver disc) rather than a slot
+const ROUND_PORTS: ReadonlySet<PortType> = new Set(["jack", "powerRound", "button"]);
+// z: m from the BACK edge toward the front, to the port's back end (where
+// each was checked is said at the model)
 export type Port = { type: PortType; z: number };
 const PORT_SIZE: Record<PortType, [number, number]> = {
   usbc: [0.0084, 0.0026],
@@ -385,6 +410,12 @@ const PORT_SIZE: Record<PortType, [number, number]> = {
   hdmi: [0.014, 0.0045],
   sd: [0.024, 0.0022],
   jack: [0.0035, 0.0035],
+  // desktop back panels (sizes read off the apple.com/au specs photos, 2026-10-12)
+  usba: [0.012, 0.0045],
+  ethernet: [0.013, 0.011],
+  power: [0.02, 0.011],
+  powerRound: [0.022, 0.022],
+  button: [0.0086, 0.0086],
 };
 
 export type LaptopDeck = "pro" | "air" | "neo";
@@ -398,7 +429,7 @@ export interface LaptopSpec {
   r: number; // footprint corner radius, m (estimate)
   res: readonly [number, number]; // native resolution (sourced)
   ppi: number; // (sourced)
-  notch: { w: number; h: number } | null; // camera housing cut into the display (w, h estimates)
+  notch: { w: number; h: number } | null; // camera housing cut into the display (w, h measured off apple.com/au buy-page photos, 2026-10-12)
   deck: LaptopDeck;
   ports: { left: Port[]; right: Port[] };
 }
@@ -420,7 +451,14 @@ export const MACBOOK_NEO: LaptopSpec = {
   ppi: 219,
   notch: null,
   deck: "neo",
-  ports: { left: [{ type: "usbc", z: 0.03 }, { type: "usbc", z: 0.045 }], right: [{ type: "jack", z: 0.04 }] },
+  // Ports photo-confirmed on apple.com/au/macbook-neo/specs "Charging and
+  // Expansion" side views (2026-10-12), scaled by the closed thickness: USB 3
+  // and USB 2 centred ~23 and ~39 mm from the back on the left; the jack
+  // further forward than the left ports, ~55 mm from the back on the right.
+  // (That view also shows a long slot in front of the jack, not drawn: the
+  // page does not say what it is.) The resolution and ppi are also on that
+  // page.
+  ports: { left: [{ type: "usbc", z: 0.0191 }, { type: "usbc", z: 0.0343 }], right: [{ type: "jack", z: 0.053 }] },
 };
 
 // MacBook Air (M5): same chassis as M4 (appleinsider.com M5 MacBook Air review,
@@ -428,9 +466,15 @@ export const MACBOOK_NEO: LaptopSpec = {
 // 15": 340.4 x 237.6 x 11.5 mm, 2880 x 1864 at 224 ppi (pixelmeasures.com).
 // Uniform thickness, not a wedge, since the M2 redesign (expertreviews.co.uk).
 // Ports MagSafe + two Thunderbolt left, jack right (references/products-computers.md).
+// Positions photo-confirmed 2026-10-12 on the side views on
+// apple.com/au/macbook-air/specs ("Charging and Expansion") and the buy
+// page's open side view; two scalings (thickness, depth) agree to ~5 mm.
+// From the back: MagSafe centre ~27 mm, Thunderbolt ~44 and ~59 mm; the jack
+// on the right lines up with the MagSafe (~27 mm), not mid-side as guessed.
+// The 15-inch's +4 mm shift is NOT checked (only one size is drawn there).
 const airPorts = {
-  left: [{ type: "magsafe" as const, z: 0.026 }, { type: "usbc" as const, z: 0.045 }, { type: "usbc" as const, z: 0.059 }],
-  right: [{ type: "jack" as const, z: 0.04 }],
+  left: [{ type: "magsafe" as const, z: 0.0208 }, { type: "usbc" as const, z: 0.0403 }, { type: "usbc" as const, z: 0.0548 }],
+  right: [{ type: "jack" as const, z: 0.0253 }],
 };
 export const MACBOOK_AIR_13: LaptopSpec = {
   id: "macbook-air-13",
@@ -457,18 +501,23 @@ export const MACBOOK_AIR_15: LaptopSpec = {
   r: 0.0115,
   res: [2880, 1864],
   ppi: 224,
-  ports: { left: airPorts.left.map((p) => ({ ...p, z: p.z + 0.004 })), right: [{ type: "jack", z: 0.044 }] },
+  ports: { left: airPorts.left.map((p) => ({ ...p, z: p.z + 0.004 })), right: [{ type: "jack", z: 0.0293 }] },
 };
 
 // MacBook Pro (M5 / M5 Pro / M5 Max): chassis, ports and notch unchanged from
 // M4 (bgr.com M5 Max review; appleinsider.com 16-inch M5 Max review, 2026-03).
 // 14": 312.6 x 221.2 x 15.5 mm, 3024 x 1964 at 254 ppi; 16": 355.7 x 248.1 x
 // 16.8 mm, 3456 x 2234 at 254 ppi. Ports: MagSafe, two Thunderbolt, jack on
-// the left; Thunderbolt, HDMI, SDXC on the right (bgr.com lists the set; the
-// side each sits on is from references/products-computers.md).
+// the left; Thunderbolt, HDMI, SDXC on the right. Positions photo-confirmed
+// and measured off the side views on apple.com/au/macbook-pro/specs
+// ("Charging and Expansion", 14-inch, 2026-10-12), scaled by the closed
+// thickness: every port is clustered in the back third. Left, from the
+// back: MagSafe (centre ~28 mm), two Thunderbolt (~46, ~61 mm), the jack
+// (~74 mm). Right, from the back: HDMI (~28 mm), Thunderbolt (~46 mm), SDXC
+// (~71 mm). The earlier guess had the jack and the right side's order wrong.
 const proPorts = {
-  left: [{ type: "magsafe" as const, z: 0.03 }, { type: "usbc" as const, z: 0.05 }, { type: "usbc" as const, z: 0.064 }, { type: "jack" as const, z: 0.15 }],
-  right: [{ type: "sd" as const, z: 0.05 }, { type: "hdmi" as const, z: 0.12 }, { type: "usbc" as const, z: 0.15 }],
+  left: [{ type: "magsafe" as const, z: 0.0217 }, { type: "usbc" as const, z: 0.0418 }, { type: "usbc" as const, z: 0.0568 }, { type: "jack" as const, z: 0.0718 }],
+  right: [{ type: "hdmi" as const, z: 0.0209 }, { type: "usbc" as const, z: 0.0418 }, { type: "sd" as const, z: 0.0589 }],
 };
 export const MACBOOK_PRO_14: LaptopSpec = {
   id: "macbook-pro-14",
@@ -480,7 +529,10 @@ export const MACBOOK_PRO_14: LaptopSpec = {
   r: 0.012,
   res: [3024, 1964],
   ppi: 254,
-  notch: { w: 0.032, h: 0.0072 },
+  // notch measured off the 14-inch front view on apple.com/au/shop/buy-mac/
+  // macbook-pro (2026-10-12), scaled by the lid width: ~37 mm wide, ~6.5 mm
+  // deep. (The Air's 30 x 6.5 mm checked the same way on its buy page.)
+  notch: { w: 0.037, h: 0.0065 },
   deck: "pro",
   ports: proPorts,
 };
@@ -494,8 +546,11 @@ export const MACBOOK_PRO_16: LaptopSpec = {
   r: 0.013,
   res: [3456, 2234],
   ppi: 254,
-  notch: { w: 0.032, h: 0.0072 },
+  notch: { w: 0.037, h: 0.0065 }, // same as the 14-inch (not separately measured)
   deck: "pro",
+  // the 14-inch's ports spaced 10% further back to front: NOT checked, the
+  // specs page's 16-inch side views sit behind a size toggle I did not reach
+  // in the 2026-10-12 browser session
   ports: { left: proPorts.left.map((p) => ({ ...p, z: p.z * 1.1 })), right: proPorts.right.map((p) => ({ ...p, z: p.z * 1.1 })) },
 };
 
@@ -562,7 +617,9 @@ export function laptopGeo(s: LaptopSpec): DeviceGeo {
 //
 // Tablets stand in landscape. Local frame: x along the long edge, y up the
 // short edge, the screen facing +z. "Portrait top" is drawn on the LEFT short
-// edge (an estimate of how the real one turns for landscape use).
+// edge: for the Pro, Air and iPad that is what turning the long-edge front
+// camera to the top does (specs-page drawings, 2026-10-12); for the mini,
+// whose front camera is on the portrait top, it is a choice.
 
 export type TabletRear =
   | { kind: "bump" } // iPad Pro: square bump, wide lens, LiDAR, flash, mic / light-sensor dots
@@ -580,9 +637,13 @@ export interface TabletSpec {
   ppi: number; // (sourced)
   frontCam: "long" | "short"; // which edge the front camera sits on, in landscape
   rear: TabletRear;
-  buttons: TabletButton[]; // estimate: placements not checked against a photo
+  buttons: TabletButton[]; // measured off apple.com/au specs-page drawings, 2026-10-12
   keyboard: "cantilever" | "folio" | null; // which keyboard the store shows it with
+  // The keyboard's own finish: real ones come in white or black whatever the
+  // iPad's colour (apple.com/au/shop/ipad/accessories/keyboards, 2026-10-12).
+  keyboardFinish?: KeyboardFinish;
 }
+export type KeyboardFinish = "white" | "black";
 
 // iPad Pro (M5): same form factor as M4 (en.wikipedia.org/wiki/IPad_Pro_(M5),
 // techradar.com, gizmodo.com reviews). 11": 249.7 x 177.5 x 5.3 mm, 2420 x
@@ -590,8 +651,18 @@ export interface TabletSpec {
 // (support.apple.com/en-us/125406, 125407). Front camera on the landscape
 // edge (techcrunch.com 2024-05-07). Rear: one wide lens, LiDAR, adaptive
 // flash, a mic and an ambient-light sensor in a small square bump
-// (9to5mac.com 2024-05-21) — the arrangement inside the bump is a best guess.
-// Keyboard: the cantilever Magic Keyboard (references/products-computers.md).
+// (9to5mac.com 2024-05-21); the arrangement inside the bump is now
+// photo-confirmed (see tabletParts). Buttons: measured off the "Buttons and
+// Connectors" drawing on apple.com/au/ipad-pro/specs (2026-10-12, the 13-inch
+// drawing): in portrait the top button sits on the top edge ~20 mm from the
+// right corner, the two volume buttons on the right edge ~24 and ~36 mm down,
+// the front camera mid-way down that right edge. Turned front-camera-up for
+// landscape, that puts the top button on the left edge near its top end and
+// the volume buttons on the top edge near its left end. The same corner
+// distances are used for the 11-inch (not separately drawn).
+// Keyboard: the cantilever Magic Keyboard (references/products-computers.md),
+// sold in white or black regardless of the iPad's finish (apple.com/au/shop/
+// ipad/accessories/keyboards, 2026-10-12).
 export const IPAD_PRO_11: TabletSpec = {
   id: "ipad-pro-11",
   name: "iPad Pro 11-inch",
@@ -604,11 +675,12 @@ export const IPAD_PRO_11: TabletSpec = {
   frontCam: "long",
   rear: { kind: "bump" },
   buttons: [
-    { edge: "left", at: 0.05, len: 0.018 },
-    { edge: "top", at: -0.07, len: 0.012 },
-    { edge: "top", at: -0.052, len: 0.012 },
+    { edge: "left", at: 0.1775 / 2 - 0.02, len: 0.0125 },
+    { edge: "top", at: -0.2497 / 2 + 0.0244, len: 0.012 },
+    { edge: "top", at: -0.2497 / 2 + 0.036, len: 0.012 },
   ],
   keyboard: "cantilever",
+  keyboardFinish: "black",
 };
 export const IPAD_PRO_13: TabletSpec = {
   ...IPAD_PRO_11,
@@ -620,16 +692,21 @@ export const IPAD_PRO_13: TabletSpec = {
   r: 0.012,
   res: [2752, 2064],
   buttons: [
-    { edge: "left", at: 0.065, len: 0.018 },
-    { edge: "top", at: -0.085, len: 0.012 },
-    { edge: "top", at: -0.067, len: 0.012 },
+    { edge: "left", at: 0.2155 / 2 - 0.02, len: 0.0125 },
+    { edge: "top", at: -0.2816 / 2 + 0.0244, len: 0.012 },
+    { edge: "top", at: -0.2816 / 2 + 0.036, len: 0.012 },
   ],
 };
 
 // iPad Air (M4): identical to M3 (techadvisor.com, tomsguide.com M4 reviews).
 // 11": 247.6 x 178.5 x 6.1 mm, 2360 x 1640; 13": 280.6 x 214.9 x 6.1 mm,
 // 2732 x 2048; 264 ppi. Touch ID in the top button. Rear: a single lens, no
-// square bump and no flash (best guess, not checked against a photo).
+// square bump and no flash — photo-confirmed on the four-colour back shot on
+// apple.com/au/ipad-air (2026-10-12). Buttons measured off the 11-inch
+// "Buttons and Connectors" drawing on apple.com/au/ipad-air/specs: top button
+// (~17 mm long) ~21 mm from the corner, volume ~24 and ~36 mm down the right
+// edge in portrait (same turn to landscape as the Pro). Magic Keyboard sold
+// in white or black (apple.com/au/shop/ipad/accessories/keyboards).
 export const IPAD_AIR_11: TabletSpec = {
   id: "ipad-air-11",
   name: "iPad Air 11-inch",
@@ -642,11 +719,12 @@ export const IPAD_AIR_11: TabletSpec = {
   frontCam: "long",
   rear: { kind: "lens", r: 0.0042, flash: false },
   buttons: [
-    { edge: "left", at: 0.05, len: 0.02 },
-    { edge: "top", at: -0.072, len: 0.013 },
-    { edge: "top", at: -0.053, len: 0.013 },
+    { edge: "left", at: 0.1785 / 2 - 0.021, len: 0.017 },
+    { edge: "top", at: -0.2476 / 2 + 0.0242, len: 0.01 },
+    { edge: "top", at: -0.2476 / 2 + 0.0356, len: 0.01 },
   ],
   keyboard: "cantilever",
+  keyboardFinish: "white",
 };
 export const IPAD_AIR_13: TabletSpec = {
   ...IPAD_AIR_11,
@@ -657,18 +735,25 @@ export const IPAD_AIR_13: TabletSpec = {
   r: 0.0115,
   res: [2732, 2048],
   buttons: [
-    { edge: "left", at: 0.065, len: 0.02 },
-    { edge: "top", at: -0.087, len: 0.013 },
-    { edge: "top", at: -0.068, len: 0.013 },
+    { edge: "left", at: 0.2149 / 2 - 0.021, len: 0.017 },
+    { edge: "top", at: -0.2806 / 2 + 0.0242, len: 0.01 },
+    { edge: "top", at: -0.2806 / 2 + 0.0356, len: 0.01 },
   ],
 };
 
 // iPad (A16): 248.6 x 179.5 x 7.0 mm, same design as the 10th generation,
 // Touch ID in the top button, no home button (en.wikipedia.org/wiki/
 // IPad_(11th_generation), apple.com/ipad-11/specs via search). 2360 x 1640 at
-// 264 ppi is NOT confirmed by a search result this session (same panel as the
-// 11" Air is my assumption). Shown with the two-piece Magic Keyboard Folio
-// (product-line.md section 10 lists it), not the cantilever.
+// 264 ppi confirmed on apple.com/au/ipad-11/specs (2026-10-12). Shown with
+// the two-piece Magic Keyboard Folio
+// (product-line.md section 10 lists it), not the cantilever; the Folio is
+// white only (apple.com/au/shop/ipad/accessories/keyboards, 2026-10-12).
+// Rear: one lens in a ring, no flash — photo-confirmed on the colour back
+// shot on apple.com/au/ipad-11 (2026-10-12), and the specs page's camera list
+// has no flash. Buttons measured off apple.com/au/ipad-11/specs "Buttons and
+// Connectors" (2026-10-12): the same layout as the Air (top button ~22 mm
+// from the corner, volume on the right edge ~25 and ~36 mm down in portrait),
+// so in landscape the volume buttons are on the TOP edge, not the left.
 export const IPAD: TabletSpec = {
   id: "ipad",
   name: "iPad",
@@ -681,18 +766,23 @@ export const IPAD: TabletSpec = {
   frontCam: "long",
   rear: { kind: "lens", r: 0.004, flash: false },
   buttons: [
-    { edge: "left", at: 0.05, len: 0.02 },
-    { edge: "left", at: 0.022, len: 0.012 },
-    { edge: "left", at: 0.006, len: 0.012 },
+    { edge: "left", at: 0.1795 / 2 - 0.0216, len: 0.0165 },
+    { edge: "top", at: -0.2486 / 2 + 0.0248, len: 0.01 },
+    { edge: "top", at: -0.2486 / 2 + 0.0363, len: 0.01 },
   ],
   keyboard: "folio",
+  keyboardFinish: "white",
 };
 
 // iPad mini (A17 Pro): 195.4 x 134.8 x 6.3 mm, 8.3" 2266 x 1488 at 326 ppi
 // (support.apple.com/en-au/121456). Front camera, volume buttons and top
 // button all on the portrait TOP (short) edge (support.apple.com iPad mini
 // user guide, via search). Rear: 12MP wide with True Tone flash (same
-// source). No keyboard sold for it.
+// source). Photo-confirmed 2026-10-12: apple.com/au/ipad-mini/specs "Buttons
+// and Connectors" shows volume (left end), front camera (centre) and top
+// button (right end, ~17 mm long, ~21 mm from the corner) along the portrait
+// top edge; volume ~17 and ~30 mm from the left corner. The buy page's back
+// views show the lens, a mic dot and the flash in a line. No keyboard sold.
 export const IPAD_MINI: TabletSpec = {
   id: "ipad-mini",
   name: "iPad mini",
@@ -705,9 +795,9 @@ export const IPAD_MINI: TabletSpec = {
   frontCam: "short",
   rear: { kind: "lens", r: 0.0038, flash: true },
   buttons: [
-    { edge: "left", at: 0.04, len: 0.016 },
-    { edge: "left", at: -0.035, len: 0.01 },
-    { edge: "left", at: -0.049, len: 0.01 },
+    { edge: "left", at: 0.1348 / 2 - 0.0207, len: 0.017 },
+    { edge: "left", at: -0.1348 / 2 + 0.0173, len: 0.0105 },
+    { edge: "left", at: -0.1348 / 2 + 0.0297, len: 0.0105 },
   ],
   keyboard: null,
 };
@@ -737,30 +827,49 @@ function tabletParts(s: TabletSpec, M: Matrix4, back: boolean): BufferGeometry[]
     parts.push(part(geo, mul(M, pos), 0.85));
   }
   if (back) {
-    // rear camera in the top-left corner seen from the FRONT (top-right seen
-    // from behind) — best guess, see the spec comments
-    const cx = -W / 2 + 0.02;
-    const cy = H - 0.02;
+    // Rear camera: in the corner behind the top-left seen from the FRONT
+    // (top-right seen from behind). Photo-confirmed 2026-10-12 for all four
+    // lines: in portrait the camera sits behind the front's top-right corner
+    // (apple.com/au/shop/buy-ipad/ipad-pro, -ipad-air, -ipad-mini gallery back
+    // views; apple.com/au/ipad-11 overview), and the specs pages' "Buttons and
+    // Connectors" drawings put the front camera on the long edge that
+    // corner shares, so turning it front-camera-up lands the lens top-left.
     const behind = (x: number, y: number, z: number) => mul(M, T(x, y, z), RY(PI));
     if (s.rear.kind === "bump") {
-      const bump = slab(0.026, 0.026, 0.0013, 0.007, 0.0004);
+      // iPad Pro, measured off the 13-inch back view on the buy page
+      // (2026-10-12): a ~28 mm rounded-square bump centred ~21 mm in from the
+      // short edge and ~19 mm down from the long edge. Inside it, seen from
+      // behind in portrait: the wide lens top-left, LiDAR bottom-left, and a
+      // right-hand column of a small dot (top), the flash (middle) and a
+      // small dot (bottom). Turned to landscape the lens column becomes the
+      // top row: lens at the outer corner, LiDAR inboard of it, the dot
+      // column underneath.
+      const bx = -W / 2 + 0.0207;
+      const by = H - 0.019;
+      const bump = slab(0.028, 0.028, 0.0013, 0.0075, 0.0004);
       bump.rotateX(-PI / 2);
-      parts.push(part(bump, mul(M, T(cx - 0.002, cy - 0.002, 0)), 0.8));
-      // seen from behind: the wide lens upper left of the bump, LiDAR below
-      // it, flash and two small sensor dots on the other side (best guess)
-      parts.push(dot(0.0047, behind(cx + 0.003, cy + 0.003, -0.0014), 0.05));
-      parts.push(dot(0.0024, behind(cx + 0.003, cy + 0.003, -0.0015), 0.18));
-      parts.push(dot(0.0036, behind(cx + 0.003, cy - 0.0075, -0.0014), 0.1));
-      parts.push(dot(0.0019, behind(cx - 0.0075, cy + 0.004, -0.0014), 0.95));
-      parts.push(dot(0.0008, behind(cx - 0.0075, cy - 0.0035, -0.0014), 0.1));
-      parts.push(dot(0.0008, behind(cx - 0.0075, cy - 0.0085, -0.0014), 0.1));
+      parts.push(part(bump, mul(M, T(bx, by, 0)), 0.8));
+      const z = -0.0014;
+      parts.push(dot(0.0042, behind(bx - 0.0063, by + 0.0063, z), 0.05)); // wide lens
+      parts.push(dot(0.0021, behind(bx - 0.0063, by + 0.0063, z - 0.0001), 0.18));
+      parts.push(dot(0.0042, behind(bx + 0.0059, by + 0.0059, z), 0.04)); // LiDAR
+      parts.push(dot(0.0013, behind(bx - 0.0084, by - 0.0068, z), 0.1)); // small dot
+      parts.push(dot(0.0028, behind(bx, by - 0.0068, z), 0.95)); // flash
+      parts.push(dot(0.0009, behind(bx + 0.0072, by - 0.0068, z), 0.1)); // small dot
     } else {
+      const cx = -W / 2 + 0.02;
+      const cy = H - 0.02;
       const ring = new CylinderGeometry(s.rear.r + 0.0008, s.rear.r + 0.0008, 0.0012, 20);
       ring.rotateX(PI / 2);
       parts.push(part(ring, mul(M, T(cx, cy, -0.0006)), 0.7));
       parts.push(dot(s.rear.r, behind(cx, cy, -0.00125), 0.05));
       parts.push(dot(s.rear.r * 0.5, behind(cx, cy, -0.0013), 0.2));
-      if (s.rear.flash) parts.push(dot(0.0017, behind(cx + 0.011, cy, -0.0002), 0.95));
+      // iPad mini (photo-confirmed, buy-page back views 2026-10-12): a small
+      // mic dot then the flash in a line from the lens along the long edge.
+      if (s.rear.flash) {
+        parts.push(dot(0.0006, behind(cx + 0.0055, cy, -0.0002), 0.1));
+        parts.push(dot(0.0014, behind(cx + 0.0105, cy, -0.0002), 0.95));
+      }
     }
     parts.push(markDisc(0.013 * (W / 0.25), mul(M, T(0, H / 2, -0.0003))));
   }
@@ -802,7 +911,7 @@ export function tabletKbGeo(s: TabletSpec): DeviceGeo {
 }
 
 function cantileverGeo(m: TabletSpec): DeviceGeo {
-  const FOLIO = 0.42;
+  const FOLIO = 1; // the finish comes from keyboardMaterial, not a shade of the iPad's colour
   const Wk = m.W + 0.002;
   const Dk = m.H + 0.012;
   const tk = 0.0065;
@@ -825,19 +934,18 @@ function cantileverGeo(m: TabletSpec): DeviceGeo {
   const wedge = new ExtrudeGeometry(ws, { depth: Wk + 0.014, bevelEnabled: false });
   wedge.rotateY(PI / 2);
   wedge.translate(-(Wk + 0.014) / 2, 0, 0);
-  const body = mergeGeometries([
-    part(wedge, null, 0.1),
-    part(slab(Wk, Dk, tk, 0.01, 0.0012), kbM, FOLIO),
+  const body = mergeGeometries([part(wedge, null, 0.1), ...tabletParts(m, tabM, false)])!;
+  const kb = mergeGeometries([
+    part(slab(Wk, Dk, tk, 0.01, 0.0012), kbM, FOLIO * 0.92),
     part(deck, mul(kbM, T(0, tk + 0.0004, 0.002)), FOLIO, R_FOLIO),
-    part(panel(Wk - 0.004, armL, 0.004, 0.008, 0.0008), armM, FOLIO),
-    part(panel(m.W + 0.002, m.H + 0.002, 0.0032, m.r + 0.001, 0.0008), mul(tabM, T(0, -0.001, -0.0032)), FOLIO),
-    ...tabletParts(m, tabM, false),
+    part(panel(Wk - 0.004, armL, 0.004, 0.008, 0.0008), armM, FOLIO * 0.92),
+    part(panel(m.W + 0.002, m.H + 0.002, 0.0032, m.r + 0.001, 0.0008), mul(tabM, T(0, -0.001, -0.0032)), FOLIO * 0.92),
   ])!;
-  return { body, screen: tabletScreen(m, tabM), format: "tablet" };
+  return { body, screen: tabletScreen(m, tabM), format: "tablet", accessory: { geo: kb, finish: m.keyboardFinish ?? "white" } };
 }
 
 function folioGeo(m: TabletSpec): DeviceGeo {
-  const FOLIO = 0.62; // a lighter folio than the Pro/Air keyboard (finish an estimate)
+  const FOLIO = 1; // white only (photo-confirmed); the finish comes from keyboardMaterial
   const Wk = m.W + 0.002;
   const Dk = m.H * 0.72; // the folio's keyboard half (proportion an estimate)
   const tk = 0.006;
@@ -846,15 +954,15 @@ function folioGeo(m: TabletSpec): DeviceGeo {
   const back = -Dk / 2 - 0.012;
   const tabM = mul(T(0, 0.002, back), RX(-0.36)); // leaning back about 20 degrees
   const standTop = new Vector3(0, m.H * 0.55, -0.0035).applyMatrix4(tabM);
-  const body = mergeGeometries([
-    part(slab(Wk, Dk, tk, 0.009, 0.0012), T(0, 0, 0.01), FOLIO),
+  const body = mergeGeometries(tabletParts(m, tabM, false))!;
+  const kb = mergeGeometries([
+    part(slab(Wk, Dk, tk, 0.009, 0.0012), T(0, 0, 0.01), FOLIO * 0.92),
     part(deck, T(0, tk + 0.0004, 0.01), FOLIO, R_FOLIO),
     // the back panel the tablet sits in, and its kickstand
-    part(panel(m.W + 0.003, m.H + 0.003, 0.003, m.r + 0.001, 0.0008), mul(tabM, T(0, -0.0015, -0.003)), FOLIO),
-    part(strut(new Vector3(0, 0.002, back - 0.08), standTop, m.W * 0.9, 0.003), null, FOLIO),
-    ...tabletParts(m, tabM, false),
+    part(panel(m.W + 0.003, m.H + 0.003, 0.003, m.r + 0.001, 0.0008), mul(tabM, T(0, -0.0015, -0.003)), FOLIO * 0.92),
+    part(strut(new Vector3(0, 0.002, back - 0.08), standTop, m.W * 0.9, 0.003), null, FOLIO * 0.92),
   ])!;
-  return { body, screen: tabletScreen(m, tabM), format: "tablet" };
+  return { body, screen: tabletScreen(m, tabM), format: "tablet", accessory: { geo: kb, finish: m.keyboardFinish ?? "white" } };
 }
 
 // ---------- standalone displays ----------
@@ -864,11 +972,15 @@ export interface DisplaySpec {
   name: string; // the real product name (references/product-line.md section 5)
   W: number; // m (sourced)
   Hh: number; // housing height, m (derived: display height + a bezel equal to the side bezel)
-  t: number; // housing depth, m (estimate)
+  t: number; // housing depth, m (~18-21 mm in the specs-page side views, 2026-10-12)
   res: readonly [number, number]; // (sourced)
   ppi: number; // (sourced)
   stand: "tilt" | "tiltHeight";
-  ventRows: number; // rows of holes across the back (sourced count; their placement is a best guess)
+  // Rows of vent holes (sourced count, text coverage). NOT drawn: Apple's own
+  // back views (apple.com/au/studio-display/specs, studio-display-xdr/specs,
+  // 2026-10-12) show a plain back on both, so the rows must be on an edge
+  // the photos don't show; where is unverified.
+  ventRows: number;
 }
 
 // Studio Display (2nd gen, March 2026) and Studio Display XDR (replaced the
@@ -905,40 +1017,68 @@ export const DISPLAY_MODELS: Record<string, DisplaySpec> = Object.fromEntries(
   [STUDIO_DISPLAY, STUDIO_DISPLAY_XDR].map((s) => [s.id, s]),
 );
 
+// Stands and back, photo-measured 2026-10-12 off the dimensioned side and back
+// views on apple.com/au/studio-display/specs and studio-display-xdr/specs
+// (scaled by the printed 47.8 cm height and 62.3 cm width). Both: display
+// bottom ~117 mm above the desk (the XDR in its bottom position), the stand
+// 150 mm wide seen from behind with a cable hole near its top, four small
+// upright ports at the back's lower left (seen from behind), the mark ~64% up.
+// - Tilt stand (168 mm foot): one plate rising from ~23 mm in front of the
+//   foot's back edge, leaning forward to a hinge on the display's back ~89 mm
+//   above its bottom; the display's front ~55 mm behind the foot's front.
+// - Tilt-and-height stand (214 mm foot): a vertical 10 mm plate ~300 mm tall
+//   standing ~33 mm in from the foot's back, and a short counterbalance arm
+//   (~30 mm thick, round pivots at both ends) sloping down from ~264 mm up the
+//   upright to the display's back ~90 mm above its bottom; the display's
+//   front ~52 mm behind the foot's front. The arm's width is hidden behind the
+//   upright in every view: 100 mm is an estimate.
 export function displayGeo(s: DisplaySpec): DeviceGeo {
   return cached(`display:${s.id}`, () => {
     const { W, Hh, t } = s;
     const [dw, dh] = displaySize(s.res, s.ppi);
-    const bx = (W - dw) / 2;
     const by = (Hh - dh) / 2;
-    const M = mul(T(0, 0.116, -0.05), RX(-0.03));
+    const xdr = s.stand === "tiltHeight";
+    const footD = xdr ? 0.214 : 0.168;
+    const footFront = 0.054;
+    const footBack = footFront - footD;
+    const front = footFront - (xdr ? 0.052 : 0.055); // the display's front face
+    const M = mul(T(0, 0.117, front - t), RX(-0.03));
     const parts: BufferGeometry[] = [
       part(panel(W, Hh, t, 0.008, 0.002), M),
       part(screenShape(W - 0.002, Hh - 0.002, 0.007), mul(M, T(0, 0.001, t + 0.0002)), 0.03),
       dot(0.0016, mul(M, T(0, Hh - by / 2, t + 0.0004)), 0.14),
-      markDisc(0.022, mul(M, T(0, Hh * 0.55, -0.0003))),
+      markDisc(0.022, mul(M, T(0, Hh * 0.64, -0.0003))),
     ];
-    // vents: a band of rows across the top of the back (placement a best guess)
-    const rowPitch = 0.0045;
-    const vh = s.ventRows * rowPitch + 0.002;
-    const vent = new PlaneGeometry(W * (s.ventRows > 5 ? 0.9 : 0.62), vh);
-    parts.push(part(vent, mul(M, T(0, Hh - 0.03 - vh / 2, -0.0004), RY(PI)), 1, s.ventRows > 5 ? R_VENT9 : R_VENT5));
-    parts.push(part(slab(0.2, 0.168, 0.006, 0.02, 0.0015), T(0, 0, -0.03)));
-    if (s.stand === "tilt") {
-      // one bent plate from the foot's back edge up to the display's back
-      const top = new Vector3(0, 0.2, -0.003).applyMatrix4(M);
-      parts.push(part(strut(new Vector3(0, 0.006, -0.106), top, 0.16, 0.006), null));
-    } else {
-      // tilt-and-height: an upright on the foot, a hinge, and a short arm up
-      // to the display's back (best guess at the arm's shape: no photo checked)
-      const hingeY = 0.17;
-      const hz = -0.1;
-      parts.push(part(new BoxGeometry(0.14, hingeY, 0.012), T(0, 0.006 + hingeY / 2, hz)));
-      const hinge = new CylinderGeometry(0.011, 0.011, 0.15, 16);
+    // four upright ports on the back's lower left as seen from behind (+x)
+    for (const x of [0.1714, 0.186, 0.2014, 0.2167]) {
+      parts.push(part(new BoxGeometry(0.0026, 0.0084, 0.0008), mul(M, T(x, 0.029, -0.0002)), 0.08));
+    }
+    parts.push(part(slab(0.15, footD, 0.006, 0.02, 0.0015), T(0, 0, footFront - footD / 2)));
+    const plateW = 0.15;
+    if (!xdr) {
+      // one plate from near the foot's back edge, leaning forward to the hinge
+      const top = new Vector3(0, 0.089, -0.003).applyMatrix4(M);
+      parts.push(part(strut(new Vector3(0, 0.006, footBack + 0.023), top, plateW, 0.006), null));
+      const hinge = new CylinderGeometry(0.008, 0.008, plateW, 16);
       hinge.rotateZ(PI / 2);
-      parts.push(part(hinge, T(0, hingeY + 0.006, hz), 0.75));
-      const top = new Vector3(0, 0.24, -0.003).applyMatrix4(M);
-      parts.push(part(strut(new Vector3(0, hingeY + 0.006, hz), top, 0.12, 0.01), null));
+      parts.push(part(hinge, T(top.x, top.y, top.z - 0.004), 0.85));
+      // the cable hole: a dark disc on the plate's back, near the top
+      const p = new Vector3(0, 0.006, footBack + 0.023).lerp(top, 0.8);
+      parts.push(dot(0.012, mul(T(p.x, p.y, p.z - 0.004), RY(PI)), 0.12));
+    } else {
+      // the upright, its counterbalance arm and the two pivots
+      const uz = footBack + 0.033;
+      const uh = 0.299;
+      parts.push(part(new BoxGeometry(plateW, uh, 0.01), T(0, 0.006 + uh / 2, uz)));
+      parts.push(dot(0.012, mul(T(0, uh - 0.035, uz - 0.0052), RY(PI)), 0.12)); // cable hole
+      const a = new Vector3(0, 0.264, uz + 0.012);
+      const b = new Vector3(0, 0.09, -0.012).applyMatrix4(M);
+      parts.push(part(strut(a, b, 0.1, 0.03), null));
+      for (const p of [a, b]) {
+        const pivot = new CylinderGeometry(0.015, 0.015, 0.104, 18);
+        pivot.rotateZ(PI / 2);
+        parts.push(part(pivot, T(p.x, p.y, p.z), 0.85));
+      }
     }
     const body = mergeGeometries(parts)!;
     const screen = activeScreen(dw, dh, 0.002, "monitor");
@@ -950,11 +1090,16 @@ export function displayGeo(s: DisplaySpec): DeviceGeo {
 // ---------- desktops ----------
 
 // iMac (M4, 24-inch): 547 x 461 mm with the stand, stand 147 mm deep x 130 mm
-// wide (support.apple.com/en-us/121556, 121557 via search); housing about
-// 11.5 mm thick (widely quoted, not on Apple's page: estimate); 4480 x 2520 at
-// 218 ppi (NOT confirmed by a search result this session). White glass bezel
-// and a colour-matched chin. Housing height 390 mm is my estimate; the chin is
-// what remains under the display and its bezel.
+// wide (support.apple.com/en-us/121556, 121557 via search). Photo-measured
+// 2026-10-12 off the dimensioned front and side drawings on
+// apple.com/au/imac/specs ("Size and Weight", scaled by the printed 54.7 cm):
+// the housing (glass top to chin bottom) is ~375 mm tall (not the 390 mm
+// first guessed), the housing bottom ~87 mm above the desk; the active area
+// ~522 mm wide, which is what 4480 x 2520 at 218 ppi gives, and the white
+// bezel ~12 mm, the coloured chin ~55 mm (both match what is derived below).
+// The side view shows the housing leaning back ~8 degrees, the stand's arm
+// meeting the housing's back ~91 mm up from its bottom, and a housing about
+// as thin as the quoted 11.5 mm (too few pixels to measure exactly).
 export interface AllInOneSpec {
   id: string;
   name: string;
@@ -973,7 +1118,7 @@ export const IMAC: AllInOneSpec = {
   name: "iMac",
   kind: "allInOne",
   W: 0.547,
-  Hh: 0.39,
+  Hh: 0.375,
   t: 0.0115,
   overallH: 0.461,
   standW: 0.13,
@@ -982,13 +1127,23 @@ export const IMAC: AllInOneSpec = {
   ppi: 218,
 };
 
-// Mac mini (M6): unchanged from M4, 127 x 127 x 50 mm, two USB-C and a
-// headphone jack on the front, three Thunderbolt on the back (petapixel.com
+// Mac mini (M6): unchanged from M4, 127 x 127 x 50 mm (petapixel.com
 // 2026-09-21, tomshardware.com late-2026 review). Mac Studio (M5 Max / Ultra):
-// unchanged, 197 x 197 x 95 mm, front ports (petapixel.com M6 mini review
-// says both have front ports; Mac Studio's two USB-C + SD card slot is from
-// memory of the previous generation: a best guess). Corner radii and the
-// base ring are estimates.
+// unchanged, 197 x 197 x 95 mm. Every port, the status light and the base
+// height below are photo-confirmed and measured off the front and back photos
+// on apple.com/au/mac-mini/specs and apple.com/au/mac-studio/specs
+// (2026-10-12), scaled by the published width:
+// - Mac mini front: two USB-C standing upright at -37 and -22 mm, the status
+//   light at +24 mm, the jack at +37 mm. Back (seen from behind, left to
+//   right): power, Ethernet, HDMI, three upright Thunderbolt. Base ~6.7 mm.
+// - Mac Studio front: two upright USB-C at -66 and -52 mm, the SDXC slot at
+//   -24 mm (left of centre, not right as first guessed), the status light at
+//   +66 mm. Back: four upright Thunderbolt 5, 10Gb Ethernet, the round power
+//   socket in the middle, two upright USB-A, HDMI, the jack, the power button.
+//   Base ~8 mm.
+// Both: port centres ~23 mm above the bottom. Corner radii are estimates.
+// (The Studio's back also has a perforated exhaust band along its top, not
+// drawn: the photo is cropped so its height is unknown.)
 export interface BoxSpec {
   id: string;
   name: string;
@@ -996,9 +1151,13 @@ export interface BoxSpec {
   W: number; // square footprint, m (sourced)
   H: number; // m (sourced)
   r: number; // m (estimate)
-  baseH: number; // dark recessed base / vent ring, m (estimate)
-  front: Array<{ type: PortType; x: number }>; // x: m from the front face's centre (estimate)
-  back: Array<{ type: PortType; x: number }>;
+  baseH: number; // dark recessed base / vent ring, m (photo-measured)
+  portY: number; // port centres above the bottom, m (photo-measured)
+  ledX: number; // the status light, m right of the front's centre (photo-measured)
+  // x: m from the face's centre, + to the right as you face that side
+  // (so a back port's x is as seen from behind); vertical: the slot stands up
+  front: Array<{ type: PortType; x: number; vertical?: boolean }>;
+  back: Array<{ type: PortType; x: number; vertical?: boolean }>;
 }
 export const MAC_MINI: BoxSpec = {
   id: "mac-mini",
@@ -1007,9 +1166,18 @@ export const MAC_MINI: BoxSpec = {
   W: 0.127,
   H: 0.05,
   r: 0.022,
-  baseH: 0.004,
-  front: [{ type: "usbc", x: -0.034 }, { type: "usbc", x: -0.022 }, { type: "jack", x: 0.026 }],
-  back: [{ type: "usbc", x: -0.01 }, { type: "usbc", x: 0.003 }, { type: "usbc", x: 0.016 }, { type: "hdmi", x: 0.035 }],
+  baseH: 0.0067,
+  portY: 0.0225,
+  ledX: 0.0244,
+  front: [{ type: "usbc", x: -0.0371, vertical: true }, { type: "usbc", x: -0.022, vertical: true }, { type: "jack", x: 0.0365 }],
+  back: [
+    { type: "power", x: -0.032 },
+    { type: "ethernet", x: -0.0103 },
+    { type: "hdmi", x: 0.0091 },
+    { type: "usbc", x: 0.0239, vertical: true },
+    { type: "usbc", x: 0.0325, vertical: true },
+    { type: "usbc", x: 0.0412, vertical: true },
+  ],
 };
 export const MAC_STUDIO: BoxSpec = {
   id: "mac-studio",
@@ -1019,8 +1187,19 @@ export const MAC_STUDIO: BoxSpec = {
   H: 0.095,
   r: 0.03,
   baseH: 0.008,
-  front: [{ type: "usbc", x: -0.06 }, { type: "usbc", x: -0.045 }, { type: "sd", x: 0.05 }],
-  back: [-0.06, -0.045, -0.03, -0.015].map((x) => ({ type: "usbc" as const, x })).concat([{ type: "usbc", x: 0.03 }, { type: "usbc", x: 0.045 }]),
+  portY: 0.0238,
+  ledX: 0.066,
+  front: [{ type: "usbc", x: -0.0662, vertical: true }, { type: "usbc", x: -0.0516, vertical: true }, { type: "sd", x: -0.0244 }],
+  back: [
+    ...[-0.0681, -0.0583, -0.0485, -0.0389].map((x) => ({ type: "usbc" as const, x, vertical: true })),
+    { type: "ethernet", x: -0.0242 },
+    { type: "powerRound", x: 0 },
+    { type: "usba", x: 0.021, vertical: true },
+    { type: "usba", x: 0.0335, vertical: true },
+    { type: "hdmi", x: 0.0507 },
+    { type: "jack", x: 0.067 },
+    { type: "button", x: 0.0809 },
+  ],
 };
 
 export type DesktopSpec = AllInOneSpec | BoxSpec;
@@ -1040,8 +1219,9 @@ function allInOneGeo(s: AllInOneSpec): DeviceGeo {
     const upper = dh + 2 * bezel;
     const chin = Hh - upper;
     const lift = s.overallH - Hh; // housing bottom above the desk
-    const M = mul(T(0, lift, -0.1), RX(-0.06));
-    const top = new Vector3(0, Hh * 0.44, -0.003).applyMatrix4(M);
+    // leaning back ~8 degrees, the arm meeting the back ~91 mm up (photo-measured)
+    const M = mul(T(0, lift, -0.1), RX(-0.145));
+    const top = new Vector3(0, 0.091, -0.003).applyMatrix4(M);
     const kbDeck = new PlaneGeometry(0.27, 0.106);
     kbDeck.rotateX(-PI / 2);
     const mouse = new SphereGeometry(1, 20, 10);
@@ -1050,7 +1230,8 @@ function allInOneGeo(s: AllInOneSpec): DeviceGeo {
       part(panel(W, Hh, t, 0.011, 0.0015), M),
       markDisc(0.024, mul(M, T(0, Hh * 0.55, -0.0003))),
       part(slab(s.standW, s.standD, 0.005, 0.012, 0.0012), T(0, 0, -0.1 - s.standD / 2 + 0.055)),
-      part(strut(new Vector3(0, 0.005, -0.1 - s.standD + 0.06), top, s.standW * 0.85, 0.005), null),
+      // the arm rises from ~26 mm in front of the foot's back edge (photo-measured)
+      part(strut(new Vector3(0, 0.005, -0.1 - s.standD + 0.055 + 0.026), top, s.standW * 0.85, 0.005), null),
       part(slab(0.278, 0.114, 0.0065, 0.007, 0.0012), T(0, 0, 0.13)),
       part(kbDeck, T(0, 0.0069, 0.13), 1, R_AIO),
       part(mouse, T(0.22, 0, 0.13)),
@@ -1072,17 +1253,19 @@ function boxGeo(s: BoxSpec): DeviceGeo {
       // the mark on top, facing up
       part(new CircleGeometry(W * 0.12, 24), mul(T(0, H + 0.0003, 0), RX(-PI / 2), RZ(PI)), 1, R_MARK),
     ];
-    const portY = baseH + (H - baseH) * 0.45;
+    const portY = s.portY;
     for (const [face, list] of [[1, s.front], [-1, s.back]] as const) {
       for (const p of list) {
         const [pw, ph] = PORT_SIZE[p.type];
-        const geo = p.type === "jack" ? new CylinderGeometry(ph / 2, ph / 2, 0.0008, 10) : new BoxGeometry(pw, ph, 0.0008);
-        if (p.type === "jack") geo.rotateX(PI / 2);
-        parts.push(part(geo, T(face * p.x, portY, face * (W / 2 - 0.0002)), 0.05));
+        const round = ROUND_PORTS.has(p.type);
+        const [w, h] = p.vertical ? [ph, pw] : [pw, ph];
+        const geo = round ? new CylinderGeometry(ph / 2, ph / 2, 0.0008, 14) : new BoxGeometry(w, h, 0.0008);
+        if (round) geo.rotateX(PI / 2);
+        parts.push(part(geo, T(face * p.x, portY, face * (W / 2 - 0.0002)), p.type === "button" ? 0.75 : 0.05));
       }
     }
-    // a status light on the front, right of centre (estimate)
-    parts.push(dot(0.0006, T(W * 0.36, portY, W / 2 + 0.0002), 0.9));
+    // the status light on the front (photo-measured, see the spec comment)
+    parts.push(dot(0.0008, T(s.ledX, portY, W / 2 + 0.0002), 0.95));
     return { body: mergeGeometries(parts)!, screen: null, format: "monitor" };
   });
 }
