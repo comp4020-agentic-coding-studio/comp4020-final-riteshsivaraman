@@ -172,6 +172,10 @@ find every resource by reading this file, not by discovering it mid-task.
 - `docs/customer-journeys.md` — seven end-to-end customer transcripts (draft, for
   Ritesh's review) and what they imply; read before writing any conversation
   script. Prices and policies in it are `[TK]`/`[verify]`.
+- `docs/adr/0004-cases-and-moves.md` — ADR 4 (draft): a durable case per customer
+  goal and conversations as moves with preconditions; either party can start.
+  Supersedes ADR 3's "character only talks if the visitor starts". Reasoning `[TK]`.
+- `docs/data-overview.html` — diagram of where every kind of data lives today.
 - `docs/blueprint/` — the floor plan, four wall elevations, ceiling and mall
   drawings (D20: the drawings are the specification), drawn from
   `src/shared/plan.ts`, `world.ts` and `mall.ts`.
