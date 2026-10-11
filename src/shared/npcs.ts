@@ -50,6 +50,8 @@ export interface NpcPose extends Pose {
   present: boolean; // inside the store (or its doorway) at this moment
   mode: Behaviour; // what they are doing
   mood: string; // the face to wear
+  seated: boolean; // sitting on a stool
+  device: boolean; // a phone or tablet is out
   intent: string; // what they are up to, in words
 }
 
@@ -57,5 +59,5 @@ export interface NpcPose extends Pose {
 // mid-stride, at server time `nowMs`.
 export function npcPose(def: NpcDef, nowMs: number): NpcPose {
   const m = momentOf(def.id, nowMs);
-  return { x: m.x, z: m.z, ry: m.ry, walking: m.walking, present: m.present, mode: m.mode, mood: m.mood, intent: m.intent };
+  return { x: m.x, z: m.z, ry: m.ry, walking: m.walking, present: m.present, mode: m.mode, mood: m.mood, seated: m.seated, device: m.device, intent: m.intent };
 }

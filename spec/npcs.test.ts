@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { NPCS, isStaff, npcPose } from "../src/shared/npcs.ts";
-import { CAST, CYCLE, OBSTACLES, STATIONS, castOf, momentOf, timelineOf } from "../src/shared/storeday.ts";
+import { CAST, CYCLE, OBSTACLES, SEATS_AT_BAR, SEATS_AT_TABLES, STATIONS, castOf, momentOf, timelineOf } from "../src/shared/storeday.ts";
 import { clearance, headingTo, wrap } from "../src/shared/steering.ts";
+import { SOLIDS, TABLES } from "../src/shared/world.ts";
 
 // Promise: the store's staff and customers are the same for everyone, move
 // like people, go where their purpose takes them, and every interaction is
@@ -52,6 +53,15 @@ describe("the day", () => {
       for (let t = 0; t < CYCLE; t += 0.5) {
         const m = momentOf(c.id, t * 1000);
         if (!m.present) continue;
+        if (m.seated) {
+          // sitting up to a table is meant to be close: check the real furniture
+          if (SOLIDS.some((b) => Math.abs(m.x - b.x) < b.w / 2 - 0.02 && Math.abs(m.z - b.z) < b.d / 2 - 0.02)) bad++;
+          continue;
+        }
+        // on the way on to a stool, or just up from one: close to a stool, which
+        // is tucked in beside the furniture on purpose
+        const atStool = [...SEATS_AT_BAR.map((x) => x.at), ...SEATS_AT_TABLES.flatMap((t) => [t.guest.at, t.host.at])].some((p) => Math.hypot(p.x - m.x, p.z - m.z) < 0.75);
+        if (atStool) continue;
         // the obstacles are inflated by a body; allow a hair for the sampling
         if (obs.some((o) => clearance(o, m.x, m.z).d < -0.02)) bad++;
       }
@@ -183,6 +193,61 @@ describe("interactions are mutual", () => {
         const toward = Math.abs(wrap(headingTo(a.x, a.z, b.x, b.z) - a.ry));
         expect(toward, `${c.id} facing ${s.with}`).toBeLessThan(0.6);
       }
+    }
+  });
+});
+
+describe("sitting", () => {
+  const seatedSegs = (id: string) => timelineOf(id).filter((x) => x.seated && x.kind !== "walk");
+
+  it("has people sit, at the bar and at the square tables, with a device out", () => {
+    let atTable = 0;
+    let atBar = 0;
+    let devices = 0;
+    for (const c of CAST) {
+      for (const s of seatedSegs(c.id)) {
+        if (s.at!.z > 7.3) atBar++;
+        else atTable++;
+      }
+      for (let t = 0; t < CYCLE; t += 0.5) if (momentOf(c.id, t * 1000).device) devices++;
+    }
+    expect(atTable).toBeGreaterThan(0);
+    expect(atBar).toBeGreaterThan(0);
+    expect(devices).toBeGreaterThan(20);
+  });
+
+  it("seats people on a stool: close to one, and never two on the same stool at once", () => {
+    const stools = TABLES.length > 0 ? [...SEATS_AT_BAR.map((s) => s.at), ...SEATS_AT_TABLES.flatMap((t) => [t.guest.at, t.host.at])] : [];
+    const taken = new Map<string, string>();
+    for (let t = 0; t < CYCLE; t += 0.5) {
+      taken.clear();
+      for (const c of CAST) {
+        const m = momentOf(c.id, t * 1000);
+        if (!m.present || !m.seated) continue;
+        expect(m.walking, `${c.id} +${t}s`).toBe(false);
+        const k = stools.findIndex((p) => Math.hypot(p.x - m.x, p.z - m.z) < 0.35);
+        expect(k, `${c.id} +${t}s seated at (${m.x.toFixed(2)}, ${m.z.toFixed(2)}) is not on a stool`).toBeGreaterThanOrEqual(0);
+        expect(taken.get(String(k)), `two people on stool ${k} at +${t}s`).toBeUndefined();
+        taken.set(String(k), c.id);
+      }
+    }
+  });
+
+  it("only brings a device out during a seated discussion (either end may be standing, behind the bar)", () => {
+    for (const c of CAST) {
+      for (let t = 0; t < CYCLE; t += 0.5) {
+        const m = momentOf(c.id, t * 1000);
+        if (!m.device) continue;
+        const seg = timelineOf(c.id).find((x) => t >= x.t0 && t < x.t1);
+        expect(seg?.act?.kind, `${c.id} +${t}s has a device out outside a sit-down`).toBe("sitdown");
+      }
+    }
+  });
+
+  it("sits two people opposite each other at a table", () => {
+    for (const t of SEATS_AT_TABLES) {
+      expect(Math.hypot(t.guest.at.x - t.host.at.x, t.guest.at.z - t.host.at.z), t.id).toBeLessThan(2.3);
+      expect(t.guest.at.x).toBeLessThan(t.host.at.x);
     }
   });
 });

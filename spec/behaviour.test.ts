@@ -12,7 +12,7 @@ describe("behaviour", () => {
     const solo = BEHAVIOURS.filter((b) => WEIGHTS[b] > 0);
     expect([...seen].sort()).toEqual([...solo].sort());
     // and none that only make sense with a partner
-    for (const b of ["listen", "handshake", "clap", "bow"] as const) expect(seen.has(b)).toBe(false);
+    for (const b of ["listen", "handshake", "clap", "bow", "device"] as const) expect(seen.has(b)).toBe(false);
   });
 
   it("can be limited to a set, for a crowd that only interacts", () => {

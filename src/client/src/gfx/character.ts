@@ -114,6 +114,7 @@ export interface BoneSet {
   el: [Bone, Bone];
   hip: [Bone, Bone];
   kn: [Bone, Bone];
+  dev: Bone; // the device in the right hand: scaled to nothing when it is put away
 }
 
 export interface Character {
@@ -130,6 +131,9 @@ export interface Character {
 }
 
 const SIDES = [-1, 1] as const;
+
+// the top of a stool, in metres (plan.ts STOOL_SEAT_H)
+const SEAT_H = 0.7;
 
 // Three flat bands of light, so the shading steps like a cartoon.
 let ramp: DataTexture | null = null;
@@ -253,7 +257,7 @@ function browGeo(innerSign: number, len: number, thick: number): BufferGeometry 
 export function buildCharacter(
   look: Appearance,
   shirtHex: string,
-  opts: { body?: BodyStyle; eyes?: EyeStyle; face?: FaceShape; shading?: Shading; beard?: BeardChoice; uniform?: { cap?: string; badge?: string } } = {},
+  opts: { body?: BodyStyle; eyes?: EyeStyle; face?: FaceShape; shading?: Shading; beard?: BeardChoice; uniform?: { cap?: string; badge?: string }; device?: "phone" | "tablet" } = {},
 ): Character {
   const bodyStyle = opts.body ?? "friendly";
   const eyeStyle = opts.eyes ?? "round";
@@ -346,6 +350,9 @@ export function buildCharacter(
   const el = SIDES.map((_, i) => mk(`el${i}`, elbowPt[i].x, elbowPt[i].y, 0, sh[i])) as [Bone, Bone];
   const hip = SIDES.map((s) => mk(`hip${s}`, s * legX, Y(0.88), 0, root)) as [Bone, Bone];
   const kn = SIDES.map((s, i) => mk(`kn${s}`, s * legX, Y(0.48), 0, hip[i])) as [Bone, Bone];
+  // a bone at the right hand for a device; scaling it 0 to 1 takes it out
+  const hand = wristPt[1].clone().addScaledVector(wristPt[1].clone().sub(elbowPt[1]).normalize(), 0.09);
+  const dev = mk("dev", hand.x - 0.01, hand.y, hand.z - 0.015, el[1]);
   const idx = (b: Bone): number => list.indexOf(b);
 
   // ---- parts ----
@@ -451,6 +458,18 @@ export function buildCharacter(
   }
   if (look.hairStyle === "bun") {
     add(new IcosahedronGeometry(1, 1), head, hair, hm(0, 0.095, 0.075, sc(0.04)));
+  }
+
+  // the device: a slim slab with a lit screen on the face that looks up at
+  // them when the forearm is raised (local -z), bound to the hand bone
+  if (opts.device) {
+    const tablet = opts.device === "tablet";
+    const w = tablet ? 0.2 : 0.072;
+    const h = tablet ? 0.15 : 0.15;
+    const body = new BoxGeometry(w, h, 0.01);
+    add(body, dev, new Color(tablet ? "#9aa0a8" : "#23262d"), at(hand.x - 0.01, hand.y + h * 0.35, hand.z - 0.015));
+    const screen = new BoxGeometry(w - 0.012, h - 0.014, 0.002);
+    add(screen, dev, new Color("#bfe0ff").multiplyScalar(1.9), at(hand.x - 0.01, hand.y + h * 0.35, hand.z - 0.015 - 0.0055));
   }
 
   // staff uniform: a cap in the role's colour, and a badge on the chest
@@ -600,7 +619,7 @@ export function buildCharacter(
 
   return {
     root: group,
-    bones: { root, spine, head, brow: browBones, lids, mouth, mouthOpen, sh, el, hip, kn },
+    bones: { root, spine, head, brow: browBones, lids, mouth, mouthOpen, sh, el, hip, kn, dev },
     triangles: merged.getAttribute("position").count / 3,
     look,
     body: bodyStyle,
@@ -619,6 +638,8 @@ export interface PoseInput {
   phase: number; // walk cycle phase, radians
   mode: Behaviour;
   seed: number; // varies idle motion between people
+  seated?: boolean; // sitting on a stool
+  device?: boolean; // a device is out (also whenever mode is "device")
 }
 
 // Bones from a behaviour, a walk cycle and a mood. Signs, for a hanging limb
@@ -636,8 +657,9 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   const walking = w >= 0.05;
   const leg = s * 0.7 * w;
   const arm = s * 0.55 * w;
-  // weight on one leg when standing: the hips tip, the shoulders answer
-  const weight = walking ? 0 : Math.sin(t * 0.45 + sd) * 0.022;
+  // weight on one leg when standing: the hips tip, the shoulders answer (not
+  // when sitting)
+  const weight = walking || p.seated ? 0 : Math.sin(t * 0.45 + sd) * 0.022;
 
   // targets: x is swing forward, z is out to the side (both arms, "outward"
   // positive), el is the elbow bend, then the torso, head and face extras
@@ -791,6 +813,18 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
         T.elR = 0.5;
         break;
       }
+      case "device":
+        // a device held up in the right hand, the left tapping at it, eyes on it
+        T.shRx = 0.85;
+        T.shRy = 0.3;
+        T.elR = 1.65;
+        T.shLx = 0.95;
+        T.shLy = -0.35 + Math.sin(t * 5 + sd) * 0.1;
+        T.elL = 1.95;
+        T.pitch = 0.4;
+        T.lean = 0.07;
+        T.curve = 0.25;
+        break;
       default:
         // idle: a slow look around, arms loose
         T.yaw = Math.sin(t * 0.55 + sd) * 0.4;
@@ -805,20 +839,32 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
     st[key] = cur + (T[key] - cur) * k;
   }
 
+  // sitting and the device ease in and out like everything else
+  const wantSeat = p.seated ? 1 : 0;
+  const wantDev = p.device || p.mode === "device" ? 1 : 0;
+  const ks = 1 - Math.exp(-6 * p.dt);
+  st.seat = (st.seat ?? 0) + (wantSeat - (st.seat ?? 0)) * ks;
+  st.dev = (st.dev ?? 0) + (wantDev - (st.dev ?? 0)) * ks;
+  const seat = st.seat;
+
   const baseY = (b.root.userData.y ??= b.root.position.y) as number;
-  b.root.position.y = baseY + Math.abs(s) * 0.03 * w;
+  // seated: the pelvis drops to the top of the stool (0.7 m) plus a little
+  const seatedY = Math.min(baseY, SEAT_H + 0.1);
+  b.root.position.y = (baseY + Math.abs(s) * 0.03 * w) * (1 - seat) + seatedY * seat;
   b.root.rotation.z = weight * 0.8;
-  b.hip[0].rotation.x = -leg;
-  b.hip[1].rotation.x = leg;
+  // the thighs go forward and the shins hang down
+  b.hip[0].rotation.x = -leg * (1 - seat) + 1.5 * seat;
+  b.hip[1].rotation.x = leg * (1 - seat) + 1.5 * seat;
   // knees bend back as a leg swings through, and a little when standing; the
   // unloaded leg softens more
-  b.kn[0].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2 + Math.PI)) * 0.95 * w + Math.max(0, weight) * 3);
-  b.kn[1].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2)) * 0.95 * w + Math.max(0, -weight) * 3);
+  b.kn[0].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2 + Math.PI)) * 0.95 * w + Math.max(0, weight) * 3) * (1 - seat) - 1.55 * seat;
+  b.kn[1].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2)) * 0.95 * w + Math.max(0, -weight) * 3) * (1 - seat) - 1.55 * seat;
+  b.dev.scale.setScalar(Math.max(0.0001, st.dev));
   b.sh[0].rotation.set(st.shLx, st.shLy, -st.shLz);
   b.sh[1].rotation.set(st.shRx, st.shRy, st.shRz);
   b.el[0].rotation.x = st.elL;
   b.el[1].rotation.x = st.elR;
-  b.spine.rotation.x = -st.lean;
+  b.spine.rotation.x = -(st.lean + 0.05 * seat);
   b.spine.rotation.z = -weight * 1.1;
   b.head.rotation.set(-st.pitch, st.yaw, st.tilt + weight * 0.9);
 

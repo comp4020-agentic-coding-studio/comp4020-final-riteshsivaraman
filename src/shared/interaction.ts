@@ -15,7 +15,7 @@ import { headingTo, wrap, type Obstacle } from "./steering.ts";
 // An interaction only starts between people who are free and within range, and
 // even then only some of the time: being near is necessary, not sufficient.
 
-export type InteractionKind = "chat" | "handshake" | "address" | "applaud" | "circle";
+export type InteractionKind = "chat" | "handshake" | "address" | "applaud" | "circle" | "sitdown";
 
 export interface KindSpec {
   cardinality: "1:1" | "1:n" | "n:1" | "n:n";
@@ -30,9 +30,13 @@ export const KINDS: Record<InteractionKind, KindSpec> = {
   address: { cardinality: "1:n", people: [3, 6], weight: 2, duration: [10, 18] },
   applaud: { cardinality: "n:1", people: [3, 7], weight: 1.5, duration: [5, 8] },
   circle: { cardinality: "n:n", people: [3, 5], weight: 2.5, duration: [10, 20] },
+  // a seated discussion with devices out: only ever scheduled, at a table or
+  // the bar (storeday.ts), never started on the spot, so weight 0
+  sitdown: { cardinality: "1:1", people: [2, 2], weight: 0, duration: [18, 30] },
 };
 
-export const KIND_LIST = Object.keys(KINDS) as InteractionKind[];
+// The kinds that can start on the spot between people who are near.
+export const KIND_LIST = (Object.keys(KINDS) as InteractionKind[]).filter((k) => KINDS[k].weight > 0);
 
 // The default distance within which someone might start one.
 export const INTERACTION_RANGE = 3.2;
@@ -102,7 +106,7 @@ export function layout(kind: InteractionKind, members: ReadonlyArray<Agent>): Sl
   const n = members.length;
   const cx = members.reduce((a, m) => a + m.x, 0) / n;
   const cz = members.reduce((a, m) => a + m.z, 0) / n;
-  if (kind === "chat" || kind === "handshake") {
+  if (kind === "chat" || kind === "handshake" || kind === "sitdown") {
     // face to face, on the line between them, about arm's length apart
     const [ux, uz] = norm(members[0].x - members[1].x, members[0].z - members[1].z);
     const half = (kind === "handshake" ? 0.9 : 1.1) / 2;
@@ -161,6 +165,14 @@ export function playPose(kind: InteractionKind, index: number, n: number, t: num
     case "applaud": {
       if (index === 0) return { mode: t < duration * 0.5 ? "wave" : "bow", mood: "smile" };
       return { mode: "clap", mood: "smile" };
+    }
+    case "sitdown": {
+      // talk, then both look at a device and use it, then talk again
+      const u = t / Math.max(1, duration);
+      if (u > 0.2 && u < 0.72) return { mode: "device", mood: index === 0 ? "curious" : "focused" };
+      const speaker = Math.floor(t / 3.4) % 2;
+      const closing = duration - t < 2;
+      return index === speaker ? { mode: "talk", mood: "smile" } : { mode: "listen", mood: closing ? "smile" : "neutral" };
     }
     case "circle": {
       const speaker = Math.floor(t / 3.4) % n;

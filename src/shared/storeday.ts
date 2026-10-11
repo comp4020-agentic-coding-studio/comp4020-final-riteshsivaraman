@@ -3,7 +3,7 @@ import { playPose, type InteractionKind } from "./interaction.ts";
 import type { ProductKind } from "./plan.ts";
 import { ENTRANCE_HALF, FLOOR } from "./protocol.ts";
 import { clearance, headingTo, stepWalker, wrap, type Obstacle, type Walker } from "./steering.ts";
-import { BACK_ROOM_Z0, BACK_ROOM_Z1, BAR_STOOLS, COUNTER, DOOR, SOLIDS, TABLES, solidsFor } from "./world.ts";
+import { BACK_ROOM_Z0, BACK_ROOM_Z1, BAR_STOOLS, COUNTER, DOOR, SOLIDS, TABLES, TABLE_STOOLS, solidsFor } from "./world.ts";
 
 // A day in the store, as a timetable. Everyone who is not a visitor has a
 // purpose and a script that follows from it:
@@ -26,7 +26,7 @@ import { BACK_ROOM_Z0, BACK_ROOM_Z1, BAR_STOOLS, COUNTER, DOOR, SOLIDS, TABLES, 
 
 export const CYCLE = 480; // seconds, then it repeats
 
-export type Purpose = "phone" | "laptop" | "tablet" | "audio" | "repair" | "pickup" | "browse";
+export type Purpose = "phone" | "laptop" | "tablet" | "audio" | "repair" | "pickup" | "browse" | "consult";
 export type StaffRole = "greeter" | "specialist" | "genius" | "stock" | "technician";
 export type SpecialtyGroup = "phones" | "laptops" | "tablets" | "audio";
 
@@ -38,6 +38,8 @@ export interface Moment {
   walking: boolean;
   mode: Behaviour;
   mood: string;
+  seated: boolean; // sitting on a stool
+  device: boolean; // a phone or tablet is out
   intent: string; // what they are doing, in words
 }
 
@@ -64,6 +66,7 @@ interface Seg {
   fromHeading?: number;
   act?: { kind: InteractionKind; index: number; n: number; dur: number; from: number };
   with?: string; // who this interaction is with
+  seated?: boolean;
 }
 
 // ---- the places ----
@@ -116,6 +119,30 @@ const BAR_SLOTS: number[] = (() => {
   return pick.length > 1 ? pick : [-2.4, -0.6, 1.2, 2.8];
 })();
 const BEHIND_BAR_Z = BAR_BACK_Z + 0.5;
+
+// Seats. At each square table, a stool for a guest on its left and one for the
+// host on its right, facing each other across it; and the stools along the bar.
+export interface Seat {
+  id: string;
+  at: Pt; // where a sitter's pelvis goes
+  face: Pt; // what they face
+}
+const SERVICE_TABLES = TABLES.filter((t) => t.service);
+export const TABLE_SEATS: Array<{ id: string; guest: Seat; host: Seat }> = SERVICE_TABLES.flatMap((t) => {
+  // the stools along this table's own two sides, not a neighbour's
+  const near = TABLE_STOOLS.filter((s) => Math.abs(s.z - t.z) < t.d / 2 + 0.3 && Math.abs(s.x - t.x) < t.w / 2 + 0.6);
+  const left = near.filter((s) => s.x < t.x).sort((a, b) => a.z - b.z)[0];
+  const right = near.filter((s) => s.x > t.x).sort((a, b) => a.z - b.z)[0];
+  if (!left || !right) return [];
+  const centre: Pt = { x: t.x, z: t.z };
+  return [{ id: t.id, guest: { id: left.id, at: { x: left.x, z: left.z }, face: centre }, host: { id: right.id, at: { x: right.x, z: right.z }, face: centre } }];
+});
+export const BAR_SEATS: Seat[] = BAR_STOOLS.filter((s) => Math.abs(s.x) < COUNTER.w / 2 - 0.4).map((s) => ({
+  id: s.id,
+  // forward a little on the seat, so the chest is not in the counter
+  at: { x: s.x, z: s.z - 0.12 },
+  face: { x: s.x, z: COUNTER.z },
+}));
 const DOOR_X = (DOOR.minX + DOOR.maxX) / 2;
 const SHOP_FRONT = FLOOR.minZ;
 
@@ -285,9 +312,14 @@ function planPath(from: Pt, to: Pt, role: "staff" | "customer"): Path {
       pts.push({ x: w.x, z: w.z });
     }
   }
-  const last = pts[pts.length - 1];
-  // arrive exactly, by a short final step (never a jump across the room)
-  if (Math.hypot(to.x - last.x, to.z - last.z) > 0.001) pts.push({ x: to.x, z: to.z });
+  // a goal that sits inside the keep-out margin (a stool tucked up to a table)
+  // is reached by walking the last bit straight there, at a walking pace
+  const last0 = pts[pts.length - 1];
+  const rest = Math.hypot(to.x - last0.x, to.z - last0.z);
+  const steps = Math.ceil(rest / (SPEED * STEP));
+  for (let i = 1; i <= steps; i++) {
+    pts.push({ x: last0.x + ((to.x - last0.x) * i) / steps, z: last0.z + ((to.z - last0.z) * i) / steps });
+  }
   const path = { pts, secs: (pts.length - 1) * STEP };
   pathCache.set(key, path);
   return path;
@@ -300,6 +332,7 @@ class Timeline {
   pos: Pt;
   heading: number;
   t = 0; // the time up to which this actor's day is written
+  seated = false; // sitting from here on, until they get up
   constructor(
     public id: string,
     public role: "staff" | "customer",
@@ -315,13 +348,14 @@ class Timeline {
   stand(until: number, intent?: string, mode: Behaviour = "idle", mood?: string, face?: Pt): void {
     if (until <= this.t + 1e-6) return;
     const f = face ?? { x: this.pos.x - Math.sin(this.heading), z: this.pos.z - Math.cos(this.heading) };
-    this.segs.push({ t0: this.t, t1: until, kind: "stand", intent: intent ?? this.idleIntent, mode, mood: mood ?? this.idleMood, at: { ...this.pos }, face: f, fromHeading: this.heading });
+    this.segs.push({ t0: this.t, t1: until, kind: "stand", intent: intent ?? this.idleIntent, mode, mood: mood ?? this.idleMood, at: { ...this.pos }, face: f, fromHeading: this.heading, seated: this.seated });
     this.heading = headingTo(this.pos.x, this.pos.z, f.x, f.z);
     this.t = until;
   }
   // set off at time `depart` (waiting where they are until then), return when they arrive
   walk(to: Pt, depart: number, intent: string, via: Pt[] = []): number {
     this.stand(depart);
+    this.seated = false; // anyone walking has got up
     let at = this.t;
     for (const target of [...via, to]) {
       const path = planPath(this.pos, target, this.role);
@@ -351,6 +385,7 @@ class Timeline {
       fromHeading: this.heading,
       act: { kind, index, n, dur: from + dur, from },
       with: withId,
+      seated: this.seated,
     });
     this.heading = headingTo(this.pos.x, this.pos.z, face.x, face.z);
     this.t += dur;
@@ -385,7 +420,7 @@ const STAFF_SHIRT = "#2f5d9e";
 const SPEC_ORDER: SpecialtyGroup[] = ["phones", "laptops", "tablets", "audio"];
 
 // the customers, each with a reason to be here
-const PURPOSES: Purpose[] = ["phone", "laptop", "repair", "tablet", "audio", "browse", "phone", "pickup", "laptop", "browse", "audio", "tablet", "repair", "phone"];
+const PURPOSES: Purpose[] = ["phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse", "audio", "consult", "repair", "phone"];
 const CUSTOMER_SHIRTS = ["#e07a5f", "#81b29a", "#f2cc8f", "#9b72aa", "#6d9dc5", "#d4a373", "#7a9e7e", "#c46f8a", "#6f8f4a", "#4a7c9a"];
 
 export const CAST: CastMember[] = [
@@ -448,6 +483,7 @@ function build(): void {
   // stations in use: one customer at a time
   const stationFree = new Map<string, number>();
   const barFree = BAR_SLOTS.map(() => 0);
+  const tableFree = TABLE_SEATS.map(() => 0);
   const customers = CAST.filter((c) => c.role === "customer");
   const horizon = CYCLE - 70;
 
@@ -515,6 +551,8 @@ function build(): void {
         // pay at the bar
         checkout(i, tl, "paying", 7);
       }
+    } else if (c.purpose === "consult" && TABLE_SEATS.length > 0) {
+      sitDownAt(i, tl);
     } else if (c.purpose === "repair" || c.purpose === "pickup") {
       checkout(i, tl, c.purpose === "repair" ? "repair" : "pickup", c.purpose === "repair" ? 13 : 5);
     } else {
@@ -533,6 +571,36 @@ function build(): void {
     tl.away(CYCLE);
   });
 
+  // a sit-down discussion at a square table with a genius, devices out
+  function sitDownAt(i: number, tl: Timeline): void {
+    let k = 0;
+    let when = Infinity;
+    TABLE_SEATS.forEach((_, j) => {
+      const t = Math.max(tableFree[j], tl.t) + rand(i * 11 + j) * 0.3;
+      if (t < when) {
+        when = t;
+        k = j;
+      }
+    });
+    const table = TABLE_SEATS[k];
+    const genius = geniuses.reduce((a, b) => (a.t <= b.t ? a : b));
+    const gPath = planPath(genius.pos, table.host.at, "staff");
+    const arrive = tl.walk(table.guest.at, Math.max(tl.t, tableFree[k]), "going to a table to sit down");
+    const gDepart = Math.max(genius.t, arrive - gPath.secs + 0.5);
+    if (gDepart + gPath.secs + 40 > horizon) return;
+    const gArrive = genius.walk(table.host.at, gDepart, "going to sit down with a customer");
+    const sit = Math.max(arrive, gArrive) + 0.4;
+    tl.seated = true;
+    genius.seated = true;
+    tl.stand(sit, "taking a seat", "idle", "smile", table.guest.face);
+    genius.stand(sit, "taking a seat", "idle", "smile", table.host.face);
+    const dur = 24 + rand(i * 5 + 2) * 6;
+    tl.act(dur, "sitdown", 0, 2, table.guest.face, "talking it through, device out", 0, genius.id);
+    genius.act(dur, "sitdown", 1, 2, table.host.face, "walking a customer through their device", 0, tl.id);
+    tableFree[k] = tl.t + 0.5;
+    genius.walk(POSTS[genius.id], genius.t + 0.6, "back to the bar");
+  }
+
   // paying at the bar, collecting, or dropping off a repair
   function checkout(i: number, tl: Timeline, what: "paying" | "repair" | "pickup", serviceSecs: number): void {
     let slotIx = 0;
@@ -544,8 +612,12 @@ function build(): void {
         slotIx = k;
       }
     });
-    const x = BAR_SLOTS[slotIx];
-    const stand: Pt = { x, z: BAR_FRONT_Z - 0.55 };
+    // a repair takes a while, so they sit on a bar stool for it; paying and
+    // collecting are quick, so they stand
+    const sitting = what === "repair" && BAR_SEATS.length > 0;
+    const seat = sitting ? BAR_SEATS.reduce((a, b) => (Math.abs(a.at.x - BAR_SLOTS[slotIx]) <= Math.abs(b.at.x - BAR_SLOTS[slotIx]) ? a : b)) : null;
+    const x = seat ? seat.at.x : BAR_SLOTS[slotIx];
+    const stand: Pt = seat ? seat.at : { x, z: BAR_FRONT_Z - 0.55 };
     const genius = geniuses.reduce((a, b) => (Math.abs(a.post.x - x) + Math.max(0, a.t - tl.t) * 0.3 <= Math.abs(b.post.x - x) + Math.max(0, b.t - tl.t) * 0.3 ? a : b));
     const behind: Pt = { x, z: BEHIND_BAR_Z }; // directly opposite them, across the counter
     const intentWait = what === "pickup" ? "waiting to collect an order" : what === "repair" ? "waiting to book a repair" : "waiting to pay";
@@ -559,6 +631,7 @@ function build(): void {
     }
     const gArrive = genius.walk(behind, gDepart, "going to serve the bar");
     const start = Math.max(tArrive, gArrive);
+    tl.seated = sitting;
     tl.stand(start, intentWait, "phone", "neutral", behind);
     genius.stand(start, "serving the bar", "idle", "smile", stand);
     // an order or a repair needs something from the back: the stock runner brings it
@@ -576,9 +649,11 @@ function build(): void {
       runner.walk(POSTS["stock-runner"], runner.t + 0.5, "back to the stock room", [{ x: DOOR_X, z: FLOOR.maxZ - 0.3 }]);
       tl.stand(genius.t, intentWait, "phone", "neutral", behind);
     }
-    const dur = serviceSecs;
-    tl.act(dur, "chat", 0, 2, behind, what === "paying" ? "paying" : what === "repair" ? "booking a repair" : "collecting an order", 0, genius.id);
-    genius.act(dur, "chat", 1, 2, stand, what === "paying" ? "taking payment" : what === "repair" ? "booking in a repair" : "handing over an order", 0, tl.id);
+    const dur = sitting ? serviceSecs + 9 : serviceSecs;
+    const kind = sitting ? "sitdown" : "chat";
+    tl.act(dur, kind, 0, 2, behind, what === "paying" ? "paying" : what === "repair" ? "booking a repair, showing the device" : "collecting an order", 0, genius.id);
+    genius.act(dur, kind, 1, 2, stand, what === "paying" ? "taking payment" : what === "repair" ? "booking in a repair, checking the device" : "handing over an order", 0, tl.id);
+    tl.seated = false; // up again to say thanks
     tl.act(2.6, "handshake", 0, 2, behind, "thanking them", 0.7, genius.id);
     genius.act(2.6, "handshake", 1, 2, stand, "thanking the customer", 0.7, tl.id);
     barFree[slotIx] = tl.t + 0.5;
@@ -635,13 +710,14 @@ build();
 // ---- reading it ----
 
 export const NPC_IDS = CAST.map((c) => c.id);
+export { BAR_SEATS as SEATS_AT_BAR, TABLE_SEATS as SEATS_AT_TABLES };
 export const castOf = (id: string): CastMember => meta.get(id)!;
 
 function at(seg: Seg, tau: number): Moment {
   const u = (tau - seg.t0) / Math.max(1e-6, seg.t1 - seg.t0);
   if (seg.kind === "away") {
     const p = seg.at!;
-    return { present: false, x: p.x, z: p.z, ry: 0, walking: false, mode: "idle", mood: "neutral", intent: seg.intent };
+    return { present: false, x: p.x, z: p.z, ry: 0, walking: false, mode: "idle", mood: "neutral", seated: false, device: false, intent: seg.intent };
   }
   if (seg.kind === "walk") {
     const path = seg.path!;
@@ -658,7 +734,7 @@ function at(seg: Seg, tau: number): Moment {
     const dx = ahead.x - behind.x;
     const dz = ahead.z - behind.z;
     const ry = Math.hypot(dx, dz) > 1e-6 ? headingTo(0, 0, dx, dz) : 0;
-    return { present: true, x, z, ry, walking: true, mode: "walk", mood: seg.mood, intent: seg.intent };
+    return { present: true, x, z, ry, walking: true, mode: "walk", mood: seg.mood, seated: false, device: false, intent: seg.intent };
   }
   const p = seg.at!;
   const face = seg.face ?? p;
@@ -676,7 +752,7 @@ function at(seg: Seg, tau: number): Moment {
     mood = pose.mood;
   }
   void u;
-  return { present: true, x: p.x, z: p.z, ry, walking: false, mode, mood, intent: seg.intent };
+  return { present: true, x: p.x, z: p.z, ry, walking: false, mode, mood, seated: seg.seated ?? false, device: mode === "device", intent: seg.intent };
 }
 
 // Where this person is and what they are doing at server time `nowMs`.

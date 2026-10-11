@@ -240,7 +240,7 @@ function Interactions({ agents, count, zonesRef, enabled, scene, playAt, onSumma
       sceneDone.current = true;
       const kind = scene as keyof typeof KINDS;
       if (KINDS[kind]) {
-        const k = Math.min(agents.length, { chat: 2, handshake: 2, address: 4, applaud: 6, circle: 4 }[kind]);
+        const k = Math.min(agents.length, { chat: 2, handshake: 2, address: 4, applaud: 6, circle: 4, sitdown: 2 }[kind]);
         // gather them close first, so the layout is built from a tight group
         for (let i = 0; i < k; i++) {
           agents[i].char.root.position.set((i - (k - 1) / 2) * 0.55, 0, 4.8 + (i % 2) * 0.2);

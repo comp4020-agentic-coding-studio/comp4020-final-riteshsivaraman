@@ -20,9 +20,10 @@ export type Behaviour =
   | "listen"
   | "handshake"
   | "clap"
-  | "bow";
+  | "bow"
+  | "device"; // a phone or tablet out, looking at it and using it
 
-export const BEHAVIOURS: Behaviour[] = ["idle", "walk", "observe", "work", "wave", "talk", "think", "phone", "crossed", "laugh", "point", "listen", "handshake", "clap", "bow"];
+export const BEHAVIOURS: Behaviour[] = ["idle", "walk", "observe", "work", "wave", "talk", "think", "phone", "crossed", "laugh", "point", "listen", "handshake", "clap", "bow", "device"];
 
 // How often each is picked, relative to the others.
 export const WEIGHTS: Record<Behaviour, number> = {
@@ -42,6 +43,7 @@ export const WEIGHTS: Record<Behaviour, number> = {
   handshake: 0,
   clap: 0,
   bow: 0,
+  device: 0,
 };
 
 // Seconds, [min, max].
@@ -61,6 +63,7 @@ export const DURATION: Record<Behaviour, [number, number]> = {
   handshake: [2, 4],
   clap: [2, 5],
   bow: [1.5, 3],
+  device: [6, 12],
 };
 
 // Expression names (see EXPRESSIONS in gfx/character.ts) that fit each.
@@ -80,6 +83,7 @@ export const MOODS: Record<Behaviour, string[]> = {
   handshake: ["smile"],
   clap: ["smile"],
   bow: ["smile", "neutral"],
+  device: ["curious", "neutral", "smile"],
 };
 
 // What a person does on their own when the crowd is "interactions only": they
