@@ -85,6 +85,18 @@ entry screen and character customiser, the conversation menu and employee panel
 in the client, drawing identity/look of other visitors, NPCs walking to a visitor
 and back (D1 on screen), E to talk, deploying.
 
+**Conversations, subsystem 3 (client), 2026-10-12.** Written and type-checked,
+suite green (207), committed in `4a4d325`, `9e672eb`, `c96d04d`:
+`Entry.tsx` (customer/employee, post, name, customiser with live preview),
+`Talk.tsx` (numbered choices, 1-9 / Space), `StaffPanel.tsx` (customers,
+Take, Hand on, staff replies), HUD chips and toast in `main.tsx`, other
+players drawn with look + uniform + name tag, NPCs off duty / engaged /
+rejoining. `?enter=<kind>&lane=<specialty>` skips the entry screen for checks.
+**Not yet checked by a human:** the entry screen was seen in a still only; the
+in-store flow (E to talk, panel, NPC walking over and back) has never been run in a
+real browser with two players. Headless Chrome never settles on the live store.
+Not deployed.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
