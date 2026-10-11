@@ -115,9 +115,15 @@ export const BACK_ROOM_Z1 = BACK_ROOM_Z0 + (FLOOR.maxZ - FLOOR.minZ);
 // store's back of house): inventory on rolling high-density shelves; a repair
 // room where technicians work on devices; a manager's office; a break and
 // training room with computers; lockers and staff restrooms; and a back door
-// to a loading dock for deliveries. The areas and their furniture are mine to
-// place (positions are working defaults, drawn in the blueprint to be
-// corrected); the footprint is the shop's.
+// to a loading dock for deliveries.
+//
+// The layout is the redesign Ritesh approved on 2026-10-12
+// (docs/blueprint/back-redesign.png; SCOPE D38). The old one put every room
+// behind four rows of shelving. Now: a clear concourse inside the staff door,
+// the stock hall with a clear staff lane down one side, a spine corridor, and
+// the rooms off the spine, with open receiving from the dock door. The areas
+// and furniture are mine to place (working defaults, drawn in the blueprint
+// to be corrected); the footprint is the shop's.
 const rz = (v: number): number => BACK_ROOM_Z0 + v;
 export interface BackArea {
   id: string;
@@ -127,33 +133,56 @@ export interface BackArea {
   z0: number;
   z1: number;
 }
+// v is metres from the back room's first row. East is +x (the visitor's left
+// as they enter, and the side of the staff door).
+export const BACK_LAYOUT = {
+  concourseV: 2.0, // clear floor just inside the staff door
+  spineV0: 9.0, // the cross corridor, 1.8 m wide
+  spineV1: 10.8,
+  laneX0: 4.2, // the staff lane down the east side of the stock hall
+  roomsX: { west: -2.2, east: 2.2 }, // receiving runs between these
+  repairV1: 15.4, // repair ends, the office begins
+  westRoomsV: 13.4, // restrooms and cleaner end, break and training begins
+  cleanerX: -3.4,
+} as const;
+const L = BACK_LAYOUT;
 export const BACK_AREAS: BackArea[] = [
-  { id: "storage", name: "INVENTORY STORAGE (rolling shelves)", x0: FLOOR.minX, x1: FLOOR.maxX, z0: rz(0), z1: rz(8.9) },
-  { id: "repair", name: "GENIUS ROOM: REPAIR", x0: FLOOR.minX, x1: -0.3, z0: rz(8.9), z1: rz(14.3) },
-  { id: "office", name: "MANAGER'S OFFICE", x0: -0.3, x1: 3.3, z0: rz(8.9), z1: rz(14.3) },
-  { id: "break", name: "BREAK & TRAINING", x0: 3.3, x1: FLOOR.maxX, z0: rz(8.9), z1: rz(14.3) },
-  { id: "dock", name: "LOCKERS, RESTROOMS, LOADING DOCK", x0: FLOOR.minX, x1: FLOOR.maxX, z0: rz(14.3), z1: rz(18.2) },
+  { id: "storage", name: "INVENTORY STORAGE (rolling shelves)", x0: FLOOR.minX, x1: L.laneX0, z0: rz(L.concourseV), z1: rz(L.spineV0) },
+  { id: "lane", name: "STAFF LANE", x0: L.laneX0, x1: FLOOR.maxX, z0: rz(L.concourseV), z1: rz(L.spineV0) },
+  { id: "concourse", name: "RUNNER CONCOURSE", x0: FLOOR.minX, x1: FLOOR.maxX, z0: rz(0), z1: rz(L.concourseV) },
+  { id: "spine", name: "SPINE", x0: FLOOR.minX, x1: FLOOR.maxX, z0: rz(L.spineV0), z1: rz(L.spineV1) },
+  { id: "restroom", name: "RESTROOMS", x0: FLOOR.minX, x1: L.cleanerX, z0: rz(L.spineV1), z1: rz(L.westRoomsV) },
+  { id: "cleaner", name: "CLEANER'S STORE", x0: L.cleanerX, x1: L.roomsX.west, z0: rz(L.spineV1), z1: rz(L.westRoomsV) },
+  { id: "break", name: "BREAK & TRAINING", x0: FLOOR.minX, x1: L.roomsX.west, z0: rz(L.westRoomsV), z1: rz(18.2) },
+  { id: "dock", name: "RECEIVING AND STAGING", x0: L.roomsX.west, x1: L.roomsX.east, z0: rz(L.spineV1), z1: rz(18.2) },
+  { id: "repair", name: "GENIUS ROOM: REPAIR", x0: L.roomsX.east, x1: FLOOR.maxX, z0: rz(L.spineV1), z1: rz(L.repairV1) },
+  { id: "office", name: "MANAGER'S OFFICE", x0: L.roomsX.east, x1: FLOOR.maxX, z0: rz(L.repairV1), z1: rz(18.2) },
 ];
 
-export const BACK_SHELF_ROW_Z = [rz(1.9), rz(3.5), rz(5.1), rz(6.7)] as const;
-export const BACK_SHELF_UNIT_X = [-3.6, 0, 3.6] as const;
+// Shelving: six banks, each two back-to-back rolling units, in two runs of
+// three. Main aisles are at least 1.35 m, the passages between banks 1.0 m.
+export const BACK_SHELF_ROW_Z = [rz(4.0), rz(6.7)] as const;
+export const BACK_SHELF_UNIT_X = [-4.4, -0.8, 2.6] as const;
+const UNIT_D = 0.62;
 export const BACK_SHELVES: Box[] = BACK_SHELF_ROW_Z.flatMap((z) =>
-  BACK_SHELF_UNIT_X.map((x) => ({ x, z, w: 2.7, d: 0.62, h: 2.4 })),
+  BACK_SHELF_UNIT_X.flatMap((x) => [-1, 1].map((s) => ({ x, z: z + (s * UNIT_D) / 2, w: 2.4, d: UNIT_D, h: 2.4 }))),
 );
 
-// Two repair benches where technicians work, in the repair room.
+// Two repair benches where technicians work, along the east wall of the repair
+// room, so it is next to the staff lane. A technician stands on the west side.
 export const SERVICE_DESKS: Box[] = [
-  { x: -4.4, z: rz(12.0), w: 2.2, d: 0.8, h: 0.95 },
-  { x: -1.7, z: rz(12.0), w: 2.2, d: 0.8, h: 0.95 },
+  { x: 5.55, z: rz(12.0), w: 0.8, d: 2.0, h: 0.95 },
+  { x: 5.55, z: rz(14.1), w: 0.8, d: 2.0, h: 0.95 },
 ];
 
 // Walls between the areas, with doorways. A wall is split into segments
-// around each doorway, so a solid is a segment and a doorway is a real gap.
+// around each gap, so a solid is a segment and a doorway is a real gap.
 export const DOORWAY_W = 1.0;
 const WALL_T = 0.12;
 const WALL_H = 2.6;
-function wallRun(z: number, doorXs: number[]): Box[] {
-  const stops = [FLOOR.minX, ...doorXs.flatMap((x) => [x - DOORWAY_W / 2, x + DOORWAY_W / 2]), FLOOR.maxX];
+type Gap = [number, number];
+function wallAlongX(z: number, x0: number, x1: number, gaps: Gap[]): Box[] {
+  const stops = [x0, ...gaps.flatMap(([a, b]) => [a, b]), x1];
   const out: Box[] = [];
   for (let i = 0; i < stops.length; i += 2) {
     const w = stops[i + 1] - stops[i];
@@ -161,17 +190,50 @@ function wallRun(z: number, doorXs: number[]): Box[] {
   }
   return out;
 }
-export const BACK_DOORWAYS = [
-  { x: -3.6, z: rz(8.9) }, // storage to repair
-  { x: 1.5, z: rz(8.9) }, // storage to office
-  { x: 4.65, z: rz(8.9) }, // storage to break room
-  { x: 0, z: rz(14.3) }, // rooms to the dock end
-] as const;
+function wallAlongZ(x: number, v0: number, v1: number, gaps: Gap[]): Box[] {
+  const stops = [v0, ...gaps.flatMap(([a, b]) => [a, b]), v1];
+  const out: Box[] = [];
+  for (let i = 0; i < stops.length; i += 2) {
+    const d = stops[i + 1] - stops[i];
+    if (d > 1e-6) out.push({ x, z: rz((stops[i] + stops[i + 1]) / 2), w: WALL_T, d, h: WALL_H });
+  }
+  return out;
+}
+export interface BackDoorway {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+  w: number; // clear opening
+  axis: "x" | "z"; // the wall it is in runs along this axis
+}
+export const BACK_DOORWAYS: BackDoorway[] = [
+  { id: "restroom", name: "RESTROOMS", x: -4.7, z: rz(L.spineV1), w: 1.0, axis: "x" },
+  { id: "cleaner", name: "CLEANER", x: -2.8, z: rz(L.spineV1), w: 1.0, axis: "x" },
+  { id: "dock", name: "RECEIVING", x: 0, z: rz(L.spineV1), w: 4.4, axis: "x" },
+  { id: "repair", name: "GENIUS ROOM", x: 3.7, z: rz(L.spineV1), w: 1.0, axis: "x" },
+  { id: "break", name: "BREAK & TRAINING", x: L.roomsX.west, z: rz(15.0), w: 1.0, axis: "z" },
+  { id: "office", name: "MANAGER", x: L.roomsX.east, z: rz(17.0), w: 1.0, axis: "z" },
+];
+const gapX = (id: string): Gap => {
+  const d = BACK_DOORWAYS.find((k) => k.id === id)!;
+  return [d.x - d.w / 2, d.x + d.w / 2];
+};
+const gapV = (id: string): Gap => {
+  const d = BACK_DOORWAYS.find((k) => k.id === id)!;
+  return [d.z - BACK_ROOM_Z0 - d.w / 2, d.z - BACK_ROOM_Z0 + d.w / 2];
+};
 export const BACK_WALLS: Box[] = [
-  ...wallRun(rz(8.9), [-3.6, 1.5, 4.65]),
-  ...wallRun(rz(14.3), [0]),
-  { x: -0.3, z: rz(11.6), w: WALL_T, d: 5.4, h: WALL_H },
-  { x: 3.3, z: rz(11.6), w: WALL_T, d: 5.4, h: WALL_H },
+  // the spine's far wall, with a doorway into each room
+  ...wallAlongX(rz(L.spineV1), FLOOR.minX, FLOOR.maxX, ["restroom", "cleaner", "dock", "repair"].map(gapX).sort((a, b) => a[0] - b[0])),
+  // receiving's two side walls, with a door to the break room and to the office
+  ...wallAlongZ(L.roomsX.west, L.spineV1, 18.2, [gapV("break")]),
+  ...wallAlongZ(L.roomsX.east, L.spineV1, 18.2, [gapV("office")]),
+  // between the restrooms and the cleaner's store, and above them
+  ...wallAlongZ(L.cleanerX, L.spineV1, L.westRoomsV, []),
+  ...wallAlongX(rz(L.westRoomsV), FLOOR.minX, L.roomsX.west, []),
+  // between repair and the office
+  ...wallAlongX(rz(L.repairV1), L.roomsX.east, FLOOR.maxX, []),
 ];
 
 export type BackKind = "desk" | "table" | "computers" | "lockers" | "restroom" | "pallet";
@@ -180,13 +242,13 @@ export interface BackThing extends Box {
   label?: string;
 }
 export const BACK_FURNITURE: BackThing[] = [
-  { kind: "desk", label: "manager", x: 1.5, z: rz(12.6), w: 1.6, d: 0.8, h: 0.75 },
-  { kind: "table", label: "break table", x: 4.65, z: rz(10.4), w: 1.2, d: 0.9, h: 0.75 },
-  { kind: "computers", label: "training computers", x: 5.6, z: rz(12.4), w: 0.7, d: 2.6, h: 0.75 },
-  { kind: "lockers", label: "lockers", x: -5.7, z: rz(16.5), w: 0.5, d: 2.8, h: 1.9 },
-  { kind: "restroom", label: "restrooms", x: 4.7, z: rz(16.1), w: 2.6, d: 2.4, h: WALL_H },
-  { kind: "pallet", label: "deliveries", x: -1.4, z: rz(17.3), w: 1.0, d: 1.0, h: 0.9 },
-  { kind: "pallet", label: "deliveries", x: 1.2, z: rz(17.3), w: 1.0, d: 1.0, h: 1.1 },
+  { kind: "lockers", label: "lockers", x: -5.7, z: rz(1.6), w: 0.5, d: 2.8, h: 1.9 },
+  { kind: "desk", label: "manager", x: 4.4, z: rz(16.9), w: 1.6, d: 0.8, h: 0.75 },
+  { kind: "table", label: "break table", x: -4.8, z: rz(14.4), w: 1.2, d: 0.9, h: 0.75 },
+  { kind: "computers", label: "training computers", x: -3.0, z: rz(16.9), w: 0.7, d: 2.4, h: 0.75 },
+  { kind: "restroom", label: "restrooms", x: -4.7, z: rz(12.55), w: 2.4, d: 1.5, h: WALL_H },
+  { kind: "pallet", label: "deliveries", x: -1.0, z: rz(16.7), w: 1.0, d: 1.0, h: 0.9 },
+  { kind: "pallet", label: "deliveries", x: 1.0, z: rz(16.7), w: 1.0, d: 1.0, h: 1.1 },
 ];
 // the back door onto the loading dock, in the far wall
 export const BACK_DOOR = { minX: -2.0, maxX: 2.0 } as const;

@@ -5,12 +5,14 @@ import { SHOT, Store } from "./Store.tsx";
 import { StaffPanel } from "./StaffPanel.tsx";
 import { Talk } from "./Talk.tsx";
 import { CharacterStage } from "./gfx/CharacterStage.tsx";
+import { DeviceStage } from "./gfx/DeviceStage.tsx";
 import { net, useNet } from "./net.ts";
 import type { Profile } from "../../shared/profile.ts";
 import "./styles.css";
 
 const Q = new URLSearchParams(location.search);
 const STAGE = Q.has("stage");
+const DEVICE = Q.has("device");
 const DEV = Q.has("dev");
 
 const POST_LABEL: Record<string, string> = {
@@ -78,17 +80,17 @@ function webglAvailable(): boolean {
   }
 }
 
-// Joins without the entry screen, for stills and checks: `?shot`, `?stage`, or
+// Joins without the entry screen, for stills and checks: `?shot`, `?stage`,
+// `?device` (no server needed at all), or
 // `?enter=customer|greeter|specialist|genius|stock|technician`.
-const AUTO: Profile | null = SHOT || STAGE ? { kind: "customer" } : Q.get("enter") ? ({ kind: Q.get("enter"), specialty: Q.get("lane") ?? undefined } as Profile) : null;
+const AUTO: Profile | null = SHOT || STAGE || DEVICE ? { kind: "customer" } : Q.get("enter") ? ({ kind: Q.get("enter"), specialty: Q.get("lane") ?? undefined } as Profile) : null;
 
 function App() {
   const [entered, setEntered] = useState(AUTO !== null);
   useEffect(() => {
-    if (AUTO) {
-      if (SHOT || STAGE) net.connect();
-      else net.enter(AUTO);
-    }
+    if (!AUTO || DEVICE) return;
+    if (SHOT || STAGE) net.connect();
+    else net.enter(AUTO);
   }, []);
   const canDraw = webglAvailable();
   if (!entered) {
@@ -104,11 +106,11 @@ function App() {
   return (
     <>
       {canDraw ? (
-        STAGE ? <CharacterStage /> : <Store />
+        DEVICE ? <DeviceStage /> : STAGE ? <CharacterStage /> : <Store />
       ) : (
         <p className="no-webgl">This browser can't draw the store (WebGL is turned off). You can still be counted as here.</p>
       )}
-      {!SHOT && !STAGE && (
+      {!SHOT && !STAGE && !DEVICE && (
         <>
           <Hud />
           <Talk />

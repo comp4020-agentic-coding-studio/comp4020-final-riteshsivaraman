@@ -123,3 +123,98 @@ export const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
 export const cyl = (rt: number, rb: number, h: number, seg = 20) => new CylinderGeometry(rt, rb, h, seg);
 export const sphere = (r: number, ws = 16, hs = 12) => new SphereGeometry(r, ws, hs);
 export const torus = (R: number, t: number, rs = 8, ts = 24, arc = Math.PI * 2) => new TorusGeometry(R, t, rs, ts, arc);
+
+// ---------- per-model phone bodies (SCOPE D37: real models, distinct looks) ----------
+//
+// One spec per real model, numbers from references/product-line.md (sourced
+// from the maker's AU pages, not memory). `buildPhoneBody` is generic across
+// every phone model: a camera-plateau shape, its lenses and a button layout
+// drive the geometry, so a new model is a new spec, not new drawing code.
+
+export type PlateauShape = "full-width" | "square" | "none";
+
+export interface PhoneModelSpec {
+  id: string;
+  length: number; // body, m (portrait height)
+  width: number; // m
+  thickness: number; // body only, m (plateau adds its own thickness on top)
+  cornerRadius: number; // m
+  plateau: {
+    shape: PlateauShape;
+    height: number; // m, vertical extent of the plateau block
+    inset: number; // m from the top edge to the plateau's top edge
+    thickness: number; // m, how far the plateau stands proud of the back
+    lensRadius: number; // m, outer ring radius
+    lensPositions: Array<[number, number]>; // offsets from the plateau centre, m
+    flashOffset?: [number, number]; // offset from the plateau centre, m
+  };
+  buttons: Array<{ side: -1 | 1; y: number; len: number }>; // y: m from body centre, +ve toward the top edge
+}
+
+// iPhone 18 Pro (6.3"): 150.0 x 71.9 x 8.75 mm, aluminium unibody, full-width
+// camera plateau (thicker than the 17 Pro's, ~11.5 mm total over the plateau),
+// 3-lens triangle (main, ultra wide, telephoto) with flash/LiDAR to the right,
+// action button + camera control added to the classic volume/side buttons.
+// Source: apple.com/au/iphone-18-pro/specs, apple.com/au/shop/buy-iphone/iphone-18-pro,
+// macrumors.com/roundup/iphone-18-pro (plateau shape) — fetched 2026-10-12.
+export const IPHONE_18_PRO: PhoneModelSpec = {
+  id: "iphone-18-pro",
+  length: 0.15,
+  width: 0.0719,
+  thickness: 0.00875,
+  cornerRadius: 0.011,
+  plateau: {
+    shape: "full-width",
+    height: 0.034,
+    inset: 0.009,
+    thickness: 0.0027,
+    lensRadius: 0.0062,
+    lensPositions: [
+      [-0.013, 0.008],
+      [0.013, 0.008],
+      [0, -0.009],
+    ],
+    flashOffset: [0.024, -0.006],
+  },
+  buttons: [
+    { side: -1, y: 0.038, len: 0.01 }, // action button
+    { side: -1, y: 0.018, len: 0.014 }, // volume up
+    { side: -1, y: 0.0, len: 0.014 }, // volume down
+    { side: 1, y: 0.01, len: 0.016 }, // side button
+    { side: 1, y: -0.016, len: 0.007 }, // camera control
+  ],
+};
+
+export const PHONE_MODELS: Record<string, PhoneModelSpec> = {
+  [IPHONE_18_PRO.id]: IPHONE_18_PRO,
+};
+
+// Body + camera plateau + lenses + buttons, merged into the three finish
+// buckets `Parts` tracks (metal buttons, matte body/plateau, gloss lenses).
+// The body is a `slab` facing +z at its front (the screen side); the plateau
+// and lenses sit on the back, at -z.
+export function buildPhoneBody(spec: PhoneModelSpec, bodyColour: string, plateauColour: string): Record<Finish, BufferGeometry | null> {
+  const p = new Parts();
+  const { length: L, width: W, thickness: T, cornerRadius: R } = spec;
+  p.add("matte", slab(W, L, T, R), bodyColour);
+  const pl = spec.plateau;
+  if (pl.shape !== "none") {
+    const plateauW = pl.shape === "full-width" ? W - 0.003 : pl.height + 0.01;
+    const plateauCy = L / 2 - pl.inset - pl.height / 2;
+    const plateauCz = -(T / 2 + pl.thickness / 2);
+    p.add("matte", slab(plateauW, pl.height, pl.thickness, Math.min(R * 0.6, pl.height / 2, plateauW / 2)), plateauColour, [0, plateauCy, plateauCz]);
+    const lensZ = -(T / 2 + pl.thickness + 0.0008);
+    for (const [lx, ly] of pl.lensPositions) {
+      p.add("gloss", cyl(pl.lensRadius, pl.lensRadius, 0.0016, 20), "#111318", [lx, plateauCy + ly, lensZ], [Math.PI / 2, 0, 0]);
+      p.add("gloss", cyl(pl.lensRadius * 0.52, pl.lensRadius * 0.52, 0.0018, 16), "#2c3c56", [lx, plateauCy + ly, lensZ - 0.0001], [Math.PI / 2, 0, 0]);
+    }
+    if (pl.flashOffset) {
+      const [fx, fy] = pl.flashOffset;
+      p.add("gloss", cyl(0.0024, 0.0024, 0.0012, 14), "#eceae2", [fx, plateauCy + fy, lensZ], [Math.PI / 2, 0, 0]);
+    }
+  }
+  for (const b of spec.buttons) {
+    p.add("metal", box(0.0012, b.len, 0.0038), "#d7d9dc", [b.side * (W / 2 + 0.0003), b.y, 0]);
+  }
+  return p.build();
+}

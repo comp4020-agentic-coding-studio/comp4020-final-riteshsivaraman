@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { DoubleSide, InstancedMesh, Object3D, RepeatWrapping } from "three";
 import { CEILING } from "../../../shared/protocol.ts";
-import { BACK_AREAS, BACK_DOORWAYS, BACK_ROOM_Z0, BACK_ROOM_Z1, BACK_SHELF_UNIT_X, BACK_WALLS, DOORWAY_W } from "../../../shared/world.ts";
+import { BACK_AREAS, BACK_DOORWAYS, BACK_LAYOUT, BACK_ROOM_Z0, BACK_ROOM_Z1, BACK_WALLS } from "../../../shared/world.ts";
 import { HALF_W, Sign, canvasTexture } from "./common.tsx";
 
 // What the staff see behind the shop. It is meant to read like a real stockroom
@@ -60,21 +60,22 @@ function floorTexture(w: number, d: number) {
     }
     const X = (x: number): number => (x + w / 2) * ppm;
     const Z = (z: number): number => (z - BACK_ROOM_Z0) * ppm;
-    // yellow edge lines along the gaps between shelf units: the aisles
-    g.fillStyle = "#e3b82a";
-    const gaps = [(BACK_SHELF_UNIT_X[0] + BACK_SHELF_UNIT_X[1]) / 2, (BACK_SHELF_UNIT_X[1] + BACK_SHELF_UNIT_X[2]) / 2];
-    for (const gx of gaps) for (const s of [-1, 1]) g.fillRect(X(gx + s * 0.52) - 3, Z(rz(0.2)), 6, (rz(8.5) - rz(0.2)) * ppm);
-    // the walkway from the shop door to the dock, in green, with a letter per aisle
+    // the staff lane: yellow edge line, a green walkway and a letter
+    const laneX = BACK_LAYOUT.laneX0;
+    const lv0 = BACK_LAYOUT.concourseV;
+    const lv1 = BACK_LAYOUT.spineV0;
     g.fillStyle = "rgba(48,150,92,0.55)";
-    for (const gx of gaps) g.fillRect(X(gx) - 0.45 * ppm, Z(rz(0.2)), 0.9 * ppm, (rz(8.5) - rz(0.2)) * ppm);
+    g.fillRect(X(laneX), Z(rz(lv0)), (5.9 - laneX) * ppm, (rz(lv1) - rz(lv0)) * ppm);
+    g.fillStyle = "#e3b82a";
+    g.fillRect(X(laneX) - 3, Z(rz(lv0)), 6, (rz(lv1) - rz(lv0)) * ppm);
     g.fillStyle = "#ffffff";
     g.font = `bold ${0.5 * ppm}px system-ui, sans-serif`;
     g.textAlign = "center";
-    ["A", "B"].forEach((ch, i) => g.fillText(ch, X(gaps[i]), Z(rz(0.9)) + 0.18 * ppm));
+    g.fillText("STAFF", X((laneX + 6) / 2), Z(rz(5.5)));
     // the dock apron: a hazard-striped box round the roller door and pallets
-    const x0 = X(-2.7);
-    const x1 = X(2.7);
-    const z0 = Z(rz(15.0));
+    const x0 = X(-2.0);
+    const x1 = X(2.0);
+    const z0 = Z(rz(15.6));
     const z1 = Z(BACK_ROOM_Z1 - 0.15);
     g.save();
     g.beginPath();
@@ -190,7 +191,7 @@ export function BackPartitions() {
   return (
     <group>
       {BACK_WALLS.map((w, i) => {
-        const long = w.d > w.w; // runs front to back: between the rooms
+        const long = w.d > 3; // a long wall between rooms: glazed above waist height
         if (!long) {
           return (
             <group key={i}>
@@ -238,26 +239,31 @@ export function BackPartitions() {
           </group>
         );
       })}
-      {BACK_DOORWAYS.map((d, i) => {
-        const name = ["REPAIR", "MANAGER'S OFFICE", "BREAK & TRAINING", "LOCKERS & DOCK"][i] ?? "";
+      {BACK_DOORWAYS.filter((d) => d.w < 3).map((d) => {
+        const across = d.axis === "x"; // the wall runs along x: the doorway faces z
+        const frame = (dx: number, dz: number, w: number, h: number, y: number) => (
+          <mesh position={[d.x + dx, y, d.z + dz]}>
+            <boxGeometry args={across ? [w, h, 0.16] : [0.16, h, w]} />
+            <meshStandardMaterial color={ALU} metalness={0.6} roughness={0.35} />
+          </mesh>
+        );
+        const half = d.w / 2 + 0.025;
         return (
-          <group key={i}>
-            {/* lintel to the ceiling, aluminium head and jambs, a plate sign on the shop side */}
+          <group key={d.id}>
             <mesh position={[d.x, (DOOR_TOP + CEILING) / 2, d.z]}>
-              <boxGeometry args={[DOORWAY_W + 0.2, CEILING - DOOR_TOP, 0.12]} />
+              <boxGeometry args={across ? [d.w + 0.2, CEILING - DOOR_TOP, 0.12] : [0.12, CEILING - DOOR_TOP, d.w + 0.2]} />
               <meshStandardMaterial color={WALL} roughness={0.85} />
             </mesh>
-            <mesh position={[d.x, DOOR_TOP + 0.025, d.z]}>
-              <boxGeometry args={[DOORWAY_W + 0.1, 0.05, 0.16]} />
-              <meshStandardMaterial color={ALU} metalness={0.6} roughness={0.35} />
-            </mesh>
-            {[-1, 1].map((s) => (
-              <mesh key={s} position={[d.x + s * (DOORWAY_W / 2 + 0.025), DOOR_TOP / 2, d.z]}>
-                <boxGeometry args={[0.05, DOOR_TOP, 0.16]} />
-                <meshStandardMaterial color={ALU} metalness={0.6} roughness={0.35} />
-              </mesh>
-            ))}
-            <Sign text={name} position={[d.x, 2.55, d.z - 0.075]} rotY={Math.PI} w={1.3} fg="#ffffff" bg="#2f3a4a" />
+            {frame(0, 0, d.w + 0.1, 0.05, DOOR_TOP + 0.025)}
+            {[-1, 1].map((s) => (across ? frame(s * half, 0, 0.05, DOOR_TOP, DOOR_TOP / 2) : frame(0, s * half, 0.05, DOOR_TOP, DOOR_TOP / 2)))}
+            <Sign
+              text={d.name}
+              position={across ? [d.x, 2.5, d.z - 0.075] : [d.x + 0.075, 2.5, d.z]}
+              rotY={across ? Math.PI : Math.PI / 2}
+              w={1.3}
+              fg="#ffffff"
+              bg="#2f3a4a"
+            />
           </group>
         );
       })}
@@ -364,15 +370,15 @@ export function BackDetails() {
       {/* an exit sign and the dock door's sign, tidied: two plates, nothing floating */}
       <Sign text="EXIT" position={[-2.7, 2.35, rzEnd - 0.04]} rotY={Math.PI} w={0.8} fg="#ffffff" bg="#1f8a4c" />
       {/* the whiteboard in the training room, the kettle bench in the break room */}
-      <mesh position={[eastX, 1.6, rz(10.3)]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[1.6, 1.0]} />
+      <mesh position={[-eastX, 1.6, rz(17.4)]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[1.4, 1.0]} />
         <meshStandardMaterial map={board} roughness={0.4} />
       </mesh>
-      <mesh position={[eastX + 0.005, 1.6, rz(10.3)]} rotation={[0, -Math.PI / 2, 0]}>
-        <planeGeometry args={[1.68, 1.08]} />
+      <mesh position={[-eastX - 0.005, 1.6, rz(17.4)]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[1.48, 1.08]} />
         <meshStandardMaterial color="#8f979f" />
       </mesh>
-      <group position={[eastX - 0.3, 0, rz(9.5)]}>
+      <group position={[-eastX + 0.3, 0, rz(15.7)]}>
         <mesh position={[0, 0.45, 0]}>
           <boxGeometry args={[0.6, 0.9, 1.6]} />
           <meshStandardMaterial color="#e9ecee" roughness={0.6} />
@@ -393,7 +399,7 @@ export function BackDetails() {
       <Plant x={office.x1 - 0.4} z={office.z0 + 0.5} />
       <Plant x={office.x0 + 0.4} z={office.z1 - 0.5} />
       {/* a cage trolley near the dock */}
-      <group position={[2.9, 0, rz(17.0)]}>
+      <group position={[1.6, 0, rz(13.2)]}>
         <mesh position={[0, 0.2, 0]}>
           <boxGeometry args={[0.7, 0.04, 1.0]} />
           <meshStandardMaterial color="#8f969d" metalness={0.5} roughness={0.4} />

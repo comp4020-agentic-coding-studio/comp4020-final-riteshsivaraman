@@ -12,6 +12,7 @@ export function Device({
   z,
   rotY,
   colour,
+  model,
 }: {
   kind: Kind;
   x: number;
@@ -19,9 +20,10 @@ export function Device({
   z: number;
   rotY: number;
   colour: string;
+  model?: string;
 }) {
   if (kind === "laptop" || kind === "tabletKb" || kind === "tablet") {
     return <ComputerDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} />;
   }
-  return <PhoneDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} />;
+  return <PhoneDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} />;
 }

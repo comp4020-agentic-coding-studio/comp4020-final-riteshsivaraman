@@ -56,6 +56,7 @@ import {
 } from "../../../shared/plan.ts";
 import { net } from "../net.ts";
 import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W, DOOR_X, DOOR_H, BENCH_X, BENCH_HALF, FACE_X, canvasTexture, labelTexture, BoxField, Sign, std, BlobShadow, type Cuboid, type Kind } from "./common.tsx";
+import { buildPhoneBody, PHONE_MODELS } from "./phones-geo.ts";
 
 
 // Original screen artwork for the products: wallpapers, app tiles, a clock
@@ -169,8 +170,16 @@ export const SCREEN_VARIANT = (colour: string): number => {
 };
 
 
+// A back finish a shade darker/lighter than the front, for a model's
+// two-tone back (camera plateau in a different finish than the body).
+function shade(colour: string, factor: number): string {
+  return `#${new Color(colour).multiplyScalar(factor).getHexString()}`;
+}
+
 // Phones, watches, earbuds, headphones, speakers and trackers: one product on a
-// surface at height y, facing rotY (0 faces +z).
+// surface at height y, facing rotY (0 faces +z). `model` picks a real,
+// distinct-looking body from `phones-geo.ts` (SCOPE D37); omit it for the
+// plain placeholder body still used by un-costed table slots.
 export function PhoneDevice({
   kind,
   x,
@@ -178,6 +187,7 @@ export function PhoneDevice({
   z,
   rotY,
   colour,
+  model,
 }: {
   kind: "phone" | "watch" | "earbuds" | "headphones" | "speaker" | "airtag";
   x: number;
@@ -185,10 +195,40 @@ export function PhoneDevice({
   z: number;
   rotY: number;
   colour: string;
+  model?: string;
 }) {
+  const spec = kind === "phone" && model ? PHONE_MODELS[model] : undefined;
+  const plateauColour = useMemo(() => shade(colour, 0.88), [colour]);
+  const built = useMemo(() => (spec ? buildPhoneBody(spec, colour, plateauColour) : null), [spec, colour, plateauColour]);
   return (
     <group position={[x, y, z]} rotation={[0, rotY, 0]}>
-      {kind === "phone" && (
+      {kind === "phone" && spec && built && (
+        <group position={[0, spec.length / 2 + 0.012, 0]}>
+          {(["matte", "metal", "gloss"] as const).map(
+            (f) =>
+              built[f] && (
+                <mesh key={f} geometry={built[f]!}>
+                  {f === "metal" ? (
+                    <meshStandardMaterial vertexColors roughness={0.3} metalness={0.85} />
+                  ) : f === "gloss" ? (
+                    <meshStandardMaterial vertexColors roughness={0.12} metalness={0.2} />
+                  ) : (
+                    <meshStandardMaterial vertexColors roughness={0.38} metalness={0.55} />
+                  )}
+                </mesh>
+              ),
+          )}
+          <mesh position={[0, 0, spec.thickness / 2 + 0.0004]}>
+            <planeGeometry args={[spec.width * 0.86, spec.length * 0.9]} />
+            <meshBasicMaterial map={screenTexture("phone", SCREEN_VARIANT(colour))} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, -spec.length / 2 - 0.006, 0]}>
+            <cylinderGeometry args={[0.05, 0.05, 0.012, 20]} />
+            {std(STAND, 0.5, 0.4)}
+          </mesh>
+        </group>
+      )}
+      {kind === "phone" && !spec && (
         <>
           <mesh position={[0, 0.01, 0]}>
             <boxGeometry args={[0.11, 0.02, 0.11]} />

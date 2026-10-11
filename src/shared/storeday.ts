@@ -3,7 +3,7 @@ import { playPose, type InteractionKind } from "./interaction.ts";
 import type { ProductKind } from "./plan.ts";
 import { ENTRANCE_HALF, FLOOR } from "./protocol.ts";
 import { clearance, HARD_GAP, headingTo, stepWalker, wrap, type Obstacle, type Walker } from "./steering.ts";
-import { BACK_ROOM_Z0, BACK_ROOM_Z1, BACK_SHELF_ROW_Z, BACK_SHELF_UNIT_X, BAR_STOOLS, COUNTER, DOOR, SOLIDS, TABLES, TABLE_STOOLS, solidsFor } from "./world.ts";
+import { BACK_ROOM_Z0, BACK_ROOM_Z1, BACK_LAYOUT, BACK_SHELF_ROW_Z, BACK_SHELF_UNIT_X, BAR_STOOLS, COUNTER, DOOR, SERVICE_DESKS, SOLIDS, TABLES, TABLE_STOOLS, solidsFor } from "./world.ts";
 
 // A day in the store, as a timetable. Everyone who is not a visitor has a
 // purpose and a script that follows from it:
@@ -451,6 +451,11 @@ export const CAST: CastMember[] = [
 ];
 
 const BR = BACK_ROOM_Z0;
+// middle of the clear floor in front of the first run and behind the second
+const STOCK_AISLE_V: [number, number] = [
+  (BACK_LAYOUT.concourseV + (BACK_SHELF_ROW_Z[0] - BR - 0.62)) / 2,
+  (BACK_SHELF_ROW_Z[1] - BR + 0.62 + BACK_LAYOUT.spineV0) / 2,
+];
 const POSTS: Record<string, Pt> = {
   "greeter-1": { x: 0, z: SHOP_FRONT + 1.0 },
   "spec-phones": { x: -4.5, z: -3.0 },
@@ -460,12 +465,18 @@ const POSTS: Record<string, Pt> = {
   "genius-1": { x: -1.8, z: BEHIND_BAR_Z },
   "genius-2": { x: 1.8, z: BEHIND_BAR_Z },
   "stock-runner": { x: DOOR_X, z: BR + 1.4 },
-  "stock-1": { x: -1.8, z: BR + 3.0 },
-  "stock-2": { x: 1.8, z: BR + 5.0 },
-  "tech-1": { x: -3.5, z: BR + 12.9 },
-  "tech-2": { x: 3.5, z: BR + 12.9 },
+  // the two stock staff work the aisle along the front of the first run and
+  // the one behind the second (back-of-house layout, SCOPE D38)
+  "stock-1": { x: -1.8, z: BR + STOCK_AISLE_V[0] },
+  "stock-2": { x: -1.8, z: BR + STOCK_AISLE_V[1] },
+  // technicians stand on the west side of their repair bench
+  "tech-1": { x: SERVICE_DESKS[0].x - 0.9, z: SERVICE_DESKS[0].z },
+  "tech-2": { x: SERVICE_DESKS[1].x - 0.9, z: SERVICE_DESKS[1].z },
 };
-const BENCH_FACE: Pt = { x: 0, z: BR + 14.5 };
+const BENCH_FACE: Record<string, Pt> = {
+  "tech-1": { x: SERVICE_DESKS[0].x, z: SERVICE_DESKS[0].z },
+  "tech-2": { x: SERVICE_DESKS[1].x, z: SERVICE_DESKS[1].z },
+};
 // a post that falls inside furniture is moved to the nearest open floor, so
 // nobody is asked to stand in a table
 for (const id of Object.keys(POSTS)) {
@@ -486,7 +497,7 @@ function build(): void {
     meta.set(c.id, c);
     if (c.role === "customer") continue;
     const post = POSTS[c.id];
-    const tl = new Timeline(c.id, "staff", post, c.role === "technician" ? BENCH_FACE : { x: post.x, z: post.z + (post.z < 0 ? 2 : 1) }, idleFor(c));
+    const tl = new Timeline(c.id, "staff", post, c.role === "technician" ? BENCH_FACE[c.id] : { x: post.x, z: post.z + (post.z < 0 ? 2 : 1) }, idleFor(c));
     staff.set(c.id, tl);
   }
   const greeter = staff.get("greeter-1")!;
@@ -678,19 +689,22 @@ function build(): void {
   for (const tl of staff.values()) {
     const c = meta.get(tl.id)!;
     if (c.role === "technician") {
-      tl.stand(CYCLE, "repairing devices", "work", "focused", BENCH_FACE);
+      tl.stand(CYCLE, "repairing devices", "work", "focused", BENCH_FACE[c.id]);
     } else if (c.id === "stock-1" || c.id === "stock-2") {
-      // restocking: go to a shelf unit along their aisle, stand square on to it
-      // and work, then on to the next one (never facing empty floor)
-      const aisle = c.id === "stock-1" ? { z: (BACK_SHELF_ROW_Z[0] + BACK_SHELF_ROW_Z[1]) / 2, row: BACK_SHELF_ROW_Z[1] } : { z: (BACK_SHELF_ROW_Z[2] + BACK_SHELF_ROW_Z[3]) / 2, row: BACK_SHELF_ROW_Z[3] };
-      const order = c.id === "stock-1" ? [0, 1, 2, 1] : [2, 1, 0, 1];
+      // restocking: go to a shelf bank along their aisle, stand square on to
+      // it and work, then on to the next one (never facing empty floor)
+      const first = c.id === "stock-1";
+      const aisle = BR + STOCK_AISLE_V[first ? 0 : 1];
+      // the face of the bank they work: the front of the first run, the back of the second
+      const faceZ = first ? BACK_SHELF_ROW_Z[0] - 0.31 : BACK_SHELF_ROW_Z[1] + 0.31;
+      const order = first ? [0, 1, 2, 1] : [2, 1, 0, 1];
       let t = tl.t;
       let k = 0;
       while (t < CYCLE - 30) {
         const unit = order[k % order.length];
-        const spot = { x: BACK_SHELF_UNIT_X[unit] + (k % 2 === 0 ? -0.5 : 0.5), z: aisle.z };
+        const spot = { x: BACK_SHELF_UNIT_X[unit] + (k % 2 === 0 ? -0.5 : 0.5), z: aisle };
         t = tl.walk(spot, tl.t, "moving to the next shelf");
-        tl.stand(t + 9 + rand(k + c.id.length) * 6, "restocking shelves", "work", "focused", { x: spot.x, z: aisle.row });
+        tl.stand(t + 9 + rand(k + c.id.length) * 6, "restocking shelves", "work", "focused", { x: spot.x, z: faceZ });
         t = tl.t;
         k++;
       }

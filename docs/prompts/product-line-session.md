@@ -114,3 +114,185 @@ inspect already logs an event; include the model id in it.
   checked a still and what you could not check.
 - Append a line to `WORKLOG.md` and a pointer in `CLAUDE.md` "Where things live"
   for each new document.
+
+
+
+# Additional Info 
+
+An Apple Store is arranged less like a traditional electronics shop and more like a minimalist product gallery. The tables are designed to let customers pick up, touch, compare and test devices, with products grouped mainly by product family and model, rather than by technical specifications or colour alone.
+
+## 1. The overall layout
+
+Apple Jamsil, Latest Apple Retail Store in South Korea, Now Open
+
+Buying Apple gear could get easier than ever with 50+ new or refreshed Apple Stores on the way | iMore
+
+Lấy cắp iPhone 15 trưng bày mang về dùng, kẻ gian nhận được tin nhắn kỳ lạ: Đọc xong muốn vứt ngay điện thoại
+
+Walking into a typical Apple Store, you will usually see:
+
+- Long wooden display tables arranged in parallel rows or islands, with generous space between them.
+- Products displayed on top, generally spaced evenly in neat rows, with screens facing upwards or angled towards customers.
+- A product-family layout, where iPhones are grouped with iPhones, Macs with Macs, iPads with iPads, and so on.
+- Small information cards or digital labels next to devices, showing the model name, starting price or key details, depending on the store.
+- Accessories on separate shelves or wall displays, rather than mixed in with the main product tables.
+- A largely uncluttered appearance — few promotional signs, little visible packaging and no piles of boxed products.
+
+The exact arrangement varies by store size, location and current product lineup, but the basic visual language is consistent.
+
+## 2. What's on each table?
+
+Buying Apple gear could get easier than ever with 50+ new or refreshed Apple Stores on the way | iMore
+
+## iPhone table
+
+The iPhones are normally grouped together on one or more tables.
+
+- By model tier: base iPhone models alongside one another, with Pro models displayed in their own section or in a clearly ordered sequence.
+- By generation: current-generation devices are the main focus; older models may be absent or shown in a separate retail area if stocked.
+- By size: smaller and larger screen versions are easy to compare side by side.
+- By colour: several colour options are displayed together, often with the same model available in multiple finishes.
+- By configuration: storage capacity, chip and camera differences are usually explained on labels or the product page, not represented by separate physical devices for every specification.
+
+Customers can pick up a phone, switch between devices, test the camera and compare screens.
+
+FRANCE-TECHNOLOGY-APPLE-STORE
+
+## Mac table
+
+MacBooks are generally laid out in orderly rows with their lids open, so customers can use the keyboards, trackpads and displays.
+
+- By family: MacBook Air and MacBook Pro are separated or arranged in identifiable groups.
+- By screen size: different sizes sit beside one another for direct comparison.
+- By chip or performance tier: base and higher-performance configurations may be identified through product labels and specifications.
+- By finish: colours such as silver, space grey or other available finishes are shown where applicable.
+- Desktop Macs: iMacs, Mac minis and Mac Studios may have dedicated displays or stations, depending on the store.
+
+The key distinction is usually the Mac family and size first, then the configuration.
+
+Apple Event April 2021 live updates: iPad Pros, new iMacs announced
+
+## iPad table
+
+iPads are placed flat or at a slight angle, often with their screens on and ready to use.
+
+- By family: standard iPad, iPad mini, iPad Air and iPad Pro.
+- By size: smaller and larger screens are placed so the difference is immediately visible.
+- By capability: higher-end models can be compared for display quality, performance and accessory compatibility.
+- By colour: available finishes are represented by the actual devices on display.
+- Accessories: Apple Pencil and keyboard accessories may be demonstrated nearby or attached to selected devices.
+
+The table makes it easy to compare a basic tablet with a more premium model without needing to read every specification first.
+
+New Apple Store design changes prioritize a straightforward shopping experience - 9to5Mac
+
+## Apple Watch display
+
+Watches are usually presented on dedicated stands, fixtures or a specialised table.
+
+- By family: standard Apple Watch, SE and Ultra models, where offered.
+- By case size: smaller and larger cases are shown for comparison.
+- By material and finish: aluminium, titanium or other available finishes.
+- By band: different band materials, colours and styles demonstrate personalisation.
+
+Here, the arrangement emphasises appearance, comfort and fit as much as technical specifications.
+
+Yelp Captcha
+
+## Audio and accessories
+
+Smaller products are commonly displayed on shelves, walls or dedicated fixtures.
+
+- AirPods: grouped by type and generation, where relevant.
+- Over-ear headphones: displayed so customers can inspect and try them.
+- HomePod: shown as a separate home-audio product.
+- Cables, chargers and cases: generally placed on accessory shelves, organised by product type and compatibility.
+
+Accessories are less likely to occupy the main demonstration tables because the tables are primarily designed for testing core devices.
+
+## 3. How are the products actually ordered?
+
+There is a hierarchy to the display. Think of it as several layers of organisation rather than a strict rule that every store follows.
+
+1. Product family
+
+iPhone, Mac, iPad, Apple Watch and accessories each have their own area.
+
+2. Model or tier
+
+For example, iPhone versus iPhone Pro, or MacBook Air versus MacBook Pro.
+
+3. Physical size and design
+
+Different screen sizes, case sizes and body designs sit where customers can compare them.
+
+4. Colour and finish
+
+Available finishes are displayed on real devices, often beside other colours of the same model.
+
+5. Technical specifications
+
+Chip, memory, storage, camera features and connectivity are communicated through labels, comparison information and the devices themselves.
+
+An important distinction: Apple generally doesn't dedicate a separate physical display device to every possible specification combination. For example, two laptops with the same screen size and finish but different memory or storage may look identical. Their configuration differences are communicated through product information and sales systems.
+
+## 4. How a typical table might look from above
+
+Imagine an iPhone table with three product groups, arranged in tidy lines. This is an illustrative layout, not a standard floor plan.
+
+WOODEN DISPLAY TABLE
+
+sorry
+
+Standard
+
+Apple iPhone 15 Pro - acheter sur Galaxus
+
+Pro
+
+Buy the Apple iPhone 15 Pro Max - 256GB - Natural Titanium ( MU793ZP/A 2 ) online - PBTech.co.nz
+
+Pro Max
+
+Product information
+
+Model name · Price · Key features · QR code or further details
+
+Conceptual example of product groupings on a display table. Real stores may use multiple rows, repeat devices, and position models in a different order.
+
+In practice, each group might have several identical demonstration phones, or a selection of finishes, rather than only one device per model. The store may also use separate tables for different iPhone generations or place all the current models together in one long row.
+
+## 5. What is deliberately not organised by specification?
+
+Apple's display approach is visual and experiential, rather than like a computer-components shop.
+
+| Attribute | Typical treatment |
+| --- | --- |
+| Product family | Separate table, zone or fixture |
+| Model and tier | Grouped together or placed in a clear sequence |
+| Screen or case size | Side-by-side physical comparison |
+| Colour | Actual devices displayed in available finishes |
+| Chip and performance | Explained through product information and demonstrations |
+| RAM and storage | Usually communicated through configuration information, not separate rows of devices |
+| Price | Shown on labels, signs or product information |
+| Accessories | Dedicated shelves, walls or adjacent displays |
+
+## 6. The rest of the store
+
+Apple reveals Battersea Power Station shop as latest "evolution of the store" | Apple store interior, Battersea power station, Acoustic baffles
+
+A look inside the Eaton Centre's colossal new Apple store - Toronto Life
+
+New Apple Stores Planned Near Los Angeles, Toronto, and Atlanta - MacRumors
+
+Beyond the main product tables, you'll often find:
+
+- Entrance and central display area: prominent tables featuring core products and current launches.
+- Wall displays: accessories and smaller products, with stock arranged neatly by category.
+- Service and support area: seating or a Genius Bar-style counter, depending on the store design.
+- Today at Apple area: a space for workshops and demonstrations in stores that offer these sessions.
+- Checkout and collection: purchases, pickup and support may be handled by staff throughout the store rather than at a traditional checkout counter.
+
+The overall goal is to make the store feel open and consistent: customers can identify the product family at a glance, compare models without being overwhelmed by technical information, and then explore the specifications that matter to them.
+
+In short: Apple Stores typically organise their tables by product family first, model or tier second, physical size and finish next, and detailed specifications through supporting information. The products are spaced evenly, displayed in working condition, and arranged to encourage hands-on comparison rather than simply showing merchandise for sale.

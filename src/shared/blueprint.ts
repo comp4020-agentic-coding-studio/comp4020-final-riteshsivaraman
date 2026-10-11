@@ -37,6 +37,7 @@ import {
   BACK_DOORWAYS,
   BACK_FURNITURE,
   BACK_SHELVES,
+  BACK_SHELF_ROW_Z,
   BACK_WALLS,
   BAY_COUNT,
   BAY_W,
@@ -141,13 +142,18 @@ export function renderPlan(): string {
   const brHalf = FLOOR.maxX + 0.6;
   R(0, (BACK_ROOM_Z0 + BACK_ROOM_Z1) / 2, brHalf * 2, BACK_ROOM_Z1 - BACK_ROOM_Z0, "#f4f1e8", "#9a9484", 1.5, 'stroke-dasharray="6 4"');
   g.text(px(0), py(BACK_ROOM_Z1) + 36, "BACK ROOM (staff only): same footprint as the shop", 12, "middle", "#6b6556", "600");
+  const areaFill: Record<string, string> = { storage: "#eef0f2", lane: "#e3f2e8", concourse: "#dfe9f5", spine: "#dfe9f5", restroom: "#e9e4f3", cleaner: "#f4ece0", break: "#f4ece0", dock: "#fbf0c9", repair: "#d9e5f3", office: "#ece5d8" };
   for (const a of BACK_AREAS) {
-    g.text(px((a.x0 + a.x1) / 2), py(a.z0) - 8, a.name, 10, "middle", "#6b6556", "700");
+    R((a.x0 + a.x1) / 2, (a.z0 + a.z1) / 2, a.x1 - a.x0, a.z1 - a.z0, areaFill[a.id] ?? "#eee", "none", 0);
+  }
+  for (const a of BACK_AREAS) {
+    const narrow = a.x1 - a.x0 < 2;
+    g.text(px((a.x0 + a.x1) / 2), py(a.z1) + (narrow ? 26 : 14), narrow ? a.name.split(" ")[0] : a.name, 9, "middle", "#6b6556", "700");
   }
   for (const u of BACK_SHELVES) R(u.x, u.z, u.w, u.d, "#cfd3d8", "#6b7280");
-  g.text(px(0), py(BACK_SHELVES[0].z) + 22, "rolling high-density shelves, labelled", 9, "middle", "#555");
+  g.text(px(-0.8), py((BACK_SHELF_ROW_Z[0] + BACK_SHELF_ROW_Z[1]) / 2) + 3, "rolling high-density shelves, six double banks", 9, "middle", "#555");
   for (const w of BACK_WALLS) R(w.x, w.z, w.w, w.d, "#8a8f96", "#4b5058", 1);
-  for (const d of BACK_DOORWAYS) g.text(px(d.x), py(d.z) - 4, "door", 8, "middle", "#c0392b");
+  for (const d of BACK_DOORWAYS) g.text(px(d.x), py(d.z) + (d.axis === "x" ? 12 : 3), "door", 8, "middle", "#c0392b");
   for (const d of SERVICE_DESKS) R(d.x, d.z, d.w, d.d, "#b7c4d0", "#355a7a", 1.2);
   g.text(px(SERVICE_DESKS[0].x + 1.4), py(SERVICE_DESKS[0].z) + 22, "repair benches (technicians behind)", 9, "middle", "#355a7a");
   const furnitureFill: Record<string, string> = { desk: "#e6cfa8", table: "#e6cfa8", computers: "#c9d4e0", lockers: "#6f8fa8", restroom: "#dfe3e7", pallet: "#c9a46b" };
