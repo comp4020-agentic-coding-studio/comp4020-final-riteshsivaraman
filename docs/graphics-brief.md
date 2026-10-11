@@ -11,6 +11,20 @@ The store is a parody retail store (an obvious spoof; the brand name is still
 models, textures or fonts, nothing sourced from the web. Everything is drawn in
 code (geometry, canvas textures, small instanced meshes).
 
+## Real products: always photo-verify what you can (Ritesh, 2026-10-12)
+
+A physical-layout claim (camera count/arrangement, button placement, bezel
+shape, hinge mechanism) from spec-page text or pre-launch leak coverage can
+be confidently wrong even with several sources agreeing — they can all be
+repeating the same unconfirmed rumour (LEARNINGS.md: the iPhone 18 Pro's
+camera plateau, caught only because Ritesh had a real marketing photo).
+Before building a model's distinguishing shape: look at a real product photo
+if one is reachable (the maker's own AU product pages, via the browser tools
+— not WebFetch, which has returned unreliable content on this project more
+than once) before falling back to text coverage. Where no photo was
+reachable, say so plainly in your report and flag the guess in a code
+comment at the relevant field — never present an unverified layout as fact.
+
 ## Never
 
 - Use a real company's name, logo or distinctive mark anywhere in a texture or
