@@ -1,16 +1,17 @@
-import { BufferGeometry, Float32BufferAttribute, IcosahedronGeometry } from "three";
-import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { BufferGeometry, Color, Float32BufferAttribute, IcosahedronGeometry } from "three";
+import type { HairStyle } from "../../../shared/appearance.ts";
 
-// A head as one displaced sphere, placed by the figure-drawing landmarks
-// (Loomis: hairline, brow, nose base and chin in equal thirds; eyes about half
-// way down the whole head; lips just above the middle of nose to chin; ears
-// between brow and nose). Metres, face looks along -z, y up, origin at the
-// middle of the head. Pure, so the two looks below differ only in how finely
-// the sphere is cut and how it is shaded.
+// A low-poly head: one displaced icosphere, flat shaded, placed by the
+// figure-drawing landmarks (Loomis: hairline, brow, nose base and chin in
+// thirds; eyes about half way down the head; lips a little above the middle of
+// nose to chin; ears between brow and nose). It is kept soft and a little
+// round on purpose: a long egg, a hard jaw and a heavy brow read as menacing.
+// Hair is painted onto the head by vertex colour (and thickened a touch), so a
+// whole head is one mesh. Metres; the face looks along -z; y is up.
 
-const HALF_W = 0.078; // a head is about 0.155 m wide,
-const HALF_H = 0.115; // 0.23 m high
-const HALF_D = 0.095; // and 0.19 m deep
+const HALF_W = 0.081;
+const HALF_H = 0.108;
+const HALF_D = 0.094;
 
 const g = (x: number, y: number, cx: number, cy: number, sx: number, sy: number): number =>
   Math.exp(-(((x - cx) ** 2) / (2 * sx * sx) + ((y - cy) ** 2) / (2 * sy * sy)));
@@ -20,52 +21,89 @@ const smooth = (a: number, b: number, x: number): number => {
 };
 
 export interface HeadShape {
-  brow: number; // strength of the brow ridge, 1 is typical
-  nose: number; // nose size
+  width: number;
+  jaw: number;
+  brow: number;
+  nose: number;
   cheek: number;
   chin: number;
-  jaw: number; // how much the lower face tapers, 1 is typical
 }
-export const TYPICAL_HEAD: HeadShape = { brow: 1, nose: 1, cheek: 1, chin: 1, jaw: 1 };
+export const TYPICAL_HEAD: HeadShape = { width: 1, jaw: 1, brow: 1, nose: 1, cheek: 1, chin: 1 };
 
-// Outward displacement, in metres, at a point on the unit sphere.
+// Where the hair stops, as a height on the unit sphere, at the front, the side
+// (above the ears) and the back. null is no hair.
+const HAIR: Record<HairStyle, { front: number; side: number; back: number } | null> = {
+  bald: null,
+  buzz: { front: 0.66, side: 0.12, back: 0.0 },
+  short: { front: 0.6, side: 0.1, back: -0.25 },
+  side: { front: 0.52, side: 0.0, back: -0.3 },
+  long: { front: 0.6, side: -0.35, back: -0.85 },
+  bun: { front: 0.6, side: 0.08, back: -0.2 },
+  curly: { front: 0.5, side: -0.05, back: -0.3 },
+};
+
+// How far a point is inside the hair, positive inside, on the unit sphere.
+function hairMargin(nx: number, ny: number, nz: number, style: HairStyle): number {
+  const h = HAIR[style];
+  if (!h) return -1;
+  const f = smooth(0.0, 0.75, -nz);
+  const b = smooth(0.0, 0.6, nz);
+  const front = h.front - 0.45 * nx * nx; // the hairline sweeps down at the temples
+  const edge = (h.side * (1 - f) + front * f) * (1 - b) + h.back * b;
+  return ny - edge;
+}
+
 function features(nx: number, ny: number, nz: number, s: HeadShape): number {
   const front = smooth(0.1, 0.6, -nz);
   if (front === 0) return 0;
-  const brow = 0.016 * s.brow * g(nx, ny, 0, 0.16, 0.55, 0.07);
-  const sockets = -0.011 * (g(nx, ny, -0.36, 0.03, 0.17, 0.12) + g(nx, ny, 0.36, 0.03, 0.17, 0.12));
-  const bridge = 0.014 * s.nose * g(nx, ny, 0, -0.05, 0.07, 0.25);
-  const tip = 0.03 * s.nose * g(nx, ny, 0, -0.3, 0.1, 0.1);
-  const alae = 0.012 * s.nose * (g(nx, ny, -0.17, -0.34, 0.07, 0.07) + g(nx, ny, 0.17, -0.34, 0.07, 0.07));
-  const cheeks = 0.01 * s.cheek * (g(nx, ny, -0.55, -0.2, 0.2, 0.2) + g(nx, ny, 0.55, -0.2, 0.2, 0.2));
-  const lips = 0.007 * g(nx, ny, 0, -0.62, 0.28, 0.07);
-  const chin = 0.014 * s.chin * g(nx, ny, 0, -0.9, 0.18, 0.1);
+  const brow = 0.008 * s.brow * g(nx, ny, 0, 0.18, 0.5, 0.08);
+  const sockets = -0.006 * (g(nx, ny, -0.36, 0.0, 0.17, 0.12) + g(nx, ny, 0.36, 0.0, 0.17, 0.12));
+  const bridge = 0.008 * s.nose * g(nx, ny, 0, -0.08, 0.07, 0.22);
+  const tip = 0.019 * s.nose * g(nx, ny, 0, -0.3, 0.11, 0.1);
+  const alae = 0.007 * s.nose * (g(nx, ny, -0.16, -0.33, 0.07, 0.07) + g(nx, ny, 0.16, -0.33, 0.07, 0.07));
+  const cheeks = 0.013 * s.cheek * (g(nx, ny, -0.52, -0.22, 0.24, 0.22) + g(nx, ny, 0.52, -0.22, 0.24, 0.22));
+  const lips = 0.005 * g(nx, ny, 0, -0.6, 0.26, 0.07);
+  const chin = 0.009 * s.chin * g(nx, ny, 0, -0.88, 0.2, 0.1);
   return front * (brow + sockets + bridge + tip + alae + cheeks + lips + chin);
 }
 
-// `detail` is the icosphere subdivision: 20 * (detail + 1)^2 triangles. Faceted
-// keeps one normal per triangle; smooth shares vertices and blends them.
-export function buildHead(detail: number, smoothShading: boolean, shape: HeadShape = TYPICAL_HEAD): BufferGeometry {
-  let geo: BufferGeometry = new IcosahedronGeometry(1, detail);
+export function buildHead(shape: HeadShape, hair: HairStyle, hairHex: string, skinHex: string, detail = 4): BufferGeometry {
+  const geo = new IcosahedronGeometry(1, detail);
   geo.deleteAttribute("uv");
   geo.deleteAttribute("normal");
-  if (smoothShading) geo = mergeVertices(geo);
   const pos = geo.getAttribute("position");
   const out = new Float32Array(pos.count * 3);
+  const col = new Float32Array(pos.count * 3);
+  const skin = new Color(skinHex);
+  const hairC = new Color(hairHex);
   for (let i = 0; i < pos.count; i++) {
     const nx = pos.getX(i);
     const ny = pos.getY(i);
     const nz = pos.getZ(i);
-    // the lower face tapers towards the chin
-    const taper = 1 - 0.28 * s_jaw(ny, shape.jaw);
-    const off = features(nx, ny, nz, shape);
-    out[i * 3] = nx * HALF_W * taper + nx * off;
+    // a softer taper than a real jaw, so the chin is round
+    const taper = 1 - 0.17 * shape.jaw * Math.pow(Math.min(1, Math.max(0, -ny / 0.95)), 1.3);
+    // hair has thickness; curly has bumps in it
+    const inside = smooth(-0.02, 0.1, hairMargin(nx, ny, nz, hair));
+    const bump = hair === "curly" ? 0.006 * (0.5 + 0.5 * Math.sin(nx * 15 + 1) * Math.sin(ny * 13 + 2) * Math.sin(nz * 14 + 3)) : 0;
+    const off = features(nx, ny, nz, shape) + inside * (0.007 + bump);
+    out[i * 3] = nx * HALF_W * shape.width * taper + nx * off;
     out[i * 3 + 1] = ny * HALF_H + ny * off;
     out[i * 3 + 2] = nz * HALF_D + nz * off;
   }
+  // one colour per triangle, by where its centre is, so the facets stay crisp
+  for (let t = 0; t < pos.count; t += 3) {
+    const cx = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3;
+    const cy = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3;
+    const cz = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3;
+    const c = hairMargin(cx, cy, cz, hair) > 0 ? hairC : skin;
+    for (let k = 0; k < 3; k++) {
+      col[(t + k) * 3] = c.r;
+      col[(t + k) * 3 + 1] = c.g;
+      col[(t + k) * 3 + 2] = c.b;
+    }
+  }
   geo.setAttribute("position", new Float32BufferAttribute(out, 3));
+  geo.setAttribute("color", new Float32BufferAttribute(col, 3));
   geo.computeVertexNormals();
   return geo;
 }
-
-const s_jaw = (ny: number, jaw: number): number => jaw * Math.pow(Math.min(1, Math.max(0, -ny / 0.95)), 1.3);

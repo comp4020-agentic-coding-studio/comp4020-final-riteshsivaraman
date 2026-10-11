@@ -22,6 +22,14 @@ export interface Appearance {
   mouthWidth: number;
   pants: string;
   shoes: string;
+  // face and frame (nothing gendered: a range, so any mix can turn up)
+  faceWidth: number; // 1 is typical
+  jaw: number; // how much the lower face tapers
+  cheek: number;
+  chin: number;
+  brow: number;
+  eyeSize: number;
+  shoulderHip: number; // shoulders against hips: low is pear-shaped, high is broad-shouldered
 }
 
 // Ranges are exported so the spec can check what is drawn against them.
@@ -75,5 +83,12 @@ export function appearanceFor(id: string): Appearance {
     mouthWidth: between(0.85, 1.15, rand(id, 10)),
     pants: pick(PANTS, rand(id, 11)),
     shoes: pick(SHOES, rand(id, 12)),
+    faceWidth: between(0.94, 1.1, rand(id, 13)),
+    jaw: between(0.55, 1.1, rand(id, 14)),
+    cheek: between(0.7, 1.35, rand(id, 15)),
+    chin: between(0.6, 1.3, rand(id, 16)),
+    brow: between(0.5, 1.2, rand(id, 17)),
+    eyeSize: between(0.92, 1.18, rand(id, 18)),
+    shoulderHip: between(0.95, 1.45, rand(id, 19)),
   };
 }

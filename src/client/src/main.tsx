@@ -1,7 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { SHOT, Store } from "./Store.tsx";
-import { HeadLab } from "./gfx/HeadLab.tsx";
+import { CharacterStage } from "./gfx/CharacterStage.tsx";
 import { net, useNet } from "./net.ts";
 import "./styles.css";
 
@@ -53,13 +53,13 @@ function App() {
   return (
     <>
       {canDraw ? (
-        new URLSearchParams(location.search).has("heads") ? <HeadLab /> : <Store />
+        new URLSearchParams(location.search).has("stage") ? <CharacterStage /> : <Store />
       ) : (
         <p className="no-webgl">
           This browser can't draw the store (WebGL is turned off). You can still be counted as here.
         </p>
       )}
-      {!SHOT && <Hud />}
+      {!SHOT && !new URLSearchParams(location.search).has("stage") && <Hud />}
     </>
   );
 }

@@ -41,6 +41,18 @@ describe("appearance", () => {
     expect(distinct((a) => a.noseSize.toFixed(2))).toBeGreaterThanOrEqual(15);
   });
 
+  it("keeps the face and frame fields inside sensible ranges", () => {
+    for (const a of looks) {
+      expect(a.faceWidth).toBeGreaterThanOrEqual(0.94);
+      expect(a.faceWidth).toBeLessThanOrEqual(1.1);
+      expect(a.shoulderHip).toBeGreaterThanOrEqual(0.95);
+      expect(a.shoulderHip).toBeLessThanOrEqual(1.45);
+      expect(a.eyeSize).toBeGreaterThanOrEqual(0.92);
+      expect(a.eyeSize).toBeLessThanOrEqual(1.18);
+    }
+    expect(new Set(looks.map((a) => a.jaw.toFixed(2))).size).toBeGreaterThan(15);
+  });
+
   it("varies features independently, not as a handful of fixed bundles", () => {
     const combos = new Set(looks.map((a) => `${a.hairStyle}|${a.skin}|${a.eyeColour}|${a.pants}`));
     expect(combos.size).toBeGreaterThan(150);
