@@ -156,13 +156,23 @@ export function wallTexture(lengthM: number): CanvasTexture {
 }
 
 
-// Grey ceiling slats running across the room, like the reference.
+// Grey ceiling slats running across the room, like the reference: a mid-grey
+// face, a dark shadow gap between slats and a thin lit lip, so the ceiling has
+// depth and the light panels in it stand out.
 export function ceilingTexture(w: number, d: number): CanvasTexture {
   const tex = canvasTexture(64, 64, (g) => {
-    g.fillStyle = "#eceef0";
+    const face = g.createLinearGradient(0, 8, 0, 62);
+    face.addColorStop(0, "#b4b9bf");
+    face.addColorStop(1, "#c8ccd1");
+    g.fillStyle = face;
     g.fillRect(0, 0, 64, 64);
-    g.fillStyle = "#a3a8ae";
-    g.fillRect(0, 0, 64, 7);
+    const gap = g.createLinearGradient(0, 0, 0, 8);
+    gap.addColorStop(0, "#5a5e64");
+    gap.addColorStop(1, "#8a8f95");
+    g.fillStyle = gap;
+    g.fillRect(0, 0, 64, 8);
+    g.fillStyle = "#e3e5e8";
+    g.fillRect(0, 62, 64, 2);
   });
   tex.wrapS = tex.wrapT = RepeatWrapping;
   tex.repeat.set(1, d / CEILING_SPEC.slatPitch);
@@ -236,6 +246,21 @@ export function ServiceMark({ position }: { position: [number, number, number] }
   );
 }
 
+
+// A soft glow around a light panel, so it reads as lit and not just white.
+let panelGlow: CanvasTexture | null = null;
+function panelGlowTexture(): CanvasTexture {
+  if (panelGlow) return panelGlow;
+  panelGlow = canvasTexture(64, 32, (g) => {
+    const r = g.createRadialGradient(32, 16, 2, 32, 16, 32);
+    r.addColorStop(0, "rgba(255,255,255,0.75)");
+    r.addColorStop(0.45, "rgba(255,255,255,0.28)");
+    r.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = r;
+    g.fillRect(0, 0, 64, 32);
+  });
+  return panelGlow;
+}
 
 // The same original service mark, hung from the ceiling so it reads from both
 // sides (outside the glass and inside).
@@ -593,14 +618,25 @@ export function ShopShell() {
           the sides and along the front, and a mark hanging near the front */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, CEILING, 0]}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial map={ceilingMap} emissive="#ffffff" emissiveIntensity={0.35} />
+        <meshStandardMaterial map={ceilingMap} emissive="#ffffff" emissiveIntensity={0.1} roughness={0.9} />
       </mesh>
       {CEILING_SPEC.panelRowsZ.flatMap((z) =>
         CEILING_SPEC.panelX.map((x) => (
-          <mesh key={`${x}:${z}`} position={[x, CEILING - 0.02, z]} rotation={[Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[CEILING_SPEC.panelW, CEILING_SPEC.panelD]} />
-            <meshBasicMaterial color="#ffffff" />
-          </mesh>
+          <group key={`${x}:${z}`} position={[x, CEILING, z]} rotation={[Math.PI / 2, 0, 0]}>
+            {/* local +z is down here: glow, then a grey frame, then the bright panel nearest the floor */}
+            <mesh position={[0, 0, 0.005]}>
+              <planeGeometry args={[CEILING_SPEC.panelW * 1.5, CEILING_SPEC.panelD * 3.2]} />
+              <meshBasicMaterial map={panelGlowTexture()} transparent depthWrite={false} toneMapped={false} />
+            </mesh>
+            <mesh position={[0, 0, 0.012]}>
+              <planeGeometry args={[CEILING_SPEC.panelW + 0.1, CEILING_SPEC.panelD + 0.1]} />
+              <meshBasicMaterial color="#7d8288" />
+            </mesh>
+            <mesh position={[0, 0, 0.02]}>
+              <planeGeometry args={[CEILING_SPEC.panelW, CEILING_SPEC.panelD]} />
+              <meshBasicMaterial color="#ffffff" toneMapped={false} />
+            </mesh>
+          </group>
         )),
       )}
       {[
