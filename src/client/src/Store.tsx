@@ -10,7 +10,7 @@ import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions } from "../../shared/world.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
 import { Npcs } from "./Npcs.tsx";
-import { Person, type PersonState } from "./Person.tsx";
+import { Actor, type ActorState } from "./gfx/Actor.tsx";
 import { Room } from "./Room.tsx";
 import { net, useNet } from "./net.ts";
 
@@ -120,7 +120,7 @@ function Player() {
 function Remotes() {
   const root = useRef<Group>(null);
   const live = useNet();
-  const speeds = useRef(new Map<string, PersonState>());
+  const speeds = useRef(new Map<string, ActorState>());
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -134,10 +134,8 @@ function Remotes() {
       const speed = dt > 0 ? Math.hypot(r.x - px, r.z - pz) / dt : 0;
       const prev = speeds.current.get(r.info.id);
       // smooth the estimate, otherwise the legs flicker on and off
-      speeds.current.set(r.info.id, {
-        speed: prev ? prev.speed + (speed - prev.speed) * 0.2 : speed,
-        mode: "idle",
-      });
+      const smooth = prev ? (prev.speed ?? 0) + (speed - (prev.speed ?? 0)) * 0.2 : speed;
+      speeds.current.set(r.info.id, { walking: smooth > 0.25, mode: "idle", mood: "neutral", speed: smooth });
     }
     root.current?.children.forEach((child) => {
       const r = net.remotes.get(child.name);
@@ -152,11 +150,11 @@ function Remotes() {
     <group ref={root}>
       {[...live.remotes.values()].map((r) => (
         <group key={r.info.id} name={r.info.id} position={[r.x, STORE_Y, r.z]}>
-          <Person
+          <Actor
             id={r.info.id}
             shirt={r.info.colour}
-            cap={r.role === "staff" ? "#ffd23f" : undefined}
-            getState={() => speeds.current.get(r.info.id) ?? { speed: 0, mode: "idle" }}
+            uniform={r.role === "staff" ? { cap: "#ffd23f", badge: "#ffd23f" } : undefined}
+            getState={() => speeds.current.get(r.info.id) ?? { walking: false, mode: "idle", mood: "neutral" }}
           />
         </group>
       ))}

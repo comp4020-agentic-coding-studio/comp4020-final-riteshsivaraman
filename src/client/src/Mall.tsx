@@ -4,7 +4,7 @@ import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from "three";
 import type { Group } from "three";
 import { CEILING, FLOOR, STORE_Y } from "../../shared/protocol.ts";
 import { MALL, ROUTES, routePose } from "../../shared/mall.ts";
-import { Person, type PersonState } from "./Person.tsx";
+import { Actor, type ActorState } from "./gfx/Actor.tsx";
 import { settledPeople } from "../../shared/people.ts";
 import { net } from "./net.ts";
 
@@ -394,7 +394,7 @@ export function Mall() {
 // Everyone on the concourse and the mezzanine, from the shared routes.
 export function MallPeople() {
   const root = useRef<Group>(null);
-  const states = useRef<PersonState[]>(ROUTES.map(() => ({ speed: 0, mode: "idle" })));
+  const states = useRef<ActorState[]>(ROUTES.map(() => ({ walking: false, mode: "idle", mood: "neutral" })));
   const shown = useRef(new Map<string, { x: number; z: number }>());
 
   useFrame(() => {
@@ -410,7 +410,7 @@ export function MallPeople() {
       shown.current.set(r.id, { x: nx, z: nz });
       child.position.set(nx, p.y, nz);
       child.rotation.y = p.ry;
-      states.current[i] = { speed: p.walking ? r.speed : 0, mode: p.walking ? "idle" : "observe" };
+      states.current[i] = { walking: p.walking, mode: p.walking ? "walk" : "observe", mood: p.walking ? "neutral" : "curious", speed: p.walking ? r.speed : 0 };
     });
   });
 
@@ -418,7 +418,7 @@ export function MallPeople() {
     <group ref={root}>
       {ROUTES.map((r, i) => (
         <group key={r.id}>
-          <Person id={r.id} shirt={r.colour} getState={() => states.current[i]} />
+          <Actor id={r.id} shirt={r.colour} getState={() => states.current[i]} />
         </group>
       ))}
     </group>

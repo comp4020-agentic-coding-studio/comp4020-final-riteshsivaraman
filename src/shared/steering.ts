@@ -159,7 +159,10 @@ export function stepWalker(
   dt: number,
   goal: WalkGoal,
   obstacles: ReadonlyArray<Obstacle>,
-  opts: SteerOpts & { walkSpeed?: number; arrive?: number } = {},
+  // followRoute: the way is already planned round the furniture, so do not be
+  // pushed off it by furniture (that stalls in a narrow gap); the hard
+  // obstacles still cannot be entered.
+  opts: SteerOpts & { walkSpeed?: number; arrive?: number; followRoute?: boolean } = {},
 ): WalkResult {
   const speed = opts.walkSpeed ?? 1.15;
   const arrive = opts.arrive ?? 0.12;
@@ -180,7 +183,7 @@ export function stepWalker(
   if (goal.walkTo) {
     const dist = Math.hypot(goal.walkTo.x - w.x, goal.walkTo.z - w.z);
     if (dist > arrive) {
-      const s = steerTo(w, goal.walkTo, obstacles, dt, opts);
+      const s = steerTo(w, goal.walkTo, opts.followRoute ? [] : obstacles, dt, opts);
       w.heading = s.heading;
       const step = Math.min(dist, speed * s.speed * dt);
       w.x += -Math.sin(w.heading) * step;

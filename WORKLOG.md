@@ -46,6 +46,17 @@ check before relying on it):
 creatures vs humans spike (D11), AI boundary (D8), budget source, what the
 device trace is. No ADR yet for the stack or for D8.
 
+**2026-10-12 update (people in the store):** NPCs (staff and customers), mall
+walkers and other visitors are now drawn as the new characters
+(`src/client/src/gfx/character.ts`, `Actor.tsx`), and the store's NPCs follow a
+purposeful timetable (`src/shared/storeday.ts`, D30 to D32 in SCOPE.md). A
+character stage with every option and a crowd test lives at `?stage=1`
+(`gfx/CharacterStage.tsx`); `?labels=1` in the store shows each NPC's intent and
+`?t=<seconds>` shows a moment of the day. Specs: `npcs`, `steering`, `interaction`,
+`behaviour`, `appearance`. Not done: staff/customers do not react to real
+visitors (decision pending, D32); `Person.tsx` is now unused; the draw call and
+phone frame-rate cost of ~30 people has not been measured on a real device.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.

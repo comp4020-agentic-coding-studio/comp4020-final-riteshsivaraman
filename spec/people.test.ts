@@ -37,6 +37,7 @@ it("keeps a visitor a body width from an NPC they walk straight at, at any momen
     const everyone = nonVisitorPeople(T0 + t);
     for (const n of NPCS) {
       const p = npcPose(n, T0 + t);
+      if (!p.present) continue; // not in the store at this moment
       const alone = everyone.filter((o) => Math.hypot(o.x - p.x, o.z - p.z) > 1e-9 && Math.hypot(o.x - p.x, o.z - p.z) < 1.5);
       if (alone.length > 0) continue;
       const q = avoidPeople(p.x, p.z, [], T0 + t);
@@ -90,7 +91,8 @@ it("moves people continuously: nobody is pushed further than a side-step in a ti
   for (let t = 100; t < 120_000; t += 100) {
     const cur = settledPeople(T0 + t);
     for (const [id, p] of cur.npc) {
-      const q = prev.npc.get(id)!;
+      const q = prev.npc.get(id);
+      if (!q) continue; // they have only just come in
       expect(Math.hypot(p.x - q.x, p.z - q.z), `${id} at +${t}ms`).toBeLessThan(BODY_RADIUS * 4 + 0.2);
     }
     prev = cur;

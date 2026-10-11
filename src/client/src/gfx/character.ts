@@ -253,7 +253,7 @@ function browGeo(innerSign: number, len: number, thick: number): BufferGeometry 
 export function buildCharacter(
   look: Appearance,
   shirtHex: string,
-  opts: { body?: BodyStyle; eyes?: EyeStyle; face?: FaceShape; shading?: Shading; beard?: BeardChoice } = {},
+  opts: { body?: BodyStyle; eyes?: EyeStyle; face?: FaceShape; shading?: Shading; beard?: BeardChoice; uniform?: { cap?: string; badge?: string } } = {},
 ): Character {
   const bodyStyle = opts.body ?? "friendly";
   const eyeStyle = opts.eyes ?? "round";
@@ -451,6 +451,16 @@ export function buildCharacter(
   }
   if (look.hairStyle === "bun") {
     add(new IcosahedronGeometry(1, 1), head, hair, hm(0, 0.095, 0.075, sc(0.04)));
+  }
+
+  // staff uniform: a cap in the role's colour, and a badge on the chest
+  if (opts.uniform?.cap) {
+    const cap = new Color(opts.uniform.cap);
+    add(new SphereGeometry(0.128, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), head, cap, hm(0, 0.022, 0.004));
+    add(new BoxGeometry(0.15, 0.012, 0.085), head, cap, hm(0, 0.026, -0.108));
+  }
+  if (opts.uniform?.badge) {
+    add(new BoxGeometry(0.075, 0.095, 0.012), spine, new Color(opts.uniform.badge), at(0.085, Y(1.25), -0.121));
   }
 
   // ---- eyes, by style ----

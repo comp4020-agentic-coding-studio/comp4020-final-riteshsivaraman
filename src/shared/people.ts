@@ -47,6 +47,7 @@ export function settledPeople(nowMs: number): SettledPeople {
   for (const n of NPCS) {
     if (n.working) continue;
     const b = npcPose(n, nowMs);
+    if (!b.present) continue; // not in the store: nothing to collide with
     npc.set(n.id, place(b.x, b.z, isStaff(n), false));
   }
   for (const r of ROUTES) {
