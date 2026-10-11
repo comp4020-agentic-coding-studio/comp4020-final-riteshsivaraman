@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { DoubleSide, InstancedMesh, Object3D, RepeatWrapping } from "three";
-import { CEILING } from "../../../shared/protocol.ts";
+import { CEILING, FLOOR } from "../../../shared/protocol.ts";
 import { BACK_AREAS, BACK_DOORWAYS, BACK_LAYOUT, BACK_ROOM_Z0, BACK_ROOM_Z1, BACK_WALLS } from "../../../shared/world.ts";
 import { HALF_W, Sign, canvasTexture } from "./common.tsx";
 
@@ -190,7 +190,16 @@ export function BackPerimeter() {
 export function BackPartitions() {
   return (
     <group>
-      {BACK_WALLS.map((w, i) => {
+      {BACK_WALLS.map((raw, i) => {
+        // The model's walls stop at the floor's edge (x = +-6); the room's
+        // side walls are 0.6 m further out. Draw a partition that reaches the
+        // edge all the way to the side wall, so there is no gap and the faces are flush.
+        let w = raw;
+        if (raw.w > raw.d) {
+          const x0 = raw.x - raw.w / 2 <= FLOOR.minX + 1e-6 ? -HALF_W : raw.x - raw.w / 2;
+          const x1 = raw.x + raw.w / 2 >= FLOOR.maxX - 1e-6 ? HALF_W : raw.x + raw.w / 2;
+          w = { ...raw, x: (x0 + x1) / 2, w: x1 - x0 };
+        }
         const long = w.d > 3; // a long wall between rooms: glazed above waist height
         if (!long) {
           return (
