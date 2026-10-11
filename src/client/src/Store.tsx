@@ -172,7 +172,7 @@ function Reflections() {
     const pmrem = new PMREMGenerator(gl);
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
-    scene.environmentIntensity = 0.45;
+    scene.environmentIntensity = 0.6;
     return () => {
       scene.environment = null;
       env.dispose();

@@ -1,6 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import {
+  AdditiveBlending,
   CanvasTexture,
   Color,
   DoubleSide,
@@ -248,6 +249,70 @@ export function ServiceMark({ position }: { position: [number, number, number] }
 }
 
 
+// A soft-edged rectangle of light, for the glow a lightbox throws on its wall.
+let softBox: CanvasTexture | null = null;
+function softBoxTexture(): CanvasTexture {
+  if (softBox) return softBox;
+  softBox = canvasTexture(128, 128, (g) => {
+    g.fillStyle = "#000";
+    g.fillRect(0, 0, 128, 128);
+    g.shadowColor = "#fff";
+    g.shadowBlur = 28;
+    g.fillStyle = "#fff";
+    g.fillRect(34, 34, 60, 60);
+  });
+  return softBox;
+}
+
+// Light from the ceiling washing down a wall: bright at the top, gone by the
+// bottom. Black is nothing under additive blending.
+let wash: CanvasTexture | null = null;
+function washTexture(): CanvasTexture {
+  if (wash) return wash;
+  wash = canvasTexture(4, 64, (g) => {
+    const r = g.createLinearGradient(0, 0, 0, 64);
+    r.addColorStop(0, "#ffffff");
+    r.addColorStop(0.35, "#6a6a6a");
+    r.addColorStop(1, "#000000");
+    g.fillStyle = r;
+    g.fillRect(0, 0, 4, 64);
+  });
+  return wash;
+}
+
+interface Quad {
+  x: number;
+  y: number;
+  z: number;
+  rx: number;
+  w: number;
+  h: number;
+}
+
+// Many flat rectangles in one draw call.
+function QuadField({ quads, children }: { quads: Quad[]; children: React.ReactNode }) {
+  const ref = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const m = ref.current;
+    if (!m) return;
+    const o = new Object3D();
+    quads.forEach((q, i) => {
+      o.position.set(q.x, q.y, q.z);
+      o.rotation.set(q.rx, 0, 0);
+      o.scale.set(q.w, q.h, 1);
+      o.updateMatrix();
+      m.setMatrixAt(i, o.matrix);
+    });
+    m.instanceMatrix.needsUpdate = true;
+  }, [quads]);
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, quads.length]} frustumCulled={false}>
+      <planeGeometry args={[1, 1]} />
+      {children}
+    </instancedMesh>
+  );
+}
+
 // A soft glow around a light panel, so it reads as lit and not just white.
 let panelGlow: CanvasTexture | null = null;
 function panelGlowTexture(): CanvasTexture {
@@ -352,6 +417,11 @@ export function LightBox({
   const y = LIGHTBOX_BOTTOM + h / 2;
   return (
     <group position={[side * (FACE_X - 0.03), y, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+      {/* the light it throws on the wall around it */}
+      <mesh position={[0, 0, 0.0005]}>
+        <planeGeometry args={[w + 1.3, h + 1.3]} />
+        <meshBasicMaterial map={softBoxTexture()} transparent opacity={0.55} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+      </mesh>
       <mesh>
         <planeGeometry args={[w, h]} />
         <meshBasicMaterial color="#ffffff" toneMapped={false} />
@@ -390,7 +460,7 @@ export function WallSections() {
         ].map((b) => (
           <mesh key={`${side}:${b.y0}`} position={[side * (FACE_X - 0.01), (b.y0 + b.y1) / 2, 0]}>
             <boxGeometry args={[0.02, b.y1 - b.y0, FLOOR.maxZ - FLOOR.minZ + 1]} />
-            <meshStandardMaterial map={bandTex} color={b.c} emissive="#ffffff" emissiveIntensity={0.12} />
+            <meshStandardMaterial map={bandTex} color={b.c} emissive="#ffffff" emissiveIntensity={0.12} roughness={0.4} metalness={0.25} />
           </mesh>
         )),
       )}
@@ -602,16 +672,29 @@ export function ShopShell() {
   const backWall = useMemo(() => wallTexture(w), [w]);
   const sideWall = useMemo(() => wallTexture(d), [d]);
   const ceilingMap = useMemo(() => ceilingTexture(w, d), [w, d]);
+  const panelAt = CEILING_SPEC.panelRowsZ.flatMap((z) => CEILING_SPEC.panelX.map((x) => ({ x, z })));
+  const panelGlows = useMemo<Quad[]>(
+    () => panelAt.map(({ x, z }) => ({ x, y: CEILING - 0.005, z, rx: Math.PI / 2, w: CEILING_SPEC.panelW * 1.5, h: CEILING_SPEC.panelD * 3.2 })),
+    [],
+  );
+  const panelCores = useMemo<Quad[]>(
+    () => panelAt.map(({ x, z }) => ({ x, y: CEILING - 0.02, z, rx: Math.PI / 2, w: CEILING_SPEC.panelW, h: CEILING_SPEC.panelD })),
+    [],
+  );
+  const floorPools = useMemo<Quad[]>(
+    () => panelAt.map(({ x, z }) => ({ x, y: 0.006, z, rx: -Math.PI / 2, w: CEILING_SPEC.panelW * 1.6, h: CEILING_SPEC.panelD * 2.8 })),
+    [],
+  );
   const fullW = w + 0.2;
   const wallMat = (map: CanvasTexture) => (
-    <meshStandardMaterial map={map} color={WALL_TONES.upper} emissive="#ffffff" emissiveIntensity={0.12} />
+    <meshStandardMaterial map={map} color={WALL_TONES.upper} emissive="#ffffff" emissiveIntensity={0.12} roughness={0.4} metalness={0.25} />
   );
 
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial map={floor} roughness={0.6} metalness={0.05} />
+        <meshStandardMaterial map={floor} roughness={0.3} metalness={0.1} />
       </mesh>
 
       {/* ceiling: grey slats running across the room, long light panels in
@@ -621,21 +704,24 @@ export function ShopShell() {
         <planeGeometry args={[w, d]} />
         <meshStandardMaterial map={ceilingMap} emissive="#ffffff" emissiveIntensity={0.1} roughness={0.9} />
       </mesh>
-      {CEILING_SPEC.panelRowsZ.flatMap((z) =>
-        CEILING_SPEC.panelX.map((x) => (
-          <group key={`${x}:${z}`} position={[x, CEILING, z]} rotation={[Math.PI / 2, 0, 0]}>
-            {/* local +z is down here: a glow, then the bright panel nearest the floor */}
-            <mesh position={[0, 0, 0.005]}>
-              <planeGeometry args={[CEILING_SPEC.panelW * 1.5, CEILING_SPEC.panelD * 3.2]} />
-              <meshBasicMaterial map={panelGlowTexture()} transparent depthWrite={false} toneMapped={false} />
-            </mesh>
-            <mesh position={[0, 0, 0.02]}>
-              <planeGeometry args={[CEILING_SPEC.panelW, CEILING_SPEC.panelD]} />
-              <meshBasicMaterial color="#ffffff" toneMapped={false} />
-            </mesh>
-          </group>
-        )),
-      )}
+      {/* the light panels, the glow around them and the pool each leaves on
+          the floor: three draw calls for all of them */}
+      <QuadField quads={panelGlows}>
+        <meshBasicMaterial map={panelGlowTexture()} transparent depthWrite={false} toneMapped={false} />
+      </QuadField>
+      <QuadField quads={panelCores}>
+        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+      </QuadField>
+      <QuadField quads={floorPools}>
+        <meshBasicMaterial map={panelGlowTexture()} transparent opacity={0.2} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+      </QuadField>
+      {/* ceiling light washing down the side walls */}
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[side * (FACE_X - 0.025), CEILING - 0.7, 0]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+          <planeGeometry args={[d, 1.4]} />
+          <meshBasicMaterial map={washTexture()} transparent opacity={0.24} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+        </mesh>
+      ))}
       {[
         { x: 0, z: FLOOR.minZ + CEILING_SPEC.trackInset, len: w - 1, alongX: true },
         { x: FLOOR.minX + CEILING_SPEC.trackInset, z: 0, len: d - 1, alongX: false },
