@@ -169,6 +169,9 @@ find every resource by reading this file, not by discovering it mid-task.
   the database, menu conversations, employees online see customers' states. Facts
   filled in, reasoning `[TK]` for Ritesh. Read before touching `visitors`,
   `player_state`, `conversations`, `stock` or `src/shared/conversation.ts`.
+- `docs/customer-journeys.md` — seven end-to-end customer transcripts (draft, for
+  Ritesh's review) and what they imply; read before writing any conversation
+  script. Prices and policies in it are `[TK]`/`[verify]`.
 - `docs/blueprint/` — the floor plan, four wall elevations, ceiling and mall
   drawings (D20: the drawings are the specification), drawn from
   `src/shared/plan.ts`, `world.ts` and `mall.ts`.
