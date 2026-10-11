@@ -126,10 +126,35 @@ source. Home-screen vs lock-screen is a real toggle (`ScreenMode` in
 orbitable, on a table-surface scrap; `?pilotPhone=<id>` puts a real model on
 every phone table in the live store for an in-context look check. Both are
 permanent dev tooling for the rest of this build, not just this pilot.
-**Not yet:** every other phone model, and every other family (tablets,
-laptops, desktops, displays, watches, earbuds/headphones, speakers, trackers,
-accessories) — in progress, dispatched as parallel subagents per family,
-each confined to its own files.
+
+**Step 3, every family built, 2026-10-12.** Dispatched as parallel subagents,
+each confined to its own files, then a photo-verification follow-up pass
+after Ritesh's "always photo-verify whenever you can" instruction:
+- Phones/watches/audio (`phones-geo.ts`, `phones.tsx`; commits `c9d56bf`,
+  `c6178eb`, plus a verification pass): 14 more models — iPhone Duo
+  (foldable), Air, 17, 16, 17e; Watch Series 12, Ultra 4, SE 3; AirPods 5,
+  Pro 3, Max 2; HomePod, HomePod mini; AirTag.
+- Computers (`computers.tsx`, `computers-geo.ts`; commits `8bf10f2`,
+  `294e6d5`, `f0d533f`, `df53056`, plus a verification pass): 16 models —
+  iPad Pro/Air/base/mini, MacBook Neo/Air/Pro, iMac, Mac mini, Mac Studio,
+  Studio Display/XDR. Found and corrected a wrong assumption in
+  `references/product-line.md`: Studio Display XDR is a new model, not a
+  renamed Pro Display XDR.
+- `docs/graphics-brief.md` now has a standing "always photo-verify what you
+  can" rule for every future family (Ritesh, after the 18 Pro's wrong-plateau
+  lesson repeated as an explicit instruction).
+
+**Open for Step 4 (table placement):** Ritesh wants **fewer iMacs per
+table**, not a wider bench pitch or a scaled-down model — the iMac is built
+true-to-size (547mm wide) and the table bench pitch (`shared/plan.ts`) is
+0.5m, so it won't fit as many per row as a phone does. Keyboards/folios were
+tinting to the tablet's colour (wrong — real ones are white/black
+regardless); fixed in the verification pass.
+
+**Not yet:** accessories (cases, chargers, bands — deferred, lower priority
+per the customer-journey scenarios), table assignment (Step 4), inspect-view
+integration (Step 5, D26-28 — not built at all yet, this is bigger than a
+"later" tweak), the storage-picker conversation step ADR 5 left open.
 
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
