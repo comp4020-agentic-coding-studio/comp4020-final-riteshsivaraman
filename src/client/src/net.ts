@@ -1,5 +1,19 @@
 import { useSyncExternalStore } from "react";
-import type { ClientMessage, Present, Role, ServerMessage, VisitorInfo } from "../../shared/protocol.ts";
+import type { PlayerStateName } from "../../shared/conversation.ts";
+import { engagedMoment, type Release } from "../../shared/engage.ts";
+import type { Profile } from "../../shared/profile.ts";
+import type {
+  ClientMessage,
+  CustomerView,
+  Engagement,
+  Identity,
+  Present,
+  Role,
+  ServerMessage,
+  StaffTurnView,
+  TurnView,
+  VisitorInfo,
+} from "../../shared/protocol.ts";
 
 export type Status = "connecting" | "open" | "closed" | "replaced";
 
@@ -8,6 +22,7 @@ export type Status = "connecting" | "open" | "closed" | "replaced";
 export interface Remote {
   info: VisitorInfo;
   role: Role;
+  identity: Identity;
   x: number;
   z: number;
   ry: number;
@@ -17,6 +32,7 @@ export interface Remote {
 }
 
 const TOKEN_KEY = "visitor-token";
+const PROFILE_KEY = "visitor-profile";
 
 function readToken(): string | null {
   try {
@@ -34,18 +50,55 @@ function writeToken(token: string): void {
   }
 }
 
+export function readProfile(): Profile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as Profile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfile(p: Profile): void {
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(p));
+  } catch {
+    /* the entry screen just starts blank next time */
+  }
+}
+
 // Plain store, not React state: positions change many times a second, so the
 // scene reads `remotes` directly in its frame loop and React only re-renders
-// when the roster or connection status changes.
+// when the roster, the connection or a conversation changes.
 class Net {
   status: Status = "connecting";
   you: VisitorInfo | null = null;
-  // Dev: which role this visitor is acting as. Kept across reconnects.
-  // (`?role=staff` starts as staff, for checks.)
-  role: Role = new URLSearchParams(location.search).get("role") === "staff" ? "staff" : "customer";
+  // who you chose to be (validated by the server), and where you are in your visit
+  profile: Profile | null = null;
+  identity: Identity = { kind: "customer" };
+  state: PlayerStateName | null = null;
+  want: string | null = null;
+  needs: string | null = null;
+  stateSince = 0; // local time the state changed, for "waiting 0:42"
+  // Dev: which role this visitor is acting as, for walking (`?dev=1`).
+  role: Role = "customer";
   // our own position, written by the player loop, read by door and NPC code
   me = { x: 0, z: 0 };
   remotes = new Map<string, Remote>();
+  // NPCs: who is off duty because a person holds their post; who is with a
+  // visitor (and since when, and where they stood); who has just been let go
+  offDuty = new Set<string>();
+  engaged = new Map<string, Engagement>();
+  released = new Map<string, Release>();
+  // the conversation you are in, the replies waiting on you if you are an
+  // employee, and the customers you can see
+  turn: TurnView | null = null;
+  staffTurns = new Map<string, StaffTurnView>();
+  customers: CustomerView[] = [];
+  notice: { text: string; at: number } | null = null;
+  // who is close enough to talk to, set by the scene
+  hint: { id: string; name: string } | null = null;
+
   private socket: WebSocket | null = null;
   private listeners = new Set<() => void>();
   private version = 0;
@@ -62,9 +115,21 @@ class Net {
 
   getVersion = (): number => this.version;
 
-  private changed(): void {
+  changed(): void {
     this.version++;
     for (const fn of this.listeners) fn();
+  }
+
+  // The entry screen's "enter": remember the choice and join the store.
+  enter(profile: Profile): void {
+    this.profile = profile;
+    writeProfile(profile);
+    this.role = profile.kind === "customer" ? "customer" : "staff";
+    this.connect();
+  }
+
+  get isEmployee(): boolean {
+    return this.identity.kind !== "customer";
   }
 
   connect(): void {
@@ -76,40 +141,17 @@ class Net {
 
     socket.onopen = () => {
       this.retry = 0;
-      this.send({ type: "hello", token: readToken() });
+      this.send({ type: "hello", token: readToken(), profile: this.profile ?? undefined });
     };
 
     socket.onmessage = (event) => {
       const message = JSON.parse(String(event.data)) as ServerMessage;
-      if (message.type === "welcome") {
-        writeToken(message.token);
-        this.clockOffset = message.serverTime - Date.now();
-        this.you = message.you;
-        this.remotes.clear();
-        for (const o of message.others) this.addRemote(o);
-        this.status = "open";
-        if (this.role !== "customer") this.send({ type: "role", role: this.role });
-      } else if (message.type === "joined") {
-        this.addRemote(message.visitor);
-      } else if (message.type === "moved") {
-        const r = this.remotes.get(message.id);
-        if (r) {
-          r.tx = message.x;
-          r.tz = message.z;
-          r.try = message.ry;
-        }
-        return; // pose only: no re-render needed
-      } else if (message.type === "role") {
-        const r = this.remotes.get(message.id);
-        if (r) r.role = message.role;
-      } else if (message.type === "left") {
-        this.remotes.delete(message.id);
-      }
-      this.changed();
+      if (this.handle(message)) this.changed();
     };
 
     socket.onclose = (event) => {
       this.remotes.clear();
+      this.turn = null;
       if (event.code === 4000) {
         this.status = "replaced"; // opened in another tab: do not fight for it
         this.changed();
@@ -123,12 +165,127 @@ class Net {
     };
   }
 
-  private addRemote(v: Present): void {
-    const { x, z, ry, role, ...info } = v;
-    this.remotes.set(info.id, { info, role, x, z, ry, tx: x, tz: z, try: ry });
+  // Applies a server message. Returns true when something a component shows
+  // has changed (pose updates do not, so they cost no render).
+  private handle(message: ServerMessage): boolean {
+    switch (message.type) {
+      case "welcome": {
+        writeToken(message.token);
+        this.clockOffset = message.serverTime - Date.now();
+        this.you = message.you;
+        this.identity = message.identity;
+        this.setState(message.state, null, null);
+        this.offDuty = new Set(message.offDuty);
+        this.engaged = new Map(message.engaged.map((e) => [e.npcId, e]));
+        this.released.clear();
+        this.remotes.clear();
+        for (const o of message.others) this.addRemote(o);
+        this.status = "open";
+        return true;
+      }
+      case "joined":
+        this.addRemote(message.visitor);
+        return true;
+      case "moved": {
+        const r = this.remotes.get(message.id);
+        if (r) {
+          r.tx = message.x;
+          r.tz = message.z;
+          r.try = message.ry;
+        }
+        return false; // pose only: no re-render needed
+      }
+      case "role": {
+        const r = this.remotes.get(message.id);
+        if (r) r.role = message.role;
+        return true;
+      }
+      case "left":
+        this.remotes.delete(message.id);
+        return true;
+      case "state":
+        this.setState(message.state, message.want, message.needs);
+        return true;
+      case "turn":
+        this.turn = message;
+        return true;
+      case "staff_turn":
+        this.staffTurns.set(message.conversationId, message);
+        return true;
+      case "staff_view":
+        this.customers = message.customers;
+        // an employee's pending replies for customers who are gone are dropped
+        return true;
+      case "duty":
+        this.offDuty = new Set(message.offDuty);
+        return true;
+      case "engaged":
+        this.engaged.set(message.npcId, message);
+        this.released.delete(message.npcId);
+        return true;
+      case "released": {
+        const e = this.engaged.get(message.npcId);
+        if (e) {
+          // where it stands now, so it can walk back from there
+          const now = this.serverNow();
+          const m = engagedMoment(message.npcId, e, now);
+          this.released.set(message.npcId, { at: now, from: { x: m.x, z: m.z } });
+          this.engaged.delete(message.npcId);
+        }
+        return true;
+      }
+      case "notice":
+        this.notice = { text: message.text, at: Date.now() };
+        return true;
+    }
   }
 
-  // Dev switch between customer and staff.
+  private setState(state: PlayerStateName | null, want: string | null, needs: string | null): void {
+    if (state !== this.state) this.stateSince = Date.now();
+    this.state = state;
+    this.want = want;
+    this.needs = needs;
+  }
+
+  private addRemote(v: Present): void {
+    const { x, z, ry, role, kind, specialty, look, ...info } = v;
+    this.remotes.set(info.id, { info, role, identity: { kind, specialty, look }, x, z, ry, tx: x, tz: z, try: ry });
+  }
+
+  // ---- what the visitor does ----
+
+  talkStart(withId: string): void {
+    this.send({ type: "talk_start", withId });
+  }
+
+  choose(choice: string): void {
+    if (this.turn && !this.turn.ended && this.turn.awaiting === "customer") {
+      this.send({ type: "talk_choose", conversationId: this.turn.conversationId, choice });
+    }
+  }
+
+  closeTurn(): void {
+    if (this.turn?.ended) {
+      this.turn = null;
+      this.changed();
+    }
+  }
+
+  staffRespond(conversationId: string, action: "reply" | "hand_to_genius" | "end"): void {
+    this.send({ type: "staff_respond", conversationId, action });
+    this.staffTurns.delete(conversationId);
+    this.changed();
+  }
+
+  claim(customerId: string): void {
+    this.send({ type: "claim", customerId });
+  }
+
+  handOn(customerId: string, to: string, note: string): void {
+    this.send({ type: "hand_on", customerId, to, note });
+  }
+
+  // Dev switch between customer and staff, for walking (`?dev=1`).
   setRole(role: Role): void {
     this.role = role;
     this.send({ type: "role", role });
@@ -146,7 +303,7 @@ export const net = new Net();
 // leave at once (see ClientMessage "bye").
 window.addEventListener("pagehide", () => net.send({ type: "bye" }));
 
-// Re-renders the calling component when status or the roster changes.
+// Re-renders the calling component when status, the roster or a conversation changes.
 export function useNet(): Net {
   useSyncExternalStore(net.subscribe, net.getVersion);
   return net;

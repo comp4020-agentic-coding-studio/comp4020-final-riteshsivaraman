@@ -2,6 +2,7 @@ import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import type { Group } from "three";
+import { engagedMoment, rejoinMoment } from "../../shared/engage.ts";
 import { NPCS, isStaff, npcPose } from "../../shared/npcs.ts";
 import { settledPeople } from "../../shared/people.ts";
 import { STORE_Y } from "../../shared/protocol.ts";
@@ -29,14 +30,32 @@ export function Npcs() {
     const settled = settledPeople(now).npc;
     root.current?.children.forEach((child, i) => {
       const def = NPCS[i];
-      const raw = npcPose(def, now);
+      let raw: { x: number; z: number; ry: number; walking: boolean; present: boolean; mode: ActorState["mode"]; mood: string; seated: boolean; device: boolean; intent: string } = npcPose(def, now);
+      // a person holds this post today: the NPC is not on
+      if (net.offDuty.has(def.id)) raw = { ...raw, present: false };
+      // with a visitor (they walk over and talk), or walking back to the day
+      const eng = net.engaged.get(def.id);
+      const rel = net.released.get(def.id);
+      let direct = false;
+      if (eng && raw.present) {
+        const m = engagedMoment(def.id, eng, now);
+        raw = { ...m, present: true };
+        direct = true;
+      } else if (rel && raw.present) {
+        const m = rejoinMoment(def.id, rel, now);
+        if (m) {
+          raw = { ...m, present: true };
+          direct = true;
+        } else net.released.delete(def.id);
+      }
       child.visible = raw.present;
       if (!raw.present) {
         shown.current.delete(def.id); // when they come in again, they start where they are
         return;
       }
-      // where they actually stand, after colliding with everyone else
-      const at = settled.get(def.id) ?? raw;
+      // where they actually stand, after colliding with everyone else (not
+      // while they are being served: they are exactly where the visitor is)
+      const at = direct ? raw : (settled.get(def.id) ?? raw);
       // ease towards the settled spot, so being pushed aside reads as a step
       // and not a snap (the first frame goes straight there)
       const k = shown.current.get(def.id);

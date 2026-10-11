@@ -1,10 +1,13 @@
-import { PointerLockControls } from "@react-three/drei";
+import { Html, PointerLockControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { PMREMGenerator } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Group } from "three";
+import { NPC_DESIGNATION, NPC_LABEL, scriptFor } from "../../shared/duty.ts";
+import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { poseChanged } from "../../shared/pose.ts";
+import { designationOf, EMPLOYEE_COLOUR, STAFF_SHIRT } from "../../shared/profile.ts";
 import { avoidPeople } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions } from "../../shared/world.ts";
@@ -61,11 +64,13 @@ function Player() {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
-    const forward = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
-    const strafe = (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
+    // in a conversation you stand and read; the keys pick from the menu
+    const talking = net.turn !== null;
+    const forward = talking ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+    const strafe = talking ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
 
     // Left and right arrows turn you on the spot (a left turn raises yaw).
-    const turn = (keys.has("ArrowLeft") ? 1 : 0) - (keys.has("ArrowRight") ? 1 : 0);
+    const turn = talking ? 0 : (keys.has("ArrowLeft") ? 1 : 0) - (keys.has("ArrowRight") ? 1 : 0);
     if (turn !== 0) camera.rotation.y += turn * TURN_SPEED * dt;
 
     // Heading from the camera: forward is where you look, flattened to the floor.
@@ -152,14 +157,80 @@ function Remotes() {
         <group key={r.info.id} name={r.info.id} position={[r.x, STORE_Y, r.z]}>
           <Actor
             id={r.info.id}
-            shirt={r.info.colour}
-            uniform={r.role === "staff" ? { cap: "#ffd23f", badge: "#ffd23f" } : undefined}
+            shirt={r.identity.kind === "customer" ? r.info.colour : STAFF_SHIRT}
+            look={r.identity.look}
+            uniform={
+              r.identity.kind !== "customer"
+                ? { cap: EMPLOYEE_COLOUR[r.identity.kind], badge: EMPLOYEE_COLOUR[r.identity.kind] }
+                : r.role === "staff"
+                  ? { cap: "#ffd23f", badge: "#ffd23f" } // the dev switch
+                  : undefined
+            }
             getState={() => speeds.current.get(r.info.id) ?? { walking: false, mode: "idle", mood: "neutral" }}
           />
+          {r.identity.kind !== "customer" && (
+            <Html position={[0, 2.0, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
+              <div className="name-tag" style={{ borderColor: EMPLOYEE_COLOUR[r.identity.kind] }}>
+                <b>{r.info.name}</b>
+                <span>{r.identity.kind === "specialist" ? `${r.identity.specialty} specialist` : r.identity.kind}</span>
+              </div>
+            </Html>
+          )}
         </group>
       ))}
     </group>
   );
+}
+
+// "Press E to talk": the nearest person in front of you who has something to
+// say, within a couple of metres. Only for customers who are free to talk.
+const TALK_HINT_RANGE = 2.6;
+function Interact() {
+  const { camera } = useThree();
+  useEffect(() => {
+    const press = (e: KeyboardEvent) => {
+      if (e.code === "KeyE" && net.hint && !net.turn && !e.repeat) net.talkStart(net.hint.id);
+    };
+    window.addEventListener("keydown", press);
+    return () => window.removeEventListener("keydown", press);
+  }, []);
+
+  useFrame(() => {
+    let best: { id: string; name: string; d: number } | null = null;
+    const free = net.state === "arriving" || net.state === "browsing" || net.state === "waiting_for_help";
+    if (net.identity.kind === "customer" && free && !net.turn && net.status === "open") {
+      const yaw = camera.rotation.y;
+      const fx = -Math.sin(yaw);
+      const fz = -Math.cos(yaw);
+      const consider = (id: string, name: string, x: number, z: number) => {
+        const dx = x - net.me.x;
+        const dz = z - net.me.z;
+        const d = Math.hypot(dx, dz);
+        if (d > TALK_HINT_RANGE) return;
+        // roughly in front of you, not behind
+        if (d > 0.5 && (dx * fx + dz * fz) / d < 0.35) return;
+        if (!best || d < best.d) best = { id, name, d };
+      };
+      const now = net.serverNow();
+      for (const n of NPCS) {
+        const post = NPC_DESIGNATION[n.id];
+        if (!post || !scriptFor(post) || net.offDuty.has(n.id) || net.engaged.has(n.id) || net.released.has(n.id)) continue;
+        const p = npcPose(n, now);
+        if (p.present) consider(n.id, NPC_LABEL[n.id] ?? n.id, p.x, p.z);
+      }
+      for (const r of net.remotes.values()) {
+        if (r.identity.kind === "customer") continue;
+        const post = designationOf({ kind: r.identity.kind, specialty: r.identity.specialty });
+        if (post && scriptFor(post)) consider(r.info.id, r.info.name, r.x, r.z);
+      }
+    }
+    const next = best ? { id: (best as { id: string }).id, name: (best as { name: string }).name } : null;
+    if (next?.id !== net.hint?.id) {
+      net.hint = next;
+      net.changed();
+    }
+  });
+  return null;
 }
 
 // Soft reflections on glass, metal and the polished floor, from a small
@@ -202,6 +273,7 @@ export function Store() {
       <fog attach="fog" args={["#dfe3e7", 28, 85]} />
       <Remotes />
       <Npcs />
+      <Interact />
       <Player />
       <PointerLockControls />
     </Canvas>

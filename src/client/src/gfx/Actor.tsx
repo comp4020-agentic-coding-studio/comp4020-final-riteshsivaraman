@@ -1,6 +1,6 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { appearanceFor } from "../../../shared/appearance.ts";
+import { lookFor, type LookChoice } from "../../../shared/look.ts";
 import type { Behaviour } from "../../../shared/behaviour.ts";
 import { buildCharacter, EXPRESSIONS, poseCharacter, type Mood } from "./character.ts";
 
@@ -27,20 +27,31 @@ export function Actor({
   id,
   shirt,
   uniform,
+  look,
   getState,
 }: {
   id: string;
   shirt?: string;
   uniform?: { cap?: string; badge?: string };
+  look?: LookChoice; // what a visitor chose; NPCs have none
   getState: () => ActorState;
 }) {
+  const lookKey = JSON.stringify(look ?? null);
   const char = useMemo(() => {
-    const look = appearanceFor(id);
-    const colour = shirt ?? SHIRTS[Math.floor(look.faceWidth * 1000) % SHIRTS.length];
+    // the base appearance is from the seed the visitor chose (so the entry
+    // preview matches what others see), or from the id
+    const appearance = lookFor(id, look);
+    const colour = look?.shirt ?? shirt ?? SHIRTS[Math.floor(appearance.faceWidth * 1000) % SHIRTS.length];
     // staff carry a tablet, customers a phone
-    return buildCharacter(look, colour, { uniform, device: uniform ? "tablet" : "phone" });
+    return buildCharacter(appearance, colour, {
+      uniform,
+      device: uniform ? "tablet" : "phone",
+      body: look?.body,
+      eyes: look?.eyes,
+      face: look?.face,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, shirt, uniform?.cap, uniform?.badge]);
+  }, [id, shirt, uniform?.cap, uniform?.badge, lookKey]);
   const seed = useMemo(() => Array.from(id).reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7) % 1000, [id]);
   const t = useRef(seed * 0.37);
   const phase = useRef(seed * 0.11);
