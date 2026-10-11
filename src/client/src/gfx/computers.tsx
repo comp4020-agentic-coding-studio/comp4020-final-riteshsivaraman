@@ -56,6 +56,45 @@ import {
 } from "../../../shared/plan.ts";
 import { net } from "../net.ts";
 import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W, DOOR_X, DOOR_H, BENCH_X, BENCH_HALF, FACE_X, canvasTexture, labelTexture, BoxField, Sign, std, BlobShadow, type Cuboid, type Kind } from "./common.tsx";
+import type { ScreenMode } from "./phones.tsx";
+import {
+  DESKTOP_MODELS,
+  DISPLAY_MODELS,
+  LAPTOP_MODELS,
+  TABLET_MODELS,
+  bodyMaterial,
+  desktopGeo,
+  displayGeo,
+  laptopGeo,
+  tabletGeo,
+  tabletKbGeo,
+  type DeviceGeo,
+} from "./computers-geo.ts";
+import { screenMaterial } from "./computers-screens.ts";
+
+// Which screen design a modelled device shows: `home` is a device in use (a
+// desktop, a call, a spreadsheet...), `lock` is a marketing-shot wallpaper
+// with no interface on it. Picked from the colour and model so neighbours
+// differ. Design 3 (computers-screens.ts's spec sheet) is left out: its copy
+// ("11- and 13-inch, from 5.1 mm thin") is only true of one model.
+const HOME_DESIGNS = [2, 4, 5, 6, 7, 9];
+const LOCK_DESIGNS = [0, 1, 8];
+function screenDesign(seed: string, mode: ScreenMode = "home"): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  const list = mode === "lock" ? LOCK_DESIGNS : HOME_DESIGNS;
+  return list[Math.abs(h) % list.length];
+}
+
+// One modelled device: the merged body (one draw call) and its screen (one more).
+function ModelMeshes({ geo, colour, model, screenMode }: { geo: DeviceGeo; colour: string; model: string; screenMode?: ScreenMode }) {
+  return (
+    <>
+      <mesh geometry={geo.body} material={bodyMaterial(colour)} />
+      {geo.screen && <mesh geometry={geo.screen} material={screenMaterial(screenDesign(colour + model, screenMode), geo.format)} />}
+    </>
+  );
+}
 
 
 // Original screen artwork for the products: wallpapers, app tiles, a clock
@@ -153,7 +192,9 @@ export const COMPUTER_VARIANT = (colour: string): number => {
 
 
 // Laptops, tablets and tablets with keyboards: one product on a surface at
-// height y, facing rotY (0 faces +z).
+// height y, facing rotY (0 faces +z). With a `model` (a LAPTOP_MODELS id for
+// a laptop, a TABLET_MODELS id for a tablet or tablet with keyboard) it draws
+// that real model (SCOPE D37); without one, the generic placeholder below.
 export function ComputerDevice({
   kind,
   x,
@@ -161,6 +202,8 @@ export function ComputerDevice({
   z,
   rotY,
   colour,
+  model,
+  screenMode,
 }: {
   kind: "laptop" | "tabletKb" | "tablet";
   x: number;
@@ -168,7 +211,17 @@ export function ComputerDevice({
   z: number;
   rotY: number;
   colour: string;
+  model?: string;
+  screenMode?: ScreenMode;
 }) {
+  const geo = modelGeo(kind, model);
+  if (geo) {
+    return (
+      <group position={[x, y, z]} rotation={[0, rotY, 0]}>
+        <ModelMeshes geo={geo} colour={colour} model={model!} screenMode={screenMode} />
+      </group>
+    );
+  }
   return (
     <group position={[x, y, z]} rotation={[0, rotY, 0]}>
       {kind === "laptop" && (
@@ -229,6 +282,21 @@ export function ComputerDevice({
   );
 }
 
+function modelGeo(kind: "laptop" | "tabletKb" | "tablet", model: string | undefined): DeviceGeo | null {
+  if (!model) return null;
+  if (kind === "laptop") {
+    const spec = LAPTOP_MODELS[model];
+    return spec ? laptopGeo(spec) : null;
+  }
+  const spec = TABLET_MODELS[model];
+  if (!spec) return null;
+  return kind === "tabletKb" ? tabletKbGeo(spec) : tabletGeo(spec);
+}
+
+// Monitor and Desktop stand on the wall bench (y 0.95) turned to face the
+// aisle from `side`. `y` and `rotY` override that for the look-check stage.
+const benchRot = (side: -1 | 1) => (side === -1 ? Math.PI / 2 : -Math.PI / 2);
+
 export function monitorTexture(): CanvasTexture {
   return canvasTexture(128, 96, (g) => {
     g.fillStyle = "#1a4fb8";
@@ -246,10 +314,20 @@ export function monitorTexture(): CanvasTexture {
 }
 
 
-export function Monitor({ x, z, side }: { x: number; z: number; side: -1 | 1 }) {
+// A standalone display. `model`: a DISPLAY_MODELS id (Studio Display, Studio
+// Display XDR); without one, the generic placeholder.
+export function Monitor({ x, z, side, model, screenMode, y = 0.95, rotY }: { x: number; z: number; side: -1 | 1; model?: string; screenMode?: ScreenMode; y?: number; rotY?: number }) {
   const map = useMemo(() => monitorTexture(), []);
+  const spec = model ? DISPLAY_MODELS[model] : undefined;
+  if (spec) {
+    return (
+      <group position={[x, y, z]} rotation={[0, rotY ?? benchRot(side), 0]}>
+        <ModelMeshes geo={displayGeo(spec)} colour={SILVER} model={spec.id} screenMode={screenMode} />
+      </group>
+    );
+  }
   return (
-    <group position={[x, 0.95, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+    <group position={[x, y, z]} rotation={[0, rotY ?? benchRot(side), 0]}>
       <mesh position={[0, 0.02, 0]}>
         <boxGeometry args={[0.3, 0.03, 0.2]} />
         <meshStandardMaterial color="#2a2d33" />
@@ -282,11 +360,22 @@ export function desktopTexture(): CanvasTexture {
 }
 
 
-// A desktop display on the bench: slim screen on a stand.
-export function Desktop({ x, z, side }: { x: number; z: number; side: -1 | 1 }) {
+// A desktop on the bench. `model`: a DESKTOP_MODELS id — "imac" (the
+// all-in-one, true size: 547 mm wide, so neighbours at the bench's 0.5 m
+// pitch overlap), "mac-mini" or "mac-studio" (boxes, silver). `colour` tints
+// the iMac (default silver). Without a model, the generic slim screen.
+export function Desktop({ x, z, side, model, colour, screenMode, y = 0.95, rotY }: { x: number; z: number; side: -1 | 1; model?: string; colour?: string; screenMode?: ScreenMode; y?: number; rotY?: number }) {
   const map = useMemo(() => desktopTexture(), []);
+  const spec = model ? DESKTOP_MODELS[model] : undefined;
+  if (spec) {
+    return (
+      <group position={[x, y, z]} rotation={[0, rotY ?? benchRot(side), 0]}>
+        <ModelMeshes geo={desktopGeo(spec)} colour={spec.kind === "box" ? SILVER : (colour ?? SILVER)} model={spec.id} screenMode={screenMode} />
+      </group>
+    );
+  }
   return (
-    <group position={[x, 0.95, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+    <group position={[x, y, z]} rotation={[0, rotY ?? benchRot(side), 0]}>
       <mesh position={[0, 0.01, 0]}>
         <boxGeometry args={[0.22, 0.02, 0.16]} />
         <meshStandardMaterial color="#c9ced3" />
