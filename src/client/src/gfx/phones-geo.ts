@@ -258,26 +258,33 @@ export const IPHONE_18_PRO: PhoneModelSpec = {
 //
 // Body dimensions are Apple's own tech-spec numbers (via WebSearch summaries
 // of apple.com/<region>/<model>/specs and support.apple.com, 2026-10-12)
-// except the Duo's, which are third-party (see its note). Camera layouts were
+// (the Duo's read straight off apple.com/au/iphone-duo/specs). Camera layouts were
 // checked by eye against Apple's own AU product photos in a browser on
 // 2026-10-12 (apple.com/au/shop/buy-iphone/<model>, apple.com/au/iphone-duo);
 // the millimetre sizes and offsets of plateaus, lenses and buttons are read
 // off those photos by proportion, so they are close, not measured. Button
 // positions along an edge are approximate everywhere (the 18 Pro's too).
 
-// iPhone Duo, closed (book-style foldable): 117.8 x 84.1 x 11.3 mm folded
-// (117.8 x 164.6 x 5.2 open), 254 g. Folded dimensions are THIRD-PARTY
-// (pcguide.com / 9to5google.com coverage of the 2026-09-09 launch, which
-// match Apple's 254 g), not read off Apple's own spec page. Seen in Apple's
+// iPhone Duo, closed (book-style foldable): 84.1 x 117.8 x 11.3 mm closed
+// (164.6 x 117.8 x 5.2 open), 254 g — Apple's own numbers, confirmed on
+// apple.com/au/iphone-duo/specs, 2026-10-12. Seen in Apple's
 // photo (apple.com/au/iphone-duo, "Durability" view): a horizontal pill
 // plateau top-left of the back (away from the hinge), the same finish as
 // the body, two large lenses side by side in bright metal rings, a mic hole
 // above the flash to their right. Front ("Closed" view): the outer screen
 // fills the face, squared corners on the hinge (left) side, a punch-hole
 // camera top-right; two volume buttons on the TOP edge right of centre, the
-// side (Touch ID) button on the right edge. Camera Control is said to be on
-// the right side (tidbits/macrumors text) but I could not see it in the
-// photo, so it is NOT drawn — check.
+// side (Touch ID) button on the right edge. All of these buttons sit on the
+// CAMERA half of the closed phone, not the outer-screen half or the seam —
+// photo-confirmed on the buy page's side-exterior gallery photo
+// (apple.com/au/shop/buy-iphone/iphone-duo, 2026-10-12), and Apple's spec
+// diagram puts side button and volume on the same half. Camera Control:
+// photo-confirmed, apple.com/au/iphone-duo/specs "External Buttons and
+// Connectors" diagram, 2026-10-12 — on the right edge (seen from the
+// front), about 10.5 mm below centre, under the side button, and FLUSH: the
+// diagram draws no bump or outline there, and the gallery photo shows a
+// plain edge below the side button. So it is deliberately not drawn (there
+// is nothing visible to draw); add it if a closer photo ever shows a mark.
 export const IPHONE_DUO: PhoneModelSpec = {
   id: "iphone-duo",
   length: 0.1178,
@@ -500,11 +507,14 @@ export function buildPhoneBody(spec: PhoneModelSpec, bodyColour: string, plateau
       p.add("gloss", cyl(e.r, e.r, 0.0012, 14), e.colour, [plateauCx + e.pos[0], plateauCy + e.pos[1], e.onBack ? backZ : lensZ], [Math.PI / 2, 0, 0]);
     }
   }
+  // A folded phone's buttons sit on its back (camera) half, -z, not on the
+  // seam or the outer-screen half (iPhone Duo photo, see its note).
+  const buttonZ = spec.fold ? -T / 4 : 0;
   for (const b of spec.buttons) {
-    p.add("metal", box(0.0012, b.len, Math.min(0.0038, T * 0.45)), "#d7d9dc", [b.side * (W / 2 + 0.0003), b.y, 0]);
+    p.add("metal", box(0.0012, b.len, Math.min(0.0038, spec.fold ? T * 0.3 : T * 0.45)), "#d7d9dc", [b.side * (W / 2 + 0.0003), b.y, buttonZ]);
   }
   for (const b of spec.topButtons ?? []) {
-    p.add("metal", box(b.len, 0.0012, Math.min(0.0038, T * 0.3)), "#d7d9dc", [b.x, L / 2 + 0.0003, spec.fold ? T / 4 : 0]);
+    p.add("metal", box(b.len, 0.0012, Math.min(0.0038, T * 0.3)), "#d7d9dc", [b.x, L / 2 + 0.0003, buttonZ]);
   }
   return p.build();
 }
@@ -574,9 +584,14 @@ export const WATCH_SERIES_12: WatchModelSpec = {
 // Apple Watch Ultra 4, 49 mm titanium: 49 x 44 x 12 mm (apple.com/apple-watch-
 // ultra-4/specs). Photo: squarer case, flat crystal in a raised titanium lip,
 // crown with an orange ring inside a crown guard, a long side button below,
-// Ocean-style ribbed band. The orange Action button on the LEFT side is not
-// visible in the photo I saw (it faces away) — from general knowledge of the
-// Ultra line, flagged as unconfirmed for this generation.
+// Ocean-style ribbed band. Orange Action button on the LEFT side:
+// photo-confirmed, apple.com/au/apple-watch-ultra-4/specs ("Hardware and
+// Buttons" side-view diagram) and the front photo in the overview page's
+// "Readiness and Vitals" tile (apple.com/au/apple-watch-ultra-4), 2026-10-12.
+// Both show it a little BELOW centre (toward 6 o'clock), about 13-14 mm
+// long; it was previously drawn above centre from memory. The same diagram
+// gave the crown (about 6.6 mm above centre) and side button (about 7.7 mm
+// below, about 11 mm long) positions, read by proportion.
 export const WATCH_ULTRA_4: WatchModelSpec = {
   id: "apple-watch-ultra-4",
   height: 0.049,
@@ -585,10 +600,10 @@ export const WATCH_ULTRA_4: WatchModelSpec = {
   cornerRadius: 0.0078,
   bezel: 0.0034,
   front: "flat-rim",
-  crown: { r: 0.0042, y: 0.0055, accent: "#ff6a13" },
-  sideButton: { len: 0.0145, y: -0.0095 },
+  crown: { r: 0.0042, y: 0.0066, accent: "#ff6a13" },
+  sideButton: { len: 0.011, y: -0.0078 },
   crownGuard: true,
-  actionButton: { len: 0.0125, y: 0.0085, colour: "#ff6a13" },
+  actionButton: { len: 0.0135, y: -0.005, colour: "#ff6a13" },
   band: { width: 0.026, thickness: 0.0045, style: "ocean" }, // band size a guess
 };
 
@@ -753,8 +768,16 @@ export interface HeadphoneModelSpec {
 // AirPods Max 2: 187.3 x 168.6 x 83.4 mm, 386.2 g (apple.com/airpods-max/
 // specs; same shell as the original Max). Photo: rounded-rect cups,
 // stainless arms and frame, a knit-mesh canopy. Cup height/thickness and
-// canopy width are GUESSES fitted inside those overall numbers; the Digital
-// Crown on top of the right cup is from general knowledge, not this photo.
+// canopy width are GUESSES fitted inside those overall numbers. Controls:
+// photo-confirmed 2026-10-12 against support.apple.com/en-au/guide/airpods/
+// devb2c431317/web (AirPods Max 2 diagram: the outside of the RIGHT cup,
+// Digital Crown top-left = toward the back of the head, listening-mode
+// button top-right = toward the face, the arm between them) and the
+// "headphone controls" photo on apple.com/au/shop/buy-airpods/airpods-max-2
+// (crown and pill button each about 0.22 of the cup's depth either side of
+// the arm; crown about 10.5 mm across, button about 12 x 5.5 mm, by
+// proportion). The button was previously drawn behind the arm, beside the
+// crown; it is in front of the arm.
 export const AIRPODS_MAX_2: HeadphoneModelSpec = {
   id: "airpods-max-2",
   height: 0.1873,
@@ -781,9 +804,11 @@ export function buildHeadphones(spec: HeadphoneModelSpec, colour: string): Recor
     p.add("matte", slab(D, c.height, c.thickness * 0.62, c.radius, 0.004), colour, [s * (cupX + c.thickness * 0.17), c.height / 2, 0], [0, Math.PI / 2, 0]);
     p.add("matte", slab(D * 0.96, c.height * 0.96, c.thickness * 0.4, c.radius * 0.95, 0.006), cushion, [s * (cupX - c.thickness * 0.33), c.height / 2, 0], [0, Math.PI / 2, 0]);
   }
-  // digital crown and noise-control button on top of the right cup (-x: the wearer's right)
-  p.add("metal", cyl(0.0042, 0.0042, 0.006, 16), "#d7d9dc", [-cupX - c.thickness * 0.1, c.height + 0.002, -D * 0.28]);
-  p.add("metal", box(0.004, 0.002, 0.009), "#d7d9dc", [-cupX - c.thickness * 0.1, c.height + 0.0005, -D * 0.1]);
+  // on top of the right cup (-x: the wearer's right), either side of the arm
+  // (z = 0): the digital crown behind it (-z), the listening-mode button in
+  // front of it (+z, toward the face). Photo-confirmed, see the spec note.
+  p.add("metal", cyl(0.0052, 0.0052, 0.006, 18), "#d7d9dc", [-cupX - c.thickness * 0.1, c.height + 0.002, -D * 0.22]);
+  p.add("metal", box(0.0055, 0.002, 0.012), "#d7d9dc", [-cupX - c.thickness * 0.1, c.height + 0.0005, D * 0.22]);
   // headband: stainless frame arc over a wide mesh canopy, arms down to the cups
   const tube = 0.0035;
   const Rarc = cupX - 0.004;
@@ -804,10 +829,12 @@ export interface SpeakerModelSpec {
   topR: number; // the touch surface on top, m
 }
 
-// HomePod: 168 x 142 mm (apple.com/au/homepod-2nd-generation/specs — the
-// 2nd-generation numbers; product-line.md just says "HomePod", so check it's
-// still that generation). Photo: a mesh cylinder with well-rounded shoulders
-// and a flat touch-surface top.
+// HomePod: 168 x 142 mm, 2.3 kg (apple.com/au/homepod-2nd-generation/specs).
+// Confirmed 2026-10-12 that the "HomePod" sold today (A$549, Midnight/White,
+// apple.com/au/shop/buy-homepod/homepod) IS the 2nd generation: the
+// apple.com/au/homepod page's HomePod "Learn more" links to
+// /au/homepod-2nd-generation/. Photo: a mesh cylinder with well-rounded
+// shoulders and a flat touch-surface top.
 export const HOMEPOD: SpeakerModelSpec = { id: "homepod", height: 0.168, diameter: 0.142, shape: "rounded-cylinder", topR: 0.04 };
 
 // HomePod mini: 84.3 x 97.9 mm (apple.com/homepod-mini/specs). Photo: a mesh
