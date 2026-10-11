@@ -70,8 +70,14 @@ export const SCREEN_WALLPAPERS: Array<[string, string, string]> = [
 
 export const screenCache = new Map<string, CanvasTexture>();
 
-export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" | "watch", variant: number): CanvasTexture {
-  const key = `${kind}:${variant}`;
+export type ScreenMode = "home" | "lock";
+
+// `home`: the app-grid look used everywhere today (sleek, modern — a device
+// someone is actually using). `lock`: the default lock screen a marketing
+// photo shows — just the wallpaper, a big time and date, a Dynamic-Island
+// pill, no app grid. Phone/tablet only; watch and laptop ignore `mode`.
+export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" | "watch", variant: number, mode: ScreenMode = "home"): CanvasTexture {
+  const key = `${kind}:${variant}:${mode}`;
   let tex = screenCache.get(key);
   if (tex) return tex;
   const [a, b, c] = SCREEN_WALLPAPERS[variant % SCREEN_WALLPAPERS.length];
@@ -94,6 +100,33 @@ export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" |
     g.arc(W * 0.72, H * 0.7, H * 0.34, 0, Math.PI * 2);
     g.fill();
     g.globalAlpha = 1;
+    if (mode === "lock" && (kind === "phone" || kind === "tablet")) {
+      // Dynamic-Island pill
+      g.fillStyle = "#0a0a0c";
+      const islandW = W * 0.34;
+      g.beginPath();
+      g.roundRect(W / 2 - islandW / 2, H * 0.025, islandW, H * 0.028, H * 0.014);
+      g.fill();
+      // big time, like the marketing lock-screen shots
+      g.fillStyle = "#ffffff";
+      g.textAlign = "center";
+      g.shadowColor = "rgba(0,0,0,0.35)";
+      g.shadowBlur = 4;
+      g.font = `600 ${Math.round(H * 0.15)}px -apple-system, system-ui, sans-serif`;
+      g.fillText("9:41", W / 2, H * 0.34);
+      g.font = `500 ${Math.round(H * 0.045)}px -apple-system, system-ui, sans-serif`;
+      g.fillText("Friday, 9 October", W / 2, H * 0.4);
+      g.shadowBlur = 0;
+      // bottom controls: flashlight and camera shortcuts
+      g.fillStyle = "rgba(255,255,255,0.22)";
+      for (const cx of [W * 0.18, W * 0.82]) {
+        g.beginPath();
+        g.arc(cx, H * 0.92, H * 0.035, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.textAlign = "left";
+      return;
+    }
     if (kind === "watch") {
       g.fillStyle = "#0c0d10";
       g.fillRect(0, 0, W, H);
@@ -120,6 +153,122 @@ export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" |
       g.moveTo(W / 2, H / 2);
       g.lineTo(W / 2 - 6, H / 2 - 34);
       g.stroke();
+      return;
+    }
+    if (mode === "home" && kind === "phone") {
+      // a modern home screen: status bar, Dynamic Island, two widgets,
+      // a 4x4 icon grid, a search pill and a dock (no real app logos —
+      // icons are plain glyphs on invented colours).
+      g.fillStyle = "#ffffff";
+      g.textAlign = "left";
+      g.font = `600 ${Math.round(H * 0.032)}px -apple-system, system-ui, sans-serif`;
+      g.fillText("9:41", W * 0.05, H * 0.034);
+      g.textAlign = "right";
+      g.font = `${Math.round(H * 0.024)}px -apple-system, system-ui, sans-serif`;
+      g.fillText("▲○▮", W * 0.95, H * 0.032); // signal / wifi / battery, as plain glyphs
+      g.textAlign = "left";
+      const islandW = W * 0.3;
+      g.fillStyle = "#0a0a0c";
+      g.beginPath();
+      g.roundRect(W / 2 - islandW / 2, H * 0.048, islandW, H * 0.026, H * 0.013);
+      g.fill();
+      // two widgets
+      const gap = W * 0.045;
+      const wy = H * 0.1;
+      const wh = H * 0.165;
+      const ww = (W - gap * 3) / 2;
+      g.fillStyle = "rgba(20,30,45,0.55)";
+      g.beginPath();
+      g.roundRect(gap, wy, ww, wh, 8);
+      g.fill();
+      g.fillStyle = "#fff";
+      g.font = `600 ${Math.round(wh * 0.34)}px -apple-system, system-ui, sans-serif`;
+      g.fillText("18°", gap + 6, wy + wh * 0.5);
+      g.font = `400 ${Math.round(wh * 0.2)}px -apple-system, system-ui, sans-serif`;
+      g.fillText("Clear", gap + 6, wy + wh * 0.78);
+      g.fillStyle = "rgba(60,90,70,0.6)";
+      g.beginPath();
+      g.roundRect(gap * 2 + ww, wy, ww, wh, 8);
+      g.fill();
+      g.fillStyle = "rgba(255,255,255,0.85)";
+      g.beginPath();
+      g.arc(gap * 2 + ww + ww * 0.3, wy + wh * 0.4, wh * 0.16, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = "rgba(255,255,255,0.5)";
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(gap * 2 + ww + ww * 0.15, wy + wh * 0.8);
+      g.lineTo(gap * 2 + ww + ww * 0.85, wy + wh * 0.65);
+      g.stroke();
+      // 4x4 icon grid, each a flat glyph (circle / ring / bars / square) so
+      // every tile reads as a different app without copying one
+      const gridTop = wy + wh + H * 0.03;
+      const cols4 = 4;
+      const rows4 = 4;
+      const cell = (W - gap * (cols4 + 1)) / cols4;
+      const pitch = cell + gap;
+      const palette = ["#ff9f0a", "#30d158", "#0a84ff", "#ff453a", "#5e5ce6", "#ffd60a", "#64d2ff", "#ff375f"];
+      for (let r = 0; r < rows4; r++) {
+        for (let k = 0; k < cols4; k++) {
+          const ix = gap + k * pitch;
+          const iy = gridTop + r * (cell + gap * 0.9);
+          const tint = palette[(variant * 3 + r * cols4 + k) % palette.length];
+          g.fillStyle = tint;
+          g.beginPath();
+          g.roundRect(ix, iy, cell, cell, cell * 0.24);
+          g.fill();
+          g.fillStyle = "rgba(255,255,255,0.92)";
+          const glyph = (r * cols4 + k) % 4;
+          const cx = ix + cell / 2;
+          const cy = iy + cell / 2;
+          if (glyph === 0) {
+            g.beginPath();
+            g.arc(cx, cy, cell * 0.22, 0, Math.PI * 2);
+            g.fill();
+          } else if (glyph === 1) {
+            g.fillRect(cx - cell * 0.2, cy - cell * 0.2, cell * 0.4, cell * 0.4);
+          } else if (glyph === 2) {
+            g.beginPath();
+            g.moveTo(cx, cy - cell * 0.22);
+            g.lineTo(cx + cell * 0.2, cy + cell * 0.16);
+            g.lineTo(cx - cell * 0.2, cy + cell * 0.16);
+            g.closePath();
+            g.fill();
+          } else {
+            g.lineWidth = cell * 0.08;
+            g.strokeStyle = "rgba(255,255,255,0.92)";
+            g.beginPath();
+            g.arc(cx, cy, cell * 0.2, 0.3, Math.PI * 1.4);
+            g.stroke();
+          }
+        }
+      }
+      // search pill, then a dock of 4 icons
+      const dockY = H * 0.93;
+      g.fillStyle = "rgba(230,230,235,0.3)";
+      g.textAlign = "center";
+      g.beginPath();
+      g.roundRect(W * 0.3, dockY - H * 0.095, W * 0.4, H * 0.034, H * 0.017);
+      g.fill();
+      g.fillStyle = "rgba(255,255,255,0.8)";
+      g.font = `${Math.round(H * 0.02)}px -apple-system, system-ui, sans-serif`;
+      g.fillText("Search", W / 2, dockY - H * 0.073);
+      g.textAlign = "left";
+      g.fillStyle = "rgba(235,235,240,0.4)";
+      g.beginPath();
+      g.roundRect(gap * 0.6, dockY - H * 0.004, W - gap * 1.2, H * 0.085, 10);
+      g.fill();
+      const dockPitch = (W - gap * 1.2) / 4;
+      const dockColours = ["#30d158", "#0a84ff", "#34c759", "#ff453a"];
+      for (let i = 0; i < 4; i++) {
+        const ix = gap * 0.6 + i * dockPitch + dockPitch * 0.14;
+        const iy = dockY + H * 0.008;
+        const s = dockPitch * 0.72;
+        g.fillStyle = dockColours[i];
+        g.beginPath();
+        g.roundRect(ix, iy, s, s, s * 0.26);
+        g.fill();
+      }
       return;
     }
     // status bar and a grid of app tiles
@@ -188,6 +337,7 @@ export function PhoneDevice({
   rotY,
   colour,
   model,
+  screenMode = "home",
 }: {
   kind: "phone" | "watch" | "earbuds" | "headphones" | "speaker" | "airtag";
   x: number;
@@ -196,9 +346,10 @@ export function PhoneDevice({
   rotY: number;
   colour: string;
   model?: string;
+  screenMode?: ScreenMode;
 }) {
   const spec = kind === "phone" && model ? PHONE_MODELS[model] : undefined;
-  const plateauColour = useMemo(() => shade(colour, 0.88), [colour]);
+  const plateauColour = useMemo(() => shade(colour, 0.78), [colour]);
   const built = useMemo(() => (spec ? buildPhoneBody(spec, colour, plateauColour) : null), [spec, colour, plateauColour]);
   return (
     <group position={[x, y, z]} rotation={[0, rotY, 0]}>
@@ -220,7 +371,7 @@ export function PhoneDevice({
           )}
           <mesh position={[0, 0, spec.thickness / 2 + 0.0004]}>
             <planeGeometry args={[spec.width * 0.86, spec.length * 0.9]} />
-            <meshBasicMaterial map={screenTexture("phone", SCREEN_VARIANT(colour))} toneMapped={false} />
+            <meshBasicMaterial map={screenTexture("phone", SCREEN_VARIANT(colour), screenMode)} toneMapped={false} />
           </mesh>
           <mesh position={[0, -spec.length / 2 - 0.006, 0]}>
             <cylinderGeometry args={[0.05, 0.05, 0.012, 20]} />

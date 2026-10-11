@@ -1,6 +1,6 @@
 import { ComputerDevice } from "./computers.tsx";
 import type { Kind } from "./common.tsx";
-import { PhoneDevice } from "./phones.tsx";
+import { PhoneDevice, type ScreenMode } from "./phones.tsx";
 
 // One product on a surface at height `y`, facing along `rotY` (0 faces +z).
 // Each family is drawn by its own module: computers.tsx (laptops and tablets)
@@ -13,6 +13,7 @@ export function Device({
   rotY,
   colour,
   model,
+  screenMode,
 }: {
   kind: Kind;
   x: number;
@@ -21,9 +22,10 @@ export function Device({
   rotY: number;
   colour: string;
   model?: string;
+  screenMode?: ScreenMode;
 }) {
   if (kind === "laptop" || kind === "tabletKb" || kind === "tablet") {
     return <ComputerDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} />;
   }
-  return <PhoneDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} />;
+  return <PhoneDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} screenMode={screenMode} />;
 }

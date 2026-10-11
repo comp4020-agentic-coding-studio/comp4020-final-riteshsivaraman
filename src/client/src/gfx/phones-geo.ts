@@ -131,7 +131,7 @@ export const torus = (R: number, t: number, rs = 8, ts = 24, arc = Math.PI * 2) 
 // every phone model: a camera-plateau shape, its lenses and a button layout
 // drive the geometry, so a new model is a new spec, not new drawing code.
 
-export type PlateauShape = "full-width" | "square" | "none";
+export type PlateauShape = "square" | "none";
 
 export interface PhoneModelSpec {
   id: string;
@@ -141,22 +141,28 @@ export interface PhoneModelSpec {
   cornerRadius: number; // m
   plateau: {
     shape: PlateauShape;
-    height: number; // m, vertical extent of the plateau block
-    inset: number; // m from the top edge to the plateau's top edge
+    width: number; // m
+    height: number; // m
+    radius: number; // m, the plateau's own (large, "squircle") corner rounding
+    inset: number; // m from the body's top edge to the plateau's top edge
     thickness: number; // m, how far the plateau stands proud of the back
-    lensRadius: number; // m, outer ring radius
-    lensPositions: Array<[number, number]>; // offsets from the plateau centre, m
-    flashOffset?: [number, number]; // offset from the plateau centre, m
+    lenses: Array<{ pos: [number, number]; r: number }>; // offsets from the plateau centre, m; first lens drawn is the main (largest)
+    extras?: Array<{ pos: [number, number]; r: number; colour: string }>; // flash, LiDAR, mic holes etc, offsets from the plateau centre, m
   };
   buttons: Array<{ side: -1 | 1; y: number; len: number }>; // y: m from body centre, +ve toward the top edge
 }
 
-// iPhone 18 Pro (6.3"): 150.0 x 71.9 x 8.75 mm, aluminium unibody, full-width
-// camera plateau (thicker than the 17 Pro's, ~11.5 mm total over the plateau),
-// 3-lens triangle (main, ultra wide, telephoto) with flash/LiDAR to the right,
-// action button + camera control added to the classic volume/side buttons.
-// Source: apple.com/au/iphone-18-pro/specs, apple.com/au/shop/buy-iphone/iphone-18-pro,
-// macrumors.com/roundup/iphone-18-pro (plateau shape) — fetched 2026-10-12.
+// iPhone 18 Pro (6.3"): 150.0 x 71.9 x 8.75 mm, aluminium unibody. Corrected
+// 2026-10-12 against a real marketing photo Ritesh supplied (not a web
+// fetch — no URL to cite, flagged for the catalogue doc): the plateau is a
+// large rounded SQUARE in the top-left, not a full-width bar (that was a
+// pre-launch leak, apparently wrong, from macrumors.com/2025/02/13/
+// iphone-17-pro-camera-design-leak — keep for history, don't reuse). Lenses
+// sit in an L: a smaller ultra-wide top-left, the larger main lens
+// bottom-left, telephoto to its right at mid-height; flash top-right of the
+// cluster, a sensor dot below it. Pricing/screen size/materials still from
+// apple.com/au/iphone-18-pro/specs and apple.com/au/shop/buy-iphone/
+// iphone-18-pro, fetched 2026-10-12.
 export const IPHONE_18_PRO: PhoneModelSpec = {
   id: "iphone-18-pro",
   length: 0.15,
@@ -164,17 +170,26 @@ export const IPHONE_18_PRO: PhoneModelSpec = {
   thickness: 0.00875,
   cornerRadius: 0.011,
   plateau: {
-    shape: "full-width",
-    height: 0.034,
-    inset: 0.009,
+    shape: "square",
+    width: 0.0618,
+    height: 0.057,
+    radius: 0.018,
+    inset: 0.0045,
     thickness: 0.0027,
-    lensRadius: 0.0062,
-    lensPositions: [
-      [-0.013, 0.008],
-      [0.013, 0.008],
-      [0, -0.009],
+    // x signs here are chosen so the plateau reads correctly in a straight-on
+    // view of the BACK (DeviceStage's default) — that view mirrors left/right
+    // relative to the body's own +x (verified empirically: a positive local x
+    // lands on screen-left when looking at -z). Matched against Ritesh's
+    // reference photo of the real back, 2026-10-12.
+    lenses: [
+      { pos: [0.0198, 0.0143], r: 0.0048 }, // ultra wide, top-left in the photo
+      { pos: [0.0124, -0.0096], r: 0.0068 }, // main, bottom-left (largest)
+      { pos: [-0.0074, 0.0029], r: 0.0052 }, // telephoto, right-mid
     ],
-    flashOffset: [0.024, -0.006],
+    extras: [
+      { pos: [-0.0186, 0.0199], r: 0.0024, colour: "#eceae2" }, // flash
+      { pos: [-0.0186, 0.0103], r: 0.0013, colour: "#1c2430" }, // sensor
+    ],
   },
   buttons: [
     { side: -1, y: 0.038, len: 0.01 }, // action button
@@ -199,18 +214,20 @@ export function buildPhoneBody(spec: PhoneModelSpec, bodyColour: string, plateau
   p.add("matte", slab(W, L, T, R), bodyColour);
   const pl = spec.plateau;
   if (pl.shape !== "none") {
-    const plateauW = pl.shape === "full-width" ? W - 0.003 : pl.height + 0.01;
+    const plateauCx = W / 2 - pl.width / 2 - (W - pl.width) * 0.07; // hugs screen-left in the back view, a small margin in from that edge
     const plateauCy = L / 2 - pl.inset - pl.height / 2;
     const plateauCz = -(T / 2 + pl.thickness / 2);
-    p.add("matte", slab(plateauW, pl.height, pl.thickness, Math.min(R * 0.6, pl.height / 2, plateauW / 2)), plateauColour, [0, plateauCy, plateauCz]);
+    // the plateau is a visibly different finish from the body (two-tone
+    // back), not just a darker tint of the same material: glossier and a
+    // touch cooler, the way a polished vs bead-blasted aluminium patch reads.
+    p.add("gloss", slab(pl.width, pl.height, pl.thickness, pl.radius), plateauColour, [plateauCx, plateauCy, plateauCz]);
     const lensZ = -(T / 2 + pl.thickness + 0.0008);
-    for (const [lx, ly] of pl.lensPositions) {
-      p.add("gloss", cyl(pl.lensRadius, pl.lensRadius, 0.0016, 20), "#111318", [lx, plateauCy + ly, lensZ], [Math.PI / 2, 0, 0]);
-      p.add("gloss", cyl(pl.lensRadius * 0.52, pl.lensRadius * 0.52, 0.0018, 16), "#2c3c56", [lx, plateauCy + ly, lensZ - 0.0001], [Math.PI / 2, 0, 0]);
+    for (const l of pl.lenses) {
+      p.add("gloss", cyl(l.r, l.r, 0.0016, 20), "#111318", [plateauCx + l.pos[0], plateauCy + l.pos[1], lensZ], [Math.PI / 2, 0, 0]);
+      p.add("gloss", cyl(l.r * 0.52, l.r * 0.52, 0.0018, 16), "#2c3c56", [plateauCx + l.pos[0], plateauCy + l.pos[1], lensZ - 0.0001], [Math.PI / 2, 0, 0]);
     }
-    if (pl.flashOffset) {
-      const [fx, fy] = pl.flashOffset;
-      p.add("gloss", cyl(0.0024, 0.0024, 0.0012, 14), "#eceae2", [fx, plateauCy + fy, lensZ], [Math.PI / 2, 0, 0]);
+    for (const e of pl.extras ?? []) {
+      p.add("gloss", cyl(e.r, e.r, 0.0012, 14), e.colour, [plateauCx + e.pos[0], plateauCy + e.pos[1], lensZ], [Math.PI / 2, 0, 0]);
     }
   }
   for (const b of spec.buttons) {

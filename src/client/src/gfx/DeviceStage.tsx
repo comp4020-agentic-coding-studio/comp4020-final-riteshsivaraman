@@ -2,12 +2,14 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Device } from "./Device.tsx";
 import { DEVICE_COLOURS, WOOD, type Kind } from "./common.tsx";
+import type { ScreenMode } from "./phones.tsx";
 
 // Dev only (`?device=1`): one product alone on a plinth, for the per-model
 // look check (graphics-brief "check your work" step 3). Not the in-store
 // pose — the camera starts behind the device so a camera plateau or back
 // design reads clearly; drag to orbit. Query params: `kind` (default phone),
-// `model` (a PHONE_MODELS id), `colour` (hex), `yaw`/`pitch` (degrees) and
+// `model` (a PHONE_MODELS id), `colour` (hex), `screen` (`home` or `lock`,
+// switches the default camera to face front), `yaw`/`pitch` (degrees) and
 // `dist`/`h` (m) place a fixed camera for a headless screenshot.
 
 const Q = new URLSearchParams(location.search);
@@ -16,7 +18,8 @@ export function DeviceStage() {
   const kind = (Q.get("kind") ?? "phone") as Kind;
   const model = Q.get("model") ?? undefined;
   const colour = Q.get("colour") ?? DEVICE_COLOURS[0];
-  const yaw = ((Number(Q.get("yaw") ?? "200")) * Math.PI) / 180;
+  const screenMode = (Q.get("screen") as ScreenMode | null) ?? undefined;
+  const yaw = ((Number(Q.get("yaw") ?? (screenMode ? "20" : "200"))) * Math.PI) / 180;
   const pitch = ((Number(Q.get("pitch") ?? "-14")) * Math.PI) / 180;
   const dist = Number(Q.get("dist") ?? "0.4");
   const h = Number(Q.get("h") ?? "0.2");
@@ -34,12 +37,13 @@ export function DeviceStage() {
           <planeGeometry args={[1.2, 1.2]} />
           <meshStandardMaterial color={WOOD} roughness={0.55} />
         </mesh>
-        <Device kind={kind} model={model} x={0} y={0} z={0} rotY={0} colour={colour} />
+        <Device kind={kind} model={model} x={0} y={0} z={0} rotY={0} colour={colour} screenMode={screenMode} />
         <OrbitControls target={target} />
       </Canvas>
       {Q.get("ui") !== "0" && (
         <div style={{ position: "fixed", left: 16, top: 16, font: "13px system-ui", color: "#111", background: "#fffc", padding: "6px 10px", borderRadius: 8 }}>
           {model ?? `${kind} (no model)`} · {colour}
+          {screenMode ? ` · ${screenMode} screen` : ""}
         </div>
       )}
     </>
