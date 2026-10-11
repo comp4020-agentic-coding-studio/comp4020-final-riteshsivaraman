@@ -11,6 +11,10 @@ import {
   Matrix4,
   MeshStandardMaterial,
   Quaternion,
+  NearestFilter,
+  DataTexture,
+  MeshToonMaterial,
+  RedFormat,
   Skeleton,
   SkinnedMesh,
   SphereGeometry,
@@ -20,7 +24,7 @@ import {
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Appearance } from "../../../shared/appearance.ts";
-import { buildHead } from "./head-geo.ts";
+import { buildHead, type HeadShape } from "./head-geo.ts";
 
 // A whole person as ONE skinned mesh: one draw call, about 3,000 triangles, a
 // 16-bone skeleton. Every part is rigidly bound to one bone (no blending),
@@ -33,11 +37,29 @@ import { buildHead } from "./head-geo.ts";
 // Shoulders against hips comes from `shoulderHip` in the appearance.
 // Metres, y up, the figure faces -z. About 1.72 m tall whatever the style.
 
-export type BodyStyle = "canon" | "natural" | "friendly" | "sturdy";
-export type EyeStyle = "soft" | "dots" | "glossy" | "lidded" | "almond";
+export type BodyStyle = "friendly" | "natural" | "canon" | "sturdy" | "toon" | "chibi";
+export type EyeStyle = "dots" | "soft" | "glossy" | "lidded" | "almond" | "bean" | "round" | "sparkle" | "happy";
+export type FaceShape = "auto" | "oval" | "round" | "square" | "heart" | "long" | "diamond" | "pear";
+export type Shading = "flat" | "toon";
 
-export const BODY_STYLES: BodyStyle[] = ["natural", "canon", "friendly", "sturdy"];
-export const EYE_STYLES: EyeStyle[] = ["soft", "dots", "glossy", "lidded", "almond"];
+export const BODY_STYLES: BodyStyle[] = ["friendly", "natural", "canon", "sturdy", "toon", "chibi"];
+export const EYE_STYLES: EyeStyle[] = ["dots", "soft", "glossy", "lidded", "almond", "bean", "round", "sparkle", "happy"];
+export const FACE_SHAPES: FaceShape[] = ["auto", "oval", "round", "square", "heart", "long", "diamond", "pear"];
+export const SHADINGS: Shading[] = ["flat", "toon"];
+
+// Each face shape is a set of head parameters (see head-geo.ts); the person's
+// own appearance then nudges them a little, so two square faces differ.
+// jaw is how much the lower face tapers (0 is a straight-sided jaw).
+const FACES: Record<Exclude<FaceShape, "auto">, Omit<HeadShape, "nose">> = {
+  oval: { width: 1.0, height: 1.0, square: 0.0, forehead: 0.0, jaw: 1.0, brow: 1.0, cheek: 1.0, chin: 1.0 },
+  round: { width: 1.15, height: 0.9, square: 0.0, forehead: 0.05, jaw: 0.35, brow: 0.8, cheek: 1.35, chin: 0.7 },
+  square: { width: 1.1, height: 0.96, square: 1.0, forehead: 0.06, jaw: 0.0, brow: 1.25, cheek: 0.75, chin: 1.2 },
+  heart: { width: 1.0, height: 1.02, square: 0.0, forehead: 0.2, jaw: 1.9, brow: 0.95, cheek: 0.85, chin: 1.3 },
+  long: { width: 0.88, height: 1.2, square: 0.3, forehead: 0.0, jaw: 0.7, brow: 1.0, cheek: 0.75, chin: 1.0 },
+  diamond: { width: 0.98, height: 1.03, square: 0.0, forehead: -0.17, jaw: 1.6, brow: 0.95, cheek: 1.7, chin: 1.1 },
+  pear: { width: 1.04, height: 0.97, square: 0.6, forehead: -0.2, jaw: 0.0, brow: 0.85, cheek: 0.95, chin: 1.0 },
+};
+const FACE_KEYS = Object.keys(FACES) as Array<Exclude<FaceShape, "auto">>;
 
 // head: size of the head against the figure-drawing canon (1 is about 8 heads
 // tall, 1.16 about 6.9, 1.34 about 6); girth: width of the frame; limb: arms.
@@ -46,6 +68,8 @@ const BODY: Record<BodyStyle, { head: number; girth: number; limb: number }> = {
   natural: { head: 1.16, girth: 0.98, limb: 0.97 },
   friendly: { head: 1.34, girth: 1.0, limb: 0.9 },
   sturdy: { head: 1.2, girth: 1.14, limb: 0.96 },
+  toon: { head: 1.58, girth: 1.06, limb: 0.82 }, // about 5 heads: a cartoon proportion
+  chibi: { head: 1.95, girth: 1.12, limb: 0.7 }, // about 4 heads: all head
 };
 
 // Head-local, from the middle of the head.
@@ -92,11 +116,23 @@ export interface Character {
   look: Appearance;
   body: BodyStyle;
   eyes: EyeStyle;
+  face: Exclude<FaceShape, "auto">;
   heads: number; // how many heads tall
   lidBias: number; // some eye styles sit with the lids a little lower
 }
 
 const SIDES = [-1, 1] as const;
+
+// Three flat bands of light, so the shading steps like a cartoon.
+let ramp: DataTexture | null = null;
+function toonRamp(): DataTexture {
+  if (ramp) return ramp;
+  ramp = new DataTexture(new Uint8Array([105, 175, 255]), 3, 1, RedFormat);
+  ramp.minFilter = NearestFilter;
+  ramp.magFilter = NearestFilter;
+  ramp.needsUpdate = true;
+  return ramp;
+}
 
 function prep(geo: BufferGeometry, bone: number, color: Color | null, m?: Matrix4): BufferGeometry {
   const g = geo.index ? geo.toNonIndexed() : geo.clone();
@@ -209,10 +245,31 @@ function browGeo(innerSign: number, len: number, thick: number): BufferGeometry 
 export function buildCharacter(
   look: Appearance,
   shirtHex: string,
-  opts: { body?: BodyStyle; eyes?: EyeStyle } = {},
+  opts: { body?: BodyStyle; eyes?: EyeStyle; face?: FaceShape; shading?: Shading } = {},
 ): Character {
-  const bodyStyle = opts.body ?? "natural";
-  const eyeStyle = opts.eyes ?? "soft";
+  const bodyStyle = opts.body ?? "friendly";
+  const eyeStyle = opts.eyes ?? "dots";
+  // "auto" picks a shape from the person, so a crowd has all of them
+  const faceKey: Exclude<FaceShape, "auto"> =
+    !opts.face || opts.face === "auto" ? FACE_KEYS[Math.floor(look.jaw * 997 + look.cheek * 131) % FACE_KEYS.length] : opts.face;
+  const fs = FACES[faceKey];
+  const jit = 0.92 + 0.16 * ((look.jaw - 0.55) / 0.55); // 0.92 to 1.08, from the person
+  const shape: HeadShape = {
+    width: look.faceWidth * fs.width,
+    height: fs.height,
+    square: fs.square,
+    forehead: fs.forehead,
+    jaw: fs.jaw * jit,
+    brow: fs.brow * look.brow,
+    nose: look.noseSize,
+    cheek: fs.cheek * Math.min(1.2, look.cheek),
+    chin: fs.chin * Math.min(1.2, look.chin),
+  };
+  const fw = shape.width;
+  const Fy = shape.height;
+  const eyeY = EYE.y * Fy;
+  const browY = BROW.y * Fy;
+  const mouthY = MOUTH.y * Fy;
   const style = BODY[bodyStyle];
   const skin = new Color(look.skin);
   const shirt = new Color(shirtHex);
@@ -258,14 +315,14 @@ export function buildCharacter(
     list.push(b);
     return b;
   };
-  const eyeX = 0.034 * look.eyeSpacing * look.faceWidth;
+  const eyeX = 0.034 * look.eyeSpacing * fw;
   const root = mk("root", 0, Y(0.9), 0, null);
   const spine = mk("spine", 0, Y(0.95), 0, root);
   const head = mk("head", 0, N, 0, spine);
-  const browBones = SIDES.map((s) => mk(`brow${s}`, ...hp(s * eyeX, BROW.y, BROW.z), head)) as [Bone, Bone];
-  const lids = mk("lids", ...hp(0, EYE.y, EYE.z), head);
-  const mouth = mk("mouth", ...hp(0, MOUTH.y, MOUTH.z), head);
-  const mouthOpen = mk("mouthOpen", ...hp(0, MOUTH.y - 0.002, MOUTH.z), head);
+  const browBones = SIDES.map((s) => mk(`brow${s}`, ...hp(s * eyeX, browY, BROW.z), head)) as [Bone, Bone];
+  const lids = mk("lids", ...hp(0, eyeY, EYE.z), head);
+  const mouth = mk("mouth", ...hp(0, mouthY, MOUTH.z), head);
+  const mouthOpen = mk("mouthOpen", ...hp(0, mouthY - 0.002, MOUTH.z), head);
 
   // arms hang a little away from the body, like a person standing at ease
   const aUp = 0.1;
@@ -366,14 +423,14 @@ export function buildCharacter(
 
   // head, with hair painted on and the ears built into it
   const headGeo = buildHead(
-    { width: look.faceWidth, jaw: look.jaw, brow: look.brow, nose: look.noseSize, cheek: look.cheek, chin: look.chin },
+    shape,
     look.hairStyle,
     look.hairColour,
     look.skin,
   );
   add(headGeo, head, null, hm());
   for (const s of SIDES) {
-    add(new IcosahedronGeometry(0.026, 1), head, skin, hm(s * 0.081 * look.faceWidth, -0.012, 0.006, sc(0.4, 1, 0.75)));
+    add(new IcosahedronGeometry(0.026, 1), head, skin, hm(s * 0.081 * fw, -0.012 * Fy, 0.006, sc(0.4, 1, 0.75)));
   }
   const hair = new Color(look.hairColour);
   if (look.hairStyle === "long") {
@@ -396,23 +453,59 @@ export function buildCharacter(
       const g = new CircleGeometry(rho * eyeR, 10);
       g.scale(1, o.sy ?? 1, 1);
       g.rotateY(Math.PI);
-      add(g, head, c, hm(ex + (o.dx ?? 0), EYE.y + (o.dy ?? 0), EYE.z + front(rho) - (o.lift ?? 0)));
+      add(g, head, c, hm(ex + (o.dx ?? 0), eyeY + (o.dy ?? 0), EYE.z + front(rho) - (o.lift ?? 0)));
     };
+    const oval = (w: number, h: number, c: Color, dx = 0, dy = 0, lift = 0): void => {
+      const g = new CircleGeometry(1, 14);
+      g.scale(w, h, 1);
+      g.rotateY(Math.PI);
+      add(g, head, c, hm(ex + dx, eyeY + dy, EYE.z - eyeR * 0.82 - lift));
+    };
+    const spot = (r: number, dx: number, dy: number, lift: number): void => {
+      const g = new CircleGeometry(r, 8);
+      g.rotateY(Math.PI);
+      add(g, head, white, hm(ex + dx, eyeY + dy, EYE.z - eyeR * 0.82 - lift));
+    };
+    const ink = new Color("#241c19");
     if (eyeStyle === "dots") {
       // two dark ovals and a spark: nothing in them to be unsettled by
       lashTube = 0.0012;
-      const g = new CircleGeometry(1, 12);
-      g.scale(0.0072 * look.eyeSize, 0.0098 * look.eyeSize, 1);
-      g.rotateY(Math.PI);
-      add(g, head, new Color("#241c19"), hm(ex, EYE.y, EYE.z - eyeR * 0.82));
-      const spark = new CircleGeometry(0.0022, 8);
-      spark.rotateY(Math.PI);
-      add(spark, head, white, hm(ex + s * -0.0022, EYE.y + 0.0035, EYE.z - eyeR * 0.82 - 0.0008));
+      oval(0.0072 * look.eyeSize, 0.0098 * look.eyeSize, ink);
+      spot(0.0022, s * -0.0022, 0.0035, 0.0008);
+    } else if (eyeStyle === "bean") {
+      // tall dark ovals, a classic cartoon eye
+      lashTube = 0.0012;
+      oval(0.0062 * look.eyeSize, 0.0135 * look.eyeSize, ink);
+      spot(0.0024, s * -0.002, 0.0055, 0.0008);
+    } else if (eyeStyle === "sparkle") {
+      // big dark eyes with a coloured glow low in them and two highlights
+      lashTube = 0.0013;
+      oval(0.0088 * look.eyeSize, 0.0125 * look.eyeSize, ink);
+      oval(0.0066 * look.eyeSize, 0.0078 * look.eyeSize, iris.clone().multiplyScalar(0.9), 0, -0.0026, 0.0006);
+      spot(0.0036, s * -0.0034, 0.0045, 0.0014);
+      spot(0.0017, s * 0.0032, -0.0042, 0.0014);
+    } else if (eyeStyle === "happy") {
+      // closed, smiling eyes: an upward arch for each
+      const arch = new TorusGeometry(0.0085 * look.eyeSize, 0.0013, 3, 8, Math.PI * 0.85);
+      arch.rotateZ(Math.PI / 2 - Math.PI * 0.425);
+      add(arch, head, ink, hm(ex, eyeY - 0.0035, EYE.z - eyeR * 0.82));
+    } else if (eyeStyle === "round") {
+      // big white eyes with a plain dot for the pupil
+      lashTube = 0.0012;
+      const big = eyeR * 1.3;
+      add(new SphereGeometry(big, 12, 8), head, white.clone().multiplyScalar(1.75), hm(ex, eyeY, EYE.z - 0.001));
+      const pupil = new CircleGeometry(big * 0.4, 10);
+      pupil.rotateY(Math.PI);
+      add(pupil, head, ink, hm(ex + s * 0.0006, eyeY, EYE.z - 0.001 + front(0.4, big) - 0.0004));
+      const gl = new CircleGeometry(big * 0.13, 8);
+      gl.rotateY(Math.PI);
+      add(gl, head, white, hm(ex + s * -0.0016, eyeY + 0.0028, EYE.z - 0.001 + front(0.4, big) - 0.0012));
     } else {
+      // soft, glossy, lidded and almond share an eyeball and a lid
       // the socket and lid shade the white of the eye, so it is pushed past 1.0
       const ballColour = new Color(eyeStyle === "glossy" ? "#f7f4ef" : "#f2ede7").multiplyScalar(1.75);
       const squash = eyeStyle === "almond" ? sc(1.1, 0.78, 1) : undefined;
-      add(new SphereGeometry(eyeR, 12, 8), head, ballColour, hm(ex, EYE.y, EYE.z, squash));
+      add(new SphereGeometry(eyeR, 12, 8), head, ballColour, hm(ex, eyeY, EYE.z, squash));
       if (eyeStyle === "glossy") {
         lashTube = 0.0011;
         disc(0.8, dark(iris, 0.62), { lift: 0.0003, sy: 1.1 });
@@ -435,24 +528,24 @@ export function buildCharacter(
   }
   // nostrils under the tip of the nose
   for (const s of SIDES) {
-    add(new SphereGeometry(0.0034, 5, 4), head, dark(skin, 0.45), hm(s * 0.0072 * look.noseSize, -0.0425, -0.1035, sc(1, 0.6, 1)));
+    add(new SphereGeometry(0.0034, 5, 4), head, dark(skin, 0.45), hm(s * 0.0072 * look.noseSize, -0.0425 * Fy, -0.1035, sc(1, 0.6, 1)));
   }
 
   // lids: a cap over each eye and a dark lash line along its rim
-  const rim = 1.08 * eyeR;
+  const rim = 1.08 * (eyeStyle === "round" ? eyeR * 1.3 : eyeR);
   for (const s of SIDES) {
     const ex = s * eyeX;
-    add(new SphereGeometry(rim, 12, 6, 0, Math.PI * 2, 0, 0.95), lids, skin, hm(ex, EYE.y, EYE.z));
+    add(new SphereGeometry(rim, 12, 6, 0, Math.PI * 2, 0, 0.95), lids, skin, hm(ex, eyeY, EYE.z));
     const lash = new TorusGeometry(rim * Math.sin(0.95), lashTube, 3, 12);
     lash.rotateX(Math.PI / 2);
-    add(lash, lids, new Color("#1c1512"), hm(ex, EYE.y + rim * Math.cos(0.95), EYE.z));
+    add(lash, lids, new Color("#1c1512"), hm(ex, eyeY + rim * Math.cos(0.95), EYE.z));
   }
 
   // brows, in the hair colour a little deeper
   const browColour = new Color(look.browColour).multiplyScalar(0.8);
   for (let i = 0; i < 2; i++) {
     const s = SIDES[i];
-    add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, BROW.y, BROW.z));
+    add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, browY, BROW.z));
   }
 
   // lips: an upper and a fuller lower arc that scale together into a smile or
@@ -460,16 +553,19 @@ export function buildCharacter(
   const arc = (radius: number, tubeR: number, colour: string, dy: number): void => {
     const t = new TorusGeometry(radius, tubeR, 4, 12, 1.2);
     t.rotateZ(-Math.PI / 2 - 0.6);
-    add(t, mouth, new Color(colour), hm(0, MOUTH.y + radius + dy, MOUTH.z));
+    add(t, mouth, new Color(colour), hm(0, mouthY + radius + dy, MOUTH.z));
   };
   arc(0.024, 0.0032, "#a8514f", 0.0014);
   arc(0.026, 0.0046, "#c46a66", -0.0022);
-  add(new SphereGeometry(0.008, 8, 6), mouthOpen, new Color("#4a1c20"), hm(0, MOUTH.y - 0.002, MOUTH.z + 0.0015));
+  add(new SphereGeometry(0.008, 8, 6), mouthOpen, new Color("#4a1c20"), hm(0, mouthY - 0.002, MOUTH.z + 0.0015));
 
   // ---- one mesh, one skeleton ----
   const merged = mergeGeometries(geos);
   if (!merged) throw new Error("character parts have mismatched attributes");
-  const material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
+  const material =
+    opts.shading === "toon"
+      ? new MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp() })
+      : new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
   const mesh = new SkinnedMesh(merged, material);
   mesh.frustumCulled = false;
   mesh.add(root);
@@ -485,6 +581,7 @@ export function buildCharacter(
     look,
     body: bodyStyle,
     eyes: eyeStyle,
+    face: faceKey,
     heads: 1.72 / (0.216 * S),
     lidBias,
   };

@@ -22,13 +22,16 @@ const smooth = (a: number, b: number, x: number): number => {
 
 export interface HeadShape {
   width: number;
+  height: number; // long or short face
+  square: number; // 0 round, 1 boxy: flattens the sides and the jaw
+  forehead: number; // wider (+) or narrower (-) across the forehead
   jaw: number;
   brow: number;
   nose: number;
   cheek: number;
   chin: number;
 }
-export const TYPICAL_HEAD: HeadShape = { width: 1, jaw: 1, brow: 1, nose: 1, cheek: 1, chin: 1 };
+export const TYPICAL_HEAD: HeadShape = { width: 1, height: 1, square: 0, forehead: 0, jaw: 1, brow: 1, nose: 1, cheek: 1, chin: 1 };
 
 // Where the hair stops, as a height on the unit sphere, at the front, the side
 // (above the ears) and the back. null is no hair.
@@ -86,9 +89,16 @@ export function buildHead(shape: HeadShape, hair: HairStyle, hairHex: string, sk
     const inside = smooth(-0.02, 0.1, hairMargin(nx, ny, nz, hair));
     const bump = hair === "curly" ? 0.006 * (0.5 + 0.5 * Math.sin(nx * 15 + 1) * Math.sin(ny * 13 + 2) * Math.sin(nz * 14 + 3)) : 0;
     const off = features(nx, ny, nz, shape) + inside * (0.007 + bump);
-    out[i * 3] = nx * HALF_W * shape.width * taper + nx * off;
-    out[i * 3 + 1] = ny * HALF_H + ny * off;
-    out[i * 3 + 2] = nz * HALF_D + nz * off;
+    // squareness pushes the sides and the jaw out towards a box, mostly low
+    // down; forehead width scales the upper half
+    const wq = shape.square * (0.3 + 0.7 * smooth(0.3, -0.6, ny));
+    const boxy = (v: number): number => Math.sign(v) * Math.pow(Math.abs(v), 0.5);
+    const px = nx * (1 - wq) + boxy(nx) * wq;
+    const pz = nz * (1 - wq) + boxy(nz) * wq;
+    const fx = 1 + shape.forehead * smooth(0.0, 0.7, ny);
+    out[i * 3] = px * HALF_W * shape.width * taper * fx + nx * off;
+    out[i * 3 + 1] = ny * HALF_H * shape.height + ny * off;
+    out[i * 3 + 2] = pz * HALF_D + nz * off;
   }
   // one colour per triangle, by where its centre is, so the facets stay crisp
   for (let t = 0; t < pos.count; t += 3) {
