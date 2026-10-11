@@ -10,6 +10,54 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## Current state: store project (branch `new-idea`, as of 2026-10-11)
+
+Nothing from Seen is carried over (D1, `b61f6c7`). Scope and decisions D1 to
+D24 are in `SCOPE.md`; this section is only "where did we leave off."
+
+**Built** (all from the commit log, 2026-10-10 to 10-11; not re-run this
+session):
+- Server: Hono + ws presence server, SQLite with numbered migrations
+  (`src/server/migrate.ts`, migration 1 = `visitors` + `events`), visitors
+  by token, join/leave/role logged to `events`.
+- Shared model in `src/shared/`: plan, world, mall, layout (`layout.json`),
+  people, npcs, pose, protocol, blueprint, homography. Server, 3D and checks
+  read the same data (D20).
+- Client: first-person scene, people and NPCs, mall around the shop, dev
+  role switch (D16), collision between people.
+- Shop at 12 x 18.2 m under a 3 m wall (D21 to D24): 4 + 1 tables per side
+  column, bar, back room, bays.
+- Tools: rectify tool for the reference photos, layout editor
+  (`pnpm layout`), `pnpm dev`, blueprint drawings and PDF in `docs/blueprint/`.
+- Graphics modules under `src/client/src/gfx/`: phones, computers,
+  furniture, shell (`562c87f` to `c8ba10a`), built to `docs/graphics-brief.md`.
+- 12 test files in `spec/` (backroom, blueprint, homography, invariants,
+  layout, mall, migrate, npcs, people, pose, presence, world).
+
+**Not started or not verified** (inferred from the code and commit log, so
+check before relying on it):
+- Genius Bar queue, slots, stock, budget, the device interaction and its
+  persistent trace: SCOPE Tier 1 items 6, 10, 11 are not visibly built.
+  `events` only logs join/leave/role.
+- Whether the Fly app is still serving Seen, or the store: not checked.
+- `pnpm check` and `pnpm check:evidence` status on this branch: not run.
+
+**Still open** (from SCOPE.md): brand name `[TK]`, occupancy cap (D12),
+creatures vs humans spike (D11), AI boundary (D8), budget source, what the
+device trace is. No ADR yet for the stack or for D8.
+
+**Docs that still describe Seen:** `README.md`, `PROCESS.md`,
+`reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
+`.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
+README and PROCESS are Ritesh's prose.
+
+---
+
+# Seen history (branch `main`)
+
+Everything below is the log for the Seen email app, kept for the commit
+citations in PROCESS.md and LEARNINGS.md. It does not describe `new-idea`.
+
 ## Live-preview banner made global (2026-10-07)
 
 Fixed the reported bug: the live-draft preview (ADR 2, `d8a87f2`) only
@@ -134,7 +182,7 @@ hit (`pnpm build` after editing client source, since `pnpm start` serves
 the gitignored `static/` dir, not a dev server) is already documented in
 CLAUDE.md's "Known gotchas."
 
-## Next session should
+## Next session should (Seen, as of 2026-10-07)
 
 1. Confirm the Fly token is still valid (`mise exec -- flyctl status -a
    comp4020-final-riteshsivaraman`), then `flyctl deploy --remote-only

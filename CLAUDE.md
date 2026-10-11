@@ -1,12 +1,19 @@
-# Seen — agent harness
+# Store sim — agent harness
 
-Cursed email app, COMP4020 final project. Theme: someone's always watching.
-Full spec and decisions: not in this repo — see PROCESS.md for what's
-recorded here; the rest stays in the brainstorm folder's history.
+COMP4020 final project, branch `new-idea`: an obvious parody of a famous
+fruit-themed retail store, as a shared first-person 3D shop (React Three
+Fiber client, Hono + ws + SQLite server). Real visitors and CPU players share
+one room, and the Genius Bar queue is the shared state. Brand name is `[TK]`.
+Scope, decisions D1 to D24, tiers and open items: `SCOPE.md`.
+
+**`main` is a different app** (Seen, the cursed email client, deployed
+earlier). `new-idea` replaced it wholesale in `b61f6c7`; nothing is carried
+over (D1). Anything below that says "Seen" is history on `main`, and the
+Seen-only agents and ADRs are flagged where they appear.
 
 ## Don't invent, don't guess through ambiguity
 No made-up copy, stats, sources, or feature details. If a decision isn't
-pinned (see seen-spec's "open" items), mark it `[TK]` and ask rather than
+pinned (see `SCOPE.md`'s `[TK]` items and open decisions), mark it `[TK]` and ask rather than
 guessing plausibly. This extends to implementation: never build through an
 ambiguous requirement by picking the most plausible reading and proceeding —
 stop and ask. A wrong guess built on top of other code is more expensive to
@@ -16,48 +23,62 @@ For a decision affecting multiple users or expensive to reverse (per the week
 8 lecture: stack, user/person definition, persistence, real-time mechanism —
 see the ADR note below), lay out the real options and their costs first,
 without picking one, and let Ritesh choose before anything gets built or
-written up. Don't collapse straight to a recommendation on these.
+written up. Don't collapse straight to a recommendation on these. Once he
+chooses, record it in `SCOPE.md`'s decision table with the date.
 
 ## Event log is load-bearing
-Every user action (send, open, draft edit, forward, contribute, destroy)
-writes an `events` row first. Stats, sorts, the C10 "creepy mirror", and any
-debugging of "did this actually happen" all read this table — don't build a
-feature's effect without also logging the event that caused it. This is also
-the one invariant a reviewer pass checks across every subsystem (see "How we
-work" below): did every state-changing action write its event row.
+Every state-changing action (today: join, leave, role switch in
+`src/server/presence.ts`; later queue join/leave, slot booking, stock
+changes, device interactions) writes an `events` row (`ts, visitor_id, type,
+data`, table from migration 1 in `src/server/migrate.ts`) first. The crit 10
+server-log reads, and any debugging of "did this actually happen", read this
+table — don't build a feature's effect without also logging the event that
+caused it. This is the one invariant a reviewer pass checks across every
+subsystem (see "How we work" below): did every state-changing action write
+its event row. Presence positions (about 10 Hz) are never persisted and are
+not events.
 
 ## No background processes
 The Fly machine stops when nobody's connected (`auto_stop_machines =
 "stop"`, `min_machines_running = 0`). Never rely on `setInterval`/`setTimeout`
-for anything that must happen (auto-send, self-destruct). Store the deadline
-as a column and catch up on the next request that touches it.
+for anything that must happen. CPU players and staff are a pure function of
+server time plus persisted state (SCOPE.md Tier 1 item 7); a deadline such as
+a slot expiry or closing time is a stored column caught up on the next
+request that touches it, never a timer. The presence loop only exists while
+someone is connected.
 
 ## Verification: checked for real, not reported
-- **Feel, not just function.** Seen's whole value is a feel (anxiety, the
-  slow creep of being watched) that `pnpm check` cannot measure. A harness
+- **Feel, not just function.** The store's whole value is a feel (the
+  calm, hotel-lobby intent against the lived queue; satisfaction and
+  frustration both simulated end to end, SCOPE.md 0b) that `pnpm check`
+  cannot measure. A harness
   that only checks stills (screenshots, static DOM, settled-state asserts)
   makes the quality nothing measures decay to zero. No feature is done until
-  someone has sat in two browser tabs as two different users and felt the
-  thing happen — not just read a green test name. Every checkpoint asks two
+  someone has sat in two browser profiles as two different visitors, at 1920x1080
+  and 390x844, and felt the thing happen — not just read a green test name. Every checkpoint asks two
   separate questions: is it broken (automated) vs how does it feel (human,
   live, never a described screenshot).
 - **State claims get checked against the real thing.** "Did it save?" means
   opening the actual SQLite file (`/data/app.db` in the container, or the
   local `.data/` path) directly, never trusted from the agent's own report.
-  "A stranger can't see X" means a second, genuinely different browser
-  session (not the owner's own session re-rendered) confirms it's actually
-  hidden — recipients, attachments, and quoted thread on a public draft,
-  specifically.
+  "A visitor can't do X" means a second, genuinely different browser
+  profile (not the same session re-rendered, and not a second tab of one
+  profile, which shares the cookie jar) confirms it — the back room being
+  staff-only (D18, enforced by server clamping), and an out-of-stock
+  configuration being unbuyable, specifically.
 - **Sensor admission bar.** A check only goes into the blocking `pnpm check`
   suite if it's specific, fast, automatic, and trustworthy. Anything fuzzier
   stays advisory (or becomes a manual crit-time check) instead of being
-  forced into a flaky gate. Voice-escalation timing and "does this feel
-  anxiety-inducing" are the canonical advisory-only examples — don't try to
-  assert those in `spec/`.
-- **Spec traceability.** seen-spec.md section 13 lists the candidate checks.
-  Every one of them either has a matching `spec/*.test.ts`, or an explicit
-  note in PROCESS.md saying why it's advisory-only — don't let one quietly
-  fall off the list under deadline pressure.
+  forced into a flaky gate. Whether a wait "feels" frustrating or the room feels calm and
+  crowded are the canonical advisory-only examples — don't try to assert those
+  in `spec/`. The drawings-match-the-model check (D20) is the opposite kind:
+  specific, fast, blocking.
+- **Spec traceability.** `SCOPE.md` section 3d lists the end-to-end
+  scenarios (S1 to S11), and each Tier 1 one is meant to be a scripted-bot
+  check in `spec/` over the real protocol. Each either has a matching
+  `spec/*.test.ts`, or an explicit note in PROCESS.md saying why it's
+  advisory-only — don't let one quietly fall off the list under deadline
+  pressure. (Adapted from the Seen rule; confirm this is how you want it.)
 - **Cut the feature, never cut the harness.** When behind schedule, the
   answer is smaller scope, not a skipped feel-check or a merged red test.
   The verification discipline above is the thing that doesn't flex.
@@ -67,10 +88,11 @@ When something's wrong: report the symptom, not your diagnosis of it. Add
 the failing sensor before attempting the fix, and confirm it's red for the
 right reason. Name the bug class, not just the instance. For code written
 without Ritesh watching it get written, mutate it afterward to confirm the
-suite would actually catch it broken — apply this especially to the
-auto-send/self-destruct catch-up timers and the draft-visibility rules,
-since a subtly wrong implementation there looks identical to a correct one
-in every normal run.
+suite would actually catch it broken — apply this especially to
+the server-authoritative rules where a subtly wrong implementation looks
+identical to a correct one in every normal run: queue and slot booking,
+finite stock (two visitors racing for the last unit, S11), the occupancy cap,
+and the staff-only back-room clamp.
 
 ## Git hygiene and dependencies
 Commit regularly: after each coherent working change, and before
@@ -89,17 +111,21 @@ Draft structure, fact lists, and `[TK]` markers for gaps — never finished
 paragraphs standing in for his account. (The brief warns agent-written docs
 read like the crit agents' median answer.)
 
-## Fiction integrity
-Before shipping, a fresh subagent with no prior context in this session
-reviews the live app purely as a stranger would, flagging anything that
-breaks the cover (stray real company names, visible COMP4020/crit/marker
-language inside the app itself, placeholder copy that doesn't read as a
-boring normal email client). Scoped to in-app copy and the company name —
-the repo's own docs (README/PROCESS/reflections) are expected to say it's a
-COMP4020 project.
+## Parody integrity
+This is an *obvious* spoof (D6), not a discreet lookalike. No real
+company's name, logo, product name or distinctive mark anywhere in code,
+textures, signs or copy; invent the marks and names, or use generic words
+("PHONE", "WATCH"). Everything is procedural: no downloaded models,
+textures or fonts (`docs/graphics-brief.md`). Never presented as official.
+Before shipping, a fresh subagent with no prior context reviews the live app
+for stray real names and for visible COMP4020/crit/marker language inside
+the app itself. The repo's own docs are expected to say it's a COMP4020
+project. **`.claude/agents/fiction-integrity-reviewer.md` is still written
+for Seen's "boring email client" cover and needs rewriting before use here.**
 
 ## Keys never touch this repo
-Gemini key (and anything else secret) goes in Fly secrets
+Gemini key (D8, runtime AI with a fallback; boundary still open) and
+anything else secret goes in Fly secrets
 (`fly secrets set`), never in a file, never asked for in chat.
 
 ## Session handoff
@@ -129,38 +155,53 @@ find every resource by reading this file, not by discovering it mid-task.
 - `reflections/crit-{8,9,10}.md` — the two standing crit prompts, one file
   per crit, Ritesh's prose.
 - `spec/README.md` — what's fixed (the two invariants) vs what's Seen's own.
-- `docs/adr/0001-stack.md` — ADR 1 (Hono + Preact SPA vs crit-7 fallback).
-  Facts filled in; narrative sections are `[TK]` for Ritesh. Read everything
-  in `docs/adr/` before changing stack, storage, or the data model — an
-  accepted record is never edited; a changed decision gets a new, numbered
-  record that supersedes it and says why.
-- `docs/adr/0002-live-preview-transport.md` — ADR 2: SSE for the one-way
-  live-preview broadcast, a deliberate split from (not a reversal of) ADR
-  1's WS+Yjs plan, which stays reserved for the board's multi-editor merge.
+- `SCOPE.md` — the store project's scope: the one idea, decisions D1 to
+  D24, tiers, staff roles, scenarios, open items. The nearest thing to a
+  spec; read it before building anything.
+- `docs/adr/0001-stack.md`, `docs/adr/0002-live-preview-transport.md` —
+  **both are Seen's** (Preact SPA, SSE draft preview), kept as history. The
+  `new-idea` stack (React Three Fiber, Hono + ws, SQLite via better-sqlite3)
+  has **no ADR yet**, nor does D8's reversal of "no runtime AI". Write one
+  before changing stack, storage, or the data model. An accepted record is
+  never edited; a changed decision gets a new, numbered record that
+  supersedes it and says why.
+- `docs/blueprint/` — the floor plan, four wall elevations, ceiling and mall
+  drawings (D20: the drawings are the specification), drawn from
+  `src/shared/plan.ts`, `world.ts` and `mall.ts`.
+- `src/shared/` — the model every layer reads (layout, plan, world, mall,
+  people, npcs, pose, protocol). Graphics work draws on it, never moves it.
+- `references/` — photos, visitor accounts, the experience and reel notes,
+  product notes. `references/README.md` says what each is.
 - `docs/design-handoff.md` — the visual design spec the real app is built
   against: color/type tokens, layout, the two permitted signature "dread"
   devices, copy voice, component inventory. Came from a standalone frontend
   exploration outside this repo; read this doc, not that directory, going
   forward.
 - `WORKLOG.md` — current state of the build, read this first for "where did
-  we leave off."
+  we leave off." Top section is the store project; Seen's log is kept below
+  it as history.
 - `LEARNINGS.md` — what Ritesh is learning about prompting/working with AI
   coding assistants, cited to commits (older entries predate this and are
   stack gotchas instead).
-- `CUTS.md` — what got cut under deadline pressure and why (attachments from
-  C8, the auto-send-deadline check left advisory-only, company name still
-  `[TK]`).
+- `CUTS.md` — what got cut under deadline pressure and why. Entries so far
+  are Seen's (attachments from C8, auto-send check advisory-only, company
+  name `[TK]`); none yet for the store project.
 - `.claude/agents/event-log-reviewer.md` — checks the event-log-write-
-  completeness invariant above; run it after a subsystem build.
-- `.claude/agents/fiction-integrity-reviewer.md` — the fiction-integrity
-  sweep below; run it before shipping public.
+  completeness invariant above; run it after a subsystem build. Its prompt
+  still lists Seen's actions (send, forward, self-destruct); update it to
+  the store's actions before relying on it.
+- `.claude/agents/fiction-integrity-reviewer.md` — see "Parody integrity";
+  Seen-era prompt, needs rewriting.
 - `.claude/skills/mutation-check/` — the defect-loop mutation check below,
-  on demand for code built unwatched (timers, draft-visibility).
+  on demand for code built unwatched. Examples in its text are Seen's.
 - `tools/layout/index.html` + `scripts/layout-server.ts` (`pnpm layout`, port 8124) —
   the floor-plan editor for tables, benches and stools; writes only
   `src/shared/layout.json`. After saving run `node scripts/blueprint.ts`.
 - `docs/graphics-brief.md` — the brief the four graphics specialists work to:
   fixed sizes, budget, ownership of `src/client/src/gfx/*`, how to check a look.
+- `README.md`, `PROCESS.md`, `reflections/crit-8.md` — currently describe
+  Seen. Ritesh's prose; they need his rewrite for the store project, and
+  nothing here should paper over that.
 - `pnpm dev` (`scripts/dev.ts`) — server on 8080 plus the client on 5173 with
   hot reload; open http://localhost:5173.
 - `references/table-map.md` — my reading of what stands on each table in the
@@ -168,8 +209,9 @@ find every resource by reading this file, not by discovering it mid-task.
 - *(add further ADRs here as they're created — don't let this list go stale.)*
 
 ## How we work
-Build v0.1 one subsystem at a time, with a fresh context per subsystem
-rather than one long session, to avoid context bleed. A reviewer pass checks
+Build one subsystem at a time, with a fresh context per subsystem rather
+than one long session, to avoid context bleed. Graphics is split across
+specialists who own separate files and never run git; the lead commits. A reviewer pass checks
 one cross-cutting invariant across subsystems: event-log-write-completeness
 (see above) — not a full re-review of everything. Before a large batch of
 building starts, restate the complete settled list for one explicit
