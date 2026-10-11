@@ -256,6 +256,12 @@ function WatchBed({ t }: { t: TableSpec }) {
 // each long side, facing out (Ritesh, 2026-10-11); the ends are bare. On the
 // centre column's watch tables, a sunken glass-covered bed of watches sits in
 // the middle. A service table is the same, square, without products.
+// Dev-only look check: `?pilotPhone=<id>` puts a real model (phones-geo.ts)
+// on every phone-kind table slot in the live store, so it can be seen at
+// real scale among real furniture, not just alone on DeviceStage. Remove
+// once table assignment (product-line-session.md Step 4) is real.
+const PILOT_PHONE_MODEL = new URLSearchParams(location.search).get("pilotPhone") ?? undefined;
+
 export function Table({ box: t }: { box: TableSpec }) {
   const m = mats();
   const bed = isWatchBed(t);
@@ -286,6 +292,7 @@ export function Table({ box: t }: { box: TableSpec }) {
           z={it.z}
           rotY={it.rotY}
           colour={DEVICE_COLOURS[(((i + Math.round(t.z * 3) + 6) % DEVICE_COLOURS.length) + DEVICE_COLOURS.length) % DEVICE_COLOURS.length]}
+          model={it.kind === "phone" ? PILOT_PHONE_MODEL : undefined}
         />
       ))}
     </group>
