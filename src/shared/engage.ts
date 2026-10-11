@@ -62,7 +62,7 @@ export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Mome
   if (p.walking) return asMoment(p, "idle", "smile", "going over to help a visitor");
   // arrived: facing the visitor, talking
   const ry = headingTo(goal.x, goal.z, e.at.x, e.at.z);
-  return asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "talk", "smile", "helping a visitor");
+  return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "talk", "smile", "helping a visitor"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };
 }
 
 export interface Release {

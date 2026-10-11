@@ -41,6 +41,9 @@ export interface Moment {
   seated: boolean; // sitting on a stool
   device: boolean; // a phone or tablet is out
   intent: string; // what they are doing, in words
+  // the point they are looking at (y is height above the floor); none while
+  // walking, when they look where they are going
+  gaze?: { x: number; y: number; z: number };
 }
 
 interface Pt {
@@ -767,7 +770,11 @@ function at(seg: Seg, tau: number): Moment {
     mood = pose.mood;
   }
   void u;
-  return { present: true, x: p.x, z: p.z, ry, walking: false, mode, mood, seated: seg.seated ?? false, device: mode === "device", intent: seg.intent };
+  // what the head is on: down at a product or their hands, up at a shelf,
+  // otherwise at the face of whoever they are with
+  const looksDown = mode === "observe" || mode === "work" || mode === "phone" || mode === "device" || mode === "think";
+  const gaze = seg.face && Math.hypot(face.x - p.x, face.z - p.z) > 1e-6 ? { x: face.x, y: looksDown ? 0.85 : 1.5, z: face.z } : undefined;
+  return { present: true, x: p.x, z: p.z, ry, walking: false, mode, mood, seated: seg.seated ?? false, device: mode === "device", intent: seg.intent, gaze };
 }
 
 // Where this person is and what they are doing at server time `nowMs`.

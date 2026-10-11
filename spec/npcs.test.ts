@@ -131,6 +131,32 @@ describe("roles", () => {
   });
 });
 
+describe("where heads look", () => {
+  it("has people look down at what is in their hands or on the table, and at faces when they talk", () => {
+    let down = 0;
+    let faces = 0;
+    for (const c of CAST) {
+      for (let t = 0; t < CYCLE; t += 1) {
+        const m = momentOf(c.id, t * 1000);
+        if (!m.present || m.walking) {
+          expect(m.gaze, `${c.id} t=${t}`).toBeUndefined();
+          continue;
+        }
+        if (["observe", "work", "phone", "device", "think"].includes(m.mode) && m.gaze) {
+          expect(m.gaze.y, `${c.id} ${m.mode}`).toBeLessThan(1.1);
+          down++;
+        }
+        if (["talk", "listen", "handshake"].includes(m.mode) && m.gaze) {
+          expect(m.gaze.y, `${c.id} ${m.mode}`).toBeGreaterThan(1.3);
+          faces++;
+        }
+      }
+    }
+    expect(down).toBeGreaterThan(50);
+    expect(faces).toBeGreaterThan(20);
+  });
+});
+
 describe("the back room", () => {
   it("has stock staff restock a shelf they are facing, never empty floor", () => {
     let seen = 0;

@@ -640,6 +640,10 @@ export interface PoseInput {
   seed: number; // varies idle motion between people
   seated?: boolean; // sitting on a stool
   device?: boolean; // a device is out (also whenever mode is "device")
+  // where the head should point, relative to the body (see shared/gaze.ts):
+  // sideways and up or down at once. The behaviour's own head movement
+  // becomes a small idle drift around it.
+  gaze?: { yaw: number; pitch: number };
 }
 
 // Bones from a behaviour, a walk cycle and a mood. Signs, for a hanging limb
@@ -832,6 +836,13 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
         T.elL = 0.18 + Math.max(0, weight) * 6;
         T.elR = 0.18 + Math.max(0, -weight) * 6;
     }
+  }
+  // looking at something: the head points at it on both axes, the behaviour's
+  // own head movement kept as a small drift. The spine's lean already tips the
+  // head forward, so it is taken off the pitch.
+  if (p.gaze && !walking) {
+    T.yaw = p.gaze.yaw + T.yaw * 0.25;
+    T.pitch = p.gaze.pitch * 0.9 - T.lean + T.pitch * 0.1;
   }
   const k = 1 - Math.exp(-(walking ? 14 : 7) * p.dt);
   for (const key of Object.keys(T)) {

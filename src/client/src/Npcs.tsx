@@ -30,7 +30,7 @@ export function Npcs() {
     const settled = settledPeople(now).npc;
     root.current?.children.forEach((child, i) => {
       const def = NPCS[i];
-      let raw: { x: number; z: number; ry: number; walking: boolean; present: boolean; mode: ActorState["mode"]; mood: string; seated: boolean; device: boolean; intent: string } = npcPose(def, now);
+      let raw: { x: number; z: number; ry: number; walking: boolean; present: boolean; mode: ActorState["mode"]; mood: string; seated: boolean; device: boolean; intent: string; gaze?: { x: number; y: number; z: number } } = npcPose(def, now);
       // a person holds this post today: the NPC is not on
       if (net.offDuty.has(def.id)) raw = { ...raw, present: false };
       // with a visitor (they walk over and talk), or walking back to the day
@@ -64,7 +64,7 @@ export function Npcs() {
       shown.current.set(def.id, { x: nx, z: nz, ry: raw.ry });
       child.position.set(nx, STORE_Y, nz);
       child.rotation.y = raw.ry;
-      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: raw.mood, seated: raw.seated, device: raw.device };
+      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: raw.mood, seated: raw.seated, device: raw.device, gaze: raw.gaze };
       intents.current[i] = raw.intent;
     });
     if (LABELS && ++frames.current % 20 === 0) bump((n) => n + 1);

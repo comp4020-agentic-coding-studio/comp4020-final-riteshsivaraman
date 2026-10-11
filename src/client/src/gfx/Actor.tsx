@@ -1,5 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
+import { Euler, Quaternion, Vector3 } from "three";
+import { gazeAt } from "../../../shared/gaze.ts";
 import { lookFor, type LookChoice } from "../../../shared/look.ts";
 import type { Behaviour } from "../../../shared/behaviour.ts";
 import { buildCharacter, EXPRESSIONS, poseCharacter, type Mood } from "./character.ts";
@@ -16,10 +18,15 @@ export interface ActorState {
   speed?: number; // m/s, to pace the legs; defaults to a normal walk
   seated?: boolean;
   device?: boolean;
+  // a world point to look at (y is height above the floor), if any
+  gaze?: { x: number; y: number; z: number };
 }
 
 // `?snap=1` skips the easing between poses, so a still shows the settled pose
 const SNAP = new URLSearchParams(location.search).has("snap");
+const tmp = new Vector3();
+const quat = new Quaternion();
+const euler = new Euler();
 
 const SHIRTS = ["#2f62b5", "#4a7c59", "#b5503a", "#6b5b95", "#3a3d45", "#c9a24a", "#2a7f8a", "#c46f8a", "#6f8f4a"];
 
@@ -71,7 +78,15 @@ export function Actor({
     const m = mood.current;
     for (const key of ["browY", "browTilt", "lid", "curve", "open", "width"] as const) m[key] += (target[key] - m[key]) * k;
     const blink = (t.current + seed * 0.013 + 1.7) % 3.4 < 0.12 ? 1.2 : 0;
-    poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device }, m, blink);
+    // the head: where the body stands and faces, in the world, against the point
+    let gaze: { yaw: number; pitch: number } | undefined;
+    if (s.gaze && char.root.parent) {
+      char.root.parent.getWorldPosition(tmp);
+      char.root.parent.getWorldQuaternion(quat);
+      euler.setFromQuaternion(quat, "YXZ");
+      gaze = gazeAt({ x: tmp.x, z: tmp.z, ry: euler.y }, s.gaze);
+    }
+    poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device, gaze }, m, blink);
   });
   return <primitive object={char.root} />;
 }
