@@ -62,6 +62,7 @@ import { Device } from "./Device.tsx";
 import { Desktop, Monitor } from "./computers.tsx";
 import { BackFurniture, RepairBenches, StorageRacks, Stools, bayFrames } from "./furniture.tsx";
 import { bayStock } from "./phones.tsx";
+import { BackCeiling, BackDetails, BackFloor, BackPartitions, BackPerimeter, DockSurround } from "./back-of-house.tsx";
 
 
 // Invented abstract poster art. "light" is a soft two-colour gradient; "dark"
@@ -540,29 +541,14 @@ export function BackAreas() {
   const rz = BACK_ROOM_Z1;
   return (
     <group>
-      {BACK_WALLS.map((w, i) => (
-        <mesh key={i} position={[w.x, w.h / 2, w.z]}>
-          <boxGeometry args={[w.w, w.h, w.d]} />
-          <meshStandardMaterial color="#e2e6ea" roughness={0.8} />
-        </mesh>
-      ))}
-      {BACK_AREAS.filter((a) => a.id !== "storage").map((a) => (
-        <Sign
-          key={a.id}
-          text={a.name.split(":")[0].split("(")[0].trim()}
-          position={[(a.x0 + a.x1) / 2, 2.35, a.z0 + 0.09]}
-          rotY={Math.PI}
-          w={2.4}
-          fg="#ffffff"
-          bg="#2f3a4a"
-        />
-      ))}
+      <BackPartitions />
       {/* the back door onto the loading dock: a roller door and a sign */}
       <mesh position={[(BACK_DOOR.minX + BACK_DOOR.maxX) / 2, 1.3, rz - 0.04]}>
         <boxGeometry args={[BACK_DOOR.maxX - BACK_DOOR.minX, 2.6, 0.06]} />
         <meshStandardMaterial map={slats} roughness={0.6} metalness={0.3} />
       </mesh>
-      <Sign text="DELIVERIES" position={[0, 2.85, rz - 0.1]} rotY={Math.PI} w={2.2} fg="#111111" bg="#ffd23f" />
+      <Sign text="DELIVERIES" position={[0, 2.78, rz - 0.04]} rotY={Math.PI} w={1.6} fg="#111111" bg="#ffd23f" />
+      <DockSurround />
     </group>
   );
 }
@@ -573,18 +559,11 @@ export function BackRoom() {
 
   const w = HALF_W * 2;
   const depth = BACK_ROOM_Z1 - BACK_ROOM_Z0;
-  const floor = useMemo(() => floorTexture(w, depth, "#858a90", "#767b82"), [w, depth]);
   const zc = (BACK_ROOM_Z0 + BACK_ROOM_Z1) / 2;
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, zc]}>
-        <planeGeometry args={[w, depth]} />
-        <meshStandardMaterial map={floor} roughness={0.9} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, CEILING, zc]}>
-        <planeGeometry args={[w, depth]} />
-        <meshStandardMaterial color="#eef0f2" emissive="#ffffff" emissiveIntensity={0.45} />
-      </mesh>
+      <BackFloor />
+      <BackCeiling />
       <mesh position={[0, CEILING / 2, BACK_ROOM_Z1 + 0.1]}>
         <boxGeometry args={[w, CEILING, 0.2]} />
         <meshStandardMaterial color="#e2e6ea" emissive="#ffffff" emissiveIntensity={0.3} />
@@ -595,6 +574,8 @@ export function BackRoom() {
           <meshStandardMaterial color="#e2e6ea" emissive="#ffffff" emissiveIntensity={0.3} />
         </mesh>
       ))}
+      <BackPerimeter />
+      <BackDetails />
       <StorageRacks />
       <BackFurniture />
       <RepairBenches />
@@ -602,14 +583,7 @@ export function BackRoom() {
       {/* walls between the areas (with doorways), area signs, furniture, the dock door */}
       <BackAreas />
 
-      <Sign
-        text="SERVICE"
-        position={[0, 2.5, SERVICE_DESKS[0].z + 0.6]}
-        rotY={Math.PI}
-        w={2}
-        fg="#ffffff"
-        bg="#1f5f99"
-      />
+
     </group>
   );
 }
