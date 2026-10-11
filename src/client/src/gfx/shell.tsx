@@ -53,6 +53,7 @@ import {
   SIDE_WALL,
   STOOL_SEAT_H,
   WALL_BANDS,
+  WALL_TONES,
 } from "../../../shared/plan.ts";
 import { net } from "../net.ts";
 import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W, DOOR_X, DOOR_H, BENCH_X, BENCH_HALF, FACE_X, canvasTexture, labelTexture, BoxField, Sign, std, BlobShadow, type Cuboid, type Kind } from "./common.tsx";
@@ -383,9 +384,9 @@ export function WallSections() {
           with a dark reveal where the panels meet the floor */}
       {[-1, 1].flatMap((side) =>
         [
-          { y0: 0, y1: BAND_LOW, c: "#8c9096" },
-          { y0: BAND_LOW, y1: BAND_MID, c: "#a8acb1" },
-          { y0: BAND_MID, y1: CEILING, c: "#cdd0d4" },
+          { y0: 0, y1: BAND_LOW, c: WALL_TONES.low },
+          { y0: BAND_LOW, y1: BAND_MID, c: WALL_TONES.mid },
+          { y0: BAND_MID, y1: CEILING, c: WALL_TONES.upper },
         ].map((b) => (
           <mesh key={`${side}:${b.y0}`} position={[side * (FACE_X - 0.01), (b.y0 + b.y1) / 2, 0]}>
             <boxGeometry args={[0.02, b.y1 - b.y0, FLOOR.maxZ - FLOOR.minZ + 1]} />
@@ -502,7 +503,7 @@ export function BackRoom() {
 
   const w = HALF_W * 2;
   const depth = BACK_ROOM_Z1 - BACK_ROOM_Z0;
-  const floor = useMemo(() => floorTexture(w, depth, "#c9ccd0", "#b3b7bc"), [w, depth]);
+  const floor = useMemo(() => floorTexture(w, depth, "#858a90", "#767b82"), [w, depth]);
   const zc = (BACK_ROOM_Z0 + BACK_ROOM_Z1) / 2;
   return (
     <group>
@@ -572,7 +573,7 @@ export function StaffDoor() {
       <group ref={slide}>
         <mesh position={[DOOR_X, DOOR_H / 2, z]}>
           <boxGeometry args={[DOOR_W - 0.03, DOOR_H - 0.03, 0.1]} />
-          <meshStandardMaterial map={wall} emissive="#ffffff" emissiveIntensity={0.3} />
+          <meshStandardMaterial map={wall} color={WALL_TONES.upper} emissive="#ffffff" emissiveIntensity={0.12} />
         </mesh>
       </group>
       {/* hairline gaps around the door */}
@@ -597,20 +598,20 @@ export function StaffDoor() {
 export function ShopShell() {
   const w = FLOOR.maxX - FLOOR.minX + 1;
   const d = FLOOR.maxZ - FLOOR.minZ + 1;
-  const floor = useMemo(() => floorTexture(w, d, "#d9dcdf", "#c3c7cb"), [w, d]);
+  const floor = useMemo(() => floorTexture(w, d, "#8f9398", "#7f848a"), [w, d]);
   const backWall = useMemo(() => wallTexture(w), [w]);
   const sideWall = useMemo(() => wallTexture(d), [d]);
   const ceilingMap = useMemo(() => ceilingTexture(w, d), [w, d]);
   const fullW = w + 0.2;
   const wallMat = (map: CanvasTexture) => (
-    <meshStandardMaterial map={map} emissive="#ffffff" emissiveIntensity={0.3} />
+    <meshStandardMaterial map={map} color={WALL_TONES.upper} emissive="#ffffff" emissiveIntensity={0.12} />
   );
 
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[w, d]} />
-        <meshStandardMaterial map={floor} roughness={0.42} metalness={0.05} />
+        <meshStandardMaterial map={floor} roughness={0.6} metalness={0.05} />
       </mesh>
 
       {/* ceiling: grey slats running across the room, long light panels in

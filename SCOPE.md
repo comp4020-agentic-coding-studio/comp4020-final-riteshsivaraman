@@ -78,6 +78,7 @@ What this implies for scope (inference, to confirm):
 | D26 | Devices can be inspected: look within about 1.5 m, click or tap, the camera eases in, drag to rotate, Esc or tap-away returns. Works the same on desktop and 390x844. Logs an `inspect` event | 2026-10-11 |
 | D27 | The inspected device gets a richer procedural version built on demand and discarded afterwards. The 512 px texture cap in `docs/graphics-brief.md` stays for the room; the one inspected device may use up to 1024 px | 2026-10-11 |
 | D28 | Inspect shows the device only: no name, price or stock. Each device gets a stable slot id (table and position) for the event and a later catalogue row. The catalogue (3e) is its own decision | 2026-10-11 |
+| D29 | Look pass A (Ritesh, 2026-10-11): walls become one satin grey with a gentle three-tone step (`WALL_TONES` in `plan.ts`, shared by the 3D room and the drawings), the floor a darker matte grey, ambient light lower so lightboxes, panels and screens are the bright things. Band heights (`WALL_BANDS`) are unchanged, so D20's drawings stay the spec | 2026-10-11 |
 
 Superseded: the earlier "no runtime AI calls" constraint in `references/help-me-scope.md`
 section 2. D8 reverses it, so it needs its own decision record when built.

@@ -2,9 +2,9 @@
 <rect width="1474" height="1664" fill="#ffffff"/>
 <text x="70.0" y="28.0" font-size="16" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">Wall elevations: each wall seen from inside the shop, as you stand facing it (metres)</text>
 <text x="70.0" y="64.0" font-size="13" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">1. LEFT WALL as you enter (the +x wall). Glass front on the left, back wall on the right.</text>
-<rect x="70.0" y="237.1" width="1184.2" height="58.9" fill="#8c9096" stroke="none" stroke-width="1" />
-<rect x="70.0" y="203.0" width="1184.2" height="34.1" fill="#a8acb1" stroke="none" stroke-width="1" />
-<rect x="70.0" y="110.0" width="1184.2" height="93.0" fill="#cdd0d4" stroke="none" stroke-width="1" />
+<rect x="70.0" y="237.1" width="1184.2" height="58.9" fill="#9a9ea4" stroke="none" stroke-width="1" />
+<rect x="70.0" y="203.0" width="1184.2" height="34.1" fill="#a3a7ac" stroke="none" stroke-width="1" />
+<rect x="70.0" y="110.0" width="1184.2" height="93.0" fill="#adb1b6" stroke="none" stroke-width="1" />
 <rect x="962.8" y="110.0" width="12.4" height="127.1" fill="#b9bdc2" stroke="#7b8087" stroke-width="1" />
 <rect x="1031.0" y="110.0" width="12.4" height="127.1" fill="#b9bdc2" stroke="#7b8087" stroke-width="1" />
 <rect x="1099.2" y="110.0" width="12.4" height="127.1" fill="#b9bdc2" stroke="#7b8087" stroke-width="1" />
@@ -228,9 +228,9 @@
 <line x1="1254.2" y1="317.0" x2="1254.2" y2="327.0" stroke="#1f6feb" stroke-width="1" />
 <text x="662.1" y="317.0" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">19.1 m wall</text>
 <text x="70.0" y="450.0" font-size="13" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">2. RIGHT WALL as you enter (the -x wall). Glass front on the right, back wall on the left.</text>
-<rect x="70.0" y="623.1" width="1184.2" height="58.9" fill="#8c9096" stroke="none" stroke-width="1" />
-<rect x="70.0" y="589.0" width="1184.2" height="34.1" fill="#a8acb1" stroke="none" stroke-width="1" />
-<rect x="70.0" y="496.0" width="1184.2" height="93.0" fill="#cdd0d4" stroke="none" stroke-width="1" />
+<rect x="70.0" y="623.1" width="1184.2" height="58.9" fill="#9a9ea4" stroke="none" stroke-width="1" />
+<rect x="70.0" y="589.0" width="1184.2" height="34.1" fill="#a3a7ac" stroke="none" stroke-width="1" />
+<rect x="70.0" y="496.0" width="1184.2" height="93.0" fill="#adb1b6" stroke="none" stroke-width="1" />
 <rect x="349.0" y="496.0" width="12.4" height="127.1" fill="#b9bdc2" stroke="#7b8087" stroke-width="1" />
 <rect x="280.8" y="496.0" width="12.4" height="127.1" fill="#b9bdc2" stroke="#7b8087" stroke-width="1" />
 <rect x="212.6" y="496.0" width="12.4" height="127.1" fill="#b9bdc2" stroke="#7b8087" stroke-width="1" />
@@ -464,7 +464,7 @@
 <line x1="70.0" y1="703.0" x2="70.0" y2="713.0" stroke="#1f6feb" stroke-width="1" />
 <text x="662.1" y="703.0" font-size="11" text-anchor="middle" fill="#1f6feb" font-weight="600" font-family="system-ui, sans-serif">19.1 m wall</text>
 <text x="70.0" y="836.0" font-size="13" text-anchor="start" fill="#111" font-weight="700" font-family="system-ui, sans-serif">3. BACK WALL, shop side (z = +9.5), seen facing it. The +x side is on the left.</text>
-<rect x="70.0" y="882.0" width="806.0" height="186.0" fill="#d9dcdf" stroke="#7b8087" stroke-width="1" />
+<rect x="70.0" y="882.0" width="806.0" height="186.0" fill="#adb1b6" stroke="#7b8087" stroke-width="1" />
 <rect x="225.0" y="1002.9" width="496.0" height="65.1" fill="#e6cfa8" stroke="#8a6a2f" stroke-width="1.5" />
 <rect x="712.3" y="1002.9" width="9.9" height="65.1" fill="#8a6a2f" stroke="#5a4210" stroke-width="1" />
 <rect x="223.8" y="1002.9" width="9.9" height="65.1" fill="#8a6a2f" stroke="#5a4210" stroke-width="1" />

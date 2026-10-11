@@ -27,6 +27,7 @@ import {
   STOOL_SEAT_H,
   TRACK_LIGHT_Y,
   WALL_BANDS,
+  WALL_TONES,
 } from "./plan.ts";
 import {
   BACK_ROOM_Z0,
@@ -362,9 +363,9 @@ export function renderWalls(): string {
   g.text(MX, 28, "Wall elevations: each wall seen from inside the shop, as you stand facing it (metres)", 16, "start", "#111", "700");
 
   const BAND = [
-    { y0: 0, y1: WALL_BANDS.low, c: "#8c9096" },
-    { y0: WALL_BANDS.low, y1: WALL_BANDS.mid, c: "#a8acb1" },
-    { y0: WALL_BANDS.mid, y1: CEILING, c: "#cdd0d4" },
+    { y0: 0, y1: WALL_BANDS.low, c: WALL_TONES.low },
+    { y0: WALL_BANDS.low, y1: WALL_BANDS.mid, c: WALL_TONES.mid },
+    { y0: WALL_BANDS.mid, y1: CEILING, c: WALL_TONES.upper },
   ];
 
   // a side wall: z runs along the horizontal axis; `dir` 1 puts the glass
@@ -482,7 +483,7 @@ export function renderWalls(): string {
     const wRect = (xa: number, xb: number, ya: number, yb: number, fill: string, stroke = "none", sw = 1): void =>
       g.rect(Math.min(hx(xa), hx(xb)), hy(yb), Math.abs(hx(xb) - hx(xa)), (yb - ya) * ES, fill, stroke, sw);
     g.text(MX, top - 46, `3. BACK WALL, shop side (z = +${WALL_FACE_Z.toFixed(1)}), seen facing it. The +x side is on the left.`, 13, "start", "#111", "700");
-    wRect(-x0, x0, 0, CEILING, "#d9dcdf", "#7b8087");
+    wRect(-x0, x0, 0, CEILING, WALL_TONES.upper, "#7b8087");
     // the bar stands in front of the wall
     wRect(COUNTER.x - COUNTER.w / 2, COUNTER.x + COUNTER.w / 2, 0, COUNTER.h, "#e6cfa8", "#8a6a2f", 1.5);
     for (const p of PARTITIONS) wRect(p.x - 0.08, p.x + 0.08, 0, p.h, "#8a6a2f", "#5a4210");

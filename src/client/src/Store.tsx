@@ -192,8 +192,8 @@ export function Store() {
     >
       <color attach="background" args={["#dfe3e7"]} />
       <Reflections />
-      <hemisphereLight args={["#ffffff", "#f1f3f5", 1.9]} />
-      <directionalLight position={[4, 8, -3]} intensity={0.8} />
+      <hemisphereLight args={["#ffffff", "#d3d6da", 1.25]} />
+      <directionalLight position={[4, 8, -3]} intensity={0.6} />
       {/* daylight through the glass front */}
       <directionalLight position={[0, 6, -14]} intensity={0.5} />
       <group position={[0, STORE_Y, 0]}>

@@ -16,6 +16,10 @@ import { BAY_START_Z } from "./world.ts";
 // Brushed-grey wall in three tones: dark below the bench, mid above it, then
 // the light upper wall. Lightboxes start at the top of the mid band.
 export const WALL_BANDS = { low: 0.95, mid: 1.5 } as const;
+// The three tones are close on purpose (Ritesh, 2026-10-11): one satin grey wall
+// with a gentle step, not three stripes. Shared so the 3D room and the drawings
+// cannot drift apart.
+export const WALL_TONES = { low: "#9a9ea4", mid: "#a3a7ac", upper: "#adb1b6" } as const;
 export const FLOOR_REVEAL = 0.05; // dark gap between the wall panels and the floor
 
 const OLD_FRONT = -4.6; // where the old wall features started (z, 10 m shop)
