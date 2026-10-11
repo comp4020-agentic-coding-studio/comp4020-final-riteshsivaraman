@@ -141,10 +141,10 @@ it("has stock on the shelves in the running app (the shop is not all sold out)",
   customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "show" });
   const ask = (await employee.next((m) => m.type === "staff_turn")) as Extract<ServerMessage, { type: "staff_turn" }>;
   employee.send({ type: "staff_respond", conversationId: ask.conversationId, action: "reply" });
-  await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id === "product:phone-b"));
+  await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id === "product:iphone-18-pro"));
   const mark = customer.mark();
-  customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "product:phone-b" });
-  const asked = (await employee.next((m) => m.type === "staff_turn" && m.customerPicked === "Phone B")) as Extract<ServerMessage, { type: "staff_turn" }>;
+  customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "product:iphone-18-pro" });
+  const asked = (await employee.next((m) => m.type === "staff_turn" && m.customerPicked === "iPhone 18 Pro")) as Extract<ServerMessage, { type: "staff_turn" }>;
   employee.send({ type: "staff_respond", conversationId: asked.conversationId, action: "reply" });
   const colours = (await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id.startsWith("colour:")), 2500, mark)) as Extract<ServerMessage, { type: "turn" }>;
   // at least one colour is in stock (a stocked shop lists "(n left)")

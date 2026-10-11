@@ -179,6 +179,15 @@ find every resource by reading this file, not by discovering it mid-task.
 - `docs/data-overview.html` — diagram of where every kind of data lives today.
 - `docs/prompts/product-line-session.md` — the prompt for the session that designs
   every device as a real, named, distinct model (SCOPE D37). Hand it to a fresh session.
+- `references/product-line.md` — Step 1 of the above: every family Apple AU
+  currently sells, sourced live (phones, iPad, Mac laptops/desktops, displays,
+  Watch, AirPods, HomePod, AirTag, a representative accessories slice), with
+  physical-layout claims flagged text-only/unverified. Read before cataloguing
+  or modelling anything outside phones.
+- `src/shared/catalogue.ts` — the real sourced catalogue (phones only so far;
+  other families wait on a conversation script to sell them). `docs/adr/0005-storage-sku-key.md`
+  is the ADR for its storage axis; read both before touching `stock`,
+  `reservations`, `catalogue.ts` or `src/server/stock.ts`.
 - `docs/blueprint/` — the floor plan, four wall elevations, ceiling and mall
   drawings (D20: the drawings are the specification), drawn from
   `src/shared/plan.ts`, `world.ts` and `mall.ts`.

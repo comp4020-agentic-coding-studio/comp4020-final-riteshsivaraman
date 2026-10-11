@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { beforeEach, describe, expect, it } from "vitest";
-import { START_STOCK } from "../src/shared/catalogue.ts";
+import { defaultStorage, productById, START_STOCK } from "../src/shared/catalogue.ts";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
 import type { ServerMessage } from "../src/shared/protocol.ts";
 import { migrate } from "../src/server/migrate.ts";
@@ -144,7 +144,10 @@ describe("the greeter, end to end", () => {
 });
 
 describe("the phones specialist and stock", () => {
-  function atColours(customer: string, product = "phone-b"): string {
+  const storageOf18Pro = defaultStorage(productById("iphone-18-pro")!);
+  const storageOf17 = defaultStorage(productById("iphone-17")!);
+
+  function atColours(customer: string, product = "iphone-18-pro"): string {
     const s = npc("spec-phones");
     positions.set(customer, { x: s.x + 1, z: s.z });
     const id = last(startTalk(ctx(), customer, "spec-phones"), customer, "turn")!.conversationId;
@@ -155,11 +158,11 @@ describe("the phones specialist and stock", () => {
 
   it("takes a unit off the shelf when you choose one that is in stock, and holds it", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
-    const before = stockOf(db, "phone-b", "Graphite");
+    const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
     const id = atColours("c1");
-    const out = chooseTurn(ctx(), "c1", id, "colour:Graphite");
+    const out = chooseTurn(ctx(), "c1", id, "colour:Glacier");
     expect(last(out, "c1", "turn")?.ended).toBe(true);
-    expect(stockOf(db, "phone-b", "Graphite")).toBe(before - 1);
+    expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
     expect(stateOf(db, "c1")?.state).toBe("in_purchase");
     const r = db.prepare("SELECT status, expires_at FROM reservations WHERE visitor_id = 'c1'").get() as { status: string; expires_at: number };
     expect(r).toEqual({ status: "held", expires_at: NOW + HOLD_MS });
@@ -168,35 +171,35 @@ describe("the phones specialist and stock", () => {
 
   it("will not sell what is out of stock, and says so", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
-    db.prepare("UPDATE stock SET qty = 0 WHERE product = 'phone-b' AND colour = 'Silver'").run();
+    db.prepare("UPDATE stock SET qty = 0 WHERE product = 'iphone-18-pro' AND colour = 'Silver' AND storage = ?").run(storageOf18Pro);
     const id = atColours("c1");
     const out = chooseTurn(ctx(), "c1", id, "colour:Silver");
     expect(last(out, "c1", "turn")?.say).toMatch(/out of stock/);
     expect(last(out, "c1", "turn")?.ended).toBe(false);
     expect(db.prepare("SELECT COUNT(*) AS n FROM reservations").get()).toEqual({ n: 0 });
-    expect(stockOf(db, "phone-b", "Silver")).toBe(0);
+    expect(stockOf(db, "iphone-18-pro", "Silver", storageOf18Pro)).toBe(0);
   });
 
   it("gives a held unit back when the time is up, with no timer (the next call catches up)", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
-    const before = stockOf(db, "phone-b", "Graphite");
+    const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
     const id = atColours("c1");
-    chooseTurn(ctx(), "c1", id, "colour:Graphite");
-    expect(stockOf(db, "phone-b", "Graphite")).toBe(before - 1);
+    chooseTurn(ctx(), "c1", id, "colour:Glacier");
+    expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
     expect(releaseExpired(ctx(NOW + HOLD_MS - 1))).toBe(0);
     expect(releaseExpired(ctx(NOW + HOLD_MS))).toBe(1);
-    expect(stockOf(db, "phone-b", "Graphite")).toBe(before);
+    expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before);
     expect(eventTypes()).toContain("reservation_expired");
     expect(releaseExpired(ctx(NOW + HOLD_MS * 2))).toBe(0); // only once
   });
 
   it("gives it back at once when the visitor leaves", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
-    const before = stockOf(db, "phone-b", "Graphite");
+    const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
     const id = atColours("c1");
-    chooseTurn(ctx(), "c1", id, "colour:Graphite");
+    chooseTurn(ctx(), "c1", id, "colour:Glacier");
     leaveStore(ctx(), "c1");
-    expect(stockOf(db, "phone-b", "Graphite")).toBe(before);
+    expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before);
     expect(stateOf(db, "c1")?.state).toBe("leaving");
     expect(eventTypes()).toContain("reservation_released");
   });
@@ -204,14 +207,14 @@ describe("the phones specialist and stock", () => {
   it("lets only one of two visitors have the last unit", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     addVisitor("c2", "Biscuit", { x: 0, z: 0 });
-    expect(START_STOCK["phone-a"].Silver).toBe(1);
+    expect(START_STOCK["iphone-17"].Black[storageOf17]).toBe(1);
     // c1 first
-    const a = atColours("c1", "phone-a");
-    chooseTurn(ctx(), "c1", a, "colour:Silver");
-    expect(stockOf(db, "phone-a", "Silver")).toBe(0);
+    const a = atColours("c1", "iphone-17");
+    chooseTurn(ctx(), "c1", a, "colour:Black");
+    expect(stockOf(db, "iphone-17", "Black", storageOf17)).toBe(0);
     // the specialist is free again for c2, and the last unit is gone
-    const b = atColours("c2", "phone-a");
-    const out = chooseTurn(ctx(), "c2", b, "colour:Silver");
+    const b = atColours("c2", "iphone-17");
+    const out = chooseTurn(ctx(), "c2", b, "colour:Black");
     expect(last(out, "c2", "turn")?.say).toMatch(/out of stock/);
   });
 });

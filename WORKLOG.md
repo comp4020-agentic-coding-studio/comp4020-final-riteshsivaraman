@@ -97,6 +97,40 @@ in-store flow (E to talk, panel, NPC walking over and back) has never been run i
 real browser with two players. Headless Chrome never settles on the live store.
 Not deployed.
 
+**Product line, Step 1 and 2, 2026-10-12.** `references/product-line.md`:
+every family Apple AU currently sells, sourced live this session (a browser
+session, not WebFetch — see the doc's own sourcing note on why). Flags
+Hermès Watch lines as a second real brand needing their own decision before
+use (not covered by D37), and several facts as text-only/unverified
+(physical layout for everything except the already-photo-verified iPhone 18
+Pro). `src/shared/catalogue.ts` replaced the placeholder with the 6 phones
+Apple AU sells direct; other families wait on a conversation script to sell
+them. ADR 5 (`docs/adr/0005-storage-sku-key.md`): storage widened into the
+real stock key (`stock`/`reservations` migration 4), `src/shared/conversation.ts`
+untouched (no picker yet — the server sells `defaultStorage()`'s SKU until one
+exists). `spec/catalogue.test.ts` added; `service.test.ts`/`conversation.test.ts`
+updated off the old placeholder ids. 231 tests, 1 pre-existing flaky live-socket
+test unrelated to this (server contention from manual browser testing, not a
+regression — confirmed by rerunning in isolation).
+
+**Pilot phone model, 2026-10-12.** `src/client/src/gfx/phones-geo.ts`
+(`PhoneModelSpec`, `buildPhoneBody`) makes a phone's camera plateau, lenses
+and buttons data-driven, so each further model is a spec, not new drawing
+code. iPhone 18 Pro built first: initial pass trusted web-search coverage of
+the 17 Pro's redesign and got the plateau shape wrong (full-width bar); a
+real marketing photo Ritesh supplied corrected it to a square plateau with an
+L-shaped lens cluster (commit `255ce19`) — logged as a reminder that
+text-only physical-layout claims need a photo check, not just a second
+source. Home-screen vs lock-screen is a real toggle (`ScreenMode` in
+`phones.tsx`). `?device=1` (`DeviceStage.tsx`) previews one product alone,
+orbitable, on a table-surface scrap; `?pilotPhone=<id>` puts a real model on
+every phone table in the live store for an in-context look check. Both are
+permanent dev tooling for the rest of this build, not just this pilot.
+**Not yet:** every other phone model, and every other family (tablets,
+laptops, desktops, displays, watches, earbuds/headphones, speakers, trackers,
+accessories) — in progress, dispatched as parallel subagents per family,
+each confined to its own files.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.

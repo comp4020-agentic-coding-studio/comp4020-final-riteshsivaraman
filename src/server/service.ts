@@ -16,7 +16,18 @@ import { NPC_DESIGNATION, NPC_LABEL, npcsOffDuty, scriptFor } from "../shared/du
 import { NPCS, npcPose } from "../shared/npcs.ts";
 import type { CustomerView, Engagement, ServerMessage, StaffTurnView, TurnView } from "../shared/protocol.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
+import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { takeOne } from "./stock.ts";
+
+// The conversation script (shared/conversation.ts) only ever asks for a
+// colour — no storage picker exists yet (ADR 5) — so the server sells
+// whichever storage `defaultStorage` names for that product. A product this
+// store doesn't catalogue yet (nothing to sell) gets "" and simply never has
+// stock.
+const storageOf = (product: string): string => {
+  const p = productById(product);
+  return p ? defaultStorage(p) : "";
+};
 
 // The store's rules about visitors: who they are in it, where they are in their
 // visit, who is dealing with them, what they have put aside. It takes a
@@ -106,22 +117,23 @@ function setState(ctx: Ctx, id: string, patch: StatePatch): void {
 }
 
 function stockWorld(db: Database.Database): World {
-  const get = db.prepare("SELECT qty FROM stock WHERE product = ? AND colour = ?");
-  return { stock: (p, c) => ((get.get(p, c) as { qty: number } | undefined)?.qty ?? 0) };
+  const get = db.prepare("SELECT qty FROM stock WHERE product = ? AND colour = ? AND storage = ?");
+  return { stock: (p, c) => ((get.get(p, c, storageOf(p)) as { qty: number } | undefined)?.qty ?? 0) };
 }
 
 // Gives back every reservation whose time is up.
 export function releaseExpired(ctx: Ctx): number {
-  const rows = ctx.db.prepare("SELECT id, visitor_id, product, colour FROM reservations WHERE status = 'held' AND expires_at <= ?").all(ctx.now) as Array<{
+  const rows = ctx.db.prepare("SELECT id, visitor_id, product, colour, storage FROM reservations WHERE status = 'held' AND expires_at <= ?").all(ctx.now) as Array<{
     id: string;
     visitor_id: string;
     product: string;
     colour: string;
+    storage: string;
   }>;
   for (const r of rows) {
     ctx.db.transaction(() => {
       ctx.db.prepare("UPDATE reservations SET status = 'expired' WHERE id = ?").run(r.id);
-      ctx.db.prepare("UPDATE stock SET qty = qty + 1 WHERE product = ? AND colour = ?").run(r.product, r.colour);
+      ctx.db.prepare("UPDATE stock SET qty = qty + 1 WHERE product = ? AND colour = ? AND storage = ?").run(r.product, r.colour, r.storage);
     })();
     log(ctx, r.visitor_id, "reservation_expired", { product: r.product, colour: r.colour });
   }
@@ -129,11 +141,16 @@ export function releaseExpired(ctx: Ctx): number {
 }
 
 function releaseReservationsOf(ctx: Ctx, visitorId: string, why: string): void {
-  const rows = ctx.db.prepare("SELECT id, product, colour FROM reservations WHERE visitor_id = ? AND status = 'held'").all(visitorId) as Array<{ id: string; product: string; colour: string }>;
+  const rows = ctx.db.prepare("SELECT id, product, colour, storage FROM reservations WHERE visitor_id = ? AND status = 'held'").all(visitorId) as Array<{
+    id: string;
+    product: string;
+    colour: string;
+    storage: string;
+  }>;
   for (const r of rows) {
     ctx.db.transaction(() => {
       ctx.db.prepare("UPDATE reservations SET status = 'released' WHERE id = ?").run(r.id);
-      ctx.db.prepare("UPDATE stock SET qty = qty + 1 WHERE product = ? AND colour = ?").run(r.product, r.colour);
+      ctx.db.prepare("UPDATE stock SET qty = qty + 1 WHERE product = ? AND colour = ? AND storage = ?").run(r.product, r.colour, r.storage);
     })();
     log(ctx, visitorId, "reservation_released", { product: r.product, colour: r.colour, why });
   }
@@ -323,10 +340,10 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
   for (let attempt = 0; attempt < 2; attempt++) {
     const reserve = r.effects.find((e): e is Extract<Effect, { type: "reserve" }> => e.type === "reserve");
     if (!reserve) break;
-    if (takeOne(ctx.db, reserve.product, reserve.colour)) {
+    if (takeOne(ctx.db, reserve.product, reserve.colour, storageOf(reserve.product))) {
       ctx.db
-        .prepare("INSERT INTO reservations (id, visitor_id, product, colour, status, created_at, expires_at) VALUES (?, ?, ?, ?, 'held', ?, ?)")
-        .run(randomUUID(), row.customer_id, reserve.product, reserve.colour, ctx.now, ctx.now + HOLD_MS);
+        .prepare("INSERT INTO reservations (id, visitor_id, product, colour, storage, status, created_at, expires_at) VALUES (?, ?, ?, ?, ?, 'held', ?, ?)")
+        .run(randomUUID(), row.customer_id, reserve.product, reserve.colour, storageOf(reserve.product), ctx.now, ctx.now + HOLD_MS);
       log(ctx, row.customer_id, "reserved", { product: reserve.product, colour: reserve.colour, expiresAt: ctx.now + HOLD_MS });
       break;
     }

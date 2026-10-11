@@ -76,6 +76,29 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX reservations_open ON reservations (status, expires_at);
   `,
+  // 4: storage joins colour as a real axis of a SKU (ADR 5, SCOPE D37/D38):
+  // a product is sold in more than one storage size, each its own price and
+  // stock count. `stock`'s primary key widens to (product, colour, storage);
+  // SQLite cannot alter a primary key in place, so the table is rebuilt (safe
+  // without the foreign_keys dance in CLAUDE.md's gotcha note: nothing
+  // references `stock` via a foreign key, and `stock` itself has none).
+  // `reservations` only gains a plain column, since its key is `id`. No
+  // picker exists yet in the conversation script (`src/shared/conversation.ts`
+  // still asks for a colour only); the server resolves a default storage per
+  // product until a later session adds the real choice — see ADR 5.
+  `
+  CREATE TABLE stock_new (
+    product TEXT NOT NULL,
+    colour  TEXT NOT NULL,
+    storage TEXT NOT NULL DEFAULT '',
+    qty     INTEGER NOT NULL CHECK (qty >= 0),
+    PRIMARY KEY (product, colour, storage)
+  );
+  INSERT INTO stock_new (product, colour, storage, qty) SELECT product, colour, '', qty FROM stock;
+  DROP TABLE stock;
+  ALTER TABLE stock_new RENAME TO stock;
+  ALTER TABLE reservations ADD COLUMN storage TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

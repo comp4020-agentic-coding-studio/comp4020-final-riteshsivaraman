@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { PRODUCTS, START_STOCK } from "../src/shared/catalogue.ts";
+import { defaultStorage, PRODUCTS, productById, START_STOCK } from "../src/shared/catalogue.ts";
 import { begin, canMove, choicesFor, reachable, step, type ConvState, type Effect, type PlayerStateName, type ScriptId, type StepResult, type World } from "../src/shared/conversation.ts";
 import { MIGRATIONS, migrate } from "../src/server/migrate.ts";
 import { seedStock, stockOf, takeOne } from "../src/server/stock.ts";
@@ -143,11 +143,11 @@ describe("the phones specialist and stock", () => {
   });
 
   it("reserves one when there is stock, and moves the visitor to paying", () => {
-    const w: World = { stock: (p, c) => (p === "phone-a" && c === "Graphite" ? 1 : 0) };
-    let r = toColours(w, "phone-a");
-    r = choose(r.state, "colour:Graphite", w);
+    const w: World = { stock: (p, c) => (p === "iphone-17" && c === "Lavender" ? 1 : 0) };
+    let r = toColours(w, "iphone-17");
+    r = choose(r.state, "colour:Lavender", w);
     expect(r.turn.ended).toBe(true);
-    expect(effectsOf(r, "reserve")).toEqual([{ type: "reserve", product: "phone-a", colour: "Graphite" }]);
+    expect(effectsOf(r, "reserve")).toEqual([{ type: "reserve", product: "iphone-17", colour: "Lavender" }]);
     expect(r.effects.some((e) => e.type === "player_state" && e.state === "in_purchase")).toBe(true);
   });
 
@@ -165,7 +165,7 @@ describe("the phones specialist and stock", () => {
 
   it("lets the visitor go back and try another colour or another phone after a sell-out", () => {
     let r = toColours(soldOut);
-    r = choose(r.state, "colour:Graphite", soldOut);
+    r = choose(r.state, `colour:${PRODUCTS[0].colours[0]}`, soldOut);
     const again = choose(r.state, "other_colour", inStock);
     expect(again.state.node).toBe("colours");
     const other = choose(r.state, "other_phone", inStock);
@@ -220,23 +220,26 @@ describe("the database", () => {
     const db = new Database(":memory:");
     migrate(db);
     seedStock(db);
+    const storageOf17 = defaultStorage(productById("iphone-17")!);
+    const rowCount = Object.values(START_STOCK).reduce((a, byColour) => a + Object.values(byColour).reduce((b, byStorage) => b + Object.keys(byStorage).length, 0), 0);
     const first = db.prepare("SELECT COUNT(*) AS n FROM stock").get() as { n: number };
-    expect(first.n).toBe(Object.values(START_STOCK).reduce((a, m) => a + Object.keys(m).length, 0));
-    expect(takeOne(db, "phone-a", "Graphite")).toBe(true);
+    expect(first.n).toBe(rowCount);
+    expect(takeOne(db, "iphone-17", "Lavender", storageOf17)).toBe(true);
     seedStock(db); // a redeploy
-    expect(stockOf(db, "phone-a", "Graphite")).toBe(START_STOCK["phone-a"].Graphite - 1);
+    expect(stockOf(db, "iphone-17", "Lavender", storageOf17)).toBe(START_STOCK["iphone-17"].Lavender[storageOf17] - 1);
   });
 
   it("lets only one of two visitors take the last unit, and never goes below zero", () => {
     const db = new Database(":memory:");
     migrate(db);
     seedStock(db);
-    // phone-a Silver has exactly one
-    expect(stockOf(db, "phone-a", "Silver")).toBe(1);
-    const results = [takeOne(db, "phone-a", "Silver"), takeOne(db, "phone-a", "Silver")];
+    const storageOf17 = defaultStorage(productById("iphone-17")!);
+    // iphone-17 Black has exactly one
+    expect(stockOf(db, "iphone-17", "Black", storageOf17)).toBe(1);
+    const results = [takeOne(db, "iphone-17", "Black", storageOf17), takeOne(db, "iphone-17", "Black", storageOf17)];
     expect(results.filter(Boolean).length).toBe(1);
-    expect(stockOf(db, "phone-a", "Silver")).toBe(0);
-    expect(takeOne(db, "phone-a", "Blue")).toBe(false); // there were none
-    expect(() => db.prepare("UPDATE stock SET qty = -1 WHERE product = 'phone-a'").run()).toThrow();
+    expect(stockOf(db, "iphone-17", "Black", storageOf17)).toBe(0);
+    expect(takeOne(db, "iphone-17", "White", storageOf17)).toBe(false); // there were none
+    expect(() => db.prepare("UPDATE stock SET qty = -1 WHERE product = 'iphone-17'").run()).toThrow();
   });
 });

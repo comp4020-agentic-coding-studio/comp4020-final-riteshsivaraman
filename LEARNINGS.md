@@ -152,3 +152,27 @@ answered. Lesson: when interviewing for a definition that'll anchor later
 decisions (this one anchors a C9 grading criterion), an unanswered question
 needs to stay visibly unanswered (`[TK]`), not get smoothed over by my own
 next-most-plausible guess just because the conversation moved on.
+
+## Confident, multi-source web coverage about a physical design detail can still be flat wrong
+
+[`255ce19`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/255ce19)
+
+Building the iPhone 18 Pro's camera plateau, I searched for its physical
+layout since Apple's own spec pages only list lens specs, not arrangement.
+Multiple independent-looking sources (MacRumors' pre-launch leak roundup,
+corroborating coverage) agreed: a full-width camera bar, replacing the
+square plateau. I built exactly that, geometry and all, and reported it
+confidently. It was wrong — not a hallucination, a real pre-launch leak that
+didn't match the final shipped design, which Ritesh could see immediately
+because he had an actual marketing photo of the real device. The text
+sources weren't lying; they were reporting rumors that turned out false,
+and nothing about their phrasing flagged that uncertainty for me to catch.
+Lesson: for a physical-appearance claim specifically (shape, layout,
+arrangement — as opposed to a spec like a price or a chip name, which a
+retailer's own page states as fact), multi-source text corroboration is not
+the same bar as verification, because the sources can all be repeating the
+same unconfirmed leak. The fix isn't "search harder" — it's treating any
+layout claim as provisional until checked against an actual photo, and
+saying so out loud rather than reporting it as settled. (Written into
+`references/product-line.md`'s sourcing note for the rest of the product-line
+build, so later sessions building other families don't repeat it.)
