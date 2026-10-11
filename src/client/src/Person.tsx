@@ -1,6 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import { CanvasTexture } from "three";
+import { appearanceFor } from "../../shared/appearance.ts";
 import type { Group } from "three";
 
 // A simple, lean, human-shaped figure built from primitives, with a walk
@@ -40,16 +41,6 @@ const FACES: Record<Mood, Face> = {
   surprised: { browY: 0.016, browL: 0, browR: 0, browLY: 0, browRY: 0, curve: 0, open: 1, width: 0.5 },
   worried: { browY: 0.006, browL: -0.45, browR: 0.45, browLY: 0, browRY: 0, curve: -0.4, open: 0, width: 0.9 },
 };
-
-const SKIN_TONES = ["#f1c9a5", "#d9a679", "#b9835a", "#8d5a3b", "#5e3b27"];
-const PANTS = ["#2b2f3a", "#3a3d45", "#4a4036", "#2f3e52"];
-
-// stable pick from a string, so a person keeps their look
-function hashPick<T>(s: string, list: T[], salt = 0): T {
-  let h = salt;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return list[Math.abs(h) % list.length];
-}
 
 let blob: CanvasTexture | null = null;
 function personBlob(): CanvasTexture {
@@ -96,8 +87,9 @@ export function Person({
   const blinkAt = useRef(2 + (id.length % 5));
   const phase = useRef(0);
   const clock = useRef(0);
-  const skin = hashPick(id, SKIN_TONES);
-  const pants = hashPick(id, PANTS, 7);
+  // body shape, skin and trousers come from the id (shared/appearance.ts)
+  const look = appearanceFor(id);
+  const { skin, pants } = look;
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -190,7 +182,7 @@ export function Person({
   });
 
   return (
-    <group ref={root}>
+    <group ref={root} scale={[look.height * look.build, look.height, look.height * look.build]}>
       {/* a soft shadow on the floor under them */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
         <circleGeometry args={[0.42, 20]} />
@@ -239,7 +231,7 @@ export function Person({
           <cylinderGeometry args={[0.05, 0.055, 0.1, 8]} />
           <meshStandardMaterial color={skin} roughness={0.7} />
         </mesh>
-        <group ref={head} position={[0, 0.74, 0]}>
+        <group ref={head} position={[0, 0.74, 0]} scale={look.headScale}>
           <mesh>
             <sphereGeometry args={[0.115, 16, 12]} />
             <meshStandardMaterial color={skin} roughness={0.65} />
