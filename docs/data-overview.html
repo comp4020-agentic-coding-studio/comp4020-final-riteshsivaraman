@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Where the data lives</title>
+<style>
+:root{--bg:#f4f5f7;--ink:#15171a;--mut:#5b6169;--card:#fff;--line:#c9cdd3;--db:#dbe8ff;--mem:#fff1d6;--code:#e6f3e4;--brw:#efe3f7;--new:#ffe0e0}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--ink:#eceef1;--mut:#9aa1ab;--card:#1d2026;--line:#3a3f48;--db:#1f3358;--mem:#4a3a14;--code:#1f3a22;--brw:#3a2a4a;--new:#4a2222}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif;padding:24px 16px}
+.wrap{max-width:1100px;margin:0 auto}
+h1{margin:0 0 4px;font-size:26px}p.lede{margin:0 0 18px;color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.box{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px}
+.box h2{margin:0 0 2px;font-size:15px}.box .where{font-size:12px;color:var(--mut);margin-bottom:8px}
+.tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;margin:2px 4px 2px 0}
+.db{background:var(--db)}.mem{background:var(--mem)}.code{background:var(--code)}.brw{background:var(--brw)}.new{background:var(--new)}
+ul{margin:6px 0 0;padding-left:18px}li{margin:3px 0}
+.flow{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:14px;margin:18px 0}
+svg{width:100%;height:auto;display:block}
+text{fill:var(--ink);font:13px system-ui,sans-serif}.sm{font-size:11px;fill:var(--mut)}
+.n{fill:var(--card);stroke:var(--line);stroke-width:1.5}
+.a{stroke:var(--mut);stroke-width:1.5;fill:none}
+</style></head><body><div class="wrap">
+<h1>Where the data lives</h1>
+<p class="lede">Branch <code>new-idea</code>, as built on 2026-10-12. Four places hold data; only one survives a restart.</p>
+
+<div class="flow"><svg viewBox="0 0 1040 420" role="img" aria-label="Data flow between browser, server and database">
+<defs><marker id="h" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#7b828c"/></marker></defs>
+<rect class="n" x="10" y="20" width="300" height="380" rx="12" style="fill:var(--brw)"/>
+<text x="26" y="46" style="font-weight:700">Browser (each visitor)</text>
+<rect class="n" x="26" y="60" width="268" height="74" rx="8"/><text x="38" y="82">localStorage</text><text class="sm" x="38" y="100">visitor-token (who you are)</text><text class="sm" x="38" y="116">visitor-profile (last look, name, post)</text>
+<rect class="n" x="26" y="146" width="268" height="86" rx="8"/><text x="38" y="168">Net store (in memory)</text><text class="sm" x="38" y="186">others' positions, your state, current turn,</text><text class="sm" x="38" y="202">staff panel list, who is engaged / off duty</text>
+<rect class="n" x="26" y="244" width="268" height="140" rx="8"/><text x="38" y="266">Computed, never stored</text><text class="sm" x="38" y="284">NPC positions = f(server clock)</text><text class="sm" x="38" y="300">(storeday.ts, 480 s cycle)</text><text class="sm" x="38" y="320">engaged / rejoin moment = f(record, clock)</text><text class="sm" x="38" y="340">layout, plan, world, catalogue (shared code)</text>
+
+<rect class="n" x="400" y="20" width="270" height="380" rx="12" style="fill:var(--mem)"/>
+<text x="416" y="46" style="font-weight:700">Server process (Node)</text>
+<rect class="n" x="416" y="60" width="238" height="86" rx="8"/><text x="428" y="82">sessions Map</text><text class="sm" x="428" y="100">live sockets, position, heading,</text><text class="sm" x="428" y="116">kind, look. Lost on restart.</text>
+<rect class="n" x="416" y="158" width="238" height="100" rx="8"/><text x="428" y="180">service.ts (rules)</text><text class="sm" x="428" y="198">talk, choose, claim, hand on,</text><text class="sm" x="428" y="214">stock take, release expired holds.</text><text class="sm" x="428" y="230">Every change writes an events row.</text>
+<rect class="n" x="416" y="270" width="238" height="114" rx="8"/><text x="428" y="292">Pure shared code</text><text class="sm" x="428" y="310">conversation.ts (the menu machine)</text><text class="sm" x="428" y="326">duty, engage, storeday, steering</text><text class="sm" x="428" y="342">same files the browser runs</text>
+
+<rect class="n" x="760" y="20" width="270" height="380" rx="12" style="fill:var(--db)"/>
+<text x="776" y="46" style="font-weight:700">SQLite  .data/store.db</text><text class="sm" x="776" y="62">/data on Fly; the only durable store</text>
+<rect class="n" x="776" y="76" width="238" height="52" rx="8"/><text x="788" y="97">visitors</text><text class="sm" x="788" y="115">id, token, name, role, specialty, look</text>
+<rect class="n" x="776" y="136" width="238" height="52" rx="8"/><text x="788" y="157">player_state</text><text class="sm" x="788" y="175">state, since, want, needs, with</text>
+<rect class="n" x="776" y="196" width="238" height="52" rx="8"/><text x="788" y="217">conversations</text><text class="sm" x="788" y="235">script, node, data, started/ended</text>
+<rect class="n" x="776" y="256" width="238" height="44" rx="8"/><text x="788" y="277">stock  /  reservations</text><text class="sm" x="788" y="293">qty with CHECK; holds + expires_at</text>
+<rect class="n" x="776" y="308" width="238" height="44" rx="8"/><text x="788" y="329">events (append-only)</text><text class="sm" x="788" y="345">ts, visitor, type, data</text>
+<text class="sm" x="776" y="376">user_version = 3 (migrations in migrate.ts)</text>
+
+<path class="a" d="M294 100 L400 100" marker-end="url(#h)"/><text class="sm" x="302" y="92">hello+token</text>
+<path class="a" d="M400 210 L294 210" marker-end="url(#h)"/><text class="sm" x="318" y="226">state, turn…</text>
+<path class="a" d="M654 208 L760 208" marker-end="url(#h)"/><path class="a" d="M760 150 L654 150" marker-end="url(#h)"/>
+<text class="sm" x="660" y="198">writes</text><text class="sm" x="666" y="144">reads</text>
+<text class="sm" x="302" y="58">WebSocket /ws</text>
+</svg></div>
+
+<div class="grid">
+<div class="box"><h2>Durable: SQLite</h2><div class="where">src/server/migrate.ts, db.ts, stock.ts</div>
+<span class="tag db">survives restart</span>
+<ul><li><b>visitors</b>: identity, token, who they chose to be, look</li><li><b>player_state</b>: one row per visitor (where they are in their visit)</li><li><b>conversations</b>: script, current node, answers so far</li><li><b>stock</b> and <b>reservations</b>: finite units, holds with a stored deadline</li><li><b>events</b>: append-only, written first for every state change</li></ul></div>
+
+<div class="box"><h2>Live only: server memory</h2><div class="where">src/server/presence.ts</div>
+<span class="tag mem">lost on restart</span>
+<ul><li>sockets and positions (about 10 Hz, never persisted, never events)</li><li>the pending staff replies are rebuilt from conversations rows</li><li>nothing here may be needed for correctness after a restart</li></ul></div>
+
+<div class="box"><h2>Computed: the clock</h2><div class="where">src/shared/storeday.ts, engage.ts</div>
+<span class="tag code">no storage</span>
+<ul><li>NPC timetable is a pure function of server time and fixed seeds</li><li>Fly auto-stops the machine, so there is no tick and no timer</li><li>Deadlines are columns caught up on the next request</li></ul></div>
+
+<div class="box"><h2>Browser</h2><div class="where">src/client/src/net.ts</div>
+<span class="tag brw">per viewer only</span>
+<ul><li>token and last profile in localStorage (blocked storage just means a new identity)</li><li>everything else is rebuilt from the welcome message</li></ul></div>
+
+<div class="box"><h2>Code as data</h2><div class="where">src/shared/*.json, catalogue.ts</div>
+<span class="tag code">in the repo</span>
+<ul><li><b>layout.json</b>: table, bench, stool positions (floor-plan editor writes it)</li><li><b>catalogue.ts</b>: the placeholder phones (<code>[TK]</code>) and START_STOCK, seeded into the stock table at boot</li><li><b>conversation.ts</b>: the scripts</li></ul></div>
+
+<div class="box"><h2>What case/moves (option B) adds</h2><div class="where">proposed, not built; needs ADR 4</div>
+<span class="tag new">new</span>
+<ul><li><b>cases</b>: goal, owner, status, facts, deadline</li><li><b>basket lines</b> and <b>orders</b> (paid, stalled, ready, collected)</li><li><b>queue / slots</b> for the Genius Bar</li><li>conversations stay, as exchanges that belong to a case</li><li>same pattern: status column + deadline, event first</li></ul></div>
+</div>
+</div></body></html>
