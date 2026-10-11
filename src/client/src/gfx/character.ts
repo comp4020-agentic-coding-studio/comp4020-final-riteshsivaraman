@@ -735,6 +735,52 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
         T.yaw = 0.35;
         T.pitch = 0.04;
         break;
+      case "listen": {
+        // attentive: a slow nod, the head a little tilted, one hand loose
+        const nod = Math.sin(t * 1.8 + sd) * 0.5 + 0.5;
+        T.pitch = 0.04 + nod * 0.1;
+        T.tilt = 0.08;
+        T.shLx = 0.12;
+        T.elL = 0.3;
+        T.elR = 0.22;
+        T.lean = 0.03;
+        break;
+      }
+      case "handshake":
+        // the right hand out, a small pump
+        T.shRx = 1.2 + Math.sin(t * 9 + sd) * 0.07;
+        T.elR = 0.5 + Math.sin(t * 9 + sd + 1) * 0.08;
+        T.shRz = -0.05;
+        T.lean = 0.06;
+        T.pitch = 0.04;
+        T.curve = 0.3;
+        break;
+      case "clap": {
+        // forearms forward, the hands coming together and apart
+        const c = Math.sin(t * 10 + sd) * 0.5 + 0.5;
+        T.shLx = 0.95;
+        T.shRx = 0.95;
+        T.elL = 1.75;
+        T.elR = 1.75;
+        T.shLy = -(0.35 + 0.4 * c);
+        T.shRy = 0.35 + 0.4 * c;
+        T.shLz = 0;
+        T.shRz = 0;
+        T.pitch = 0.04;
+        T.curve = 0.4;
+        break;
+      }
+      case "bow": {
+        // forward from the waist and back up, hands in front
+        const b = Math.max(0, Math.sin(t * 1.7 - 0.8));
+        T.lean = 0.75 * b;
+        T.pitch = 0.25 * b;
+        T.shLx = 0.3;
+        T.shRx = 0.3;
+        T.elL = 0.5;
+        T.elR = 0.5;
+        break;
+      }
       default:
         // idle: a slow look around, arms loose
         T.yaw = Math.sin(t * 0.55 + sd) * 0.4;

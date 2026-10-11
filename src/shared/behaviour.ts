@@ -15,9 +15,14 @@ export type Behaviour =
   | "phone"
   | "crossed" // arms folded
   | "laugh"
-  | "point";
+  | "point"
+  // only ever chosen as part of an interaction (see shared/interaction.ts)
+  | "listen"
+  | "handshake"
+  | "clap"
+  | "bow";
 
-export const BEHAVIOURS: Behaviour[] = ["idle", "walk", "observe", "work", "wave", "talk", "think", "phone", "crossed", "laugh", "point"];
+export const BEHAVIOURS: Behaviour[] = ["idle", "walk", "observe", "work", "wave", "talk", "think", "phone", "crossed", "laugh", "point", "listen", "handshake", "clap", "bow"];
 
 // How often each is picked, relative to the others.
 export const WEIGHTS: Record<Behaviour, number> = {
@@ -32,6 +37,11 @@ export const WEIGHTS: Record<Behaviour, number> = {
   crossed: 1.5,
   laugh: 1,
   point: 1,
+  // part of an interaction only: never picked on their own
+  listen: 0,
+  handshake: 0,
+  clap: 0,
+  bow: 0,
 };
 
 // Seconds, [min, max].
@@ -47,6 +57,10 @@ export const DURATION: Record<Behaviour, [number, number]> = {
   crossed: [3, 8],
   laugh: [2, 4],
   point: [2, 4],
+  listen: [3, 8],
+  handshake: [2, 4],
+  clap: [2, 5],
+  bow: [1.5, 3],
 };
 
 // Expression names (see EXPRESSIONS in gfx/character.ts) that fit each.
@@ -62,12 +76,17 @@ export const MOODS: Record<Behaviour, string[]> = {
   crossed: ["neutral", "worried", "focused"],
   laugh: ["smile"],
   point: ["curious", "neutral", "surprised"],
+  listen: ["neutral", "smile", "curious"],
+  handshake: ["smile"],
+  clap: ["smile"],
+  bow: ["smile", "neutral"],
 };
 
 // Picks one by weight from r in [0, 1). `not` is skipped, so a person never
-// repeats the same thing back to back.
+// repeats the same thing back to back. Weight 0 is never picked: those are only
+// ever part of an interaction.
 export function pickBehaviour(r: number, not?: Behaviour): Behaviour {
-  const pool = BEHAVIOURS.filter((b) => b !== not);
+  const pool = BEHAVIOURS.filter((b) => b !== not && WEIGHTS[b] > 0);
   const total = pool.reduce((a, b) => a + WEIGHTS[b], 0);
   let x = Math.min(0.999999, Math.max(0, r)) * total;
   for (const b of pool) {

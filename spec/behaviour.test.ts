@@ -9,7 +9,10 @@ const EXPRESSION_NAMES = ["neutral", "smile", "curious", "focused", "surprised",
 describe("behaviour", () => {
   it("picks every behaviour over a full sweep of random numbers", () => {
     const seen = new Set(Array.from({ length: 1000 }, (_, i) => pickBehaviour(i / 1000)));
-    expect(seen.size).toBe(BEHAVIOURS.length);
+    const solo = BEHAVIOURS.filter((b) => WEIGHTS[b] > 0);
+    expect([...seen].sort()).toEqual([...solo].sort());
+    // and none that only make sense with a partner
+    for (const b of ["listen", "handshake", "clap", "bow"] as const) expect(seen.has(b)).toBe(false);
   });
 
   it("never repeats the one it was asked to skip", () => {
@@ -27,6 +30,7 @@ describe("behaviour", () => {
     }
     const total = BEHAVIOURS.reduce((a, b) => a + WEIGHTS[b], 0);
     for (const b of BEHAVIOURS) expect((count.get(b) ?? 0) / n).toBeCloseTo(WEIGHTS[b] / total, 1);
+    expect(count.get("clap") ?? 0).toBe(0);
   });
 
   it("only offers moods that exist, and at least one per behaviour", () => {
