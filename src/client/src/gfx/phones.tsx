@@ -6,6 +6,8 @@ import {
   DoubleSide,
   type Group,
   InstancedMesh,
+  LatheGeometry,
+  type BufferGeometry,
   Object3D,
   RepeatWrapping,
   SRGBColorSpace,
@@ -56,7 +58,24 @@ import {
 } from "../../../shared/plan.ts";
 import { net } from "../net.ts";
 import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W, DOOR_X, DOOR_H, BENCH_X, BENCH_HALF, FACE_X, canvasTexture, labelTexture, BoxField, Sign, std, BlobShadow, type Cuboid, type Kind } from "./common.tsx";
-import { buildPhoneBody, PHONE_MODELS } from "./phones-geo.ts";
+import {
+  buildEarbuds,
+  buildHeadphones,
+  buildPhoneBody,
+  buildTracker,
+  buildWatch,
+  EARBUD_MODELS,
+  HEADPHONE_MODELS,
+  PHONE_MODELS,
+  roundedPlane,
+  SPEAKER_MODELS,
+  speakerProfile,
+  TRACKER_MODELS,
+  WATCH_LOOP_R,
+  WATCH_MODELS,
+  type Finish,
+  type ScreenCutout,
+} from "./phones-geo.ts";
 
 
 // Original screen artwork for the products: wallpapers, app tiles, a clock
@@ -76,14 +95,33 @@ export type ScreenMode = "home" | "lock";
 // someone is actually using). `lock`: the default lock screen a marketing
 // photo shows — just the wallpaper, a big time and date, a Dynamic-Island
 // pill, no app grid. Phone/tablet only; watch and laptop ignore `mode`.
-export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" | "watch", variant: number, mode: ScreenMode = "home"): CanvasTexture {
-  const key = `${kind}:${variant}:${mode}`;
+// `opts` (phones only): `aspect` is the screen's height / width (default 2,
+// a slab phone; the folding phone's outer screen is squatter) and `cutout`
+// the front camera's shape (Dynamic Island, a notch, or a punch hole).
+export function screenTexture(
+  kind: "phone" | "tablet" | "laptop" | "tabletKb" | "watch",
+  variant: number,
+  mode: ScreenMode = "home",
+  opts: { aspect?: number; cutout?: ScreenCutout } = {},
+): CanvasTexture {
+  const aspect = kind === "phone" ? (opts.aspect ?? 2) : 0;
+  const cutout: ScreenCutout = opts.cutout ?? "island";
+  const key = `${kind}:${variant}:${mode}` + (kind === "phone" && (aspect !== 2 || cutout !== "island") ? `:${aspect.toFixed(2)}:${cutout}` : "");
   let tex = screenCache.get(key);
   if (tex) return tex;
   const [a, b, c] = SCREEN_WALLPAPERS[variant % SCREEN_WALLPAPERS.length];
   const portrait = kind === "phone";
   const W = portrait ? 128 : kind === "watch" ? 128 : 192;
-  const H = portrait ? 256 : kind === "watch" ? 128 : 128;
+  const H = portrait ? Math.round(128 * aspect) : kind === "watch" ? 128 : 128;
+  // the front camera's cutout, drawn over the wallpaper
+  const drawCutout = (g: CanvasRenderingContext2D, islandY: number, islandW: number, islandH: number) => {
+    g.fillStyle = "#0a0a0c";
+    g.beginPath();
+    if (cutout === "notch") g.roundRect(W / 2 - W * 0.21, -H * 0.02, W * 0.42, H * 0.052, H * 0.016);
+    else if (cutout === "punch") g.arc(W * 0.87, W * 0.075, W * 0.038, 0, Math.PI * 2);
+    else g.roundRect(W / 2 - islandW / 2, islandY, islandW, islandH, islandH / 2);
+    g.fill();
+  };
   tex = canvasTexture(W, H, (g) => {
     const grad = g.createLinearGradient(0, 0, W, H);
     grad.addColorStop(0, a);
@@ -101,12 +139,8 @@ export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" |
     g.fill();
     g.globalAlpha = 1;
     if (mode === "lock" && (kind === "phone" || kind === "tablet")) {
-      // Dynamic-Island pill
-      g.fillStyle = "#0a0a0c";
-      const islandW = W * 0.34;
-      g.beginPath();
-      g.roundRect(W / 2 - islandW / 2, H * 0.025, islandW, H * 0.028, H * 0.014);
-      g.fill();
+      // Dynamic-Island pill (or the model's notch / punch hole)
+      drawCutout(g, H * 0.025, W * 0.34, H * 0.028);
       // big time, like the marketing lock-screen shots
       g.fillStyle = "#ffffff";
       g.textAlign = "center";
@@ -167,11 +201,7 @@ export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" |
       g.font = `${Math.round(H * 0.024)}px -apple-system, system-ui, sans-serif`;
       g.fillText("▲○▮", W * 0.95, H * 0.032); // signal / wifi / battery, as plain glyphs
       g.textAlign = "left";
-      const islandW = W * 0.3;
-      g.fillStyle = "#0a0a0c";
-      g.beginPath();
-      g.roundRect(W / 2 - islandW / 2, H * 0.048, islandW, H * 0.026, H * 0.013);
-      g.fill();
+      drawCutout(g, H * 0.048, W * 0.3, H * 0.026);
       // two widgets
       const gap = W * 0.045;
       const wy = H * 0.1;
@@ -204,7 +234,7 @@ export function screenTexture(kind: "phone" | "tablet" | "laptop" | "tabletKb" |
       // every tile reads as a different app without copying one
       const gridTop = wy + wh + H * 0.03;
       const cols4 = 4;
-      const rows4 = 4;
+      const rows4 = H / W < 1.7 ? 3 : 4; // a squat screen fits three rows above the dock
       const cell = (W - gap * (cols4 + 1)) / cols4;
       const pitch = cell + gap;
       const palette = ["#ff9f0a", "#30d158", "#0a84ff", "#ff453a", "#5e5ce6", "#ffd60a", "#64d2ff", "#ff375f"];
@@ -312,6 +342,24 @@ export function grilleTexture(): CanvasTexture {
   return t;
 }
 
+// A light knit-mesh texture for the speaker models, so the `colour` they are
+// tinted with shows true (grilleTexture is dark and would turn every colour
+// near-black).
+let meshTex: CanvasTexture | null = null;
+function meshTexture(): CanvasTexture {
+  if (meshTex) return meshTex;
+  const t = canvasTexture(64, 64, (g) => {
+    g.fillStyle = "#f2f2f2";
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle = "#c4c4c4";
+    for (let y = 1; y < 64; y += 4) for (let x = (y / 4) % 2 ? 1 : 3; x < 64; x += 4) g.fillRect(x, y, 2, 2);
+  });
+  t.wrapS = t.wrapT = RepeatWrapping;
+  t.repeat.set(10, 4);
+  meshTex = t;
+  return t;
+}
+
 export const SCREEN_VARIANT = (colour: string): number => {
   let h = 0;
   for (let i = 0; i < colour.length; i++) h = (h * 31 + colour.charCodeAt(i)) | 0;
@@ -325,10 +373,53 @@ function shade(colour: string, factor: number): string {
   return `#${new Color(colour).multiplyScalar(factor).getHexString()}`;
 }
 
+function mix(colour: string, other: string, t: number): string {
+  return `#${new Color(colour).lerp(new Color(other), t).getHexString()}`;
+}
+
+// Built model geometry, shared by every copy of the same model in the same
+// colour (a table of twelve watches builds one), never disposed: the set of
+// models x colours is small and fixed.
+const builtCache = new Map<string, unknown>();
+function cached<T>(key: string, build: () => T): T {
+  let v = builtCache.get(key) as T | undefined;
+  if (v === undefined) {
+    v = build();
+    builtCache.set(key, v);
+  }
+  return v;
+}
+
+const lathes = new Map<string, LatheGeometry>();
+
+// The three finish buckets of a built model, one mesh (one draw call) each.
+function FinishMeshes({ parts }: { parts: Record<Finish, BufferGeometry | null> }) {
+  return (
+    <>
+      {(["matte", "metal", "gloss"] as const).map(
+        (f) =>
+          parts[f] && (
+            <mesh key={f} geometry={parts[f]!}>
+              {f === "metal" ? (
+                <meshStandardMaterial vertexColors roughness={0.3} metalness={0.85} />
+              ) : f === "gloss" ? (
+                <meshStandardMaterial vertexColors roughness={0.12} metalness={0.2} />
+              ) : (
+                <meshStandardMaterial vertexColors roughness={0.38} metalness={0.55} />
+              )}
+            </mesh>
+          ),
+      )}
+    </>
+  );
+}
+
 // Phones, watches, earbuds, headphones, speakers and trackers: one product on a
 // surface at height y, facing rotY (0 faces +z). `model` picks a real,
-// distinct-looking body from `phones-geo.ts` (SCOPE D37); omit it for the
-// plain placeholder body still used by un-costed table slots.
+// distinct-looking body from `phones-geo.ts` (SCOPE D37) — a PHONE_MODELS id
+// for a phone, WATCH_MODELS for a watch, and so on; omit it (or pass an id
+// that family doesn't have) for the plain placeholder body still used by
+// un-costed table slots. `colour` is a hex string, the body/case colour.
 export function PhoneDevice({
   kind,
   x,
@@ -349,29 +440,27 @@ export function PhoneDevice({
   screenMode?: ScreenMode;
 }) {
   const spec = kind === "phone" && model ? PHONE_MODELS[model] : undefined;
-  const plateauColour = useMemo(() => shade(colour, 0.78), [colour]);
-  const built = useMemo(() => (spec ? buildPhoneBody(spec, colour, plateauColour) : null), [spec, colour, plateauColour]);
+  const watch = kind === "watch" && model ? WATCH_MODELS[model] : undefined;
+  const buds = kind === "earbuds" && model ? EARBUD_MODELS[model] : undefined;
+  const cans = kind === "headphones" && model ? HEADPHONE_MODELS[model] : undefined;
+  const speaker = kind === "speaker" && model ? SPEAKER_MODELS[model] : undefined;
+  const tag = kind === "airtag" && model ? TRACKER_MODELS[model] : undefined;
+  const built = spec ? cached(`phone:${spec.id}:${colour}`, () => buildPhoneBody(spec, colour, shade(colour, spec.plateau.tone ?? 0.78))) : null;
+  const watchBuilt = watch ? cached(`watch:${watch.id}:${colour}`, () => buildWatch(watch, colour, mix(colour, "#e9e6df", 0.35))) : null;
+  const budsBuilt = buds ? cached(`buds:${buds.id}:${colour}`, () => buildEarbuds(buds, colour)) : null;
+  const cansBuilt = cans ? cached(`cans:${cans.id}:${colour}`, () => buildHeadphones(cans, colour)) : null;
+  const tagBuilt = tag ? cached(`tag:${tag.id}`, () => buildTracker(tag)) : null;
+  const scr = spec?.screen;
+  const screenW = scr?.width ?? (spec ? spec.width * 0.86 : 0);
+  const screenH = scr?.height ?? (spec ? spec.length * 0.9 : 0);
   return (
     <group position={[x, y, z]} rotation={[0, rotY, 0]}>
       {kind === "phone" && spec && built && (
         <group position={[0, spec.length / 2 + 0.012, 0]}>
-          {(["matte", "metal", "gloss"] as const).map(
-            (f) =>
-              built[f] && (
-                <mesh key={f} geometry={built[f]!}>
-                  {f === "metal" ? (
-                    <meshStandardMaterial vertexColors roughness={0.3} metalness={0.85} />
-                  ) : f === "gloss" ? (
-                    <meshStandardMaterial vertexColors roughness={0.12} metalness={0.2} />
-                  ) : (
-                    <meshStandardMaterial vertexColors roughness={0.38} metalness={0.55} />
-                  )}
-                </mesh>
-              ),
-          )}
-          <mesh position={[0, 0, spec.thickness / 2 + 0.0004]}>
-            <planeGeometry args={[spec.width * 0.86, spec.length * 0.9]} />
-            <meshBasicMaterial map={screenTexture("phone", SCREEN_VARIANT(colour), screenMode)} toneMapped={false} />
+          <FinishMeshes parts={built} />
+          <mesh position={[scr?.offsetX ?? 0, 0, spec.thickness / 2 + 0.0004]}>
+            <planeGeometry args={[screenW, screenH]} />
+            <meshBasicMaterial map={screenTexture("phone", SCREEN_VARIANT(colour), screenMode, { aspect: screenH / screenW, cutout: scr?.cutout })} toneMapped={false} />
           </mesh>
           <mesh position={[0, -spec.length / 2 - 0.006, 0]}>
             <cylinderGeometry args={[0.05, 0.05, 0.012, 20]} />
@@ -397,7 +486,22 @@ export function PhoneDevice({
           </group>
         </>
       )}
-      {kind === "watch" && (
+      {kind === "watch" && watch && watchBuilt && (
+        <>
+          {/* a low display puck, the band looped over it, case facing out */}
+          <mesh position={[0, 0.006, 0]}>
+            <cylinderGeometry args={[0.042, 0.045, 0.012, 24]} />
+            {std(STAND, 0.5, 0.4)}
+          </mesh>
+          <group position={[0, 0.012, -WATCH_LOOP_R * 0.35]}>
+            <FinishMeshes parts={watchBuilt.parts} />
+            <mesh position={[0, WATCH_LOOP_R, watchBuilt.screen.z + 0.0003]} geometry={cached(`watchScreen:${watch.id}`, () => roundedPlane(watchBuilt.screen.w, watchBuilt.screen.h, watchBuilt.screen.r))}>
+              <meshBasicMaterial map={screenTexture("watch", SCREEN_VARIANT(colour))} toneMapped={false} />
+            </mesh>
+          </group>
+        </>
+      )}
+      {kind === "watch" && !watch && (
         <>
           <mesh position={[0, 0.01, 0]}>
             <cylinderGeometry args={[0.07, 0.07, 0.02, 20]} />
@@ -417,7 +521,18 @@ export function PhoneDevice({
           </mesh>
         </>
       )}
-      {kind === "earbuds" && (
+      {kind === "earbuds" && buds && budsBuilt && (
+        <>
+          <mesh position={[0, 0.005, 0]}>
+            <cylinderGeometry args={[0.045, 0.047, 0.01, 24]} />
+            {std(STAND, 0.5, 0.4)}
+          </mesh>
+          <group position={[0, 0.01, 0.004]}>
+            <FinishMeshes parts={budsBuilt} />
+          </group>
+        </>
+      )}
+      {kind === "earbuds" && !buds && (
         <>
           <mesh position={[0, 0.01, 0]}>
             <cylinderGeometry args={[0.08, 0.08, 0.02, 20]} />
@@ -437,7 +552,18 @@ export function PhoneDevice({
           </mesh>
         </>
       )}
-      {kind === "headphones" && (
+      {kind === "headphones" && cans && cansBuilt && (
+        <>
+          <mesh position={[0, 0.005, 0]}>
+            <boxGeometry args={[cans.width + 0.02, 0.01, cans.depth + 0.03]} />
+            {std(STAND, 0.5, 0.4)}
+          </mesh>
+          <group position={[0, 0.01, 0]}>
+            <FinishMeshes parts={cansBuilt} />
+          </group>
+        </>
+      )}
+      {kind === "headphones" && !cans && (
         <>
           <mesh position={[0, 0.01, 0]}>
             <boxGeometry args={[0.14, 0.02, 0.14]} />
@@ -455,13 +581,35 @@ export function PhoneDevice({
           ))}
         </>
       )}
-      {kind === "speaker" && (
+      {kind === "speaker" && speaker && (
+        <>
+          <mesh
+            geometry={(() => {
+              let g = lathes.get(speaker.id);
+              if (!g) {
+                g = new LatheGeometry(speakerProfile(speaker), 40);
+                lathes.set(speaker.id, g);
+              }
+              return g;
+            })()}
+          >
+            <meshStandardMaterial color={colour} map={meshTexture()} roughness={0.85} metalness={0.02} />
+          </mesh>
+          {/* the touch surface on top */}
+          <mesh position={[0, speaker.height + 0.0004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[speaker.topR, 32]} />
+            <meshStandardMaterial color={mix(colour, "#101114", 0.45)} roughness={0.15} metalness={0.1} />
+          </mesh>
+        </>
+      )}
+      {kind === "speaker" && !speaker && (
         <mesh position={[0, 0.1, 0]}>
           <cylinderGeometry args={[0.09, 0.1, 0.2, 20]} />
           <meshStandardMaterial color={colour} map={grilleTexture()} roughness={0.7} metalness={0.05} />
         </mesh>
       )}
-      {kind === "airtag" && (
+      {kind === "airtag" && tag && tagBuilt && <FinishMeshes parts={tagBuilt} />}
+      {kind === "airtag" && !tag && (
         <mesh position={[0, 0.012, 0]}>
           <cylinderGeometry args={[0.04, 0.04, 0.012, 20]} />
           {std("#eeeeec", 0.3, 0.5)}
