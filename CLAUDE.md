@@ -113,9 +113,10 @@ read like the crit agents' median answer.)
 
 ## Parody integrity
 This is an *obvious* spoof (D6), not a discreet lookalike. No real
-company's name, logo, product name or distinctive mark anywhere in code,
-textures, signs or copy; invent the marks and names, or use generic words
-("PHONE", "WATCH"). Everything is procedural: no downloaded models,
+company's name, logo or distinctive mark anywhere in code, textures, signs or
+copy; invent the marks and the store's name. **Product and model names may be
+the real current ones (D37, Ritesh 2026-10-12), copied from the maker's own
+pages with the source and date recorded, never from memory.** Everything is procedural: no downloaded models,
 textures or fonts (`docs/graphics-brief.md`). Never presented as official.
 Before shipping, a fresh subagent with no prior context reviews the live app
 for stray real names and for visible COMP4020/crit/marker language inside
@@ -176,6 +177,8 @@ find every resource by reading this file, not by discovering it mid-task.
   goal and conversations as moves with preconditions; either party can start.
   Supersedes ADR 3's "character only talks if the visitor starts". Reasoning `[TK]`.
 - `docs/data-overview.html` — diagram of where every kind of data lives today.
+- `docs/prompts/product-line-session.md` — the prompt for the session that designs
+  every device as a real, named, distinct model (SCOPE D37). Hand it to a fresh session.
 - `docs/blueprint/` — the floor plan, four wall elevations, ceiling and mall
   drawings (D20: the drawings are the specification), drawn from
   `src/shared/plan.ts`, `world.ts` and `mall.ts`.

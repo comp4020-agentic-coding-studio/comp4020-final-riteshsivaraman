@@ -13,10 +13,11 @@ code (geometry, canvas textures, small instanced meshes).
 
 ## Never
 
-- Use a real company's name, logo, product name or distinctive mark anywhere in
-  a texture or sign. Invent the brand marks, product names and box art. Where a
-  name is needed, use generic words ("PHONE", "WATCH", "BUDS", "CASE") or an
-  abstract mark. Do not invent the company name itself: that is `[TK]`.
+- Use a real company's name, logo or distinctive mark anywhere in a texture or
+  sign. Invent the brand marks and box art. **Product and model names may be the
+  real current ones (SCOPE D37), sourced from the maker's pages, not memory.**
+  Where no real name applies use generic words ("CASE") or an abstract mark.
+  Do not invent the company name itself: that is `[TK]`.
 - Change `src/shared/*` or any spec. Positions, sizes and heights there are the
   model the server, the collision and the drawings use. Draw on them, do not
   move them. If you believe a shared number is wrong, say so in your report.
