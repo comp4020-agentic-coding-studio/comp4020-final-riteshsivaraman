@@ -143,6 +143,22 @@ after Ritesh's "always photo-verify whenever you can" instruction:
 - `docs/graphics-brief.md` now has a standing "always photo-verify what you
   can" rule for every future family (Ritesh, after the 18 Pro's wrong-plateau
   lesson repeated as an explicit instruction).
+- **Photo-verification pass, same day** (`d0768ff`, `4f0db02`, `5b1ba13`):
+  went back over every guess the two builds above had flagged as text-only,
+  against Apple's own AU buttons/connectors/size diagrams and gallery
+  photos (browser tools, not WebFetch). Phones: 3 of 5 flagged items were
+  actually wrong (iPhone Duo's side/volume buttons on the wrong half of the
+  folded body, Watch Ultra 4's Action button above centre instead of below,
+  AirPods Max 2's crown and listening-mode button swapped) — fixed; 2 were
+  already right, comments upgraded from "unverified" to a cited source.
+  Computers: most flagged guesses were wrong (iPad Pro's camera-bump
+  internals and several models' button positions, all three MacBooks' port
+  order/spacing, the Mac Studio's entire back port set — invented as "six
+  USB-C", it's Thunderbolt/Ethernet/USB-A/HDMI — the iMac's housing height
+  and stand angle, both displays' stands rebuilt from a dimensioned
+  drawing) — fixed; base iPad's resolution/ppi/no-flash claim confirmed.
+  Net: confirms the new graphics-brief rule earns its keep — most first-pass
+  guesses across both families turned out wrong on inspection, not right.
 
 **Open for Step 4 (table placement):** Ritesh wants **fewer iMacs per
 table**, not a wider bench pitch or a scaled-down model — the iMac is built
