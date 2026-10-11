@@ -53,6 +53,14 @@ describe("appearance", () => {
     expect(new Set(looks.map((a) => a.jaw.toFixed(2))).size).toBeGreaterThan(15);
   });
 
+  it("gives some people facial hair and some none, in every style", () => {
+    const styles = new Set(looks.map((a) => a.beard));
+    expect(styles.size).toBe(5);
+    const none = looks.filter((a) => a.beard === "none").length;
+    expect(none).toBeGreaterThan(looks.length * 0.35);
+    expect(none).toBeLessThan(looks.length * 0.65);
+  });
+
   it("varies features independently, not as a handful of fixed bundles", () => {
     const combos = new Set(looks.map((a) => `${a.hairStyle}|${a.skin}|${a.eyeColour}|${a.pants}`));
     expect(combos.size).toBeGreaterThan(150);

@@ -7,6 +7,7 @@
 // (a tall person is not always also broad, or dark-haired).
 
 export type HairStyle = "bald" | "buzz" | "short" | "side" | "long" | "bun" | "curly";
+export type BeardStyle = "none" | "stubble" | "moustache" | "goatee" | "full";
 
 export interface Appearance {
   height: number; // scale on the whole figure; 1 is about 1.7 m
@@ -14,6 +15,7 @@ export interface Appearance {
   headScale: number;
   skin: string;
   hairStyle: HairStyle;
+  beard: BeardStyle; // facial hair, rolled per person, not tied to body shape
   hairColour: string;
   browColour: string;
   eyeColour: string;
@@ -44,6 +46,8 @@ const HAIR_COLOURS = ["#15110e", "#2a1d14", "#4a3322", "#6b4a2e", "#8a3b1f", "#c
 const EYE_COLOURS = ["#1b1b1f", "#3a2616", "#5a3d1f", "#4d6b3a", "#4f6f8f"];
 const SHOES = ["#1d1f24", "#3b3b3f", "#e9e9e9", "#5b4636", "#7a2e2e", "#2f4057"];
 const PANTS = ["#2b2f3a", "#3a3d45", "#4a4036", "#2f3e52", "#53575f"];
+// about half of people have none; repeated entries are weights
+const BEARDS: BeardStyle[] = ["none", "none", "none", "none", "none", "stubble", "stubble", "moustache", "goatee", "full"];
 // repeated entries are weights: short is common, bald and bun are not
 const HAIR_STYLES: HairStyle[] = [
   "short", "short", "short", "side", "side", "buzz", "long", "long", "curly", "bun", "bald",
@@ -75,6 +79,7 @@ export function appearanceFor(id: string): Appearance {
     headScale: between(0.94, 1.07, rand(id, 3)),
     skin: pick(SKIN_TONES, rand(id, 5)),
     hairStyle: pick(HAIR_STYLES, rand(id, 6)),
+    beard: pick(BEARDS, rand(id, 20)),
     hairColour,
     browColour: hairColour,
     eyeColour: pick(EYE_COLOURS, rand(id, 7)),

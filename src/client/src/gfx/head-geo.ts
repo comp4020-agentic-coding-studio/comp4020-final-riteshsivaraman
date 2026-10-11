@@ -1,5 +1,5 @@
 import { BufferGeometry, Color, Float32BufferAttribute, IcosahedronGeometry } from "three";
-import type { HairStyle } from "../../../shared/appearance.ts";
+import type { BeardStyle, HairStyle } from "../../../shared/appearance.ts";
 
 // A low-poly head: one displaced icosphere, flat shaded, placed by the
 // figure-drawing landmarks (Loomis: hairline, brow, nose base and chin in
@@ -56,6 +56,26 @@ function hairMargin(nx: number, ny: number, nz: number, style: HairStyle): numbe
   return ny - edge;
 }
 
+// How far a point is inside the facial hair, positive inside, on the unit
+// sphere (face at -z). The mouth sits at about ny -0.58, the nose tip at -0.3.
+function beardMargin(nx: number, ny: number, nz: number, style: BeardStyle): number {
+  if (style === "none" || nz > 0.3) return -1;
+  const ax = Math.abs(nx);
+  switch (style) {
+    case "moustache":
+      return Math.min(0.42 - ax, ny + 0.57, -0.4 - ny);
+    case "goatee":
+      return Math.min(0.3 - ax, -0.64 - ny, 0.2 - nz > 0 ? 1 : -1);
+    case "full": {
+      const jaw = -0.27 - ny;
+      const sideburn = Math.min(ax - 0.8, 0.12 - ny);
+      return Math.max(jaw, sideburn);
+    }
+    default: // stubble: the lower face, the same area as a full beard
+      return Math.max(-0.27 - ny, Math.min(ax - 0.8, 0.12 - ny));
+  }
+}
+
 function features(nx: number, ny: number, nz: number, s: HeadShape): number {
   const front = smooth(0.1, 0.6, -nz);
   if (front === 0) return 0;
@@ -70,7 +90,14 @@ function features(nx: number, ny: number, nz: number, s: HeadShape): number {
   return front * (brow + sockets + bridge + tip + alae + cheeks + lips + chin);
 }
 
-export function buildHead(shape: HeadShape, hair: HairStyle, hairHex: string, skinHex: string, detail = 4): BufferGeometry {
+export function buildHead(
+  shape: HeadShape,
+  hair: HairStyle,
+  hairHex: string,
+  skinHex: string,
+  beard: BeardStyle = "none",
+  detail = 4,
+): BufferGeometry {
   const geo = new IcosahedronGeometry(1, detail);
   geo.deleteAttribute("uv");
   geo.deleteAttribute("normal");
@@ -79,6 +106,8 @@ export function buildHead(shape: HeadShape, hair: HairStyle, hairHex: string, sk
   const col = new Float32Array(pos.count * 3);
   const skin = new Color(skinHex);
   const hairC = new Color(hairHex);
+  const beardC = hairC.clone().multiplyScalar(0.9);
+  const stubbleC = skin.clone().lerp(hairC, 0.42);
   for (let i = 0; i < pos.count; i++) {
     const nx = pos.getX(i);
     const ny = pos.getY(i);
@@ -88,7 +117,8 @@ export function buildHead(shape: HeadShape, hair: HairStyle, hairHex: string, sk
     // hair has thickness; curly has bumps in it
     const inside = smooth(-0.02, 0.1, hairMargin(nx, ny, nz, hair));
     const bump = hair === "curly" ? 0.006 * (0.5 + 0.5 * Math.sin(nx * 15 + 1) * Math.sin(ny * 13 + 2) * Math.sin(nz * 14 + 3)) : 0;
-    const off = features(nx, ny, nz, shape) + inside * (0.007 + bump);
+    const beardIn = beard === "none" || beard === "stubble" ? 0 : smooth(-0.04, 0.12, beardMargin(nx, ny, nz, beard));
+    const off = features(nx, ny, nz, shape) + inside * (0.007 + bump) + beardIn * 0.0055;
     // squareness pushes the sides and the jaw out towards a box, mostly low
     // down; forehead width scales the upper half
     const wq = shape.square * (0.3 + 0.7 * smooth(0.3, -0.6, ny));
@@ -105,7 +135,14 @@ export function buildHead(shape: HeadShape, hair: HairStyle, hairHex: string, sk
     const cx = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3;
     const cy = (pos.getY(t) + pos.getY(t + 1) + pos.getY(t + 2)) / 3;
     const cz = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3;
-    const c = hairMargin(cx, cy, cz, hair) > 0 ? hairC : skin;
+    const c =
+      hairMargin(cx, cy, cz, hair) > 0
+        ? hairC
+        : beard !== "none" && beardMargin(cx, cy, cz, beard) > 0
+          ? beard === "stubble"
+            ? stubbleC
+            : beardC
+          : skin;
     for (let k = 0; k < 3; k++) {
       col[(t + k) * 3] = c.r;
       col[(t + k) * 3 + 1] = c.g;

@@ -2,7 +2,7 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appearanceFor } from "../../../shared/appearance.ts";
-import { BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, FACE_SHAPES, poseCharacter, SHADINGS, type Character, type Mood } from "./character.ts";
+import { BEARD_CHOICES, BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, FACE_SHAPES, poseCharacter, SHADINGS, type Character, type Mood } from "./character.ts";
 
 // Dev only (`?stage=1`): a full-body person on a stage. New character gives a
 // random person, Next expression cycles the face, Walk starts the walk cycle,
@@ -70,10 +70,12 @@ export function CharacterStage() {
   const [walking, setWalking] = useState(() => new URLSearchParams(location.search).has("walk"));
   const [crowd, setCrowd] = useState(() => new URLSearchParams(location.search).has("crowd"));
   const [stats, setStats] = useState("");
-  const [eyeIx, setEyeIx] = useState(() => Number(new URLSearchParams(location.search).get("eyes") ?? 0));
+  const [eyeIx, setEyeIx] = useState(() => Number(new URLSearchParams(location.search).get("eyes") ?? EYE_STYLES.indexOf("round")));
   const [bodyIx, setBodyIx] = useState(() => Number(new URLSearchParams(location.search).get("body") ?? 0));
   const [faceIx, setFaceIx] = useState(() => Number(new URLSearchParams(location.search).get("face") ?? 0));
-  const [shadeIx, setShadeIx] = useState(() => Number(new URLSearchParams(location.search).get("shade") ?? 0));
+  const [shadeIx, setShadeIx] = useState(() => Number(new URLSearchParams(location.search).get("shade") ?? SHADINGS.indexOf("toon")));
+  const [beardIx, setBeardIx] = useState(() => Number(new URLSearchParams(location.search).get("beard") ?? 0));
+  const beard = BEARD_CHOICES[beardIx % BEARD_CHOICES.length];
   const face = FACE_SHAPES[faceIx % FACE_SHAPES.length];
   const shading = SHADINGS[shadeIx % SHADINGS.length];
   const eyes = EYE_STYLES[eyeIx % EYE_STYLES.length];
@@ -81,7 +83,7 @@ export function CharacterStage() {
   const [close, setClose] = useState(() => new URLSearchParams(location.search).has("close"));
   const id = `person-${seed}`;
   const look = useMemo(() => appearanceFor(id), [id]);
-  const single = useMemo(() => buildCharacter(look, shirtFor(id), { eyes, body, face, shading }), [look, id, eyes, body, face, shading]);
+  const single = useMemo(() => buildCharacter(look, shirtFor(id), { eyes, body, face, shading, beard }), [look, id, eyes, body, face, shading, beard]);
   const people = useMemo(() => {
     if (!crowd) return [];
     return Array.from({ length: 40 }, (_, i) => {
@@ -104,6 +106,7 @@ export function CharacterStage() {
       if (e.key === "b") setBodyIx((i) => i + 1);
       if (e.key === "s") setFaceIx((i) => i + 1);
       if (e.key === "t") setShadeIx((i) => i + 1);
+      if (e.key === "g") setBeardIx((i) => i + 1);
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
@@ -138,6 +141,7 @@ export function CharacterStage() {
         <button style={btn} onClick={() => setBodyIx((i) => i + 1)}>Body: {body} (B)</button>
         <button style={btn} onClick={() => setFaceIx((i) => i + 1)}>Face: {face} (S)</button>
         <button style={btn} onClick={() => setShadeIx((i) => i + 1)}>Shading: {shading} (T)</button>
+        <button style={btn} onClick={() => setBeardIx((i) => i + 1)}>Beard: {beard === "auto" ? `auto (${look.beard})` : beard} (G)</button>
       </div>
       <div style={{ position: "fixed", left: 16, bottom: 16, fontSize: 13, color: "#111", lineHeight: 1.5, zIndex: 5 }}>
         {crowd ? (
