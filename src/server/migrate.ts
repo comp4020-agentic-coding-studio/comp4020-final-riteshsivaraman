@@ -25,6 +25,42 @@ export const MIGRATIONS: string[] = [
     data       TEXT
   );
   `,
+  // 2: who a visitor chose to be, how they look, where they are in their visit,
+  // the conversations they have had with characters, and what the shop has in
+  // stock (shared, finite, and so contended). Existing visitors become
+  // customers with the default look.
+  `
+  ALTER TABLE visitors ADD COLUMN role TEXT NOT NULL DEFAULT 'customer';
+  ALTER TABLE visitors ADD COLUMN specialty TEXT;
+  ALTER TABLE visitors ADD COLUMN look TEXT;
+  CREATE TABLE player_state (
+    visitor_id TEXT PRIMARY KEY REFERENCES visitors(id),
+    state      TEXT NOT NULL,
+    since      INTEGER NOT NULL,
+    want       TEXT,
+    needs      TEXT,
+    with_id    TEXT,
+    data       TEXT
+  );
+  CREATE TABLE conversations (
+    id          TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL REFERENCES visitors(id),
+    with_id     TEXT NOT NULL,
+    with_kind   TEXT NOT NULL,
+    script      TEXT NOT NULL,
+    node        TEXT NOT NULL,
+    data        TEXT,
+    started_at  INTEGER NOT NULL,
+    ended_at    INTEGER
+  );
+  CREATE INDEX conversations_customer ON conversations (customer_id, ended_at);
+  CREATE TABLE stock (
+    product TEXT NOT NULL,
+    colour  TEXT NOT NULL,
+    qty     INTEGER NOT NULL CHECK (qty >= 0),
+    PRIMARY KEY (product, colour)
+  );
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

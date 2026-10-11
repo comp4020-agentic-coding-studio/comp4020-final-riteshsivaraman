@@ -19,7 +19,7 @@ it("builds the schema on an empty database", () => {
 it("is idempotent: a second run changes nothing and does not throw", () => {
   const db = new Database(":memory:");
   migrate(db);
-  db.prepare("INSERT INTO visitors VALUES ('a','t','n','c',1,1)").run();
+  db.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES ('a','t','n','c',1,1)").run();
   migrate(db);
   expect(db.prepare("SELECT COUNT(*) AS n FROM visitors").get()).toEqual({ n: 1 });
 });
@@ -27,7 +27,7 @@ it("is idempotent: a second run changes nothing and does not throw", () => {
 it("picks up only the steps a database has not seen", () => {
   const db = new Database(":memory:");
   migrate(db, MIGRATIONS.slice(0, 1));
-  db.prepare("INSERT INTO visitors VALUES ('a','t','n','c',1,1)").run();
+  db.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES ('a','t','n','c',1,1)").run();
   migrate(db, [...MIGRATIONS, "ALTER TABLE visitors ADD COLUMN note TEXT;"]);
   expect(columns(db, "visitors")).toContain("note");
   expect(db.prepare("SELECT COUNT(*) AS n FROM visitors").get()).toEqual({ n: 1 });

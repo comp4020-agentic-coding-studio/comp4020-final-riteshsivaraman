@@ -165,6 +165,10 @@ find every resource by reading this file, not by discovering it mid-task.
   before changing stack, storage, or the data model. An accepted record is
   never edited; a changed decision gets a new, numbered record that
   supersedes it and says why.
+- `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
+  the database, menu conversations, employees online see customers' states. Facts
+  filled in, reasoning `[TK]` for Ritesh. Read before touching `visitors`,
+  `player_state`, `conversations`, `stock` or `src/shared/conversation.ts`.
 - `docs/blueprint/` — the floor plan, four wall elevations, ceiling and mall
   drawings (D20: the drawings are the specification), drawn from
   `src/shared/plan.ts`, `world.ts` and `mall.ts`.

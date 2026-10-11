@@ -57,6 +57,18 @@ character stage with every option and a crowd test lives at `?stage=1`
 visitors (decision pending, D32); `Person.tsx` is now unused; the draw call and
 phone frame-rate cost of ~30 people has not been measured on a real device.
 
+**2026-10-12, later (conversations, subsystem 1 of 3):** ADR 3 drafted
+(`docs/adr/0003-...`, reasoning `[TK]` for Ritesh); D34 in SCOPE.md. Migration 2
+adds `visitors.role/specialty/look`, `player_state`, `conversations`, `stock`.
+`src/shared/conversation.ts` is the pure menu state machine (greeter and phones
+script; stock passed in), `src/server/stock.ts` seeds and takes stock
+atomically, `src/shared/catalogue.ts` is `[TK]` placeholder data. Specs:
+`conversation` (graph integrity, out-of-stock cannot be bought, last unit goes
+to one visitor, migration keeps existing visitors). **Not yet:** server wiring
+(protocol messages, persisting state, broadcasting to employees), the
+onboarding screen and character customiser, the conversation menu UI, the
+staff view, NPC takeover and rejoin (D1). Open: stock reservation expiry.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
