@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { migrate } from "./migrate.ts";
+import { seedStock } from "./stock.ts";
 
 // One SQLite file on the Fly volume (/data in the container, .data/ locally).
 // Only things that must outlive a restart live here: who a visitor is, and a
@@ -17,3 +18,5 @@ db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
 migrate(db);
+// what is on the shelves at the start; never resets what the shop has now
+seedStock(db);

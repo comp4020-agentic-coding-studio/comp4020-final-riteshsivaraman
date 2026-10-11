@@ -69,6 +69,22 @@ to one visitor, migration keeps existing visitors). **Not yet:** server wiring
 onboarding screen and character customiser, the conversation menu UI, the
 staff view, NPC takeover and rejoin (D1). Open: stock reservation expiry.
 
+**2026-10-12, later still (conversations, subsystem 2 of 3: the server):**
+`src/server/service.ts` holds the store's rules over a database (start a
+conversation, take a turn, employee reply, claim, hand on, leave, reservation
+expiry, who is waiting), returns the messages to send and touches no socket;
+`presence.ts` only validates the profile in `hello` and delivers. New:
+`shared/look.ts`, `profile.ts`, `duty.ts` (profile validation; posts and which
+NPCs stand down), migration 3 (`reservations`), protocol messages (`talk_start`,
+`talk_choose`, `staff_respond`, `claim`, `hand_on`; `turn`, `staff_turn`,
+`staff_view`, `state`, `duty`, `engaged`, `released`, `notice`; `welcome` now
+carries identity, state, offDuty, engaged). Specs: `service` (in-memory db, 6
+mutations checked), `profile`, `conversations-live` (real sockets).
+`seedStock` runs at boot (found empty in the real file, fixed). **Not yet:** the
+entry screen and character customiser, the conversation menu and employee panel
+in the client, drawing identity/look of other visitors, NPCs walking to a visitor
+and back (D1 on screen), E to talk, deploying.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.

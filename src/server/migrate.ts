@@ -61,6 +61,21 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (product, colour)
   );
   `,
+  // 3: a unit put aside for a visitor is held for a while, not forever. The
+  // deadline is a column; the next request that touches stock gives back what
+  // has expired (no timer: the machine stops when nobody is connected).
+  `
+  CREATE TABLE reservations (
+    id         TEXT PRIMARY KEY,
+    visitor_id TEXT NOT NULL REFERENCES visitors(id),
+    product    TEXT NOT NULL,
+    colour     TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'held',
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX reservations_open ON reservations (status, expires_at);
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

@@ -41,8 +41,8 @@ export const HEIGHT_RANGE = [0.9, 1.1] as const;
 // the next person even though collision keeps them apart.
 export const BUILD_RANGE = [0.82, 1.1] as const;
 
-const SKIN_TONES = ["#f1c9a5", "#e3b68d", "#d9a679", "#b9835a", "#8d5a3b", "#5e3b27"];
-const HAIR_COLOURS = ["#15110e", "#2a1d14", "#4a3322", "#6b4a2e", "#8a3b1f", "#c9a25a", "#8f8f92", "#d8d6d0"];
+export const SKIN_TONES = ["#f1c9a5", "#e3b68d", "#d9a679", "#b9835a", "#8d5a3b", "#5e3b27"];
+export const HAIR_COLOURS = ["#15110e", "#2a1d14", "#4a3322", "#6b4a2e", "#8a3b1f", "#c9a25a", "#8f8f92", "#d8d6d0"];
 const EYE_COLOURS = ["#1b1b1f", "#3a2616", "#5a3d1f", "#4d6b3a", "#4f6f8f"];
 const SHOES = ["#1d1f24", "#3b3b3f", "#e9e9e9", "#5b4636", "#7a2e2e", "#2f4057"];
 const PANTS = ["#2b2f3a", "#3a3d45", "#4a4036", "#2f3e52", "#53575f"];

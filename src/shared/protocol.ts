@@ -9,10 +9,63 @@ export interface Pose {
   ry: number;
 }
 
+import type { PlayerStateName } from "./conversation.ts";
+import type { LookChoice } from "./look.ts";
+import type { Kind, Profile, Specialty } from "./profile.ts";
+
 export interface VisitorInfo {
   id: string;
   name: string;
   colour: string;
+}
+
+// What everyone else may know about a visitor: who they chose to be, and how
+// they look (so their character can be drawn).
+export interface Identity {
+  kind: Kind;
+  specialty?: Specialty;
+  look?: LookChoice;
+}
+
+// One customer as an employee sees them: where they are in their visit.
+export interface CustomerView {
+  id: string;
+  name: string;
+  state: PlayerStateName;
+  want: string | null;
+  needs: string | null; // the post they are waiting for, if any
+  sinceMs: number; // how long they have been in this state
+  withName: string | null; // who is dealing with them now
+  note: string | null; // a note left when they were handed on
+}
+
+// The menu a visitor is shown, and whose turn it is.
+export interface TurnView {
+  conversationId: string;
+  withId: string;
+  withName: string;
+  say: string;
+  choices: Array<{ id: string; label: string }>;
+  ended: boolean;
+  awaiting: "customer" | "staff"; // whose turn: a customer waits on staff, shown no menu
+}
+
+// The employee's side of a menu conversation: what the customer picked, and
+// the reply the script would give, to send or change.
+export interface StaffTurnView {
+  conversationId: string;
+  customerId: string;
+  customerName: string;
+  customerPicked: string;
+  scripted: string; // the scripted reply, if they just reply
+  actions: Array<{ id: "reply" | "hand_to_genius" | "end"; label: string }>;
+}
+
+export interface Engagement {
+  npcId: string;
+  visitorId: string;
+  since: number; // server time
+  at: { x: number; z: number }; // where the visitor stood when it began
 }
 
 // Who a visitor is acting as. Customers stay on the shop floor; staff may also
@@ -21,15 +74,22 @@ export interface VisitorInfo {
 export type Role = "customer" | "staff";
 
 export type ClientMessage =
-  | { type: "hello"; token: string | null }
+  | { type: "hello"; token: string | null; profile?: Profile }
   | { type: "move"; x: number; z: number; ry: number }
   | { type: "role"; role: Role }
+  // start a conversation with an NPC or an employee (E near them)
+  | { type: "talk_start"; withId: string }
+  | { type: "talk_choose"; conversationId: string; choice: string }
+  // an employee's side
+  | { type: "staff_respond"; conversationId: string; action: "reply" | "hand_to_genius" | "end" }
+  | { type: "claim"; customerId: string }
+  | { type: "hand_on"; customerId: string; to: string; note?: string }
   // Sent as an ordinary message just before closing. A clean WebSocket close
   // takes about 5 s to reach the server through Fly's proxy (measured), while
   // a message arrives at once, so this is what makes a departure prompt.
   | { type: "bye" };
 
-export type Present = VisitorInfo & Pose & { role: Role };
+export type Present = VisitorInfo & Pose & Identity & { role: Role };
 
 export type ServerMessage =
   | {
@@ -39,11 +99,25 @@ export type ServerMessage =
       others: Present[];
       // The server's clock, so every client moves the NPCs to the same place.
       serverTime: number;
+      // who you are (as validated), where you are in your visit, and the
+      // state of the NPCs: who is off duty and who is with a visitor
+      identity: Identity;
+      state: PlayerStateName | null;
+      offDuty: string[];
+      engaged: Engagement[];
     }
   | { type: "joined"; visitor: Present }
   | { type: "moved"; id: string; x: number; z: number; ry: number }
   | { type: "role"; id: string; role: Role }
-  | { type: "left"; id: string };
+  | { type: "left"; id: string }
+  | { type: "state"; state: PlayerStateName; want: string | null; needs: string | null }
+  | ({ type: "turn" } & TurnView)
+  | ({ type: "staff_turn" } & StaffTurnView)
+  | { type: "staff_view"; customers: CustomerView[] }
+  | { type: "duty"; offDuty: string[] }
+  | ({ type: "engaged" } & Engagement)
+  | { type: "released"; npcId: string }
+  | { type: "notice"; text: string };
 
 // The walkable shop floor. Positions are clamped to the walkable areas in
 // world.ts (clampToWalkable), which start from this box.
