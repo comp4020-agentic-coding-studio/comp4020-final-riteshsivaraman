@@ -42,7 +42,7 @@ function Preview({ look, kind }: { look: LookChoice; kind: Kind }) {
   const uniform = kind !== "customer" ? { cap: EMPLOYEE_COLOUR[kind], badge: EMPLOYEE_COLOUR[kind] } : undefined;
   const state = useMemo(() => ({ walking: false, mode: "idle" as const, mood: "smile" }), []);
   return (
-    <Canvas camera={{ position: [0, 1.0, 3.6], fov: 28 }} dpr={[1, 1.5]} gl={{ antialias: true }}>
+    <Canvas camera={{ position: [0, 0.95, 4.6], fov: 30 }} onCreated={({ camera }) => camera.lookAt(0, 0.88, 0)} dpr={[1, 1.5]} gl={{ antialias: true }}>
       <color attach="background" args={["#cfd3d8"]} />
       <hemisphereLight args={["#ffffff", "#9aa0a6", 1.25]} />
       <directionalLight position={[-2, 4, -3]} intensity={1.4} />
@@ -119,7 +119,7 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
       <div className="entry-card">
         <div className="entry-preview">
           <Preview look={look} kind={kind} />
-          <div className="entry-preview-note">Drag nothing, just look: this is how others will see you.</div>
+          <div className="entry-preview-note">This is how others will see you.</div>
         </div>
 
         <div className="entry-form">
