@@ -1,6 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { SHOT, Store } from "./Store.tsx";
+import { HeadLab } from "./gfx/HeadLab.tsx";
 import { net, useNet } from "./net.ts";
 import "./styles.css";
 
@@ -52,7 +53,7 @@ function App() {
   return (
     <>
       {canDraw ? (
-        <Store />
+        new URLSearchParams(location.search).has("heads") ? <HeadLab /> : <Store />
       ) : (
         <p className="no-webgl">
           This browser can't draw the store (WebGL is turned off). You can still be counted as here.
