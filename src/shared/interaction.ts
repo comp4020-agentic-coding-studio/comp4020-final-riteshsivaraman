@@ -1,4 +1,5 @@
 import type { Behaviour } from "./behaviour.ts";
+import { headingTo, wrap, type Obstacle } from "./steering.ts";
 
 // Interactions between people: things that only work with a partner and where
 // each end does something that fits the other. Like behaviours, the decisions
@@ -191,13 +192,25 @@ export interface SimAgent {
   id: number;
   x: number;
   z: number;
+  heading?: number; // if known, play waits until they face the right way
   plan: Active | null;
   directive: Directive | null;
   nextConsider: number;
 }
 
-export const GATHER_TIMEOUT = 10; // seconds to get everyone in place, or call it off
+export const GATHER_TIMEOUT = 16; // seconds to get everyone in place, or call it off
 export const ARRIVED = 0.25; // metres from their place that counts as there
+export const FACING = 0.35; // radians off the way they should face that still counts
+
+// The ground an interaction uses: everyone in it and a little room round them.
+// Walkers not in it go round this, so nobody cuts through a conversation.
+export function zoneOf(plan: Plan): Obstacle {
+  const n = plan.slots.length;
+  const cx = plan.slots.reduce((a, s) => a + s.x, 0) / n;
+  const cz = plan.slots.reduce((a, s) => a + s.z, 0) / n;
+  const r = Math.max(...plan.slots.map((s) => Math.hypot(s.x - cx, s.z - cz))) + 0.6;
+  return { kind: "disc", x: cx, z: cz, r, hard: true }; // hard: only the people in it may stand there
+}
 
 export interface StepEvents {
   started: Active[];
@@ -234,6 +247,17 @@ export function stepInteractions(
       a.nextConsider = now + 2 + r() * 4;
       const plan = propose(view[a.id], view, r, opts.chance, opts.range);
       if (!plan) continue;
+      // not on top of one that is already going: two groups cannot share ground
+      const zone = zoneOf(plan) as { x: number; z: number; r: number };
+      const crowded = live.some((ap) => {
+        const other = zoneOf(ap.plan) as { x: number; z: number; r: number };
+        return Math.hypot(zone.x - other.x, zone.z - other.z) < zone.r + other.r + 0.3;
+      });
+      if (crowded) continue;
+      // nor round someone who is not in it: they would end up trapped in the
+      // middle of a ring of people, with no way out
+      const stranger = agents.some((o) => !plan.members.includes(o.id) && Math.hypot(o.x - zone.x, o.z - zone.z) < zone.r + 0.25);
+      if (stranger) continue;
       const ap: Active = { plan, state: "gather", startedAt: now, t0: now };
       live.push(ap);
       events.started.push(ap);
@@ -249,7 +273,12 @@ export function stepInteractions(
   for (const ap of [...live]) {
     const members = ap.plan.members.map((id) => agents[id]);
     if (ap.state === "gather") {
-      const arrived = members.every((a, i) => Math.hypot(a.x - ap.plan.slots[i].x, a.z - ap.plan.slots[i].z) < ARRIVED);
+      const arrived = members.every((a, i) => {
+        const s = ap.plan.slots[i];
+        const there = Math.hypot(a.x - s.x, a.z - s.z) < ARRIVED;
+        if (!there || a.heading === undefined) return there;
+        return Math.abs(wrap(headingTo(a.x, a.z, s.faceX, s.faceZ) - a.heading)) < FACING;
+      });
       if (arrived) {
         ap.state = "play";
         ap.t0 = now;

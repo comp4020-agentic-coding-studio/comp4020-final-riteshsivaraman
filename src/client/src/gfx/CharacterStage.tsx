@@ -2,8 +2,9 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appearanceFor } from "../../../shared/appearance.ts";
-import { avoidanceTurn, BEHAVIOURS, durationFor, pickBehaviour, pickMood, type Behaviour } from "../../../shared/behaviour.ts";
-import { KINDS, layout, stepInteractions, type Active, type Directive, type SimAgent } from "../../../shared/interaction.ts";
+import { BEHAVIOURS, durationFor, pickBehaviour, pickMood, type Behaviour } from "../../../shared/behaviour.ts";
+import { KINDS, layout, stepInteractions, zoneOf, type Active, type SimAgent } from "../../../shared/interaction.ts";
+import { freePoint, goalBlocked, headingTo, pushOutOfHard, stepWalker, type Obstacle, type Walker } from "../../../shared/steering.ts";
 import { separateFromPeople } from "../../../shared/world.ts";
 import { BEARD_CHOICES, BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, FACE_SHAPES, poseCharacter, SHADINGS, type Character, type Mood } from "./character.ts";
 
@@ -13,6 +14,19 @@ import { BEARD_CHOICES, BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, FA
 
 const SHIRTS = ["#2f62b5", "#4a7c59", "#b5503a", "#6b5b95", "#3a3d45", "#c9a24a", "#2a7f8a"];
 const shirtFor = (id: string): string => SHIRTS[Math.floor(appearanceFor(id).faceWidth * 1000) % SHIRTS.length];
+
+// One fixed arena, whatever the number of people: the slider reveals people in
+// it, it does not change the space. Tables and a counter stand in it, for
+// people to walk round.
+const MAX_PEOPLE = 60;
+const ARENA = { minX: -8, maxX: 8, minZ: -1.5, maxZ: 10 };
+const STATIC_OBSTACLES: Obstacle[] = [
+  { kind: "disc", x: -4.5, z: 3.0, r: 0.8, hard: true },
+  { kind: "disc", x: 4.2, z: 5.2, r: 0.8, hard: true },
+  { kind: "disc", x: 0.5, z: 1.4, r: 0.6, hard: true },
+  { kind: "rect", minX: -2.2, maxX: 2.2, minZ: 7.0, maxZ: 7.8, hard: true },
+];
+const PERSON_R = 0.32;
 
 // `?speed=8` runs the crowd faster than real time, to see a long run quickly.
 const SPEED = Number(new URLSearchParams(location.search).get("speed") ?? 1);
@@ -34,6 +48,8 @@ function rng(seed: number): () => number {
 interface AgentState extends SimAgent {
   char: Character;
   snapHeading: number | null; // set to face instantly (scripted scenes)
+  roamGoal: { x: number; z: number } | null;
+  zonesOf: () => Obstacle[]; // the ground other interactions are using
 }
 
 interface PersonProps {
@@ -46,11 +62,12 @@ interface PersonProps {
   auto: boolean; // each person picks their own behaviours on their own timer
   independent: boolean; // each person changes their own expression
   roam: boolean; // walking moves them about the stage
-  all: Character[]; // everyone on the stage, to steer around
+  agents: AgentState[]; // everyone on the stage (the crowd), to walk round
   agent?: AgentState; // present in the crowd: an interaction can direct this person
+  count: number; // how many of the pool are on the stage
 }
 
-function Person({ char, seed, offset = 0, expr, manual, walking, auto, independent, roam, all, agent }: PersonProps) {
+function Person({ char, seed, offset = 0, expr, manual, walking, auto, independent, roam, agents, agent, count }: PersonProps) {
   const rnd = useRef(rng(seed * 7919 + offset * 104729 + 13));
   const mood = useRef<Mood>({ ...expr });
   // `?phase=1.2` freezes a mid-stride, so a still picture can show the walk
@@ -65,7 +82,11 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
   const exprAt = useRef<Mood>(EXPRESSIONS[0]);
   const nextExpr = useRef(-1);
   const heading = useRef(char.root.rotation.y);
+  const walker = useRef<Walker>({ x: 0, z: 0, heading: 0 });
+  const progressAt = useRef(0);
+  const bestDist = useRef(Infinity);
   useFrame((_, delta) => {
+    if (agent && agent.id >= count) return; // not on the stage: costs nothing
     const dt = Math.min(delta, 0.05) * SPEED;
     t.current += dt;
     const r = rnd.current;
@@ -103,58 +124,69 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
       mode.current = dir.mode;
       nextBehaviour.current = -1; // pick afresh once it lets go
       if (dir.mood) target = EXPRESSIONS.find((e) => e.name === dir.mood) ?? target;
-      const root = char.root;
-      const x = root.position.x;
-      const z = root.position.z;
-      const turnTo = (tx: number, tz: number, rate: number): number => {
-        const want = Math.atan2(-(tx - x), -(tz - z));
-        const d = Math.atan2(Math.sin(want - heading.current), Math.cos(want - heading.current));
-        heading.current += Math.max(-rate * dt, Math.min(rate * dt, d));
-        return Math.abs(d);
-      };
-      wantWalk = false;
-      if (dir.walkTo) {
-        const dist = Math.hypot(dir.walkTo.x - x, dir.walkTo.z - z);
-        if (dist > 0.12) {
-          const off = turnTo(dir.walkTo.x, dir.walkTo.z, 5);
-          wantWalk = true;
-          if (off < 0.9) {
-            const step = Math.min(dist, 1.15 * walk.current * dt);
-            root.position.x += -Math.sin(heading.current) * step;
-            root.position.z += -Math.cos(heading.current) * step;
-          }
-        } else if (dir.faceTo) {
-          turnTo(dir.faceTo.x, dir.faceTo.z, 4);
-        }
-      } else if (dir.faceTo) {
-        turnTo(dir.faceTo.x, dir.faceTo.z, 4);
+    }
+    // everything that is in the way: tables, other people, and the ground other
+    // people's interactions are using. (Members of the same interaction do not
+    // avoid each other: they are walking to stand together.)
+    const obstacleList = (): Obstacle[] => {
+      const out: Obstacle[] = [...STATIC_OBSTACLES, ...(agent ? agent.zonesOf() : [])];
+      for (const o of agents) {
+        if (o === agent || o.id >= count) continue;
+        if (agent?.plan && o.plan === agent.plan) continue;
+        out.push({ kind: "disc", x: o.char.root.position.x, z: o.char.root.position.z, r: PERSON_R });
       }
-      root.rotation.y = heading.current;
+      return out;
+    };
+    const root = char.root;
+    if (agent && (directed || (roam && wantWalk))) {
+      const w: Walker = walker.current;
+      w.x = root.position.x;
+      w.z = root.position.z;
+      w.heading = heading.current;
+      const obs = obstacleList();
+      let goal: { walkTo?: { x: number; z: number }; faceTo?: { x: number; z: number } } = {};
+      if (dir) {
+        goal = { walkTo: dir.walkTo, faceTo: dir.faceTo };
+      } else {
+        // wander: a waypoint that is clear of everything, and another when it
+        // is reached, blocked, or not getting any closer
+        const g = agent.roamGoal;
+        const stuck = g && t.current - progressAt.current > 3.5;
+        if (!g || Math.hypot(g.x - w.x, g.z - w.z) < 0.5 || goalBlocked(g, obs.filter((o) => o.hard)) || stuck) {
+          agent.roamGoal = freePoint(r, ARENA, obs.filter((o) => o.hard), 0.9) ?? { x: 0, z: 3 };
+          bestDist.current = Infinity;
+          progressAt.current = t.current;
+        }
+        const gg = agent.roamGoal!;
+        const dd = Math.hypot(gg.x - w.x, gg.z - w.z);
+        if (dd < bestDist.current - 0.25) {
+          bestDist.current = dd;
+          progressAt.current = t.current;
+        }
+        goal = { walkTo: gg };
+      }
+      const res = stepWalker(w, dt, goal, obs);
+      root.position.x = w.x;
+      root.position.z = w.z;
+      heading.current = w.heading;
+      root.rotation.y = w.heading;
+      wantWalk = res.moving;
+    } else if (dir) {
+      wantWalk = false;
+    }
+    if (directed && !wantWalk) {
+      // standing: face whoever or whatever they are meant to
+      const w: Walker = walker.current;
+      w.x = root.position.x;
+      w.z = root.position.z;
+      w.heading = heading.current;
+      if (dir?.faceTo) stepWalker(w, dt, { faceTo: dir.faceTo }, []);
+      heading.current = w.heading;
+      root.rotation.y = w.heading;
     }
     if (frozen === null) {
       walk.current += ((wantWalk ? 1 : 0) - walk.current) * (1 - Math.exp(-6 * dt));
       phase.current += dt * (3 + walk.current * 2.4) * (walk.current > 0.05 ? 1 : 0);
-    }
-    // wander: walk forward, and turn back when near the edge of the stage
-    if (roam && !directed && walk.current > 0.3) {
-      const root = char.root;
-      const x = root.position.x;
-      const z = root.position.z;
-      if (Math.abs(x) > 7 || z < -2 || z > 8.5) {
-        // face the middle of the stage, turning a little each frame
-        const want = Math.atan2(-(0 - x), -(3.2 - z));
-        let d = want - heading.current;
-        d = Math.atan2(Math.sin(d), Math.cos(d));
-        heading.current += Math.max(-1.6 * dt, Math.min(1.6 * dt, d));
-      } else {
-        // steer round anyone in the way (the collision pass below is the
-        // backstop: bodies cannot overlap, but a walker should not need it)
-        const others = all.filter((o) => o !== char).map((o) => ({ x: o.root.position.x, z: o.root.position.z }));
-        heading.current += avoidanceTurn(x, z, heading.current, others) * 2.2 * dt;
-      }
-      root.rotation.y = heading.current;
-      root.position.x += -Math.sin(heading.current) * 0.85 * walk.current * dt;
-      root.position.z += -Math.cos(heading.current) * 0.85 * walk.current * dt;
     }
     const k = 1 - Math.exp(-9 * dt);
     const m = mood.current;
@@ -169,14 +201,26 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
 // what, where everyone stands, what each does and when it ends) are all in
 // shared/interaction.ts, the same function a spec runs for two simulated
 // minutes; this only feeds it positions and hands the directives back.
-function Interactions({ agents, enabled, scene, playAt, onSummary }: { agents: AgentState[]; enabled: boolean; scene: string | null; playAt: number; onSummary: (s: string) => void }) {
+function Interactions({ agents, count, zonesRef, enabled, scene, playAt, onSummary }: { agents: AgentState[]; count: number; zonesRef: { current: Array<{ ap: Active; disc: Obstacle }> }; enabled: boolean; scene: string | null; playAt: number; onSummary: (s: string) => void }) {
   const clock = useRef(0);
   const rand = useRef(rng(424242));
   const active = useRef<Active[]>([]);
   const sceneDone = useRef(false);
   const lastSummary = useRef("");
+  const lastCount = useRef(count);
   useFrame((_, delta) => {
     const now = (clock.current += Math.min(delta, 0.05) * SPEED);
+    // the people on the stage are the first `count`; if that changes, start
+    // the interactions afresh rather than leave someone half-way through one
+    if (count !== lastCount.current) {
+      lastCount.current = count;
+      active.current = [];
+      for (const a of agents) {
+        a.plan = null;
+        a.directive = null;
+        a.roamGoal = null;
+      }
+    }
     for (const a of agents) {
       a.x = a.char.root.position.x;
       a.z = a.char.root.position.z;
@@ -189,7 +233,7 @@ function Interactions({ agents, enabled, scene, playAt, onSummary }: { agents: A
         const k = Math.min(agents.length, { chat: 2, handshake: 2, address: 4, applaud: 6, circle: 4 }[kind]);
         // gather them close first, so the layout is built from a tight group
         for (let i = 0; i < k; i++) {
-          agents[i].char.root.position.set((i - (k - 1) / 2) * 0.55, 0, 1.5 + (i % 2) * 0.2);
+          agents[i].char.root.position.set((i - (k - 1) / 2) * 0.55, 0, 4.8 + (i % 2) * 0.2);
           agents[i].x = agents[i].char.root.position.x;
           agents[i].z = agents[i].char.root.position.z;
         }
@@ -206,8 +250,9 @@ function Interactions({ agents, enabled, scene, playAt, onSummary }: { agents: A
         });
       }
     }
-    const step = stepInteractions(agents, active.current, now, rand.current, { enabled });
+    const step = stepInteractions(agents.slice(0, count), active.current, now, rand.current, { enabled });
     active.current = step.active;
+    zonesRef.current = active.current.map((ap) => ({ ap, disc: zoneOf(ap.plan) }));
     for (const [what, list] of [["started", step.events.started], ["played", step.events.played], ["ended", step.events.ended], ["cancelled", step.events.cancelled]] as const) {
       for (const ap of list) console.log(`INTERACT ${what} t=${now.toFixed(1)} ${ap.plan.kind} [${ap.plan.members.join(",")}]`);
     }
@@ -226,12 +271,13 @@ function Interactions({ agents, enabled, scene, playAt, onSummary }: { agents: A
 
 // People are solid: after everyone has moved, each is pushed out of the ones
 // before them, with the same rule the store uses (shared/world.ts).
-function Collision({ people }: { people: Character[] }) {
+function Collision({ people, count }: { people: Character[]; count: number }) {
   useFrame(() => {
     const placed: Array<{ x: number; z: number }> = [];
-    for (const c of people) {
+    for (const c of people.slice(0, count)) {
       const p = c.root.position;
-      const q = separateFromPeople(p.x, p.z, placed);
+      let q = separateFromPeople(p.x, p.z, placed);
+      q = pushOutOfHard(q.x, q.z, STATIC_OBSTACLES); // a shove cannot put anyone in a table
       p.x = q.x;
       p.z = q.z;
       placed.push(q);
@@ -257,9 +303,9 @@ function Camera({ crowd, close, near }: { crowd: boolean; close: boolean; near: 
   const controls = useRef<{ target: { set: (x: number, y: number, z: number) => void }; update: () => void } | null>(null);
   useEffect(() => {
     const ty = crowd ? (near ? 1.0 : 0.9) : close ? 1.5 : 0.88;
-    const tz = crowd ? (near ? 1.5 : 3.6) : 0;
-    if (crowd && near) camera.position.set(0, 2.3, -5.2);
-    else if (crowd) camera.position.set(0, 4.2, -17);
+    const tz = crowd ? (near ? 4.8 : 4.2) : 0;
+    if (crowd && near) camera.position.set(0, 2.4, -1.9);
+    else if (crowd) camera.position.set(0, 10, -17);
     else if (close) camera.position.set(0, 1.52, -1.15);
     else camera.position.set(0, 1.1, -4.6);
     controls.current?.target.set(0, ty, tz);
@@ -278,7 +324,8 @@ export function CharacterStage() {
   const [interact, setInteract] = useState(() => new URLSearchParams(location.search).has("interact"));
   const [summary, setSummary] = useState("none right now");
   const scene = new URLSearchParams(location.search).get("scene");
-  const count = Number(new URLSearchParams(location.search).get("n") ?? 40);
+  const [count, setCount] = useState(() => Math.max(1, Math.min(MAX_PEOPLE, Number(new URLSearchParams(location.search).get("n") ?? 24))));
+  const zonesRef = useRef<Array<{ ap: Active; disc: Obstacle }>>([]);
   const near = new URLSearchParams(location.search).has("near");
   const playAt = Number(new URLSearchParams(location.search).get("playt") ?? 1.5);
   const [behaveIx, setBehaveIx] = useState(() => Number(new URLSearchParams(location.search).get("behave") ?? 0));
@@ -299,20 +346,64 @@ export function CharacterStage() {
   const id = `person-${seed}`;
   const look = useMemo(() => appearanceFor(id), [id]);
   const single = useMemo(() => buildCharacter(look, shirtFor(id), { eyes, body, face, shading, beard }), [look, id, eyes, body, face, shading, beard]);
+  // The whole pool is built once (60 people, one mesh each); the slider only
+  // decides how many are on the stage. They are scattered through one fixed
+  // arena, clear of the tables and of each other.
   const people = useMemo(() => {
     if (!crowd) return [];
-    return Array.from({ length: count }, (_, i) => {
+    const r = rng(seed * 131 + 7);
+    const spots: Array<{ x: number; z: number }> = [];
+    for (let i = 0; i < MAX_PEOPLE; i++) {
+      let p = { x: 0, z: 4 };
+      for (let tries = 0; tries < 60; tries++) {
+        const q = freePoint(r, ARENA, STATIC_OBSTACLES, 1.0, 1) ?? p;
+        if (spots.every((o) => Math.hypot(o.x - q.x, o.z - q.z) > 1.2)) {
+          p = q;
+          break;
+        }
+        p = q;
+      }
+      spots.push(p);
+    }
+    const packed = new URLSearchParams(location.search).has("pack");
+    return Array.from({ length: MAX_PEOPLE }, (_, i) => {
       const cid = `crowd-${seed}-${i}`;
       const c = buildCharacter(appearanceFor(cid), shirtFor(cid), { eyes, body, shading });
       // `?pack=1` stacks everyone on one spot, to show the collision pushing
       // them apart
-      if (new URLSearchParams(location.search).has("pack")) c.root.position.set(((i * 7) % 5) * 0.01, 0, 3 + ((i * 3) % 7) * 0.01);
-      else c.root.position.set(((i % 8) - 3.5) * 1.8, 0, Math.floor(i / 8) * 2.1 - 1);
-      c.root.rotation.y = Math.PI * 0.08 * (i % 3 - 1);
+      if (packed) c.root.position.set(((i * 7) % 5) * 0.01, 0, 4 + ((i * 3) % 7) * 0.01);
+      else c.root.position.set(spots[i].x, 0, spots[i].z);
+      c.root.rotation.y = r() * Math.PI * 2;
       return c;
     });
-  }, [crowd, seed, eyes, body, shading, count]);
-  const agents = useMemo<AgentState[]>(() => people.map((c, i) => ({ id: i, char: c, directive: null, plan: null, nextConsider: 1 + (i % 7) * 0.6, snapHeading: null, x: c.root.position.x, z: c.root.position.z })), [people]);
+  }, [crowd, seed, eyes, body, shading]);
+  const agents = useMemo<AgentState[]>(
+    () =>
+      people.map((c, i) => {
+        const a: AgentState = {
+          id: i,
+          char: c,
+          directive: null,
+          plan: null,
+          nextConsider: 1 + (i % 7) * 0.6,
+          snapHeading: null,
+          roamGoal: null,
+          x: c.root.position.x,
+          z: c.root.position.z,
+          zonesOf: () => [],
+        };
+        // the ground other people's interactions are using (hard: nobody walks in)
+        a.zonesOf = () => zonesRef.current.filter((z) => z.ap !== a.plan).map((z) => z.disc);
+        return a;
+      }),
+    [people],
+  );
+  // only the first `count` are on the stage
+  useEffect(() => {
+    people.forEach((c, i) => {
+      c.root.visible = i < count;
+    });
+  }, [people, count]);
   const expr = EXPRESSIONS[ei % EXPRESSIONS.length];
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
@@ -330,6 +421,8 @@ export function CharacterStage() {
       if (e.key === "p") setAuto((v) => !v);
       if (e.key === "x") setIndependent((v) => !v);
       if (e.key === "i") setInteract((v) => !v);
+      if (e.key === "+" || e.key === "=") setCount((c) => Math.min(MAX_PEOPLE, c + 4));
+      if (e.key === "-" || e.key === "_") setCount((c) => Math.max(1, c - 4));
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
@@ -348,13 +441,24 @@ export function CharacterStage() {
         </mesh>
         {crowd ? (
           people.map((c, i) => (
-            <Person key={`${seed}-${i}`} char={c} seed={seed} offset={i} expr={EXPRESSIONS[i % 2 === 0 ? 0 : 1]} manual="idle" walking={walking} auto={auto} independent={independent} roam all={people} agent={agents[i]} />
+            <Person key={`${seed}-${i}`} char={c} seed={seed} offset={i} expr={EXPRESSIONS[i % 2 === 0 ? 0 : 1]} manual="idle" walking={walking} auto={auto} independent={independent} roam agents={agents} agent={agents[i]} count={count} />
           ))
         ) : (
-          <Person key={id} char={single} seed={seed} expr={expr} manual={behaviour} walking={walking} auto={false} independent={false} roam={false} all={[]} />
+          <Person key={id} char={single} seed={seed} expr={expr} manual={behaviour} walking={walking} auto={false} independent={false} roam={false} agents={[]} count={MAX_PEOPLE} />
         )}
-        {crowd && <Interactions agents={agents} enabled={interact} scene={scene} playAt={playAt} onSummary={setSummary} />}
-        {crowd && <Collision people={people} />}
+        {crowd && <Interactions agents={agents} count={count} zonesRef={zonesRef} enabled={interact} scene={scene} playAt={playAt} onSummary={setSummary} />}
+        {crowd && <Collision people={people} count={count} />}
+        {crowd && STATIC_OBSTACLES.map((o, i) => (o.kind === "disc" ? (
+          <mesh key={i} position={[o.x, 0.45, o.z]}>
+            <cylinderGeometry args={[o.r, o.r, 0.9, 20]} />
+            <meshStandardMaterial color="#c9a56e" roughness={0.6} />
+          </mesh>
+        ) : (
+          <mesh key={i} position={[(o.minX + o.maxX) / 2, 0.55, (o.minZ + o.maxZ) / 2]}>
+            <boxGeometry args={[o.maxX - o.minX, 1.1, o.maxZ - o.minZ]} />
+            <meshStandardMaterial color="#b89358" roughness={0.6} />
+          </mesh>
+        )))}
         <Camera crowd={crowd} close={close} near={near} />
         <Stats onStats={setStats} />
       </Canvas>
@@ -368,6 +472,11 @@ export function CharacterStage() {
             <button style={btn} onClick={() => setAuto((v) => !v)}>Behaviours: {auto ? "each their own" : "off"} (P)</button>
             <button style={btn} onClick={() => setIndependent((v) => !v)}>Expressions: {independent || auto ? "independent" : "shared"} (X)</button>
             <button style={btn} onClick={() => setInteract((v) => !v)}>Interactions: {interact ? "on" : "off"} (I)</button>
+            <label style={{ ...btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "default" }}>
+              People
+              <input type="range" min={1} max={MAX_PEOPLE} value={count} onChange={(e) => setCount(Number(e.target.value))} style={{ width: 160 }} />
+              <strong style={{ minWidth: 22, textAlign: "right" }}>{count}</strong>
+            </label>
           </>
         ) : (
           <button style={btn} onClick={() => setBehaveIx((i) => i + 1)}>Behaviour: {behaviour} (V)</button>
@@ -382,7 +491,7 @@ export function CharacterStage() {
       <div style={{ position: "fixed", left: 16, bottom: 16, fontSize: 13, color: "#111", lineHeight: 1.5, zIndex: 5 }}>
         {crowd ? (
           <div>
-            <strong>crowd of {count}</strong> · interactions {interact ? "on" : "off"}: <strong>{summary}</strong> · behaviours {auto ? "each their own" : "off"} · expressions {independent || auto ? "independent" : "shared"} · {stats} · {(people[0]?.triangles ?? 0).toFixed(0)} triangles each, 1 mesh each
+            <strong>{count} people</strong> · interactions {interact ? "on" : "off"}: <strong>{summary}</strong> · behaviours {auto ? "each their own" : "off"} · expressions {independent || auto ? "independent" : "shared"} · {stats} · {(people[0]?.triangles ?? 0).toFixed(0)} triangles each, 1 mesh each
           </div>
         ) : (
           <>
