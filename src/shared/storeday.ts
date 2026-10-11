@@ -2,7 +2,7 @@ import type { Behaviour } from "./behaviour.ts";
 import { playPose, type InteractionKind } from "./interaction.ts";
 import type { ProductKind } from "./plan.ts";
 import { ENTRANCE_HALF, FLOOR } from "./protocol.ts";
-import { clearance, headingTo, stepWalker, wrap, type Obstacle, type Walker } from "./steering.ts";
+import { clearance, HARD_GAP, headingTo, stepWalker, wrap, type Obstacle, type Walker } from "./steering.ts";
 import { BACK_ROOM_Z0, BACK_ROOM_Z1, BAR_STOOLS, COUNTER, DOOR, SOLIDS, TABLES, TABLE_STOOLS, solidsFor } from "./world.ts";
 
 // A day in the store, as a timetable. Everyone who is not a visitor has a
@@ -171,7 +171,8 @@ function blockedGrid(role: "staff" | "customer"): Uint8Array {
     for (let c = 0; c < COLS; c++) {
       const x = GRID.minX + (c + 0.5) * CELL;
       const z = GRID.minZ + (r + 0.5) * CELL;
-      if (obs.some((o) => clearance(o, x, z).d < 0)) g[r * COLS + c] = 1;
+      // closer than the steering's own gap and a walker cannot stand there
+      if (obs.some((o) => clearance(o, x, z).d < HARD_GAP + 0.02)) g[r * COLS + c] = 1;
     }
   }
   blockedGrids.set(role, g);
@@ -305,9 +306,19 @@ export function planPath(from: Pt, to: Pt, role: "staff" | "customer"): Path {
   const w: Walker = { x: from.x, z: from.z, heading: headingTo(from.x, from.z, to.x, to.z) };
   const pts: Pt[] = [{ x: w.x, z: w.z }];
   for (const wp of route(from, to, role)) {
+    // a walker pinned against furniture (a goal inside a keep-out margin)
+    // used to spend all 900 steps, 90 s, walking on the spot. If it has
+    // barely moved in half a second, stop; the straight last approach below
+    // finishes. (Distance moved, not distance left: going round a corner
+    // legitimately leaves the distance to the waypoint unchanged.)
+    const recent: Pt[] = [];
     for (let i = 0; i < 900; i++) {
-      const done = Math.hypot(wp.x - w.x, wp.z - w.z) < 0.13;
-      if (done) break;
+      if (Math.hypot(wp.x - w.x, wp.z - w.z) < 0.13) break;
+      recent.push({ x: w.x, z: w.z });
+      if (recent.length > 5) {
+        const old = recent[recent.length - 6];
+        if (Math.hypot(w.x - old.x, w.z - old.z) < 0.08) break;
+      }
       stepWalker(w, STEP, { walkTo: wp }, obs, { walkSpeed: SPEED, followRoute: true, turnRate: 6 });
       pts.push({ x: w.x, z: w.z });
     }

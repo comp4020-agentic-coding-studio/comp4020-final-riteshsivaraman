@@ -37,6 +37,27 @@ describe("the day", () => {
     expect(worst).toBeLessThan(3.2);
   });
 
+  it("never walks on the spot: nobody is shown walking for more than a second without getting anywhere", () => {
+    // Defect class: a walker pinned against furniture kept its walking pose
+    // for the whole 90 s it took the planner to give up (seen as people
+    // "continuously walking into a table").
+    const stalls: string[] = [];
+    for (const c of CAST) {
+      let still = 0;
+      let prev = momentOf(c.id, 0);
+      for (let t = 0.1; t < CYCLE; t += 0.1) {
+        const m = momentOf(c.id, t * 1000);
+        if (m.present && prev.present && m.walking && Math.hypot(m.x - prev.x, m.z - prev.z) < 0.02) still += 0.1;
+        else {
+          if (still > 1) stalls.push(`${c.id} stands still for ${still.toFixed(1)} s ending t=${t.toFixed(1)} (${m.intent})`);
+          still = 0;
+        }
+        prev = m;
+      }
+    }
+    expect(stalls).toEqual([]);
+  });
+
   it("is continuous in time: every timeline covers the whole cycle with no gap or overlap", () => {
     for (const c of CAST) {
       const segs = timelineOf(c.id);
