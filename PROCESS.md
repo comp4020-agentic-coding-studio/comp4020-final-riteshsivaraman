@@ -2,41 +2,45 @@
 
 ## What I built
 
-Seen is an email client for a company whose whole brand is radical
-transparency. I applied that premise with no exceptions, which is why BCC is
-visible to every recipient, drafts sit on a public board anyone can edit, and a
-recipient watches a draft being typed to them before it is sent. It runs on
-Hono, a Preact SPA, better-sqlite3 and Drizzle
-([`dc9a8ab`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/dc9a8ab)).
-I did not reuse my crit 7 Astro stack, because crit 9 needs raw WebSocket
-access and Astro would have needed a Node layer bolted on. The cost is a
-slower boot, since the server runs through `tsx` with no compile step.
+I built a shared first-person 3D store that is an obvious parody of a fruit-themed
+retail store. Real visitors and CPU staff share one room, and customers talk to
+staff through menus. It is built on React Three Fiber, with a Hono, ws and
+SQLite server, and nothing in the room is a downloaded model.
 
 ## The moments that mattered
 
-### 1. Options before picking
+1. The 3D store was hard to cover with `pnpm check`, because there was nothing
+   small to assert on. Instead of settling for screenshots, I had Claude draw a
+   2D blueprint (the floor plan, four wall elevations and the ceiling) from the
+   same shared data that the 3D room reads. The checks then compare the
+   committed drawings with the model, and fail if the two drift apart
+   ([`baa57a6`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/baa57a6)).
+   I knew this worked when I enlarged the room and every drawing and check
+   moved with it, instead of me finding the server and the scene disagreeing
+   later
+   ([`025c3ee`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/025c3ee)).
 
-I asked for a live preview of a draft, and the agent had a plausible reading
-ready. Instead it laid out what the feature meant and which transport to use
-as separate questions, and I chose keystroke level over SSE, not the WebSocket
-plan from my first ADR
-([`cf2242d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/cf2242d)).
-This became a rule in CLAUDE.md, written before any app code
-([`168ca9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/168ca9b)).
+2. I did not want to describe the characters in a prompt and judge whatever
+   came back. So I asked Claude to build a tool where I could change heads,
+   bodies, eyes and expressions myself and look at them side by side, starting
+   from one low-poly bust
+   ([`25558d5`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/25558d5)).
+   It grew into full bodies and a crowd test, and I kept experimenting until I
+   settled on a friendly body with round eyes as the default, with the other
+   options kept in the tool
+   ([`076dfc7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/076dfc7)).
+   The decision was made by looking at the characters, which is the only way I
+   could have judged them.
 
-### 2. A design spec the app ignored
-
-I had a design doc with real colours, fonts and radii, but the app still used
-its own blue accent and a different typeface. Nothing failed, because nothing
-checked it. I compared the computed styles against the doc's hex values and
-renamed every token to match
-([`dbb8e65`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/dbb8e65)).
-A rule I had written down was not the same as an app that followed it.
-
-### 3. A reviewer for the invariant
-
-I could not read every line the agents wrote, so I built an event log reviewer.
-It found two actions that did not write their event
-([`9127d9d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9127d9d)).
-I also cut attachments to protect the draft board, and kept every check
-(`CUTS.md`).
+3. I was not sure what backend the customer service pipeline needed, and a
+   guess would have meant rebuilding it later. So I asked Claude to generate
+   seven full, end-to-end transcripts of a store visit, based on the visitor
+   accounts I had collected, marking who starts each exchange and what state
+   changes
+   ([`8299a2f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8299a2f)).
+   They showed a gap my first design had missed. One script ended with "go to
+   the Genius Bar", which created nothing for a genius to see, and staff had to
+   be able to start a conversation as well as customers. I used them as context
+   to rebuild the state machine around a durable case per customer, with either
+   side able to start
+   ([`c16a1e6`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/c16a1e6)).
