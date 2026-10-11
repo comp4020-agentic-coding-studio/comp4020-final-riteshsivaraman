@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { NPCS, isStaff, npcPose } from "../src/shared/npcs.ts";
 import { CAST, CYCLE, OBSTACLES, SEATS_AT_BAR, SEATS_AT_TABLES, STATIONS, castOf, momentOf, timelineOf } from "../src/shared/storeday.ts";
 import { clearance, headingTo, wrap } from "../src/shared/steering.ts";
-import { SOLIDS, TABLES } from "../src/shared/world.ts";
+import { BACK_SHELVES, SOLIDS, TABLES } from "../src/shared/world.ts";
 
 // Promise: the store's staff and customers are the same for everyone, move
 // like people, go where their purpose takes them, and every interaction is
@@ -128,6 +128,25 @@ describe("roles", () => {
         expect(m.z, `${c.id} +${t}s`).toBeLessThan(8.0); // the bar is at the back; its far side is behind it
       }
     }
+  });
+});
+
+describe("the back room", () => {
+  it("has stock staff restock a shelf they are facing, never empty floor", () => {
+    let seen = 0;
+    for (const id of ["stock-1", "stock-2"]) {
+      for (let t = 0; t < CYCLE; t += 0.5) {
+        const m = momentOf(id, t * 1000);
+        // not while still turning on arrival (about 0.7 s)
+        if (m.intent !== "restocking shelves" || momentOf(id, (t - 1) * 1000).intent !== "restocking shelves") continue;
+        seen++;
+        const fx = m.x - Math.sin(m.ry) * 0.9;
+        const fz = m.z - Math.cos(m.ry) * 0.9;
+        const facing = BACK_SHELVES.some((b) => Math.abs(fx - b.x) <= b.w / 2 + 0.1 && Math.abs(fz - b.z) <= b.d / 2 + 0.25);
+        expect(facing, `${id} at t=${t} faces (${fx.toFixed(1)}, ${fz.toFixed(1)})`).toBe(true);
+      }
+    }
+    expect(seen).toBeGreaterThan(20);
   });
 });
 

@@ -3,7 +3,7 @@ import { playPose, type InteractionKind } from "./interaction.ts";
 import type { ProductKind } from "./plan.ts";
 import { ENTRANCE_HALF, FLOOR } from "./protocol.ts";
 import { clearance, HARD_GAP, headingTo, stepWalker, wrap, type Obstacle, type Walker } from "./steering.ts";
-import { BACK_ROOM_Z0, BACK_ROOM_Z1, BAR_STOOLS, COUNTER, DOOR, SOLIDS, TABLES, TABLE_STOOLS, solidsFor } from "./world.ts";
+import { BACK_ROOM_Z0, BACK_ROOM_Z1, BACK_SHELF_ROW_Z, BACK_SHELF_UNIT_X, BAR_STOOLS, COUNTER, DOOR, SOLIDS, TABLES, TABLE_STOOLS, solidsFor } from "./world.ts";
 
 // A day in the store, as a timetable. Everyone who is not a visitor has a
 // purpose and a script that follows from it:
@@ -677,14 +677,18 @@ function build(): void {
     if (c.role === "technician") {
       tl.stand(CYCLE, "repairing devices", "work", "focused", BENCH_FACE);
     } else if (c.id === "stock-1" || c.id === "stock-2") {
-      // restocking the shelves: stand and work, step along, work again
+      // restocking: go to a shelf unit along their aisle, stand square on to it
+      // and work, then on to the next one (never facing empty floor)
+      const aisle = c.id === "stock-1" ? { z: (BACK_SHELF_ROW_Z[0] + BACK_SHELF_ROW_Z[1]) / 2, row: BACK_SHELF_ROW_Z[1] } : { z: (BACK_SHELF_ROW_Z[2] + BACK_SHELF_ROW_Z[3]) / 2, row: BACK_SHELF_ROW_Z[3] };
+      const order = c.id === "stock-1" ? [0, 1, 2, 1] : [2, 1, 0, 1];
       let t = tl.t;
-      const lane: Pt[] = [POSTS[c.id], { x: POSTS[c.id].x, z: POSTS[c.id].z + 3.2 }];
       let k = 0;
       while (t < CYCLE - 30) {
-        tl.stand(t + 9 + rand(k + c.id.length) * 6, "restocking shelves", "work", "focused", { x: tl.pos.x + 1, z: tl.pos.z });
-        const target = lane[(k + 1) % 2];
-        t = tl.walk(target, tl.t, "moving stock along the shelves");
+        const unit = order[k % order.length];
+        const spot = { x: BACK_SHELF_UNIT_X[unit] + (k % 2 === 0 ? -0.5 : 0.5), z: aisle.z };
+        t = tl.walk(spot, tl.t, "moving to the next shelf");
+        tl.stand(t + 9 + rand(k + c.id.length) * 6, "restocking shelves", "work", "focused", { x: spot.x, z: aisle.row });
+        t = tl.t;
         k++;
       }
     }
