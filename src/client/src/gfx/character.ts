@@ -10,6 +10,7 @@ import {
   IcosahedronGeometry,
   Matrix4,
   MeshStandardMaterial,
+  Quaternion,
   Skeleton,
   SkinnedMesh,
   SphereGeometry,
@@ -21,18 +22,34 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Appearance } from "../../../shared/appearance.ts";
 import { buildHead } from "./head-geo.ts";
 
-// A whole person as ONE skinned mesh: one draw call, about 2,500 triangles,
-// a 16-bone skeleton. Every part is rigidly bound to one bone (no blending),
+// A whole person as ONE skinned mesh: one draw call, about 3,000 triangles, a
+// 16-bone skeleton. Every part is rigidly bound to one bone (no blending),
 // which suits a faceted look. The face moves through bones too: brows tilt and
 // lift, the lids close, the mouth scales into a smile or a frown and opens.
 //
-// Proportions follow the 7.5-head figure canon: a 0.23 m head, 1.72 m tall,
-// chin at 1.49 m, shoulders at 1.38 m, crotch at the midpoint, knees at 0.48 m.
+// Two things are chosen at build time, so they can be compared by eye:
+//   BodyStyle  how big the head is against the body, how heavy the frame is
+//   EyeStyle   how the eyes are drawn (some are far less uncanny than others)
 // Shoulders against hips comes from `shoulderHip` in the appearance.
-// Metres, y up, the figure faces -z.
+// Metres, y up, the figure faces -z. About 1.72 m tall whatever the style.
 
-const HEAD_Y = 1.605; // centre of the head
-const EYE = { y: 0.002, z: -0.0855 }; // half-embedded: the face surface here is at about -0.087
+export type BodyStyle = "canon" | "natural" | "friendly" | "sturdy";
+export type EyeStyle = "soft" | "dots" | "glossy" | "lidded" | "almond";
+
+export const BODY_STYLES: BodyStyle[] = ["natural", "canon", "friendly", "sturdy"];
+export const EYE_STYLES: EyeStyle[] = ["soft", "dots", "glossy", "lidded", "almond"];
+
+// head: size of the head against the figure-drawing canon (1 is about 8 heads
+// tall, 1.16 about 6.9, 1.34 about 6); girth: width of the frame; limb: arms.
+const BODY: Record<BodyStyle, { head: number; girth: number; limb: number }> = {
+  canon: { head: 1.0, girth: 1.0, limb: 1.0 },
+  natural: { head: 1.16, girth: 0.98, limb: 0.97 },
+  friendly: { head: 1.34, girth: 1.0, limb: 0.9 },
+  sturdy: { head: 1.2, girth: 1.14, limb: 0.96 },
+};
+
+// Head-local, from the middle of the head.
+const EYE = { y: 0.002, z: -0.0855 }; // half-embedded: the face surface is at about -0.087
 const BROW = { y: 0.032, z: -0.0915 };
 const MOUTH = { y: -0.0625, z: -0.0845 };
 
@@ -73,6 +90,10 @@ export interface Character {
   bones: BoneSet;
   triangles: number;
   look: Appearance;
+  body: BodyStyle;
+  eyes: EyeStyle;
+  heads: number; // how many heads tall
+  lidBias: number; // some eye styles sit with the lids a little lower
 }
 
 const SIDES = [-1, 1] as const;
@@ -103,8 +124,9 @@ function prep(geo: BufferGeometry, bone: number, color: Color | null, m?: Matrix
   return g;
 }
 
-// A faceted tube through rings: each ring is a height, half-width, half-depth.
-function loft(rings: Array<{ y: number; wx: number; wz: number; cz?: number }>, sides = 8): BufferGeometry {
+// A faceted tube through rings (a height, half-width, half-depth, and an
+// optional forward shift), closed at both ends.
+function loft(rings: Array<{ y: number; wx: number; wz: number; cz?: number }>, sides = 10): BufferGeometry {
   const pos: number[] = [];
   const ring = (r: (typeof rings)[number], k: number): [number, number, number] => {
     const a = (k / sides) * Math.PI * 2;
@@ -137,17 +159,29 @@ function loft(rings: Array<{ y: number; wx: number; wz: number; cz?: number }>, 
 }
 
 const at = (x: number, y: number, z: number): Matrix4 => new Matrix4().makeTranslation(x, y, z);
+const sc = (x: number, y = x, z = x): Matrix4 => new Matrix4().makeScale(x, y, z);
 
-// A hanging limb segment between two heights, tapering from r0 to r1.
-function segment(x: number, yTop: number, yBottom: number, r0: number, r1: number, sides = 7): BufferGeometry {
-  const len = yTop - yBottom;
-  const g = new CylinderGeometry(r0, r1, len, sides, 1);
-  g.translate(x, (yTop + yBottom) / 2, 0);
+// A tapering cylinder between two points, r0 at p0 and r1 at p1.
+function tube(p0: Vector3, p1: Vector3, r0: number, r1: number, sides = 8): BufferGeometry {
+  const len = p0.distanceTo(p1);
+  const g = new CylinderGeometry(r0, r1, len, sides, 1); // r0 is the top (+y)
+  const dir = p1.clone().sub(p0).normalize();
+  g.applyQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), dir.clone().negate()));
+  const mid = p0.clone().add(p1).multiplyScalar(0.5);
+  g.translate(mid.x, mid.y, mid.z);
   return g;
 }
 
-// A brow: a few short boxes along a gentle arch, thick at the inner end and
-// tapering outward. Local to the brow bone, which sits at the brow's centre.
+// A box whose long (y) side lies along `dir`, centred at `centre`.
+function along(w: number, l: number, d: number, centre: Vector3, dir: Vector3): BufferGeometry {
+  const g = new BoxGeometry(w, l, d);
+  g.applyQuaternion(new Quaternion().setFromUnitVectors(new Vector3(0, -1, 0), dir.clone().normalize()));
+  g.translate(centre.x, centre.y, centre.z);
+  return g;
+}
+
+// A brow: short boxes along a gentle arch, thick at the inner end and tapering
+// outward. Local to the brow bone, which sits at the brow's centre.
 function browGeo(innerSign: number, len: number, thick: number): BufferGeometry {
   const parts: BufferGeometry[] = [];
   const n = 4;
@@ -167,22 +201,48 @@ function browGeo(innerSign: number, len: number, thick: number): BufferGeometry 
     b.translate((x0 + x1) / 2, (y0 + y1) / 2, 0);
     parts.push(b);
   }
-  return mergeGeometries(parts.map((p) => p.toNonIndexed()))!;
+  const merged = mergeGeometries(parts.map((p) => p.toNonIndexed()));
+  if (!merged) throw new Error("brow parts mismatched");
+  return merged;
 }
 
-export function buildCharacter(look: Appearance, shirtHex: string): Character {
+export function buildCharacter(
+  look: Appearance,
+  shirtHex: string,
+  opts: { body?: BodyStyle; eyes?: EyeStyle } = {},
+): Character {
+  const bodyStyle = opts.body ?? "natural";
+  const eyeStyle = opts.eyes ?? "soft";
+  const style = BODY[bodyStyle];
   const skin = new Color(look.skin);
   const shirt = new Color(shirtHex);
   const pants = new Color(look.pants);
   const shoes = new Color(look.shoes);
   const dark = (c: Color, k: number): Color => c.clone().multiplyScalar(k);
 
+  // ---- scale: a bigger head takes height from the body, not from the top ----
+  const S = style.head * look.headScale; // head scale
+  const N = 1.72 - 0.22 * S; // where the neck pivots
+  const r = N / 1.5; // body heights are written for N = 1.5
+  const Y = (y: number): number => y * r;
+  const headY = N + 0.105 * S;
+  // a point in head-local space, scaled and lifted into the figure
+  const hm = (x = 0, y = 0, z = 0, extra?: Matrix4): Matrix4 => {
+    const m = at(0, headY, 0).multiply(sc(S)).multiply(at(x, y, z));
+    return extra ? m.multiply(extra) : m;
+  };
+  const hp = (x: number, y: number, z: number): [number, number, number] => [x * S, headY + y * S, z * S];
+
   // ---- frame ----
-  const shoulderHalf = 0.185 * look.build * (0.82 + 0.3 * look.shoulderHip) * 0.95;
-  const hipHalf = Math.max(0.1, (shoulderHalf * 1.05) / look.shoulderHip);
-  const waistHalf = Math.min(shoulderHalf, hipHalf) * 0.84;
-  const legX = hipHalf * 0.52;
-  const armX = shoulderHalf * 1.02;
+  const gth = style.girth * look.build;
+  const shoulderHalf = 0.178 * gth * (0.85 + 0.28 * look.shoulderHip);
+  const hipHalf = Math.max(0.1, (shoulderHalf * 1.04) / look.shoulderHip);
+  const chestHalf = shoulderHalf * 0.9;
+  const waistHalf = Math.min(shoulderHalf, hipHalf) * 0.86;
+  const legX = hipHalf * 0.5;
+  const shoulderX = shoulderHalf * 0.9;
+  const upLen = 0.27 * style.limb * r;
+  const foreLen = 0.235 * style.limb * r;
 
   // ---- bones ----
   const world = new Map<Bone, Vector3>();
@@ -198,18 +258,25 @@ export function buildCharacter(look: Appearance, shirtHex: string): Character {
     list.push(b);
     return b;
   };
-  const root = mk("root", 0, 0.9, 0, null);
-  const spine = mk("spine", 0, 0.95, 0, root);
-  const head = mk("head", 0, 1.5, 0, spine);
   const eyeX = 0.034 * look.eyeSpacing * look.faceWidth;
-  const browBones = SIDES.map((s) => mk(`brow${s}`, s * eyeX, HEAD_Y + BROW.y, BROW.z, head)) as [Bone, Bone];
-  const lids = mk("lids", 0, HEAD_Y + EYE.y, EYE.z, head);
-  const mouth = mk("mouth", 0, HEAD_Y + MOUTH.y, MOUTH.z, head);
-  const mouthOpen = mk("mouthOpen", 0, HEAD_Y + MOUTH.y - 0.002, MOUTH.z, head);
-  const sh = SIDES.map((s) => mk(`sh${s}`, s * armX, 1.37, 0, spine)) as [Bone, Bone];
-  const el = SIDES.map((s, i) => mk(`el${s}`, s * (armX + 0.01), 1.1, 0, sh[i])) as [Bone, Bone];
-  const hip = SIDES.map((s) => mk(`hip${s}`, s * legX, 0.88, 0, root)) as [Bone, Bone];
-  const kn = SIDES.map((s, i) => mk(`kn${s}`, s * legX, 0.48, 0, hip[i])) as [Bone, Bone];
+  const root = mk("root", 0, Y(0.9), 0, null);
+  const spine = mk("spine", 0, Y(0.95), 0, root);
+  const head = mk("head", 0, N, 0, spine);
+  const browBones = SIDES.map((s) => mk(`brow${s}`, ...hp(s * eyeX, BROW.y, BROW.z), head)) as [Bone, Bone];
+  const lids = mk("lids", ...hp(0, EYE.y, EYE.z), head);
+  const mouth = mk("mouth", ...hp(0, MOUTH.y, MOUTH.z), head);
+  const mouthOpen = mk("mouthOpen", ...hp(0, MOUTH.y - 0.002, MOUTH.z), head);
+
+  // arms hang a little away from the body, like a person standing at ease
+  const aUp = 0.1;
+  const aLo = 0.05;
+  const shoulderPt = SIDES.map((s) => new Vector3(s * shoulderX, Y(1.35), 0));
+  const elbowPt = SIDES.map((s, i) => shoulderPt[i].clone().add(new Vector3(s * Math.sin(aUp) * upLen, -Math.cos(aUp) * upLen, 0)));
+  const wristPt = SIDES.map((s, i) => elbowPt[i].clone().add(new Vector3(s * Math.sin(aLo) * foreLen, -Math.cos(aLo) * foreLen, 0)));
+  const sh = SIDES.map((_, i) => mk(`sh${i}`, shoulderPt[i].x, shoulderPt[i].y, 0, spine)) as [Bone, Bone];
+  const el = SIDES.map((_, i) => mk(`el${i}`, elbowPt[i].x, elbowPt[i].y, 0, sh[i])) as [Bone, Bone];
+  const hip = SIDES.map((s) => mk(`hip${s}`, s * legX, Y(0.88), 0, root)) as [Bone, Bone];
+  const kn = SIDES.map((s, i) => mk(`kn${s}`, s * legX, Y(0.48), 0, hip[i])) as [Bone, Bone];
   const idx = (b: Bone): number => list.indexOf(b);
 
   // ---- parts ----
@@ -218,45 +285,83 @@ export function buildCharacter(look: Appearance, shirtHex: string): Character {
     geos.push(prep(g, idx(bone), color, m));
   };
 
-  // pelvis to the root bone; chest, shoulders and neck base to the spine
+  // pelvis and trousers to the root bone; the shirt, chest and shoulders to
+  // the spine. Heights are canon heights (for N = 1.5) scaled by r.
   add(
     loft([
-      { y: 0.78, wx: hipHalf * 0.9, wz: 0.1 },
-      { y: 0.92, wx: hipHalf * 1.12, wz: 0.115 },
-      { y: 1.07, wx: waistHalf, wz: 0.095 },
+      { y: Y(0.76), wx: hipHalf * 0.86, wz: 0.098 },
+      { y: Y(0.85), wx: hipHalf * 1.04, wz: 0.112, cz: 0.004 },
+      { y: Y(0.95), wx: hipHalf * 1.02, wz: 0.11, cz: 0.006 },
+      { y: Y(1.02), wx: waistHalf * 1.08, wz: 0.098 },
     ]),
     root,
     pants,
   );
   add(
     loft([
-      { y: 1.07, wx: waistHalf, wz: 0.095 },
-      { y: 1.26, wx: shoulderHalf * 0.92, wz: 0.115 },
-      { y: 1.38, wx: shoulderHalf * 1.0, wz: 0.1 },
-      { y: 1.46, wx: 0.06, wz: 0.055 },
+      { y: Y(0.92), wx: hipHalf * 1.07, wz: 0.118, cz: 0.006 },
+      { y: Y(1.0), wx: waistHalf * 1.1, wz: 0.105 },
+      { y: Y(1.08), wx: waistHalf, wz: 0.098 },
+      { y: Y(1.18), wx: waistHalf + (chestHalf - waistHalf) * 0.55, wz: 0.108, cz: -0.004 },
+      { y: Y(1.27), wx: chestHalf, wz: 0.118, cz: -0.008 },
+      { y: Y(1.34), wx: shoulderHalf * 0.97, wz: 0.1, cz: -0.004 },
+      { y: Y(1.4), wx: shoulderHalf * 0.62, wz: 0.082 },
+      { y: Y(1.455), wx: 0.064, wz: 0.058 },
     ]),
     spine,
     shirt,
   );
-  // neck turns with the head
-  add(new CylinderGeometry(0.046, 0.05, 0.1, 8), head, skin, at(0, 1.5, 0.004));
+  // neck turns with the head, from the base of the neck up under the chin
+  const neckBase = Y(1.445);
+  const neckTop = headY - 0.085 * S;
+  add(new CylinderGeometry(0.045, 0.052, neckTop - neckBase, 8), head, skin, at(0, (neckBase + neckTop) / 2, 0.004));
 
   for (let i = 0; i < 2; i++) {
     const s = SIDES[i];
-    const ax = s * armX;
-    // arm: shoulder ball, upper arm in the sleeve, elbow, bare forearm, hand
-    add(new IcosahedronGeometry(0.047, 0), spine, shirt, at(ax, 1.365, 0));
-    add(segment(ax, 1.37, 1.11, 0.046, 0.038), sh[i], shirt);
-    add(new IcosahedronGeometry(0.038, 0), el[i], shirt, at(ax + s * 0.01, 1.1, 0));
-    add(segment(ax + s * 0.01, 1.1, 0.9, 0.035, 0.027), el[i], skin);
-    add(new BoxGeometry(0.05, 0.085, 0.028), el[i], skin, at(ax + s * 0.01, 0.855, 0));
-    // leg: thigh, knee, shin, shoe
+    const sp = shoulderPt[i];
+    const ep = elbowPt[i];
+    const wp = wristPt[i];
+    const handDir = wp.clone().sub(ep).normalize();
+    // sleeve to the elbow, a bare forearm, then a hand: palm, fingers, thumb
+    add(tube(sp, ep, 0.049, 0.039, 8), sh[i], shirt);
+    add(new IcosahedronGeometry(0.039, 0), el[i], shirt, at(ep.x, ep.y, ep.z));
+    add(tube(ep, wp, 0.036, 0.027, 8), el[i], skin);
+    add(along(0.05, 0.075, 0.025, wp.clone().addScaledVector(handDir, 0.035), handDir), el[i], skin);
+    add(along(0.046, 0.058, 0.018, wp.clone().addScaledVector(handDir, 0.096).add(new Vector3(0, 0, -0.005)), handDir), el[i], dark(skin, 0.97));
+    add(along(0.017, 0.05, 0.017, wp.clone().addScaledVector(handDir, 0.05).add(new Vector3(-s * 0.03, 0, -0.012)), handDir), el[i], skin);
+
+    // leg: thigh, knee, calf, shoe
     const lx = s * legX;
-    add(segment(lx, 0.9, 0.5, 0.09, 0.062), hip[i], pants);
-    add(new IcosahedronGeometry(0.058, 0), kn[i], pants, at(lx, 0.48, 0));
-    add(segment(lx, 0.48, 0.1, 0.057, 0.04), kn[i], pants);
-    add(new BoxGeometry(0.095, 0.075, 0.24), kn[i], shoes, at(lx, 0.045, -0.04));
-    add(new SphereGeometry(0.05, 6, 4), kn[i], shoes, at(lx, 0.05, -0.15));
+    add(
+      loft(
+        [
+          { y: Y(0.9), wx: 0.093, wz: 0.09 },
+          { y: Y(0.7), wx: 0.082, wz: 0.08 },
+          { y: Y(0.49), wx: 0.058, wz: 0.057 },
+        ],
+        8,
+      ),
+      hip[i],
+      pants,
+      at(lx, 0, 0),
+    );
+    add(new IcosahedronGeometry(0.057, 0), kn[i], pants, at(lx, Y(0.48), 0));
+    add(
+      loft(
+        [
+          { y: Y(0.49), wx: 0.057, wz: 0.056 },
+          { y: Y(0.38), wx: 0.061, wz: 0.064, cz: 0.006 },
+          { y: Y(0.2), wx: 0.046, wz: 0.046 },
+          { y: Y(0.09), wx: 0.036, wz: 0.036 },
+        ],
+        8,
+      ),
+      kn[i],
+      pants,
+      at(lx, 0, 0),
+    );
+    add(new BoxGeometry(0.092, 0.07, 0.25), kn[i], shoes, at(lx, 0.04, -0.06));
+    add(new SphereGeometry(0.047, 7, 5), kn[i], shoes, new Matrix4().makeTranslation(lx, 0.045, -0.17).multiply(sc(1, 0.85, 1.1)));
   }
 
   // head, with hair painted on and the ears built into it
@@ -266,75 +371,100 @@ export function buildCharacter(look: Appearance, shirtHex: string): Character {
     look.hairColour,
     look.skin,
   );
-  headGeo.translate(0, HEAD_Y, 0);
-  add(headGeo, head, null);
+  add(headGeo, head, null, hm());
   for (const s of SIDES) {
-    add(new IcosahedronGeometry(0.026, 1), head, skin, new Matrix4().makeTranslation(s * 0.081 * look.faceWidth, HEAD_Y - 0.012, 0.006).multiply(new Matrix4().makeScale(0.4, 1, 0.75)));
+    add(new IcosahedronGeometry(0.026, 1), head, skin, hm(s * 0.081 * look.faceWidth, -0.012, 0.006, sc(0.4, 1, 0.75)));
   }
   const hair = new Color(look.hairColour);
   if (look.hairStyle === "long") {
-    add(new IcosahedronGeometry(1, 1), head, hair, new Matrix4().makeTranslation(0, HEAD_Y - 0.09, 0.07).multiply(new Matrix4().makeScale(0.088, 0.15, 0.042)));
+    add(new IcosahedronGeometry(1, 1), head, hair, hm(0, -0.09, 0.07, sc(0.088, 0.15, 0.042)));
   }
   if (look.hairStyle === "bun") {
-    add(new IcosahedronGeometry(1, 1), head, hair, new Matrix4().makeTranslation(0, HEAD_Y + 0.095, 0.075).multiply(new Matrix4().makeScale(0.04, 0.04, 0.04)));
+    add(new IcosahedronGeometry(1, 1), head, hair, hm(0, 0.095, 0.075, sc(0.04)));
   }
 
-  // eyes: a ball, then flat discs stacked on its front (limbal ring, iris,
-  // pupil, a highlight), so each eye has depth for very few triangles
+  // ---- eyes, by style ----
   const eyeR = 0.0112 * look.eyeSize;
   const iris = new Color(look.eyeColour);
-  const sclera = new Color("#ffffff");
-  const front = (rho: number): number => -Math.sqrt(1 - rho * rho) * eyeR - 0.0004;
+  const white = new Color("#ffffff");
+  const front = (rho: number, radius = eyeR): number => -Math.sqrt(Math.max(0, 1 - rho * rho)) * radius - 0.0004;
+  let lidBias = 0;
+  let lashTube = 0.0007;
   for (const s of SIDES) {
     const ex = s * eyeX;
-    const ey = HEAD_Y + EYE.y;
-    add(new SphereGeometry(eyeR, 12, 8), head, sclera, at(ex, ey, EYE.z));
-    const disc = (rho: number, c: Color, dx = 0, dy = 0, lift = 0): void => {
-      const g = new CircleGeometry(rho * eyeR, 8);
+    const disc = (rho: number, c: Color, o: { dx?: number; dy?: number; lift?: number; sy?: number } = {}): void => {
+      const g = new CircleGeometry(rho * eyeR, 10);
+      g.scale(1, o.sy ?? 1, 1);
       g.rotateY(Math.PI);
-      add(g, head, c, at(ex + dx, ey + dy, EYE.z + front(rho) - lift));
+      add(g, head, c, hm(ex + (o.dx ?? 0), EYE.y + (o.dy ?? 0), EYE.z + front(rho) - (o.lift ?? 0)));
     };
-    disc(0.64, dark(iris, 0.45)); // limbal ring
-    disc(0.54, iris, 0, 0, 0.0005);
-    disc(0.4, iris.clone().lerp(new Color("#ffffff"), 0.18), 0, -0.0006, 0.001);
-    disc(0.26, new Color("#0c0a09"), 0, 0, 0.0015);
-    disc(0.1, new Color("#ffffff"), s * -0.0025, 0.0032, 0.002);
+    if (eyeStyle === "dots") {
+      // two dark ovals and a spark: nothing in them to be unsettled by
+      lashTube = 0.0012;
+      const g = new CircleGeometry(1, 12);
+      g.scale(0.0072 * look.eyeSize, 0.0098 * look.eyeSize, 1);
+      g.rotateY(Math.PI);
+      add(g, head, new Color("#241c19"), hm(ex, EYE.y, EYE.z - eyeR * 0.82));
+      const spark = new CircleGeometry(0.0022, 8);
+      spark.rotateY(Math.PI);
+      add(spark, head, white, hm(ex + s * -0.0022, EYE.y + 0.0035, EYE.z - eyeR * 0.82 - 0.0008));
+    } else {
+      // the socket and lid shade the white of the eye, so it is pushed past 1.0
+      const ballColour = new Color(eyeStyle === "glossy" ? "#f7f4ef" : "#f2ede7").multiplyScalar(1.75);
+      const squash = eyeStyle === "almond" ? sc(1.1, 0.78, 1) : undefined;
+      add(new SphereGeometry(eyeR, 12, 8), head, ballColour, hm(ex, EYE.y, EYE.z, squash));
+      if (eyeStyle === "glossy") {
+        lashTube = 0.0011;
+        disc(0.8, dark(iris, 0.62), { lift: 0.0003, sy: 1.1 });
+        disc(0.36, new Color("#0e0c0b"), { lift: 0.0009, sy: 1.1 });
+        disc(0.2, white, { dx: s * -0.0034, dy: 0.0042, lift: 0.0016 });
+        disc(0.08, white, { dx: s * 0.003, dy: -0.0034, lift: 0.0016 });
+      } else {
+        const warm = iris.clone().multiplyScalar(0.8).lerp(new Color("#5a4a40"), 0.2);
+        const sy = eyeStyle === "almond" ? 0.85 : 1;
+        disc(0.62, warm, { lift: 0.0003, sy });
+        disc(0.3, new Color("#1c1512"), { lift: 0.0009, sy });
+        disc(0.13, white, { dx: s * -0.0026, dy: 0.0032 * sy, lift: 0.0015 });
+        if (eyeStyle === "lidded") lidBias = 0.3;
+        if (eyeStyle === "almond") {
+          lidBias = 0.12;
+          lashTube = 0.0011;
+        }
+      }
+    }
   }
   // nostrils under the tip of the nose
   for (const s of SIDES) {
-    add(new SphereGeometry(0.0034, 5, 4), head, dark(skin, 0.45), new Matrix4().makeTranslation(s * 0.0072 * look.noseSize, HEAD_Y - 0.0425, -0.1035).multiply(new Matrix4().makeScale(1, 0.6, 1)));
+    add(new SphereGeometry(0.0034, 5, 4), head, dark(skin, 0.45), hm(s * 0.0072 * look.noseSize, -0.0425, -0.1035, sc(1, 0.6, 1)));
   }
 
-  // lids: a cap over each eyeball and a dark lash line along its rim
+  // lids: a cap over each eye and a dark lash line along its rim
   const rim = 1.08 * eyeR;
   for (const s of SIDES) {
     const ex = s * eyeX;
-    const ey = HEAD_Y + EYE.y;
-    add(new SphereGeometry(rim, 12, 6, 0, Math.PI * 2, 0, 0.95), lids, skin, at(ex, ey, EYE.z));
-    const lash = new TorusGeometry(rim * Math.sin(0.95), 0.0007, 3, 12);
+    add(new SphereGeometry(rim, 12, 6, 0, Math.PI * 2, 0, 0.95), lids, skin, hm(ex, EYE.y, EYE.z));
+    const lash = new TorusGeometry(rim * Math.sin(0.95), lashTube, 3, 12);
     lash.rotateX(Math.PI / 2);
-    add(lash, lids, new Color("#1c1512"), at(ex, ey + rim * Math.cos(0.95), EYE.z));
+    add(lash, lids, new Color("#1c1512"), hm(ex, EYE.y + rim * Math.cos(0.95), EYE.z));
   }
 
   // brows, in the hair colour a little deeper
   const browColour = new Color(look.browColour).multiplyScalar(0.8);
   for (let i = 0; i < 2; i++) {
     const s = SIDES[i];
-    const g = browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45));
-    add(g, browBones[i], browColour, at(s * eyeX, HEAD_Y + BROW.y, BROW.z));
+    add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, BROW.y, BROW.z));
   }
 
   // lips: an upper and a fuller lower arc that scale together into a smile or
   // a frown, and a dark opening that grows with the jaw
-  const arc = (radius: number, tube: number, colour: string, dy: number): void => {
-    const t = new TorusGeometry(radius, tube, 4, 12, 1.2);
+  const arc = (radius: number, tubeR: number, colour: string, dy: number): void => {
+    const t = new TorusGeometry(radius, tubeR, 4, 12, 1.2);
     t.rotateZ(-Math.PI / 2 - 0.6);
-    add(t, mouth, new Color(colour), at(0, HEAD_Y + MOUTH.y + radius + dy, MOUTH.z));
+    add(t, mouth, new Color(colour), hm(0, MOUTH.y + radius + dy, MOUTH.z));
   };
   arc(0.024, 0.0032, "#a8514f", 0.0014);
   arc(0.026, 0.0046, "#c46a66", -0.0022);
-  const inside = new SphereGeometry(0.008, 8, 6);
-  add(inside, mouthOpen, new Color("#4a1c20"), at(0, HEAD_Y + MOUTH.y - 0.002, MOUTH.z + 0.0015));
+  add(new SphereGeometry(0.008, 8, 6), mouthOpen, new Color("#4a1c20"), hm(0, MOUTH.y - 0.002, MOUTH.z + 0.0015));
 
   // ---- one mesh, one skeleton ----
   const merged = mergeGeometries(geos);
@@ -348,12 +478,15 @@ export function buildCharacter(look: Appearance, shirtHex: string): Character {
   group.updateMatrixWorld(true);
   mesh.bind(new Skeleton(list));
 
-  const triangles = merged.getAttribute("position").count / 3;
   return {
     root: group,
     bones: { root, spine, head, brow: browBones, lids, mouth, mouthOpen, sh, el, hip, kn },
-    triangles,
+    triangles: merged.getAttribute("position").count / 3,
     look,
+    body: bodyStyle,
+    eyes: eyeStyle,
+    heads: 1.72 / (0.216 * S),
+    lidBias,
   };
 }
 
@@ -381,9 +514,12 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   let aR = -arm;
   let eL = 0.15 + w * 0.7 * Math.max(0, s);
   let eR = 0.15 + w * 0.7 * Math.max(0, -s);
+  // weight on one leg when standing: the hips tip, the shoulders answer
+  let weight = 0;
   if (w < 0.05) {
     aL = 0.06;
     aR = 0.06;
+    weight = Math.sin(p.t * 0.45 + p.seed) * 0.022;
     if (p.mode === "observe") {
       lean = 0.22 + Math.sin(p.t * 0.8) * 0.015;
       headPitch = 0.32;
@@ -402,25 +538,32 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
       headYaw = Math.sin(p.t * 0.55 + p.seed) * 0.4;
       aL = 0.07 + Math.sin(p.t * 1.1 + p.seed) * 0.03;
       aR = 0.07;
+      eL = 0.18 + Math.max(0, weight) * 6;
+      eR = 0.18 + Math.max(0, -weight) * 6;
     }
   }
-  b.root.position.y = 0.9 + Math.abs(s) * 0.03 * w;
+  const baseY = (b.root.userData.y ??= b.root.position.y) as number;
+  b.root.position.y = baseY + Math.abs(s) * 0.03 * w;
+  b.root.rotation.z = weight * 0.8;
   b.hip[0].rotation.x = -leg;
   b.hip[1].rotation.x = leg;
-  // knees bend back as a leg swings through, and a little when standing
-  b.kn[0].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2 + Math.PI)) * 0.95 * w);
-  b.kn[1].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2)) * 0.95 * w);
+  // knees bend back as a leg swings through, and a little when standing; the
+  // unloaded leg softens more
+  b.kn[0].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2 + Math.PI)) * 0.95 * w + Math.max(0, weight) * 3);
+  b.kn[1].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2)) * 0.95 * w + Math.max(0, -weight) * 3);
   b.sh[0].rotation.x = aL;
   b.sh[1].rotation.x = aR;
   b.el[0].rotation.x = eL;
   b.el[1].rotation.x = eR;
   b.spine.rotation.x += (-lean - b.spine.rotation.x) * 0.15;
+  b.spine.rotation.z = -weight * 1.1;
   b.head.rotation.x += (-headPitch - b.head.rotation.x) * 0.15;
   b.head.rotation.y += (headYaw - b.head.rotation.y) * 0.1;
+  b.head.rotation.z = weight * 0.9;
 
-  // face: lids (with a blink), brows (lift and tilt, inner ends up is
-  // positive), and the mouth as an arc that bends and an opening that grows
-  b.lids.rotation.x = -Math.min(1.35, m.lid + blink);
+  // face: lids (with a blink and the eye style's resting droop), brows (lift
+  // and tilt, inner ends up is positive), mouth as an arc plus an opening
+  b.lids.rotation.x = -Math.min(1.35, m.lid + c.lidBias + blink);
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? -1 : 1;
     const base = (b.brow[i].userData.y ??= b.brow[i].position.y) as number;

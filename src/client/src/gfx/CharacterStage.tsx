@@ -2,7 +2,7 @@ import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { appearanceFor } from "../../../shared/appearance.ts";
-import { buildCharacter, EXPRESSIONS, poseCharacter, type Character, type Mood } from "./character.ts";
+import { BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, poseCharacter, type Character, type Mood } from "./character.ts";
 
 // Dev only (`?stage=1`): a full-body person on a stage. New character gives a
 // random person, Next expression cycles the face, Walk starts the walk cycle,
@@ -70,20 +70,24 @@ export function CharacterStage() {
   const [walking, setWalking] = useState(() => new URLSearchParams(location.search).has("walk"));
   const [crowd, setCrowd] = useState(() => new URLSearchParams(location.search).has("crowd"));
   const [stats, setStats] = useState("");
+  const [eyeIx, setEyeIx] = useState(() => Number(new URLSearchParams(location.search).get("eyes") ?? 0));
+  const [bodyIx, setBodyIx] = useState(() => Number(new URLSearchParams(location.search).get("body") ?? 0));
+  const eyes = EYE_STYLES[eyeIx % EYE_STYLES.length];
+  const body = BODY_STYLES[bodyIx % BODY_STYLES.length];
   const [close, setClose] = useState(() => new URLSearchParams(location.search).has("close"));
   const id = `person-${seed}`;
   const look = useMemo(() => appearanceFor(id), [id]);
-  const single = useMemo(() => buildCharacter(look, shirtFor(id)), [look, id]);
+  const single = useMemo(() => buildCharacter(look, shirtFor(id), { eyes, body }), [look, id, eyes, body]);
   const people = useMemo(() => {
     if (!crowd) return [];
     return Array.from({ length: 40 }, (_, i) => {
       const cid = `crowd-${seed}-${i}`;
-      const c = buildCharacter(appearanceFor(cid), shirtFor(cid));
+      const c = buildCharacter(appearanceFor(cid), shirtFor(cid), { eyes, body });
       c.root.position.set(((i % 8) - 3.5) * 1.1, 0, Math.floor(i / 8) * 1.4 - 1);
       c.root.rotation.y = Math.PI * 0.08 * (i % 3 - 1);
       return c;
     });
-  }, [crowd, seed]);
+  }, [crowd, seed, eyes, body]);
   const expr = EXPRESSIONS[ei % EXPRESSIONS.length];
   useEffect(() => {
     const key = (e: KeyboardEvent): void => {
@@ -92,6 +96,8 @@ export function CharacterStage() {
       if (e.key === "w") setWalking((v) => !v);
       if (e.key === "c") setCrowd((v) => !v);
       if (e.key === "f") setClose((v) => !v);
+      if (e.key === "o") setEyeIx((i) => i + 1);
+      if (e.key === "b") setBodyIx((i) => i + 1);
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
@@ -122,6 +128,8 @@ export function CharacterStage() {
         <button style={btn} onClick={() => setWalking((v) => !v)}>{walking ? "Stand (W)" : "Walk (W)"}</button>
         <button style={btn} onClick={() => setCrowd((v) => !v)}>{crowd ? "Single (C)" : "Crowd of 40 (C)"}</button>
         <button style={btn} onClick={() => setClose((v) => !v)}>{close ? "Full body (F)" : "Face close-up (F)"}</button>
+        <button style={btn} onClick={() => setEyeIx((i) => i + 1)}>Eyes: {eyes} (O)</button>
+        <button style={btn} onClick={() => setBodyIx((i) => i + 1)}>Body: {body} (B)</button>
       </div>
       <div style={{ position: "fixed", left: 16, bottom: 16, fontSize: 13, color: "#111", lineHeight: 1.5, zIndex: 5 }}>
         {crowd ? (
@@ -131,7 +139,7 @@ export function CharacterStage() {
         ) : (
           <>
             <div>
-              <strong>{expr.name}</strong> · {EXPRESSIONS.length} expressions · seed {seed} · {stats} ({single.triangles.toFixed(0)} triangles in this person)
+              <strong>{expr.name}</strong> · eyes <strong>{eyes}</strong> · body <strong>{body}</strong> ({single.heads.toFixed(1)} heads tall) · seed {seed} · {stats} ({single.triangles.toFixed(0)} triangles in this person)
             </div>
             <div>
               height {(1.72 * look.height).toFixed(2)} m · build {look.build.toFixed(2)} · shoulder:hip {look.shoulderHip.toFixed(2)} · hair {look.hairStyle} · head {look.faceWidth.toFixed(2)} wide, jaw {look.jaw.toFixed(2)}
