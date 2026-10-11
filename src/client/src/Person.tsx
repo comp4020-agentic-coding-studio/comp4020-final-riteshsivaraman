@@ -1,7 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import { CanvasTexture } from "three";
-import { appearanceFor } from "../../shared/appearance.ts";
+import { appearanceFor, type HairStyle } from "../../shared/appearance.ts";
 import type { Group } from "three";
 
 // A simple, lean, human-shaped figure built from primitives, with a walk
@@ -58,6 +58,74 @@ function personBlob(): CanvasTexture {
 }
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+
+// Hair, in the head group's own space (the face looks along -z, so +z is the
+// back of the head). A cap is the top of a sphere tipped back so the forehead
+// shows; the longer styles add pieces behind and beside it. A staff cap covers
+// the top, so only the styles that hang or sit below it are drawn then.
+function Hair({ style, colour, capped }: { style: HairStyle; colour: string; capped: boolean }) {
+  if (style === "bald") return null;
+  const mat = <meshStandardMaterial color={colour} roughness={0.9} />;
+  const dome = (r: number, theta: number, tilt: number) => (
+    <mesh rotation={[tilt, 0, 0]}>
+      <sphereGeometry args={[r, 16, 10, 0, Math.PI * 2, 0, theta]} />
+      {mat}
+    </mesh>
+  );
+  const under = style === "long" || style === "bun";
+  if (capped && !under) return null;
+  return (
+    <group>
+      {!capped && style === "buzz" && dome(0.119, 1.75, 0.5)}
+      {!capped && style === "short" && dome(0.126, 1.95, 0.45)}
+      {!capped && style === "side" && (
+        <>
+          {dome(0.126, 1.95, 0.45)}
+          <mesh position={[0.045, 0.085, -0.095]} rotation={[0, 0, -0.35]}>
+            <boxGeometry args={[0.1, 0.035, 0.05]} />
+            {mat}
+          </mesh>
+        </>
+      )}
+      {!capped && style === "curly" && (
+        <>
+          {dome(0.128, 1.9, 0.45)}
+          {[
+            [0, 0.12, 0.0],
+            [-0.09, 0.09, 0.02],
+            [0.09, 0.09, 0.02],
+            [-0.06, 0.07, 0.09],
+            [0.06, 0.07, 0.09],
+            [0, 0.05, 0.12],
+          ].map((p, i) => (
+            <mesh key={i} position={p as [number, number, number]}>
+              <sphereGeometry args={[0.05, 8, 6]} />
+              {mat}
+            </mesh>
+          ))}
+        </>
+      )}
+      {style === "long" && (
+        <>
+          {!capped && dome(0.126, 1.95, 0.45)}
+          <mesh position={[0, -0.07, 0.085]} scale={[1, 1, 0.5]}>
+            <capsuleGeometry args={[0.105, 0.2, 4, 10]} />
+            {mat}
+          </mesh>
+        </>
+      )}
+      {style === "bun" && (
+        <>
+          {!capped && dome(0.121, 1.8, 0.5)}
+          <mesh position={[0, 0.08, 0.11]}>
+            <sphereGeometry args={[0.05, 10, 8]} />
+            {mat}
+          </mesh>
+        </>
+      )}
+    </group>
+  );
+}
 
 export function Person({
   id,
@@ -239,22 +307,28 @@ export function Person({
           {/* face: eyes, brows and mouth, which change with the expression */}
           <group ref={eyes} position={[0, 0.022, -0.104]}>
             {[-0.04, 0.04].map((x) => (
-              <mesh key={x} position={[x, 0, 0]}>
-                <sphereGeometry args={[0.0155, 8, 6]} />
-                <meshStandardMaterial color="#1b1b1f" roughness={0.3} />
-              </mesh>
+              <group key={x} position={[x, 0, 0]}>
+                <mesh>
+                  <sphereGeometry args={[0.0175, 8, 6]} />
+                  <meshStandardMaterial color="#f2f1ee" roughness={0.4} />
+                </mesh>
+                <mesh position={[0, 0, -0.0105]}>
+                  <sphereGeometry args={[0.0105, 8, 6]} />
+                  <meshStandardMaterial color={look.eyeColour} roughness={0.3} />
+                </mesh>
+              </group>
             ))}
           </group>
           <group ref={browL} position={[-0.04, 0.052, -0.103]}>
             <mesh>
               <boxGeometry args={[0.04, 0.008, 0.01]} />
-              <meshStandardMaterial color="#3a2a1f" roughness={0.8} />
+              <meshStandardMaterial color={look.browColour} roughness={0.8} />
             </mesh>
           </group>
           <group ref={browR} position={[0.04, 0.052, -0.103]}>
             <mesh>
               <boxGeometry args={[0.04, 0.008, 0.01]} />
-              <meshStandardMaterial color="#3a2a1f" roughness={0.8} />
+              <meshStandardMaterial color={look.browColour} roughness={0.8} />
             </mesh>
           </group>
           <group ref={mouthL} position={[-0.016, -0.047, -0.105]}>
@@ -280,6 +354,7 @@ export function Person({
             <boxGeometry args={[0.04, 0.05, 0.04]} />
             <meshStandardMaterial color={skin} roughness={0.65} />
           </mesh>
+          <Hair style={look.hairStyle} colour={look.hairColour} capped={!!cap} />
           {cap && (
             <>
               <mesh position={[0, 0.09, 0]}>
