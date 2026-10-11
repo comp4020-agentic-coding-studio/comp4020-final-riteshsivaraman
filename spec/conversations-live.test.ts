@@ -39,7 +39,7 @@ class Visitor {
       if (found) return found;
       await new Promise((r) => setTimeout(r, 20));
     }
-    throw new Error(`timed out waiting for a message (have: ${this.messages.map((m) => m.type).join(", ")})`);
+    throw new Error(`timed out waiting for a message (have: ${this.messages.map((m) => (m.type === "notice" ? `notice "${m.text}"` : m.type)).join(", ")})`);
   }
   mark(): number {
     return this.messages.length;

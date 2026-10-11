@@ -46,8 +46,9 @@ export function Actor({
     return buildCharacter(appearance, colour, {
       uniform,
       device: uniform ? "tablet" : "phone",
-      body: look?.body,
-      eyes: look?.eyes,
+      // everyone in the store is drawn the same way: toon body, round eyes
+      body: "toon",
+      eyes: "round",
       face: look?.face,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -4,14 +4,13 @@ import { useNet } from "./net.ts";
 // The conversation box, at the bottom of the screen like a Pokemon text box:
 // who is speaking, what they say, and your choices as numbered buttons (press
 // 1 to 9, or click). When it is the employee's turn it says so, and when it has
-// ended Space, Enter or Esc closes it. The mouse look is let go while it is open.
+// ended Space, Enter or Esc closes it. The mouse is never captured, so it stays visible.
 export function Talk() {
   const net = useNet();
   const turn = net.turn;
 
   useEffect(() => {
     if (!turn) return;
-    document.exitPointerLock?.();
     const key = (e: KeyboardEvent) => {
       const t = net.turn;
       if (!t) return;

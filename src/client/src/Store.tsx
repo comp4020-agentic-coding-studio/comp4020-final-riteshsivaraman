@@ -1,4 +1,4 @@
-import { Html, PointerLockControls } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { PMREMGenerator } from "three";
@@ -34,7 +34,7 @@ const keys = new Set<string>();
 // First person: the camera is the visitor's eyes. Keys move you relative to
 // where you are looking, and collisions use the same boxes the scene draws.
 function Player() {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const lastSent = useRef(0);
   const sent = useRef<Pose | null>(null);
   const velocity = useRef({ x: 0, z: 0 });
@@ -55,12 +55,42 @@ function Player() {
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
+
+    // Look by dragging with the mouse held down. The pointer is never captured
+    // by the browser, so the cursor stays on screen all the time.
+    const canvas = gl.domElement;
+    canvas.style.cursor = "grab";
+    canvas.style.touchAction = "none";
+    let dragging = false;
+    const press = (e: PointerEvent) => {
+      dragging = true;
+      canvas.setPointerCapture?.(e.pointerId);
+      canvas.style.cursor = "grabbing";
+    };
+    const drag = (e: PointerEvent) => {
+      if (!dragging) return;
+      camera.rotation.y -= e.movementX * 0.003;
+      camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x - e.movementY * 0.003));
+    };
+    const release = (e: PointerEvent) => {
+      dragging = false;
+      canvas.releasePointerCapture?.(e.pointerId);
+      canvas.style.cursor = "grab";
+    };
+    canvas.addEventListener("pointerdown", press);
+    canvas.addEventListener("pointermove", drag);
+    canvas.addEventListener("pointerup", release);
+    canvas.addEventListener("pointercancel", release);
     return () => {
+      canvas.removeEventListener("pointerdown", press);
+      canvas.removeEventListener("pointermove", drag);
+      canvas.removeEventListener("pointerup", release);
+      canvas.removeEventListener("pointercancel", release);
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
     };
-  }, [camera]);
+  }, [camera, gl]);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -275,7 +305,6 @@ export function Store() {
       <Npcs />
       <Interact />
       <Player />
-      <PointerLockControls />
     </Canvas>
   );
 }

@@ -1,14 +1,16 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import type { Group } from "three";
-import { BEARDS, BODY_STYLES, EYE_STYLES, FACE_SHAPES, HAIR_COLOURS, HAIR_STYLES, SHIRT_COLOURS, SKIN_TONES, type LookChoice } from "../../shared/look.ts";
+import { HAIR_COLOURS, SHIRT_COLOURS, SKIN_TONES, type LookChoice } from "../../shared/look.ts";
+import { GENDERS, randomName, type Gender } from "../../shared/names.ts";
 import { EMPLOYEE_COLOUR, EMPLOYEE_KINDS, SPECIALTIES, STAFF_SHIRT, type EmployeeKind, type Kind, type Profile, type Specialty } from "../../shared/profile.ts";
 import { Actor } from "./gfx/Actor.tsx";
 import { readProfile } from "./net.ts";
 
-// The first thing a visitor sees: who they are today (a customer, or an
-// employee of a kind) and how they look. Their last choices are filled in, but
-// the screen shows every time (D35).
+// The first thing a visitor sees. It is built so that one click gets you in:
+// a random character and a random name are already chosen, and everything
+// else (who you are, male or female, hair, colours) is optional. Everyone is
+// drawn the same way (toon body, round eyes), so there is no style to pick.
 
 const KIND_LABEL: Record<EmployeeKind, string> = {
   greeter: "Greeter",
@@ -24,16 +26,42 @@ const KIND_BLURB: Record<EmployeeKind, string> = {
   stock: "Fetch what the bar and the floor need from the back.",
   technician: "Repair devices at the bench.",
 };
+const HAIR_FOR: Record<Gender, readonly NonNullable<LookChoice["hairStyle"]>[]> = {
+  male: ["buzz", "short", "side", "curly", "long", "bald"],
+  female: ["short", "side", "long", "curly", "bun", "buzz"],
+};
+const BEARD_FOR_MALE = ["none", "stubble", "moustache", "goatee", "full"] as const;
 // which posts have a customer conversation so far
 const HAS_SCRIPT = (kind: EmployeeKind, specialty: Specialty): boolean => kind === "greeter" || (kind === "specialist" && specialty === "phones");
 
 const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
 const newSeed = (): string => Math.random().toString(36).slice(2, 10);
+const reduceMotion = (): boolean => {
+  try {
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+};
+
+function rollLook(gender: Gender): LookChoice {
+  return {
+    seed: newSeed(),
+    gender,
+    hairStyle: pick(HAIR_FOR[gender]),
+    hairColour: pick(HAIR_COLOURS),
+    skin: pick(SKIN_TONES),
+    shirt: pick(SHIRT_COLOURS),
+    // about a third of men get some facial hair
+    beard: gender === "male" && Math.random() < 0.35 ? pick(BEARD_FOR_MALE.slice(1)) : "none",
+  };
+}
 
 function Turntable({ children }: { children: React.ReactNode }) {
   const g = useRef<Group>(null);
+  const still = useMemo(reduceMotion, []);
   useFrame((s) => {
-    if (g.current) g.current.rotation.y = Math.PI + Math.sin(s.clock.elapsedTime * 0.6) * 0.7;
+    if (g.current) g.current.rotation.y = Math.PI + (still ? 0.35 : Math.sin(s.clock.elapsedTime * 0.6) * 0.7);
   });
   return <group ref={g}>{children}</group>;
 }
@@ -42,14 +70,13 @@ function Preview({ look, kind }: { look: LookChoice; kind: Kind }) {
   const uniform = kind !== "customer" ? { cap: EMPLOYEE_COLOUR[kind], badge: EMPLOYEE_COLOUR[kind] } : undefined;
   const state = useMemo(() => ({ walking: false, mode: "idle" as const, mood: "smile" }), []);
   return (
-    <Canvas camera={{ position: [0, 0.95, 4.6], fov: 30 }} onCreated={({ camera }) => camera.lookAt(0, 0.88, 0)} dpr={[1, 1.5]} gl={{ antialias: true }}>
-      <color attach="background" args={["#cfd3d8"]} />
-      <hemisphereLight args={["#ffffff", "#9aa0a6", 1.25]} />
+    <Canvas camera={{ position: [0, 0.95, 4.2], fov: 30 }} onCreated={({ camera }) => camera.lookAt(0, 0.7, 0)} dpr={[1, 1.5]} gl={{ antialias: true }}>
+      <hemisphereLight args={["#ffffff", "#a7adb5", 1.3]} />
       <directionalLight position={[-2, 4, -3]} intensity={1.4} />
       <directionalLight position={[2, 2, 3]} intensity={0.7} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <circleGeometry args={[1.1, 40]} />
-        <meshStandardMaterial color="#aeb3b9" roughness={0.9} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[1.0, 48]} />
+        <meshStandardMaterial color="#d9dce1" roughness={0.9} />
       </mesh>
       <Turntable>
         <Actor id={look.seed ?? "preview"} look={look} shirt={kind === "customer" ? undefined : STAFF_SHIRT} uniform={uniform} getState={() => state} />
@@ -58,28 +85,25 @@ function Preview({ look, kind }: { look: LookChoice; kind: Kind }) {
   );
 }
 
-function Chips<T extends string>({ label, options, value, onChange }: { label: string; options: readonly T[]; value: T | undefined; onChange: (v: T) => void }) {
+function Segmented<T extends string>({ label, options, value, onChange, show }: { label: string; options: readonly T[]; value: T; onChange: (v: T) => void; show?: (v: T) => string }) {
   return (
-    <div className="field">
-      <div className="field-label">{label}</div>
-      <div className="chips">
-        {options.map((o) => (
-          <button key={o} type="button" className={o === value ? "chip on" : "chip"} onClick={() => onChange(o)}>
-            {o}
-          </button>
-        ))}
-      </div>
+    <div role="radiogroup" aria-label={label} className="seg">
+      {options.map((o) => (
+        <button key={o} type="button" role="radio" aria-checked={o === value} className={o === value ? "on" : undefined} onClick={() => onChange(o)}>
+          {show ? show(o) : o}
+        </button>
+      ))}
     </div>
   );
 }
 
 function Swatches({ label, options, value, onChange }: { label: string; options: readonly string[]; value: string | undefined; onChange: (v: string) => void }) {
   return (
-    <div className="field">
-      <div className="field-label">{label}</div>
+    <div className="opt">
+      <div className="opt-label">{label}</div>
       <div className="swatches">
         {options.map((c) => (
-          <button key={c} type="button" aria-label={`${label} ${c}`} className={c === value ? "swatch on" : "swatch"} style={{ background: c }} onClick={() => onChange(c)} />
+          <button key={c} type="button" aria-label={`${label} ${c}`} aria-pressed={c === value} className={c === value ? "swatch on" : "swatch"} style={{ background: c }} onClick={() => onChange(c)} />
         ))}
       </div>
     </div>
@@ -90,23 +114,23 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
   const saved = useMemo(() => readProfile(), []);
   const [kind, setKind] = useState<Kind>(saved?.kind ?? "customer");
   const [specialty, setSpecialty] = useState<Specialty>(saved?.specialty ?? "phones");
-  const [name, setName] = useState(saved?.name ?? "");
-  const [look, setLook] = useState<LookChoice>(() => ({ seed: newSeed(), ...(saved?.look ?? {}) }));
-  const set = <K extends keyof LookChoice>(k: K, v: LookChoice[K]): void => setLook((l) => ({ ...l, [k]: v }));
+  const [gender, setGender] = useState<Gender>(saved?.look?.gender ?? pick(GENDERS));
+  const [look, setLook] = useState<LookChoice>(() => (saved?.look?.seed ? { ...saved.look } : rollLook(saved?.look?.gender ?? gender)));
+  const [name, setName] = useState(saved?.name ?? randomName(look.gender ?? gender));
+  const [typed, setTyped] = useState(Boolean(saved?.name)); // once they type, we stop re-rolling it
   const employee = kind !== "customer";
+  const set = <K extends keyof LookChoice>(k: K, v: LookChoice[K]): void => setLook((l) => ({ ...l, [k]: v }));
 
-  const randomise = (): void =>
-    setLook({
-      seed: newSeed(),
-      body: pick(BODY_STYLES),
-      eyes: pick(EYE_STYLES),
-      face: pick(FACE_SHAPES),
-      beard: pick(BEARDS),
-      hairStyle: pick(HAIR_STYLES),
-      hairColour: pick(HAIR_COLOURS),
-      skin: pick(SKIN_TONES),
-      shirt: pick(SHIRT_COLOURS),
-    });
+  const shuffle = (g: Gender = gender): void => {
+    setLook(rollLook(g));
+    if (!typed) setName(randomName(g));
+  };
+  const chooseGender = (g: Gender): void => {
+    setGender(g);
+    shuffle(g);
+  };
+  const post = employee ? (kind === "specialist" ? `${specialty} specialist` : KIND_LABEL[kind as EmployeeKind]) : "Visitor";
+  const accent = employee ? EMPLOYEE_COLOUR[kind as EmployeeKind] : "#1d1f23";
 
   const go = (): void => {
     const p: Profile = { kind, name: name.trim() || undefined, look };
@@ -115,71 +139,120 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
   };
 
   return (
-    <div className="entry">
-      <div className="entry-card">
-        <div className="entry-preview">
+    <div className="entry" style={{ ["--post" as string]: accent }}>
+      <div className="entry-grid">
+        <section className="stage" aria-label="Your character">
           <Preview look={look} kind={kind} />
-          <div className="entry-preview-note">This is how others will see you.</div>
-        </div>
-
-        <div className="entry-form">
-          <h1>Welcome</h1>
-          <p className="entry-lede">Who are you in the store today?</p>
-
-          <div className="who">
-            <button type="button" className={!employee ? "who-btn on" : "who-btn"} onClick={() => setKind("customer")}>
-              <b>A customer</b>
-              <span>Look around, ask for help, buy something.</span>
-            </button>
-            <button type="button" className={employee ? "who-btn on" : "who-btn"} onClick={() => setKind(employee ? kind : "greeter")}>
-              <b>An employee</b>
-              <span>Work the floor. Help the customers who ask.</span>
-            </button>
-          </div>
-
-          {employee && (
-            <div className="field">
-              <div className="field-label">Your post</div>
-              <div className="chips">
-                {EMPLOYEE_KINDS.map((k) => (
-                  <button key={k} type="button" className={k === kind ? "chip on" : "chip"} onClick={() => setKind(k)} style={k === kind ? { borderColor: EMPLOYEE_COLOUR[k] } : undefined}>
-                    {KIND_LABEL[k]}
-                  </button>
-                ))}
-              </div>
-              <div className="field-note">{KIND_BLURB[kind as EmployeeKind]}</div>
-              {kind === "specialist" && <Chips label="Which products" options={SPECIALTIES} value={specialty} onChange={setSpecialty} />}
-              {!HAS_SCRIPT(kind as EmployeeKind, specialty) && <div className="field-note warn">No customer conversations for this post yet. You can still join the shop and walk about.</div>}
+          <div className="badge">
+            <div className="badge-band">
+              <span>Hello</span>
+              <span className="badge-post">{post}</span>
             </div>
-          )}
+            <div className="badge-body">
+              <label htmlFor="who">my name is</label>
+              <div className="badge-row">
+                <input
+                  id="who"
+                  value={name}
+                  maxLength={24}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setTyped(true);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="dice"
+                  aria-label="Pick another random name"
+                  onClick={() => {
+                    setName(randomName(gender));
+                    setTyped(false);
+                  }}
+                >
+                  ↻
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
 
-          <div className="field">
-            <div className="field-label">Your name</div>
-            <input className="text" value={name} maxLength={24} placeholder="Leave blank for a random one" onChange={(e) => setName(e.target.value)} />
+        <section className="panel">
+          <header>
+            <h1>Step inside</h1>
+            <p>You're ready to go. Change anything you like first.</p>
+          </header>
+
+          <div className="group">
+            <h2>You are</h2>
+            <Segmented label="Customer or employee" options={["customer", "employee"] as const} value={employee ? "employee" : "customer"} onChange={(v) => setKind(v === "customer" ? "customer" : employee ? kind : "greeter")} show={(v) => (v === "customer" ? "A customer" : "An employee")} />
+            {employee && (
+              <div className="posts">
+                <div className="chips" role="radiogroup" aria-label="Your post">
+                  {EMPLOYEE_KINDS.map((k) => (
+                    <button key={k} type="button" role="radio" aria-checked={k === kind} className={k === kind ? "chip on" : "chip"} style={{ ["--c" as string]: EMPLOYEE_COLOUR[k] }} onClick={() => setKind(k)}>
+                      <i /> {KIND_LABEL[k]}
+                    </button>
+                  ))}
+                </div>
+                {kind === "specialist" && (
+                  <div className="chips" role="radiogroup" aria-label="Which products">
+                    {SPECIALTIES.map((s) => (
+                      <button key={s} type="button" role="radio" aria-checked={s === specialty} className={s === specialty ? "chip on" : "chip"} onClick={() => setSpecialty(s)}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <p className="note">{KIND_BLURB[kind as EmployeeKind]}</p>
+                {!HAS_SCRIPT(kind as EmployeeKind, specialty) && <p className="note warn">No customer conversations for this post yet. You can still walk about.</p>}
+              </div>
+            )}
           </div>
 
-          <div className="entry-look">
-            <div className="entry-look-head">
-              <h2>Your look</h2>
-              <button type="button" className="chip" onClick={randomise}>
-                Randomise
+          <div className="group">
+            <h2>Your character</h2>
+            <div className="char-row">
+              <Segmented label="Male or female" options={GENDERS} value={gender} onChange={chooseGender} show={(g) => (g === "male" ? "Male" : "Female")} />
+              <button type="button" className="shuffle" onClick={() => shuffle()}>
+                Shuffle
               </button>
             </div>
-            <Chips label="Body" options={BODY_STYLES} value={look.body} onChange={(v) => set("body", v)} />
-            <Chips label="Eyes" options={EYE_STYLES} value={look.eyes} onChange={(v) => set("eyes", v)} />
-            <Chips label="Face" options={FACE_SHAPES} value={look.face} onChange={(v) => set("face", v)} />
-            <Chips label="Hair" options={HAIR_STYLES} value={look.hairStyle} onChange={(v) => set("hairStyle", v)} />
-            <Chips label="Beard" options={BEARDS} value={look.beard} onChange={(v) => set("beard", v)} />
-            <Swatches label="Hair colour" options={HAIR_COLOURS} value={look.hairColour} onChange={(v) => set("hairColour", v)} />
-            <Swatches label="Skin" options={SKIN_TONES} value={look.skin} onChange={(v) => set("skin", v)} />
-            {!employee && <Swatches label="Shirt" options={SHIRT_COLOURS} value={look.shirt} onChange={(v) => set("shirt", v)} />}
-            {employee && <div className="field-note">Employees wear the store uniform: a cap and badge in their post's colour.</div>}
+            <details className="fine">
+              <summary>Fine-tune</summary>
+              <div className="opt">
+                <div className="opt-label">Hair</div>
+                <div className="chips">
+                  {HAIR_FOR[gender].map((h) => (
+                    <button key={h} type="button" className={look.hairStyle === h ? "chip on" : "chip"} aria-pressed={look.hairStyle === h} onClick={() => set("hairStyle", h)}>
+                      {h}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Swatches label="Hair colour" options={HAIR_COLOURS} value={look.hairColour} onChange={(v) => set("hairColour", v)} />
+              {gender === "male" && (
+                <div className="opt">
+                  <div className="opt-label">Beard</div>
+                  <div className="chips">
+                    {BEARD_FOR_MALE.map((b) => (
+                      <button key={b} type="button" className={(look.beard ?? "none") === b ? "chip on" : "chip"} aria-pressed={(look.beard ?? "none") === b} onClick={() => set("beard", b)}>
+                        {b}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Swatches label="Skin" options={SKIN_TONES} value={look.skin} onChange={(v) => set("skin", v)} />
+              {!employee ? <Swatches label="Shirt" options={SHIRT_COLOURS} value={look.shirt} onChange={(v) => set("shirt", v)} /> : <p className="note">Employees wear the store uniform.</p>}
+            </details>
           </div>
 
           <button type="button" className="enter" onClick={go}>
             Enter the store
           </button>
-        </div>
+        </section>
       </div>
     </div>
   );

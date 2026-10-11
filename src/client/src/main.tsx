@@ -49,7 +49,7 @@ function Hud() {
           <>Connecting…</>
         )}
       </div>
-      <div className="hud-hint">Click the view to look around · W A S D to walk · arrows turn · E to talk</div>
+      <div className="hud-hint">Drag the view to look around · W A S D to walk · arrows turn · E to talk</div>
       {waiting && (
         <div className="chip-status">
           Waiting for {POST_LABEL[live.needs!] ?? live.needs} · {mmss(Date.now() - live.stateSince)}

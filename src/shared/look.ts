@@ -1,3 +1,5 @@
+import type { Gender } from "./names.ts";
+import { GENDERS } from "./names.ts";
 import { appearanceFor, HAIR_COLOURS, SKIN_TONES, type Appearance, type BeardStyle, type HairStyle } from "./appearance.ts";
 
 // What a visitor may choose about how their character looks. These lists are
@@ -18,6 +20,8 @@ export interface LookChoice {
   // what the base appearance (face, height, build, eyes) is drawn from; a new
   // one is a different person. Without one, the visitor's id is used.
   seed?: string;
+  // shapes the frame (shoulders against hips) and the hair and beard offered
+  gender?: Gender;
   body?: (typeof BODY_STYLES)[number];
   eyes?: (typeof EYE_STYLES)[number];
   face?: (typeof FACE_SHAPES)[number];
@@ -37,6 +41,8 @@ export function validateLook(raw: unknown): LookChoice {
   const r = raw as Record<string, unknown>;
   const out: LookChoice = {};
   if (typeof r.seed === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(r.seed)) out.seed = r.seed;
+  const gender = oneOf(GENDERS, r.gender);
+  if (gender) out.gender = gender;
   const body = oneOf(BODY_STYLES, r.body);
   const eyes = oneOf(EYE_STYLES, r.eyes);
   const face = oneOf(FACE_SHAPES, r.face);
@@ -75,5 +81,12 @@ export function withLook(base: Appearance, look: LookChoice | undefined): Appear
   }
   if (look.skin) a.skin = look.skin;
   if (look.beard) a.beard = look.beard;
+  if (look.gender === "female") {
+    a.shoulderHip = 0.95 + (a.shoulderHip - 0.95) * 0.45; // 0.95 to 1.17
+    a.height *= 0.97;
+    a.beard = "none";
+  } else if (look.gender === "male") {
+    a.shoulderHip = 1.12 + (a.shoulderHip - 0.95) * 0.66; // 1.12 to 1.45
+  }
   return a;
 }
