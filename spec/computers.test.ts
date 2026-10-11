@@ -58,8 +58,8 @@ describe("computer models", () => {
 
   it("tells the two 27-inch displays apart by stand and back, since their housings match", () => {
     const ds = Object.values(DISPLAY_MODELS);
-    expectAllDifferent("display stand", ds.map((s) => [s.id, s.stand]));
-    expectAllDifferent("display vents", ds.map((s) => [s.id, s.ventRows]));
+    expectAllDifferent("display stand", ds.map((s) => [s.id, s.stand])); // the real, drawn distinction
+    expectAllDifferent("display vents", ds.map((s) => [s.id, s.ventRows])); // sourced data only, not drawn (ventRows' own comment says why)
   });
 
   it("gives no two desktops the same shape", () => {
