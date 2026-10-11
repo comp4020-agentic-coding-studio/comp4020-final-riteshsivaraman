@@ -21,6 +21,7 @@ export interface Appearance {
   noseSize: number;
   mouthWidth: number;
   pants: string;
+  shoes: string;
 }
 
 // Ranges are exported so the spec can check what is drawn against them.
@@ -33,6 +34,7 @@ export const BUILD_RANGE = [0.82, 1.1] as const;
 const SKIN_TONES = ["#f1c9a5", "#e3b68d", "#d9a679", "#b9835a", "#8d5a3b", "#5e3b27"];
 const HAIR_COLOURS = ["#15110e", "#2a1d14", "#4a3322", "#6b4a2e", "#8a3b1f", "#c9a25a", "#8f8f92", "#d8d6d0"];
 const EYE_COLOURS = ["#1b1b1f", "#3a2616", "#5a3d1f", "#4d6b3a", "#4f6f8f"];
+const SHOES = ["#1d1f24", "#3b3b3f", "#e9e9e9", "#5b4636", "#7a2e2e", "#2f4057"];
 const PANTS = ["#2b2f3a", "#3a3d45", "#4a4036", "#2f3e52", "#53575f"];
 // repeated entries are weights: short is common, bald and bun are not
 const HAIR_STYLES: HairStyle[] = [
@@ -72,5 +74,6 @@ export function appearanceFor(id: string): Appearance {
     noseSize: between(0.8, 1.3, rand(id, 9)),
     mouthWidth: between(0.85, 1.15, rand(id, 10)),
     pants: pick(PANTS, rand(id, 11)),
+    shoes: pick(SHOES, rand(id, 12)),
   };
 }

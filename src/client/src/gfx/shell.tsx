@@ -419,8 +419,8 @@ export function LightBox({
     <group position={[side * (FACE_X - 0.03), y, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
       {/* the light it throws on the wall around it */}
       <mesh position={[0, 0, 0.0005]}>
-        <planeGeometry args={[w + 1.3, h + 1.3]} />
-        <meshBasicMaterial map={softBoxTexture()} transparent opacity={0.55} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+        <planeGeometry args={[w + 0.9, h + 0.9]} />
+        <meshBasicMaterial map={softBoxTexture()} transparent opacity={0.3} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
       </mesh>
       <mesh>
         <planeGeometry args={[w, h]} />

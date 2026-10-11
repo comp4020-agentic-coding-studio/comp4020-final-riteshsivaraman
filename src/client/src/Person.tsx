@@ -140,8 +140,12 @@ export function Person({
 }) {
   const legL = useRef<Group>(null);
   const legR = useRef<Group>(null);
+  const kneeL = useRef<Group>(null);
+  const kneeR = useRef<Group>(null);
   const armL = useRef<Group>(null);
   const armR = useRef<Group>(null);
+  const elbowL = useRef<Group>(null);
+  const elbowR = useRef<Group>(null);
   const torso = useRef<Group>(null);
   const head = useRef<Group>(null);
   const root = useRef<Group>(null);
@@ -157,7 +161,7 @@ export function Person({
   const clock = useRef(0);
   // body shape, skin and trousers come from the id (shared/appearance.ts)
   const look = appearanceFor(id);
-  const { skin, pants } = look;
+  const { skin, pants, shoes } = look;
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -173,6 +177,10 @@ export function Person({
     const arm = s * 0.6 * walk;
     if (legL.current) legL.current.rotation.x = leg;
     if (legR.current) legR.current.rotation.x = -leg;
+    // knees bend as each leg swings through, and a little when standing
+    const kneeStand = 0.05;
+    if (kneeL.current) kneeL.current.rotation.x = -(kneeStand + Math.max(0, Math.sin(phase.current + 1.2)) * 0.95 * walk);
+    if (kneeR.current) kneeR.current.rotation.x = -(kneeStand + Math.max(0, Math.sin(phase.current + Math.PI + 1.2)) * 0.95 * walk);
     if (root.current) root.current.position.y = Math.abs(s) * 0.035 * walk;
 
     // poses (negative x rotation: lean or look forward and down; positive: an
@@ -182,6 +190,9 @@ export function Person({
     let headYaw = 0;
     let aL = -arm;
     let aR = arm;
+    // elbows: a relaxed bend, deeper on the arm swinging forward
+    let eL = 0.18 + walk * 0.7 * Math.max(0, -s);
+    let eR = 0.18 + walk * 0.7 * Math.max(0, s);
     if (walk < 0.05) {
       aL = 0.08;
       aR = 0.08;
@@ -191,12 +202,16 @@ export function Person({
         headPitch = -0.38;
         aR = 1.25;
         aL = 0.25;
+        eR = 1.15;
+        eL = 0.45;
       } else if (mode === "work") {
         // at a bench: leaning over it, both hands busy
         lean = -0.22;
         headPitch = -0.45;
         aL = 1.05 + Math.sin(t * 5) * 0.08;
         aR = 1.05 + Math.sin(t * 5 + 1.7) * 0.08;
+        eL = 0.85;
+        eR = 0.85;
       } else {
         // standing: a slow look around
         headYaw = Math.sin(t * 0.55 + id.length) * 0.45;
@@ -242,6 +257,8 @@ export function Person({
 
     if (armL.current) armL.current.rotation.x = aL;
     if (armR.current) armR.current.rotation.x = aR;
+    if (elbowL.current) elbowL.current.rotation.x = eL;
+    if (elbowR.current) elbowR.current.rotation.x = eR;
     if (torso.current) torso.current.rotation.x += (lean - torso.current.rotation.x) * 0.15;
     if (head.current) {
       head.current.rotation.x += (headPitch - head.current.rotation.x) * 0.15;
@@ -256,42 +273,79 @@ export function Person({
         <circleGeometry args={[0.42, 20]} />
         <meshBasicMaterial map={personBlob()} transparent depthWrite={false} />
       </mesh>
-      {/* legs, pivoting at the hips */}
+      {/* legs: thigh from the hip, shin from the knee, then a shoe */}
       {[
-        { ref: legL, x: -0.09 },
-        { ref: legR, x: 0.09 },
+        { ref: legL, knee: kneeL, x: -0.085 },
+        { ref: legR, knee: kneeR, x: 0.085 },
       ].map((l) => (
         <group key={l.x} ref={l.ref} position={[l.x, 0.9, 0]}>
-          <mesh position={[0, -0.44, 0]}>
-            <capsuleGeometry args={[0.065, 0.68, 4, 8]} />
-            <meshStandardMaterial color={pants} roughness={0.8} />
+          <mesh position={[0, -0.22, 0]}>
+            <cylinderGeometry args={[0.078, 0.06, 0.44, 12]} />
+            <meshStandardMaterial color={pants} roughness={0.85} />
           </mesh>
-          <mesh position={[0, -0.86, -0.03]}>
-            <boxGeometry args={[0.1, 0.06, 0.2]} />
-            <meshStandardMaterial color="#e9e9e9" roughness={0.7} />
-          </mesh>
+          <group ref={l.knee} position={[0, -0.44, 0]}>
+            <mesh>
+              <sphereGeometry args={[0.06, 10, 8]} />
+              <meshStandardMaterial color={pants} roughness={0.85} />
+            </mesh>
+            <mesh position={[0, -0.215, 0]}>
+              <cylinderGeometry args={[0.058, 0.042, 0.43, 12]} />
+              <meshStandardMaterial color={pants} roughness={0.85} />
+            </mesh>
+            {/* shoe: a low rounded sole with a toe cap */}
+            <mesh position={[0, -0.455, -0.045]}>
+              <boxGeometry args={[0.1, 0.07, 0.24]} />
+              <meshStandardMaterial color={shoes} roughness={0.55} />
+            </mesh>
+            <mesh position={[0, -0.43, -0.12]}>
+              <sphereGeometry args={[0.052, 10, 8]} />
+              <meshStandardMaterial color={shoes} roughness={0.55} />
+            </mesh>
+          </group>
         </group>
       ))}
 
       {/* upper body, pivoting at the hips so it can lean */}
       <group ref={torso} position={[0, 0.9, 0]}>
-        <mesh position={[0, 0.3, 0]} scale={[1, 1, 0.66]}>
-          <capsuleGeometry args={[0.16, 0.36, 4, 10]} />
-          <meshStandardMaterial color={shirt} roughness={0.75} />
+        {/* pelvis, then a chest that is wider at the shoulders */}
+        <mesh position={[0, 0.08, 0]} scale={[1.12, 1, 0.72]}>
+          <capsuleGeometry args={[0.135, 0.1, 4, 10]} />
+          <meshStandardMaterial color={shirt} roughness={0.8} />
         </mesh>
+        <mesh position={[0, 0.38, 0]} scale={[1.2, 1, 0.7]}>
+          <capsuleGeometry args={[0.145, 0.2, 4, 12]} />
+          <meshStandardMaterial color={shirt} roughness={0.8} />
+        </mesh>
+        {[-1, 1].map((sx) => (
+          <mesh key={sx} position={[sx * 0.2, 0.54, 0]}>
+            <sphereGeometry args={[0.05, 10, 8]} />
+            <meshStandardMaterial color={shirt} roughness={0.8} />
+          </mesh>
+        ))}
         {[
-          { ref: armL, x: -0.23 },
-          { ref: armR, x: 0.23 },
+          { ref: armL, elbow: elbowL, x: -0.215 },
+          { ref: armR, elbow: elbowR, x: 0.215 },
         ].map((a) => (
-          <group key={a.x} ref={a.ref} position={[a.x, 0.52, 0]}>
-            <mesh position={[0, -0.27, 0]}>
-              <capsuleGeometry args={[0.042, 0.46, 4, 8]} />
-              <meshStandardMaterial color={shirt} roughness={0.75} />
+          <group key={a.x} ref={a.ref} position={[a.x, 0.53, 0]}>
+            {/* upper arm, elbow, forearm, hand */}
+            <mesh position={[0, -0.145, 0]}>
+              <cylinderGeometry args={[0.048, 0.039, 0.29, 10]} />
+              <meshStandardMaterial color={shirt} roughness={0.8} />
             </mesh>
-            <mesh position={[0, -0.57, 0]}>
-              <sphereGeometry args={[0.045, 8, 6]} />
-              <meshStandardMaterial color={skin} roughness={0.7} />
-            </mesh>
+            <group ref={a.elbow} position={[0, -0.29, 0]}>
+              <mesh>
+                <sphereGeometry args={[0.039, 8, 6]} />
+                <meshStandardMaterial color={shirt} roughness={0.8} />
+              </mesh>
+              <mesh position={[0, -0.135, 0]}>
+                <cylinderGeometry args={[0.038, 0.03, 0.27, 10]} />
+                <meshStandardMaterial color={skin} roughness={0.7} />
+              </mesh>
+              <mesh position={[0, -0.275, 0]} scale={[0.85, 1.25, 0.6]}>
+                <sphereGeometry args={[0.04, 10, 8]} />
+                <meshStandardMaterial color={skin} roughness={0.7} />
+              </mesh>
+            </group>
           </group>
         ))}
         {/* neck and head */}
