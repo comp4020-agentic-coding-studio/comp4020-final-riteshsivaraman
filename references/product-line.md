@@ -137,11 +137,10 @@ Source: https://www.apple.com/au/shop/buy-mac/studio-display and
 | **Studio Display** | 27″ 5K Retina | 12MP Center Stage camera w/ Desk View, studio mics/speakers, Thunderbolt 5 | $2,599 (standard glass, tilt stand) / $3,099 (nano-texture) |
 | **Studio Display XDR** | 27″ 5K Retina XDR, mini‑LED | 2,000 nits peak HDR, P3 + Adobe RGB, 120Hz ProMotion-style refresh, same camera/audio as Studio Display | $4,799 (standard glass, tilt+height stand) / $5,299 (nano-texture) |
 
-Note: this appears to be a **rename** of what was previously "Pro Display
-XDR" to "Studio Display XDR" — not confirmed against Apple's own naming
-history, just noted because the name differs from what older project
-references might assume. **Flag for Ritesh to confirm** this isn't a
-mis-read.
+**Correction (computers-family build pass, 2026-10-12):** not a rename.
+Studio Display XDR is a new 27″ model that replaced the discontinued 32″
+Pro Display XDR (9to5mac.com, 2026-03-03). The two displays share the same
+27″ housing and differ mainly in panel/HDR capability, not size.
 
 ---
 
