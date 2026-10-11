@@ -25,7 +25,7 @@ export function Device({
   screenMode?: ScreenMode;
 }) {
   if (kind === "laptop" || kind === "tabletKb" || kind === "tablet") {
-    return <ComputerDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} />;
+    return <ComputerDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} screenMode={screenMode} />;
   }
   return <PhoneDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} screenMode={screenMode} />;
 }

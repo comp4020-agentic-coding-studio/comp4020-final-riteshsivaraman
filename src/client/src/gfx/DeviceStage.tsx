@@ -1,6 +1,7 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Device } from "./Device.tsx";
+import { Desktop, Monitor } from "./computers.tsx";
 import { DEVICE_COLOURS, WOOD, type Kind } from "./common.tsx";
 import type { ScreenMode } from "./phones.tsx";
 
@@ -10,7 +11,9 @@ import type { ScreenMode } from "./phones.tsx";
 // design reads clearly; drag to orbit. Query params: `kind` (default phone),
 // `model` (a PHONE_MODELS id), `colour` (hex), `screen` (`home` or `lock`,
 // switches the default camera to face front), `yaw`/`pitch` (degrees) and
-// `dist`/`h` (m) place a fixed camera for a headless screenshot.
+// `dist`/`h` (m) place a fixed camera for a headless screenshot. `kind=desktop`
+// or `kind=monitor` stands a Desktop / Monitor (DESKTOP_MODELS / DISPLAY_MODELS
+// id in `model`) instead; `ty` (m) moves the orbit target up for tall things.
 
 const Q = new URLSearchParams(location.search);
 
@@ -23,7 +26,7 @@ export function DeviceStage() {
   const pitch = ((Number(Q.get("pitch") ?? "-14")) * Math.PI) / 180;
   const dist = Number(Q.get("dist") ?? "0.4");
   const h = Number(Q.get("h") ?? "0.2");
-  const target: [number, number, number] = [0, 0.12, 0];
+  const target: [number, number, number] = [0, Number(Q.get("ty") ?? "0.12"), 0];
   const camPos: [number, number, number] = [Math.sin(yaw) * dist * Math.cos(pitch), h - Math.sin(pitch) * dist, Math.cos(yaw) * dist * Math.cos(pitch)];
   return (
     <>
@@ -37,7 +40,13 @@ export function DeviceStage() {
           <planeGeometry args={[1.2, 1.2]} />
           <meshStandardMaterial color={WOOD} roughness={0.55} />
         </mesh>
-        <Device kind={kind} model={model} x={0} y={0} z={0} rotY={0} colour={colour} screenMode={screenMode} />
+        {(kind as string) === "desktop" ? (
+          <Desktop model={model} colour={colour} x={0} y={0} z={0} side={1} rotY={0} screenMode={screenMode} />
+        ) : (kind as string) === "monitor" ? (
+          <Monitor model={model} x={0} y={0} z={0} side={1} rotY={0} screenMode={screenMode} />
+        ) : (
+          <Device kind={kind} model={model} x={0} y={0} z={0} rotY={0} colour={colour} screenMode={screenMode} />
+        )}
         <OrbitControls target={target} />
       </Canvas>
       {Q.get("ui") !== "0" && (
