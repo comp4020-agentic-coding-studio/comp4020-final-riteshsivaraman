@@ -124,13 +124,13 @@ export function floorTexture(w: number, d: number, base: string, joint: string):
     let seed = 12345;
     const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
     for (let i = 0; i < 38; i++) {
-      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "70,76,84"},${0.025 + rnd() * 0.035})`;
+      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "70,76,84"},${0.01 + rnd() * 0.016})`;
       g.beginPath();
       g.ellipse(rnd() * 256, rnd() * 256, 20 + rnd() * 60, 10 + rnd() * 30, rnd() * Math.PI, 0, Math.PI * 2);
       g.fill();
     }
     for (let i = 0; i < 260; i++) {
-      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "60,66,74"},${0.05 + rnd() * 0.08})`;
+      g.fillStyle = `rgba(${rnd() > 0.5 ? "255,255,255" : "60,66,74"},${0.03 + rnd() * 0.05})`;
       g.fillRect(rnd() * 256, rnd() * 256, 1.5, 1.5);
     }
     g.strokeStyle = joint;
@@ -148,11 +148,11 @@ export function wallTexture(lengthM: number): CanvasTexture {
   const tex = canvasTexture(128, 128, (g) => {
     g.fillStyle = WALL;
     g.fillRect(0, 0, 128, 128);
-    g.fillStyle = "#b4b8bd";
-    g.fillRect(0, 0, 2, 128);
+    g.fillStyle = "#c9ccd0";
+    g.fillRect(0, 0, 1, 128);
   });
   tex.wrapS = tex.wrapT = RepeatWrapping;
-  tex.repeat.set(lengthM, 1);
+  tex.repeat.set(lengthM / 1.5, 1); // joints every 1.5 m, faint
   return tex;
 }
 
@@ -162,16 +162,16 @@ export function wallTexture(lengthM: number): CanvasTexture {
 // depth and the light panels in it stand out.
 export function ceilingTexture(w: number, d: number): CanvasTexture {
   const tex = canvasTexture(64, 64, (g) => {
-    const face = g.createLinearGradient(0, 8, 0, 62);
-    face.addColorStop(0, "#b4b9bf");
-    face.addColorStop(1, "#c8ccd1");
+    const face = g.createLinearGradient(0, 5, 0, 62);
+    face.addColorStop(0, "#bcc0c6");
+    face.addColorStop(1, "#cbcfd4");
     g.fillStyle = face;
     g.fillRect(0, 0, 64, 64);
-    const gap = g.createLinearGradient(0, 0, 0, 8);
-    gap.addColorStop(0, "#5a5e64");
-    gap.addColorStop(1, "#8a8f95");
+    const gap = g.createLinearGradient(0, 0, 0, 5);
+    gap.addColorStop(0, "#7e8389");
+    gap.addColorStop(1, "#a6abb1");
     g.fillStyle = gap;
-    g.fillRect(0, 0, 64, 8);
+    g.fillRect(0, 0, 64, 5);
     g.fillStyle = "#e3e5e8";
     g.fillRect(0, 62, 64, 2);
   });
@@ -624,14 +624,10 @@ export function ShopShell() {
       {CEILING_SPEC.panelRowsZ.flatMap((z) =>
         CEILING_SPEC.panelX.map((x) => (
           <group key={`${x}:${z}`} position={[x, CEILING, z]} rotation={[Math.PI / 2, 0, 0]}>
-            {/* local +z is down here: glow, then a grey frame, then the bright panel nearest the floor */}
+            {/* local +z is down here: a glow, then the bright panel nearest the floor */}
             <mesh position={[0, 0, 0.005]}>
               <planeGeometry args={[CEILING_SPEC.panelW * 1.5, CEILING_SPEC.panelD * 3.2]} />
               <meshBasicMaterial map={panelGlowTexture()} transparent depthWrite={false} toneMapped={false} />
-            </mesh>
-            <mesh position={[0, 0, 0.012]}>
-              <planeGeometry args={[CEILING_SPEC.panelW + 0.1, CEILING_SPEC.panelD + 0.1]} />
-              <meshBasicMaterial color="#7d8288" />
             </mesh>
             <mesh position={[0, 0, 0.02]}>
               <planeGeometry args={[CEILING_SPEC.panelW, CEILING_SPEC.panelD]} />
@@ -647,8 +643,8 @@ export function ShopShell() {
       ].map((r, i) => (
         <group key={i}>
           <mesh position={[r.x, CEILING - 0.04, r.z]}>
-            <boxGeometry args={r.alongX ? [r.len, 0.04, 0.05] : [0.05, 0.04, r.len]} />
-            <meshStandardMaterial color="#23262b" />
+            <boxGeometry args={r.alongX ? [r.len, 0.025, 0.03] : [0.03, 0.025, r.len]} />
+            <meshStandardMaterial color="#868b91" />
           </mesh>
           {Array.from({ length: Math.floor(r.len / CEILING_SPEC.spotPitch) }, (_, k) => {
             const off = -r.len / 2 + CEILING_SPEC.spotPitch / 2 + k * CEILING_SPEC.spotPitch;
@@ -657,11 +653,11 @@ export function ShopShell() {
             return (
               <group key={k} position={[px, CEILING - 0.12, pz]}>
                 <mesh>
-                  <cylinderGeometry args={[0.05, 0.05, 0.14, 10]} />
-                  <meshStandardMaterial color="#23262b" />
+                  <cylinderGeometry args={[0.034, 0.034, 0.11, 10]} />
+                  <meshStandardMaterial color="#5c6066" />
                 </mesh>
                 <mesh position={[0, -0.075, 0]}>
-                  <cylinderGeometry args={[0.04, 0.04, 0.01, 10]} />
+                  <cylinderGeometry args={[0.028, 0.028, 0.01, 10]} />
                   <meshBasicMaterial color="#fff6dd" />
                 </mesh>
               </group>
