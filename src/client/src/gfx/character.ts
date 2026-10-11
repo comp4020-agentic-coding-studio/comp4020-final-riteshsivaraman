@@ -24,6 +24,7 @@ import {
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Appearance, BeardStyle } from "../../../shared/appearance.ts";
+import type { Behaviour } from "../../../shared/behaviour.ts";
 import { buildHead, type HeadShape } from "./head-geo.ts";
 
 // A whole person as ONE skinned mesh: one draw call, about 3,000 triangles, a
@@ -125,6 +126,7 @@ export interface Character {
   face: Exclude<FaceShape, "auto">;
   heads: number; // how many heads tall
   lidBias: number; // some eye styles sit with the lids a little lower
+  pose: Record<string, number>; // smoothed pose targets, so behaviours blend
 }
 
 const SIDES = [-1, 1] as const;
@@ -596,61 +598,157 @@ export function buildCharacter(
     face: faceKey,
     heads: 1.72 / (0.216 * S),
     lidBias,
+    pose: {},
   };
 }
 
 export interface PoseInput {
-  t: number; // seconds, for idle motion
+  t: number; // seconds, for motion
+  dt: number; // seconds since the last frame
   walk: number; // 0 standing, 1 walking at pace
   phase: number; // walk cycle phase, radians
-  mode: "idle" | "observe" | "work";
+  mode: Behaviour;
   seed: number; // varies idle motion between people
 }
 
-// Bones from a walk cycle, a pose and a mood. Signs, for a hanging limb that
-// points down: a positive x rotation swings it forward (-z) and a negative one
-// back; a head or torso tips forward with a negative x rotation.
+// Bones from a behaviour, a walk cycle and a mood. Signs, for a hanging limb
+// that points down: a positive x rotation swings it forward (-z) and a
+// negative one back; a z rotation of the +x arm that is positive swings it
+// out and up. A head or torso tips forward with a negative x rotation.
+// Targets are smoothed, so one behaviour melts into the next.
 export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number): void {
   const b = c.bones;
+  const st = c.pose;
+  const t = p.t;
+  const sd = p.seed;
   const s = Math.sin(p.phase);
   const w = p.walk;
+  const walking = w >= 0.05;
   const leg = s * 0.7 * w;
   const arm = s * 0.55 * w;
-  let lean = 0; // forward, radians
-  let headPitch = 0; // down, radians
-  let headYaw = 0;
-  let aL = arm;
-  let aR = -arm;
-  let eL = 0.15 + w * 0.7 * Math.max(0, s);
-  let eR = 0.15 + w * 0.7 * Math.max(0, -s);
   // weight on one leg when standing: the hips tip, the shoulders answer
-  let weight = 0;
-  if (w < 0.05) {
-    aL = 0.06;
-    aR = 0.06;
-    weight = Math.sin(p.t * 0.45 + p.seed) * 0.022;
-    if (p.mode === "observe") {
-      lean = 0.22 + Math.sin(p.t * 0.8) * 0.015;
-      headPitch = 0.32;
-      aR = 1.15;
-      aL = 0.2;
-      eR = 1.15;
-      eL = 0.45;
-    } else if (p.mode === "work") {
-      lean = 0.2;
-      headPitch = 0.4;
-      aL = 1.0 + Math.sin(p.t * 5) * 0.07;
-      aR = 1.0 + Math.sin(p.t * 5 + 1.7) * 0.07;
-      eL = 0.85;
-      eR = 0.85;
-    } else {
-      headYaw = Math.sin(p.t * 0.55 + p.seed) * 0.4;
-      aL = 0.07 + Math.sin(p.t * 1.1 + p.seed) * 0.03;
-      aR = 0.07;
-      eL = 0.18 + Math.max(0, weight) * 6;
-      eR = 0.18 + Math.max(0, -weight) * 6;
+  const weight = walking ? 0 : Math.sin(t * 0.45 + sd) * 0.022;
+
+  // targets: x is swing forward, z is out to the side (both arms, "outward"
+  // positive), el is the elbow bend, then the torso, head and face extras
+  const T: Record<string, number> = {
+    shLx: 0.07, shRx: 0.07, shLz: 0.06, shRz: 0.06, shLy: 0, shRy: 0, elL: 0.18, elR: 0.18,
+    lean: 0, pitch: 0, yaw: 0, tilt: 0, open: 0, lid: 0, curve: 0,
+  };
+  if (walking || p.mode === "walk") {
+    T.shLx = arm;
+    T.shRx = -arm;
+    T.shLz = 0.05;
+    T.shRz = 0.05;
+    T.elL = 0.15 + w * 0.7 * Math.max(0, s);
+    T.elR = 0.15 + w * 0.7 * Math.max(0, -s);
+  } else {
+    switch (p.mode) {
+      case "observe":
+        // leaning in on a product, one hand up to the chin
+        T.lean = 0.22 + Math.sin(t * 0.8) * 0.015;
+        T.pitch = 0.32;
+        T.shRx = 1.15;
+        T.shLx = 0.2;
+        T.elR = 1.15;
+        T.elL = 0.45;
+        T.yaw = Math.sin(t * 0.3 + sd) * 0.15;
+        break;
+      case "work":
+        T.lean = 0.2;
+        T.pitch = 0.4;
+        T.shLx = 1.0 + Math.sin(t * 5) * 0.07;
+        T.shRx = 1.0 + Math.sin(t * 5 + 1.7) * 0.07;
+        T.elL = 0.85;
+        T.elR = 0.85;
+        break;
+      case "wave":
+        // the right arm up and out, the hand swinging
+        T.shRx = 0.0;
+        T.shRz = 2.45 + Math.sin(t * 7 + sd) * 0.18;
+        T.elR = 0.35 + (Math.sin(t * 7 + sd) * 0.5 + 0.5) * 0.7;
+        T.tilt = 0.1;
+        T.yaw = -0.15;
+        T.curve = 0.3;
+        break;
+      case "talk":
+        // gesturing with the right hand, the mouth moving
+        T.shRx = 0.6 + Math.sin(t * 3.1 + sd) * 0.25;
+        T.elR = 1.2 + Math.sin(t * 4.3 + sd) * 0.3;
+        T.shLx = 0.25;
+        T.elL = 0.5;
+        T.yaw = Math.sin(t * 0.9 + sd) * 0.18;
+        T.pitch = Math.sin(t * 2.7 + sd) * 0.04;
+        T.open = 0.12 + 0.28 * Math.pow(Math.sin(t * 9 + sd * 3) * 0.5 + 0.5, 2);
+        break;
+      case "think":
+        // a hand to the chin, the other arm across to hold the elbow
+        T.shRx = 1.0;
+        T.elR = 2.3;
+        T.shLx = 0.55;
+        T.shLz = -0.25;
+        T.elL = 1.5;
+        T.tilt = 0.14;
+        T.pitch = 0.08;
+        T.yaw = Math.sin(t * 0.4 + sd) * 0.2;
+        break;
+      case "phone":
+        // both hands up in front, eyes on the screen
+        T.shLx = 0.9;
+        T.shRx = 0.95;
+        T.elL = 1.45;
+        T.elR = 1.55;
+        T.pitch = 0.4;
+        T.lean = 0.07;
+        T.lid = 0.15;
+        break;
+      case "crossed":
+        // arms folded: the elbow bends the forearm forward, then the shoulder
+        // turns inward about the vertical axis so it lies across the chest
+        T.shLx = 0.3;
+        T.shRx = 0.3;
+        T.shLy = -1.3;
+        T.shRy = 1.3;
+        T.shLz = 0.0;
+        T.shRz = 0.0;
+        T.elL = 1.65;
+        T.elR = 1.65;
+        T.yaw = Math.sin(t * 0.35 + sd) * 0.3;
+        break;
+      case "laugh":
+        // head back, shoulders bouncing, hands to the belly
+        T.shLx = 0.45;
+        T.shRx = 0.45;
+        T.elL = 1.0;
+        T.elR = 1.0;
+        T.lean = 0.02 + Math.sin(t * 11 + sd) * 0.05;
+        T.pitch = -0.22;
+        T.open = 0.7 + 0.25 * Math.sin(t * 11 + sd);
+        T.lid = 0.5;
+        T.curve = 0.5;
+        break;
+      case "point":
+        // the right arm straight out, looking where it points
+        T.shRx = 1.45;
+        T.shRz = 0.2;
+        T.elR = 0.08;
+        T.yaw = 0.35;
+        T.pitch = 0.04;
+        break;
+      default:
+        // idle: a slow look around, arms loose
+        T.yaw = Math.sin(t * 0.55 + sd) * 0.4;
+        T.shLx = 0.07 + Math.sin(t * 1.1 + sd) * 0.03;
+        T.elL = 0.18 + Math.max(0, weight) * 6;
+        T.elR = 0.18 + Math.max(0, -weight) * 6;
     }
   }
+  const k = 1 - Math.exp(-(walking ? 14 : 7) * p.dt);
+  for (const key of Object.keys(T)) {
+    const cur = st[key] ?? T[key];
+    st[key] = cur + (T[key] - cur) * k;
+  }
+
   const baseY = (b.root.userData.y ??= b.root.position.y) as number;
   b.root.position.y = baseY + Math.abs(s) * 0.03 * w;
   b.root.rotation.z = weight * 0.8;
@@ -660,27 +758,28 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   // unloaded leg softens more
   b.kn[0].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2 + Math.PI)) * 0.95 * w + Math.max(0, weight) * 3);
   b.kn[1].rotation.x = -(0.04 + Math.max(0, Math.sin(p.phase + 1.2)) * 0.95 * w + Math.max(0, -weight) * 3);
-  b.sh[0].rotation.x = aL;
-  b.sh[1].rotation.x = aR;
-  b.el[0].rotation.x = eL;
-  b.el[1].rotation.x = eR;
-  b.spine.rotation.x += (-lean - b.spine.rotation.x) * 0.15;
+  b.sh[0].rotation.set(st.shLx, st.shLy, -st.shLz);
+  b.sh[1].rotation.set(st.shRx, st.shRy, st.shRz);
+  b.el[0].rotation.x = st.elL;
+  b.el[1].rotation.x = st.elR;
+  b.spine.rotation.x = -st.lean;
   b.spine.rotation.z = -weight * 1.1;
-  b.head.rotation.x += (-headPitch - b.head.rotation.x) * 0.15;
-  b.head.rotation.y += (headYaw - b.head.rotation.y) * 0.1;
-  b.head.rotation.z = weight * 0.9;
+  b.head.rotation.set(-st.pitch, st.yaw, st.tilt + weight * 0.9);
 
   // face: lids (with a blink and the eye style's resting droop), brows (lift
-  // and tilt, inner ends up is positive), mouth as an arc plus an opening
-  b.lids.rotation.x = -Math.min(1.35, m.lid + c.lidBias + blink);
+  // and tilt, inner ends up is positive), mouth as an arc plus an opening;
+  // a behaviour can add to the mood (a laugh opens the mouth and squints)
+  b.lids.rotation.x = -Math.min(1.35, m.lid + st.lid + c.lidBias + blink);
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? -1 : 1;
     const base = (b.brow[i].userData.y ??= b.brow[i].position.y) as number;
     b.brow[i].position.y = base + m.browY;
     b.brow[i].rotation.z = -side * m.browTilt;
   }
-  const bend = Math.abs(m.curve * 1.6) < 0.08 ? 0.08 : m.curve * 1.6;
+  const curve = m.curve + st.curve;
+  const open = Math.min(1.2, m.open + st.open);
+  const bend = Math.abs(curve * 1.6) < 0.08 ? 0.08 : curve * 1.6;
   const mw = c.look.mouthWidth * m.width;
-  b.mouth.scale.set(mw * (1 - m.open * 0.5), bend * (1 - m.open * 0.6), 1);
-  b.mouthOpen.scale.set(0.5 + m.open * 1.0, 0.1 + m.open * 2.4, 1);
+  b.mouth.scale.set(mw * (1 - open * 0.5), bend * (1 - open * 0.6), 1);
+  b.mouthOpen.scale.set(0.5 + open * 1.0, 0.1 + open * 2.4, 1);
 }
