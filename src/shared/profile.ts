@@ -18,6 +18,16 @@ export interface Profile {
   look?: LookChoice;
 }
 
+// The colour of an employee's cap and badge, by kind (the same as the NPCs').
+export const EMPLOYEE_COLOUR: Record<EmployeeKind, string> = {
+  greeter: "#4caf50",
+  specialist: "#ffd23f",
+  genius: "#ff6f61",
+  stock: "#9c6ade",
+  technician: "#29b6f6",
+};
+export const STAFF_SHIRT = "#2f5d9e";
+
 export const isEmployee = (p: Pick<Profile, "kind">): boolean => p.kind !== "customer";
 
 // A designation names a post that a person or an NPC can hold:

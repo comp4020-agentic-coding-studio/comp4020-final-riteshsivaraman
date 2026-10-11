@@ -1,4 +1,4 @@
-import { HAIR_COLOURS, SKIN_TONES, type Appearance, type BeardStyle, type HairStyle } from "./appearance.ts";
+import { appearanceFor, HAIR_COLOURS, SKIN_TONES, type Appearance, type BeardStyle, type HairStyle } from "./appearance.ts";
 
 // What a visitor may choose about how their character looks. These lists are
 // the same ones the character builder offers (gfx/character.ts), kept here so
@@ -15,6 +15,9 @@ export const SHIRT_COLOURS = ["#2f62b5", "#4a7c59", "#b5503a", "#6b5b95", "#3a3d
 export { HAIR_COLOURS, SKIN_TONES };
 
 export interface LookChoice {
+  // what the base appearance (face, height, build, eyes) is drawn from; a new
+  // one is a different person. Without one, the visitor's id is used.
+  seed?: string;
   body?: (typeof BODY_STYLES)[number];
   eyes?: (typeof EYE_STYLES)[number];
   face?: (typeof FACE_SHAPES)[number];
@@ -33,6 +36,7 @@ export function validateLook(raw: unknown): LookChoice {
   if (!raw || typeof raw !== "object") return {};
   const r = raw as Record<string, unknown>;
   const out: LookChoice = {};
+  if (typeof r.seed === "string" && /^[A-Za-z0-9_-]{1,24}$/.test(r.seed)) out.seed = r.seed;
   const body = oneOf(BODY_STYLES, r.body);
   const eyes = oneOf(EYE_STYLES, r.eyes);
   const face = oneOf(FACE_SHAPES, r.face);
@@ -50,6 +54,13 @@ export function validateLook(raw: unknown): LookChoice {
   if (skin) out.skin = skin;
   if (shirt) out.shirt = shirt;
   return out;
+}
+
+// The appearance of a visitor or NPC: generated from their seed (or id), with
+// their choices laid over it. Everyone's client builds it the same way, so a
+// visitor looks the same in the entry preview as to everyone else.
+export function lookFor(id: string, look: LookChoice | undefined): Appearance {
+  return withLook(appearanceFor(look?.seed ?? id), look);
 }
 
 // A generated appearance with the visitor's choices laid over it. (body, eyes,

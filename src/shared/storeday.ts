@@ -297,7 +297,7 @@ function route(from: Pt, to: Pt, role: "staff" | "customer"): Pt[] {
   return out;
 }
 
-function planPath(from: Pt, to: Pt, role: "staff" | "customer"): Path {
+export function planPath(from: Pt, to: Pt, role: "staff" | "customer"): Path {
   const key = `${role}|${from.x.toFixed(2)},${from.z.toFixed(2)}|${to.x.toFixed(2)},${to.z.toFixed(2)}`;
   const hit = pathCache.get(key);
   if (hit) return hit;
