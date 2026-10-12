@@ -265,7 +265,7 @@ function Interact() {
 
 // Soft reflections on glass, metal and the polished floor, from a small
 // procedural room (no image download, so it costs nothing to load).
-function Reflections() {
+export function Reflections() {
   const { gl, scene } = useThree();
   useEffect(() => {
     const pmrem = new PMREMGenerator(gl);

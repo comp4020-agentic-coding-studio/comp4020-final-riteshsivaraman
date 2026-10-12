@@ -392,6 +392,17 @@ function cached<T>(key: string, build: () => T): T {
 
 const lathes = new Map<string, LatheGeometry>();
 
+// A screen: unlit content (emissive, so it reads true regardless of store
+// lighting) under a thin glossy glass response — low roughness means the
+// store's baked environment (Store.tsx's `Reflections`) puts a specular
+// highlight on it that shifts with view angle, a moving glare bar rather
+// than a flat, static image. Same pattern as computers-screens.ts's
+// `screenMaterial`, kept here since phones' screen textures are generated
+// per-call, not cached by a (design, format) key.
+function ScreenGlass({ map }: { map: CanvasTexture }) {
+  return <meshStandardMaterial color="#000000" emissive="#ffffff" emissiveMap={map} roughness={0.08} metalness={0} envMapIntensity={0.9} toneMapped={false} />;
+}
+
 // The three finish buckets of a built model, one mesh (one draw call) each.
 function FinishMeshes({ parts }: { parts: Record<Finish, BufferGeometry | null> }) {
   return (
@@ -401,11 +412,11 @@ function FinishMeshes({ parts }: { parts: Record<Finish, BufferGeometry | null> 
           parts[f] && (
             <mesh key={f} geometry={parts[f]!}>
               {f === "metal" ? (
-                <meshStandardMaterial vertexColors roughness={0.3} metalness={0.85} />
+                <meshStandardMaterial vertexColors roughness={0.14} metalness={0.9} envMapIntensity={1.1} />
               ) : f === "gloss" ? (
-                <meshStandardMaterial vertexColors roughness={0.12} metalness={0.2} />
+                <meshStandardMaterial vertexColors roughness={0.06} metalness={0.3} envMapIntensity={1.2} />
               ) : (
-                <meshStandardMaterial vertexColors roughness={0.38} metalness={0.55} />
+                <meshStandardMaterial vertexColors roughness={0.22} metalness={0.6} envMapIntensity={1} />
               )}
             </mesh>
           ),
@@ -460,7 +471,7 @@ export function PhoneDevice({
           <FinishMeshes parts={built} />
           <mesh position={[scr?.offsetX ?? 0, 0, spec.thickness / 2 + 0.0004]}>
             <planeGeometry args={[screenW, screenH]} />
-            <meshBasicMaterial map={screenTexture("phone", SCREEN_VARIANT(colour), screenMode, { aspect: screenH / screenW, cutout: scr?.cutout })} toneMapped={false} />
+            <ScreenGlass map={screenTexture("phone", SCREEN_VARIANT(colour), screenMode, { aspect: screenH / screenW, cutout: scr?.cutout })} />
           </mesh>
           <mesh position={[0, -spec.length / 2 - 0.006, 0]}>
             <cylinderGeometry args={[0.05, 0.05, 0.012, 20]} />
@@ -477,11 +488,11 @@ export function PhoneDevice({
           <group position={[0, 0.12, -0.02]} rotation={[-0.3, 0, 0]}>
             <mesh>
               <boxGeometry args={[0.1, 0.2, 0.01]} />
-              {std(colour, 0.3, 0.4)}
+              {std(colour, 0.16, 0.6)}
             </mesh>
             <mesh position={[0, 0, 0.0055]}>
               <planeGeometry args={[0.088, 0.184]} />
-              <meshBasicMaterial map={screenTexture(kind, SCREEN_VARIANT(colour))} toneMapped={false} />
+              <ScreenGlass map={screenTexture(kind, SCREEN_VARIANT(colour))} />
             </mesh>
           </group>
         </>
@@ -496,7 +507,7 @@ export function PhoneDevice({
           <group position={[0, 0.012, -WATCH_LOOP_R * 0.35]}>
             <FinishMeshes parts={watchBuilt.parts} />
             <mesh position={[0, WATCH_LOOP_R, watchBuilt.screen.z + 0.0003]} geometry={cached(`watchScreen:${watch.id}`, () => roundedPlane(watchBuilt.screen.w, watchBuilt.screen.h, watchBuilt.screen.r))}>
-              <meshBasicMaterial map={screenTexture("watch", SCREEN_VARIANT(colour))} toneMapped={false} />
+              <ScreenGlass map={screenTexture("watch", SCREEN_VARIANT(colour))} />
             </mesh>
           </group>
         </>
@@ -509,11 +520,11 @@ export function PhoneDevice({
           </mesh>
           <mesh position={[0, 0.1, 0]}>
             <boxGeometry args={[0.09, 0.1, 0.03]} />
-            {std("#1c1f26", 0.3, 0.4)}
+            {std("#1c1f26", 0.16, 0.6)}
           </mesh>
           <mesh position={[0, 0.1, 0.0155]}>
             <planeGeometry args={[0.075, 0.085]} />
-            <meshBasicMaterial map={screenTexture("watch", SCREEN_VARIANT(colour))} toneMapped={false} />
+            <ScreenGlass map={screenTexture("watch", SCREEN_VARIANT(colour))} />
           </mesh>
           <mesh position={[0, 0.1, 0.01]}>
             <boxGeometry args={[0.05, 0.2, 0.025]} />
@@ -571,12 +582,12 @@ export function PhoneDevice({
           </mesh>
           <mesh position={[0, 0.2, 0]}>
             <boxGeometry args={[0.2, 0.014, 0.05]} />
-            {std(colour, 0.4, 0.3)}
+            {std(colour, 0.2, 0.4)}
           </mesh>
           {[-0.1, 0.1].map((cx) => (
             <mesh key={cx} position={[cx, 0.14, 0]} rotation={[0, 0, Math.PI / 2]}>
               <cylinderGeometry args={[0.055, 0.055, 0.05, 16]} />
-              {std(colour, 0.4, 0.3)}
+              {std(colour, 0.2, 0.4)}
             </mesh>
           ))}
         </>
