@@ -181,6 +181,10 @@ find every resource by reading this file, not by discovering it mid-task.
   monitor/headphone slot, and bay ledge to a specific real model id (pure
   data, doesn't touch `layout.json`/`world.ts`/`plan.ts`). A proposal, not
   final — read `references/table-map.md` alongside it.
+- `src/shared/slots.ts` — every product-table device's stable id (D28:
+  "table and position"), one source of truth the 3D render and the
+  server's inspect range-check (D39) both read. Read before touching how
+  or where a device actually sits on a table.
 - `docs/prompts/product-line-session.md` — the prompt for the session that designs
   every device as a real, named, distinct model (SCOPE D37). Hand it to a fresh session.
 - `references/product-line.md` — Step 1 of the above: every family Apple AU

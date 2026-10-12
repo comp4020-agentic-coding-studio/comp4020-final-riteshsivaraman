@@ -240,6 +240,52 @@ debugging: the yaw convention is 0° = faces -z/entrance, 90° = faces -x,
 180° = faces +z, 270° = faces +x — confirmed empirically from the world
 origin; an earlier working note in this session had 90/270 backwards.)
 
+**Device inspect, phone pilot (D39), 2026-10-12** (`e7d7796`, `cc9fd3b`,
+`ac7b9f0`): the device stays on the table (no pick-up); camera eases in and
+orbits on drag; E to interact within ~1.5-2m; Esc or a tap-away (vs. a drag)
+puts it down. Built server-authoritative, mirroring the existing `Engagement`
+pattern (NPC talk) rather than piggybacking on the ~10Hz move broadcast, per
+D39's own reasoning: another visitor must see it live, including one who
+joins mid-inspection.
+- `src/shared/slots.ts` (new): every product-table device gets a stable id
+  (D28), extracted from position math `furniture.tsx`'s `Table` component
+  used to compute inline — now there is exactly one source of truth the
+  render and the server's range check both read, so they can't disagree
+  about where a device actually is.
+- Migration 5: an `inspections` table, one open row per slot; `service.ts`
+  gained `startInspect`/`endInspect`/`inspections`, gated to phones only
+  (pilot scope), range-checked, and mutually exclusive per slot (the same
+  race class as S11's stock race, a view instead of a sale). Starting a
+  conversation or leaving the store always closes an open inspection first.
+  Every start/end writes its own `events` row.
+- Client: `Player`'s camera takes over during an inspection (initial orbit
+  yaw derived from the slot's own `rotY`, so it starts facing the screen);
+  `Interact()` gained a device-hint scan beside the existing talk-hint one
+  (talk wins if both are in range); a new `InspectMarkers` component shows
+  a live "`<name>` looking" label over any slot someone is inspecting, to
+  every visitor, not just the one doing it.
+- **Verification is split and incomplete on purpose, not glossed over:**
+  `spec/inspect.test.ts` (in-memory db, 14 cases: the phone-only gate, range
+  edges, mutual exclusion, switching devices, cleanup on leave/talk) and
+  `spec/inspect-live.test.ts` (4 cases, real WebSockets against the actual
+  running server: a second connection sees a start/end live, gets backfilled
+  if it joins mid-inspection, is refused a taken slot, and sees it end on a
+  disconnect, not just an explicit `inspect_end`) both pass — this is the
+  "is it broken" half. The "how does it feel" half (does the camera-ease and
+  orbit feel natural, is the live label legible, any jank) is **not yet
+  checked by a human**: the only browser available this session had no
+  WebGL at all (confirmed directly, not just the app's fallback message), so
+  the planned two-profile live walkthrough could not render anything. Needs
+  Ritesh, in his own Chrome, two profiles, one inspecting while the other
+  watches.
+- Known cut: the exit transition snaps back to standing instantly rather
+  than easing out (D26 only asked for the entrance to ease).
+- Not built: tablet/watch/laptop inspect (phone-only is the stated pilot
+  scope), the reference-photo stand-style question (chunky puck vs. a thin
+  oval plinth) raised earlier this session and still unaddressed, and the
+  `Actor.tsx`/`CharacterStage.tsx` held-device offset mismatch from the
+  character-pairing pilot above.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
