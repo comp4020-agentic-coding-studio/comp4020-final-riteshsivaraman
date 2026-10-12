@@ -182,6 +182,64 @@ at all yet, this is bigger than a "later" tweak), the storage-picker
 conversation step ADR 5 left open, Hermès Watch lines left out of the
 catalogue (a second real brand, a different question from D37).
 
+**Materials/glossiness pass, 2026-10-12** (`471dccf`, `f2b26c3`): the store
+already had a procedural environment map (`Reflections` in `Store.tsx` —
+`RoomEnvironment` + `PMREMGenerator`, no downloaded image) but devices
+weren't using it — roughness was too high and screens used a flat
+`meshBasicMaterial`. Fixed: `phones.tsx`'s shared `FinishMeshes` (metal,
+gloss, matte/body all lowered roughness, raised metalness, added
+`envMapIntensity`), a new `ScreenGlass` component replacing
+`meshBasicMaterial` at every phone/watch/earbuds/headphones screen (mirrors
+the pattern `computers-screens.ts` already used), and the same treatment
+extended to `computers-geo.ts`'s `bodyMaterial()`. Also exported
+`Reflections` from `Store.tsx` into `DeviceStage.tsx`, which previously had
+no environment at all — every earlier per-model screenshot this session was
+under flatter lighting than the real store. Verified: the specular highlight
+on an iPhone 18 Pro genuinely shifts position between two camera angles
+(real reflection, not static), MacBook Pro lid shows a real edge highlight.
+249 tests green.
+
+**Character-object pairing pilot, 2026-10-12** (`fe45d9c`): the "device"
+behaviour (sitdown consults, D33) was scaling up a flat invented box+screen
+baked directly into the character's own skinned mesh
+(`character.ts`'s `buildCharacter`) — disconnected from the real catalogue,
+exactly the "actions independent of objects" gap. Removed the baked
+geometry, kept the `dev` bone as a bare attachment point, added
+`deviceKind?: "phone"|"tablet"` to `Character`. Found a real R3F bug along
+the way: rendering `<primitive object={existingBone}>` as a sibling JSX
+element reparents that bone to the component's own output (R3F attaches a
+primitive to its JSX parent on mount) instead of adding to it in place —
+this silently tore `dev` out of the skeleton with no console error. Fixed by
+rendering a plain `<group ref={devRef}>` and attaching it imperatively in a
+`useEffect` (`bone.add(group)` / `bone.remove(group)` on cleanup) — now the
+documented pattern for any future bone/socket attachment. Applied to
+`Actor.tsx` (real NPCs; new `HELD_DEVICE` map — customers hold an iPhone 18
+Pro, staff an iPad mini) and `CharacterStage.tsx` (dev preview). Verified via
+`?stage=1&behave=15&snap=1`: a real iPhone 18 Pro appears in the raised
+hand, following the arm's pose.
+
+**Known rough edges, not yet fixed:** the phone's tabletop display-stand nub
+still renders while held (needs a `held` variant that skips the stand); the
+hand-hold position/rotation is eyeballed and **currently differs between
+`Actor.tsx` and `CharacterStage.tsx`** (the latter was tuned, the former
+wasn't updated to match) — these need reconciling to one verified value;
+only the phone/customer case has been screenshotted, tablet/staff uses the
+same code path but hasn't been checked; orientation in the hand hasn't been
+validated from multiple angles.
+
+**Table-slot device orientation, re-validated 2026-10-12:** checked whether
+screens on product tables actually face the aisle (phone, tablet, watch,
+laptop) using the live store's `?shot=1&at=x,z,yaw,pitch` debug camera.
+`furniture.tsx`'s `Table` component assigns `rotY: -Math.PI/2` for every
+table's "-x" side and `+Math.PI/2` for every "+x" side, identically
+regardless of product kind — so this was a single code path to check, not
+four. Screenshots at T1 (phone), T3 (tablet), T5 (watch) and T7 (laptop)
+confirm screens face their own side's aisle and backs face the other side's
+aisle, correctly, on all four. No bug found. (Note for future screenshot
+debugging: the yaw convention is 0° = faces -z/entrance, 90° = faces -x,
+180° = faces +z, 270° = faces +x — confirmed empirically from the world
+origin; an earlier working note in this session had 90/270 backwards.)
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.

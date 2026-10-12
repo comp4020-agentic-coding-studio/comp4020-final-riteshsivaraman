@@ -177,6 +177,10 @@ find every resource by reading this file, not by discovering it mid-task.
   goal and conversations as moves with preconditions; either party can start.
   Supersedes ADR 3's "character only talks if the visitor starts". Reasoning `[TK]`.
 - `docs/data-overview.html` — diagram of where every kind of data lives today.
+- `src/shared/assignments.ts` — maps every table id+side, wall desktop/
+  monitor/headphone slot, and bay ledge to a specific real model id (pure
+  data, doesn't touch `layout.json`/`world.ts`/`plan.ts`). A proposal, not
+  final — read `references/table-map.md` alongside it.
 - `docs/prompts/product-line-session.md` — the prompt for the session that designs
   every device as a real, named, distinct model (SCOPE D37). Hand it to a fresh session.
 - `references/product-line.md` — Step 1 of the above: every family Apple AU
