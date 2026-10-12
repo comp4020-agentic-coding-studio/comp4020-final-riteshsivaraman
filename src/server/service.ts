@@ -387,6 +387,81 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   return out;
 }
 
+// ---- NPCs acting on their own (D32/D40, first pass) ----
+//
+// Neither of the two functions below is a timer — both are checked only
+// inside a request that was already happening (a conversation step, a move),
+// per the no-background-processes rule. The walk-over itself needs no new
+// code: `open()`'s "npc" branch already broadcasts an `engaged` Engagement,
+// and the client already animates an NPC walking from wherever it is to the
+// visitor for that (shared/engage.ts, built for human-claim and customer-
+// initiated talk). Full per-role reactive state machines are explicitly out
+// of scope for this pass (Ritesh, 2026-10-12: "later we can try giving npc a
+// type of state machine... for now" this lighter layer).
+//
+// `tryNpcAutoClaim` is written and unit-tested but deliberately NOT wired
+// into the live request paths yet: with today's scripts, the only designation
+// it would ever actually act on is "specialist:phones" (genius/stock/
+// technician have no script, D34, so it's a no-op for them regardless), and
+// that's the one post this project's own tests and D35 treat as a deliberate
+// human-staff interaction showcase (claim/hand-on/staff-reply). Having an
+// idle NPC beat a human to every waiting customer, every time, would make
+// that showcase unplayable rather than fix an idle-staff complaint — a
+// multi-user behaviour tradeoff CLAUDE.md wants Ritesh's call on, not a
+// default I pick. `tryGreeterApproach` has no such conflict (nothing today
+// ever greets a new customer unprompted) and is wired into "move" below.
+
+const npcBusy = (ctx: Ctx, npcId: string): boolean =>
+  !!ctx.db.prepare("SELECT 1 FROM conversations WHERE ended_at IS NULL AND with_id = ? AND with_kind = 'npc'").get(npcId);
+
+// If this customer is waiting for help and an on-duty NPC for that post is
+// free, that NPC claims them now — the same thing a human's `claim()` does,
+// just automatic. See the note above on why this isn't called yet.
+export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
+  const st = stateOf(ctx.db, customerId);
+  if (!st || st.state !== "waiting_for_help" || !st.needs) return [];
+  const script = scriptFor(st.needs);
+  if (!script) return [];
+  const offDutyIds = offDuty(ctx);
+  const npcId = Object.keys(NPC_DESIGNATION).find((id) => NPC_DESIGNATION[id] === st.needs && !offDutyIds.includes(id) && !npcBusy(ctx, id));
+  if (!npcId) return [];
+  const npc = NPCS.find((n) => n.id === npcId);
+  if (!npc || !npcPose(npc, ctx.now).present) return [];
+  const at = ctx.position(customerId);
+  if (!at) return [];
+  // logged under the customer, like every other conversation event — an NPC
+  // id is not a row in `visitors`, so it cannot be the events table's own
+  // visitor_id (foreign key)
+  log(ctx, customerId, "npc_claimed", { npcId, designation: st.needs });
+  return open(ctx, customerId, npcId, "npc", script, at);
+}
+
+const GREETER_APPROACH_RANGE = 4.0; // metres: generous, since the NPC closes the distance itself
+
+// A customer who hasn't asked for anything yet (just arrived, or browsing)
+// gets approached by the greeter once, if the greeter is free and nearby —
+// so the first contact in the store doesn't depend on the visitor pressing E
+// first (Ritesh, 2026-10-12, "the biggest thing"). Only the greeter: every
+// other role waits to be asked, which matches a real store (a specialist
+// doesn't stalk the floor; the greeter is the one who says hello).
+export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
+  const st = stateOf(ctx.db, customerId);
+  if (!st || (st.state !== "arriving" && st.state !== "browsing") || st.with_id) return [];
+  const greeted = ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1'").get(customerId);
+  if (greeted) return []; // asked or approached before: up to the customer now
+  if (offDuty(ctx).includes("greeter-1") || npcBusy(ctx, "greeter-1")) return [];
+  const greeter = NPCS.find((n) => n.id === "greeter-1");
+  if (!greeter) return [];
+  const pose = npcPose(greeter, ctx.now);
+  if (!pose.present) return [];
+  const here = ctx.position(customerId);
+  if (!here || dist(here, pose) > GREETER_APPROACH_RANGE) return [];
+  const script = scriptFor("greeter");
+  if (!script) return [];
+  log(ctx, customerId, "npc_approached", { npcId: "greeter-1" });
+  return open(ctx, customerId, "greeter-1", "npc", script, here);
+}
+
 // ---- taking turns ----
 
 // Applies a step's effects, then tells the customer. Reserving stock is
@@ -499,7 +574,9 @@ export function staffRespond(ctx: Ctx, staffId: string, conversationId: string, 
   if (action === "hand_to_genius") {
     log(ctx, staffId, "staff_handed_to_genius", { conversationId });
     setState(ctx, row.customer_id, { state: "waiting_for_help", needs: "genius", want: stateOf(ctx.db, row.customer_id)?.want ?? null, with_id: null });
-    return finish(ctx, row, `${nameOf(ctx, staffId)} has sent you to the Genius Bar.`, "handed to genius");
+    // a no-op today (no genius script yet, D34), but takes effect the moment
+    // one exists without this call site needing to change
+    return [...finish(ctx, row, `${nameOf(ctx, staffId)} has sent you to the Genius Bar.`, "handed to genius"), ...tryNpcAutoClaim(ctx, row.customer_id)];
   }
   log(ctx, staffId, "staff_ended", { conversationId });
   setState(ctx, row.customer_id, { state: "browsing", with_id: null });
@@ -565,5 +642,8 @@ export function handOn(ctx: Ctx, staffId: string, customerId: string, to: string
   setState(ctx, customerId, { needs: to, note: text.length > 0 ? `${e.name}: ${text}` : null });
   log(ctx, staffId, "handed_on", { customerId, to, note: text || null });
   const sm = stateMessage(ctx, customerId);
+  // not auto-claimed here even for a no-op-today post: `to` is any post a
+  // human can type, including "specialist:phones" (see the note above
+  // tryNpcAutoClaim) — unlike hand_to_genius this isn't safely hardcoded
   return [...(sm ? [sm] : []), staffViewMessage(ctx)];
 }

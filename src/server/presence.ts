@@ -28,6 +28,7 @@ import {
   startTalk,
   staffRespond,
   stateOf,
+  tryGreeterApproach,
   type Ctx,
   type Employee,
   type Outgoing,
@@ -304,6 +305,9 @@ export function handleConnection(socket: WebSocket): void {
       me.z = p.z;
       me.ry = message.ry;
       broadcast({ type: "moved", id: me.id, x: me.x, z: me.z, ry: me.ry }, me.id);
+      // a customer who hasn't been approached yet, checked on their own
+      // movement rather than any timer (D32/D40)
+      if (me.kind === "customer") deliver(tryGreeterApproach(serviceCtx(), me.id));
     }
   });
 

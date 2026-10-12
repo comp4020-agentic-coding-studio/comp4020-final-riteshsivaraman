@@ -13,6 +13,8 @@ import {
   HOLD_MS,
   leaveConversation,
   leaveStore,
+  tryGreeterApproach,
+  tryNpcAutoClaim,
   releaseExpired,
   startTalk,
   staffRespond,
@@ -351,6 +353,78 @@ describe("walking away mid-conversation (Esc, either side)", () => {
   it("is a no-op for someone in no conversation", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     expect(leaveConversation(ctx(), "c1")).toEqual([]);
+  });
+});
+
+describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)", () => {
+  // Not wired into any live request path yet (see service.ts's own note on
+  // why: today it would only ever act on "specialist:phones", which this
+  // suite's "employees" block treats as a deliberate human-staff showcase).
+  // Tested directly so the rule itself is still pinned down.
+  it("claims a waiting customer when an on-duty, idle NPC matches their post", () => {
+    const s = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
+    const out = tryNpcAutoClaim(ctx(), "c1");
+    expect(last(out, "c1", "turn")).toMatchObject({ withId: "spec-phones", ended: false });
+    expect(stateOf(db, "c1")?.state).toBe("in_conversation");
+  });
+
+  it("is a no-op for a post with no script yet (genius, D34)", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'genius' WHERE visitor_id = 'c1'").run();
+    expect(tryNpcAutoClaim(ctx(), "c1")).toEqual([]);
+  });
+
+  it("will not claim through an NPC a human already holds the post for", () => {
+    const s = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
+    addVisitor("e1", "Sam", s, "specialist", "phones"); // takes the post off duty
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
+    expect(tryNpcAutoClaim(ctx(), "c1")).toEqual([]);
+    expect(stateOf(db, "c1")?.state).toBe("waiting_for_help"); // left for the human to claim
+  });
+
+  it("will not double-book an NPC already serving someone else", () => {
+    const s = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
+    addVisitor("c2", "Biscuit", { x: s.x, z: s.z });
+    for (const id of ["c1", "c2"]) db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = ?").run(id);
+    expect(last(tryNpcAutoClaim(ctx(), "c1"), "c1", "turn")).toBeDefined();
+    expect(tryNpcAutoClaim(ctx(), "c2")).toEqual([]);
+  });
+});
+
+describe("the greeter approaching a new customer on its own (tryGreeterApproach)", () => {
+  it("approaches an arriving customer nearby", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    const out = tryGreeterApproach(ctx(), "c1");
+    expect(last(out, "c1", "turn")).toMatchObject({ withId: "greeter-1", ended: false });
+    expect(stateOf(db, "c1")?.state).toBe("in_conversation");
+  });
+
+  it("never approaches the same customer twice", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    const first = tryGreeterApproach(ctx(), "c1");
+    const id = last(first, "c1", "turn")!.conversationId;
+    leaveConversation(ctx(), "c1"); // back to browsing
+    expect(stateOf(db, "c1")?.state).toBe("browsing");
+    expect(tryGreeterApproach(ctx(), "c1")).toEqual([]);
+    expect(db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id)).not.toEqual({ ended_at: null });
+  });
+
+  it("does not approach from across the store", () => {
+    addVisitor("c1", "Pebble", { x: 50, z: 50 });
+    expect(tryGreeterApproach(ctx(), "c1")).toEqual([]);
+  });
+
+  it("does not approach while a human holds the greeter post", () => {
+    const g = npc("greeter-1");
+    addVisitor("e1", "Sam", g, "greeter");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    expect(tryGreeterApproach(ctx(), "c1")).toEqual([]);
   });
 });
 
