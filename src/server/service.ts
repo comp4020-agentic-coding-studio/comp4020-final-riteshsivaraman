@@ -217,9 +217,13 @@ export function dutyMessage(ctx: Ctx): Outgoing {
   return { to: "all", message: { type: "duty", offDuty: offDuty(ctx) } };
 }
 
-// ---- inspecting a device (D39, first pass: phone only, stays on the table) ----
+// ---- inspecting a device (D39, extended 2026-10-12 to every tabled device, stays on the table) ----
 
-export const INSPECT_RANGE = 2.0; // metres: D26's "about 1.5 m" plus a step of slack
+// Genuinely within arm's reach, not just "somewhere near the table" (Ritesh,
+// 2026-10-12: "especially not on the other end of the table") — the client's
+// own DEVICE_HINT_RANGE is tighter still, so this is the hard server-side
+// gate, with a little slack for latency between the two.
+export const INSPECT_RANGE = 1.0;
 
 interface InspectionRow {
   id: string;
@@ -253,7 +257,6 @@ export function endInspect(ctx: Ctx, visitorId: string, why: string): Outgoing[]
 export function startInspect(ctx: Ctx, visitorId: string, slotId: string): Outgoing[] {
   const slot = DEVICE_SLOT_BY_ID.get(slotId);
   if (!slot) return [notice(visitorId, "There is nothing there to look at.")];
-  if (slot.kind !== "phone") return [notice(visitorId, "Only phones can be inspected so far.")];
   const here = ctx.position(visitorId);
   if (!here) return [];
   if (dist(here, slot) > INSPECT_RANGE) return [notice(visitorId, "Walk a little closer first.")];

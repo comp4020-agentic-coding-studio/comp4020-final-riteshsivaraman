@@ -36,7 +36,7 @@ const keys = new Set<string>();
 
 // First person: the camera is the visitor's eyes. Keys move you relative to
 // where you are looking, and collisions use the same boxes the scene draws.
-const INSPECT_RADIUS = 0.5; // metres, close enough to read a screen
+const INSPECT_RADIUS = 0.32; // metres — close, a real zoomed-in look (Ritesh, 2026-10-12)
 // orbit pitch is signed so positive = camera above the target (looking down
 // at it); the default is "looking over it" (Ritesh, 2026-10-12) — above and
 // a bit in front, not bird's-eye, not level with the screen
@@ -278,10 +278,15 @@ function Remotes() {
 
 // "Press E to talk": the nearest person in front of you who has something to
 // say, within a couple of metres. Only for customers who are free to talk.
-// "Press E to inspect" (D39, pilot: phone only) works the same way, for
-// anyone free to look — talking takes priority if both are in range at once.
+// "Press E to inspect" (D39, extended 2026-10-12 to every tabled device, not
+// just the phone pilot) works the same way, for anyone free to look —
+// talking takes priority if both are in range at once.
 const TALK_HINT_RANGE = 2.6;
-const DEVICE_HINT_RANGE = 1.6; // D26's "about 1.5 m", kept under the server's slack
+// genuinely in front of you, within arm's reach — not the far end of the
+// same table (Ritesh, 2026-10-12: "especially not on the other end of the
+// table"), kept a little under the server's own INSPECT_RANGE
+const DEVICE_HINT_RANGE = 0.8;
+const DEVICE_HINT_COS = 0.5; // within about a 60° cone of where you're looking
 // mirrors furniture.tsx's own override, so the hint names the same model it draws
 const PILOT_PHONE_MODEL = new URLSearchParams(location.search).get("pilotPhone") ?? undefined;
 const nameOfSlot = (slot: DeviceSlot): string => {
@@ -313,12 +318,12 @@ function Interact() {
     let bestDevice: { slot: DeviceSlot; sd: number } | null = null;
     if (!net.turn && !net.myInspectSlot && net.status === "open") {
       for (const s of DEVICE_SLOTS) {
-        if (s.kind !== "phone" || net.inspections.has(s.id)) continue;
+        if (net.inspections.has(s.id)) continue;
         const dx = s.x - net.me.x;
         const dz = s.z - net.me.z;
         const d = Math.hypot(dx, dz);
         if (d > DEVICE_HINT_RANGE) continue;
-        if (d > 0.3 && (dx * fx + dz * fz) / d <= 0) continue; // behind you
+        if (d > 0.15 && (dx * fx + dz * fz) / d < DEVICE_HINT_COS) continue; // not genuinely facing it
         PROJECT_TMP.set(s.x, STORE_Y + TABLE_H + 0.1, s.z).project(camera);
         if (PROJECT_TMP.z > 1) continue; // behind the near/far clip
         const sdx = PROJECT_TMP.x - TARGET_NDC_X;

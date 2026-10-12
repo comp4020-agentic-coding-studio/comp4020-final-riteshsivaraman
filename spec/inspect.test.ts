@@ -4,12 +4,13 @@ import { migrate } from "../src/server/migrate.ts";
 import { enter, endInspect, inspections, INSPECT_RANGE, leaveStore, startInspect, startTalk, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
 import type { ServerMessage } from "../src/shared/protocol.ts";
 
-// Promise: D39's rules hold with nothing but a database — only a phone can be
-// inspected (the pilot), only within range, only one visitor per slot at a
-// time, inspecting one device while already looking at another closes the
-// first, and every start/end writes its own events row (CLAUDE.md's
-// event-log invariant) so a server-log read can answer "is this happening
-// right now", not just "did it happen at some point".
+// Promise: D39's rules hold with nothing but a database — any tabled device
+// can be inspected (extended 2026-10-12 past the original phone-only pilot),
+// only within range, only one visitor per slot at a time, inspecting one
+// device while already looking at another closes the first, and every
+// start/end writes its own events row (CLAUDE.md's event-log invariant) so a
+// server-log read can answer "is this happening right now", not just "did it
+// happen at some point".
 
 const NOW = 1000;
 let db: Database.Database;
@@ -59,11 +60,10 @@ describe("starting an inspection", () => {
     expect(inspections(db)).toEqual([]);
   });
 
-  it("refuses anything that isn't a phone yet (pilot scope)", () => {
+  it("lets a tablet be inspected too, not just phones (extended past the original pilot)", () => {
     positions.set("alice", { x: -3.6, z: -1.25 }); // right at TABLET_SLOT
     const out = startInspect(ctx(), "alice", TABLET_SLOT);
-    expect(messagesTo(out, "alice", "notice")).toHaveLength(1);
-    expect(inspections(db)).toEqual([]);
+    expect(messagesTo(out, "all", "inspecting")).toEqual([{ type: "inspecting", slotId: TABLET_SLOT, visitorId: "alice", since: NOW }]);
   });
 
   it("refuses from outside the range", () => {
