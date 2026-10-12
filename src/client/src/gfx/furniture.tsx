@@ -28,6 +28,7 @@ import {
   type Table as TableSpec,
 } from "../../../shared/world.ts";
 import { BAY_LEDGES, BAY_SHELVES, LEDGE_DEPTH, STOOL_SEAT_H } from "../../../shared/plan.ts";
+import { BAY_LEDGE_MODELS, TABLE_ASSIGNMENTS } from "../../../shared/assignments.ts";
 import { DEVICE_COLOURS, BOX_COLOURS, FACE_X, BlobShadow, Sign, blobTexture, type Cuboid, type Kind } from "./common.tsx";
 import { Device } from "./Device.tsx";
 import {
@@ -256,10 +257,9 @@ function WatchBed({ t }: { t: TableSpec }) {
 // each long side, facing out (Ritesh, 2026-10-11); the ends are bare. On the
 // centre column's watch tables, a sunken glass-covered bed of watches sits in
 // the middle. A service table is the same, square, without products.
-// Dev-only look check: `?pilotPhone=<id>` puts a real model (phones-geo.ts)
-// on every phone-kind table slot in the live store, so it can be seen at
-// real scale among real furniture, not just alone on DeviceStage. Remove
-// once table assignment (product-line-session.md Step 4) is real.
+// Dev-only look check: `?pilotPhone=<id>` overrides every phone-kind table
+// slot with one model, to see it at real scale among real furniture
+// regardless of the real assignment below.
 const PILOT_PHONE_MODEL = new URLSearchParams(location.search).get("pilotPhone") ?? undefined;
 
 export function Table({ box: t }: { box: TableSpec }) {
@@ -270,11 +270,12 @@ export function Table({ box: t }: { box: TableSpec }) {
   const inset = 0.2; // a product stands this far in from its edge
   const perSide = Math.max(1, Math.floor((t.d - 0.5) / 0.42) + 1);
   const along = (i: number): number => (perSide === 1 ? 0 : (i / (perSide - 1) - 0.5) * (t.d - 0.7));
+  const assigned = TABLE_ASSIGNMENTS[t.id];
   const items = t.service
     ? []
     : [
-        ...Array.from({ length: perSide }, (_, i) => ({ x: t.x - (t.w / 2 - inset), z: t.z + along(i), rotY: -Math.PI / 2, kind: kinds[0] })),
-        ...Array.from({ length: perSide }, (_, i) => ({ x: t.x + (t.w / 2 - inset), z: t.z + along(i), rotY: Math.PI / 2, kind: kinds[1] })),
+        ...Array.from({ length: perSide }, (_, i) => ({ x: t.x - (t.w / 2 - inset), z: t.z + along(i), rotY: -Math.PI / 2, kind: kinds[0], side: "-x" as const })),
+        ...Array.from({ length: perSide }, (_, i) => ({ x: t.x + (t.w / 2 - inset), z: t.z + along(i), rotY: Math.PI / 2, kind: kinds[1], side: "+x" as const })),
       ];
   return (
     <group>
@@ -292,7 +293,7 @@ export function Table({ box: t }: { box: TableSpec }) {
           z={it.z}
           rotY={it.rotY}
           colour={DEVICE_COLOURS[(((i + Math.round(t.z * 3) + 6) % DEVICE_COLOURS.length) + DEVICE_COLOURS.length) % DEVICE_COLOURS.length]}
-          model={it.kind === "phone" ? PILOT_PHONE_MODEL : undefined}
+          model={PILOT_PHONE_MODEL ?? assigned?.[it.side]}
         />
       ))}
     </group>
@@ -377,7 +378,16 @@ export function BayLedges() {
       <mesh geometry={slab} material={m.wood} />
       <mesh geometry={shade} material={m.fade} />
       {ledges.map((l) => (
-        <Device key={l.key} kind={l.kind} x={l.x} y={0.95} z={l.z} rotY={l.side === 1 ? -Math.PI / 2 : Math.PI / 2} colour="#c9ced3" />
+        <Device
+          key={l.key}
+          kind={l.kind}
+          x={l.x}
+          y={0.95}
+          z={l.z}
+          rotY={l.side === 1 ? -Math.PI / 2 : Math.PI / 2}
+          colour="#c9ced3"
+          model={BAY_LEDGE_MODELS[l.side === 1 ? "+x" : "-x"][l.kind]}
+        />
       ))}
     </group>
   );

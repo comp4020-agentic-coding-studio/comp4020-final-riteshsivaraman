@@ -60,6 +60,7 @@ import { net } from "../net.ts";
 import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W, DOOR_X, DOOR_H, BENCH_X, BENCH_HALF, FACE_X, canvasTexture, labelTexture, BoxField, Sign, std, BlobShadow, type Cuboid, type Kind } from "./common.tsx";
 import { Device } from "./Device.tsx";
 import { Desktop, Monitor } from "./computers.tsx";
+import { DESKTOP_WALL_MODELS, HEADPHONES_WALL_MODEL, MONITOR_WALL_MODELS } from "../../../shared/assignments.ts";
 import { BackFurniture, RepairBenches, StorageRacks, Stools, bayFrames } from "./furniture.tsx";
 import { bayStock } from "./phones.tsx";
 import { BackCeiling, BackDetails, BackFloor, BackPartitions, BackPerimeter, DockSurround } from "./back-of-house.tsx";
@@ -488,11 +489,11 @@ export function WallSections() {
               );
             }
             if (f.kind === "monitors") {
-              return f.zs.map((mz) => <Monitor key={`m${mz}`} x={side * BENCH_X} z={mz} side={side} />);
+              return f.zs.map((mz, k) => <Monitor key={`m${mz}`} x={side * BENCH_X} z={mz} side={side} model={MONITOR_WALL_MODELS[k % MONITOR_WALL_MODELS.length]} />);
             }
             if (f.kind === "desktops") {
               return Array.from({ length: f.count }, (_, k) => (
-                <Desktop key={`d${k}`} x={side * BENCH_X} z={f.z0 + k * f.pitch} side={side} />
+                <Desktop key={`d${k}`} x={side * BENCH_X} z={f.z0 + k * f.pitch} side={side} model={DESKTOP_WALL_MODELS[k % DESKTOP_WALL_MODELS.length]} />
               ));
             }
             return Array.from({ length: f.count }, (_, k) => (
@@ -504,6 +505,7 @@ export function WallSections() {
                 z={f.z0 + k * f.pitch}
                 rotY={faceRot(side)}
                 colour={["#e8a98c", "#c9ced3", "#d8cfe8"][k % 3]}
+                model={HEADPHONES_WALL_MODEL}
               />
             ));
           })}
