@@ -63,7 +63,7 @@ const LAYOUT = layoutData as LayoutFile;
 // The table columns: about a quarter of the shop's width either side of the
 // middle. Tables sit near these but are free to move (src/shared/layout.json).
 export const COLUMN_X = [-3.2, 0, 3.2] as const;
-export const TABLE_H = 0.9;
+export const TABLE_H = 0.95; // Ritesh, 2026-10-12: "table heights may need to be raised slightly" (was 0.9)
 
 export const TABLES: Table[] = LAYOUT.tables.map((t) => ({ ...t, h: TABLE_H }));
 

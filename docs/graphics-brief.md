@@ -43,7 +43,7 @@ comment at the relevant field — never present an unverified layout as fact.
 
 ## Fixed heights and sizes (metres)
 
-Table top 0.9 (TABLE_H); wall bench top 0.95; bar top 1.05; stool seat 0.7;
+Table top 0.95 (TABLE_H, raised from 0.9, Ritesh 2026-10-12); wall bench top 0.95; bar top 1.05; stool seat 0.7;
 ceiling 3.0; wall bands: dark low band to 0.95, mid band to 1.5, light above;
 lightboxes 1.0 high from 1.55; bays 0.9 wide between 0.2 piers, shelves from
 1.05 every 0.27 up to six, panel top 2.55, shelf plate 0.24 deep. Product
