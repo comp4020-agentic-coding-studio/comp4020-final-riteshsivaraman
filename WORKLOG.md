@@ -342,6 +342,14 @@ green (285 tests):
   why "the Genius Bar ignores me" can't be fully fixed by behaviour-engine
   work alone; it needs content (a genius script) written first.
 
+**Inspect, second round of live feedback, 2026-10-12** (`cafa4ad`): range
+tightened to genuine arm's reach (client hint 1.6m -> 0.8m, server's hard
+gate 2.0m -> 1.0m) and the forward cone narrowed, so a device at the far end
+of the same table no longer registers. Zoom-in distance 0.5m -> 0.32m. The
+phone-only gate is gone on both sides — any product-table device (tablet,
+watch, laptop, earbuds) now goes through the same inspect mechanism, since
+nothing about it was actually phone-specific beyond that one check.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
