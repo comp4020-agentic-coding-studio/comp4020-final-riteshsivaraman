@@ -160,17 +160,27 @@ after Ritesh's "always photo-verify whenever you can" instruction:
   Net: confirms the new graphics-brief rule earns its keep — most first-pass
   guesses across both families turned out wrong on inspection, not right.
 
-**Open for Step 4 (table placement):** Ritesh wants **fewer iMacs per
-table**, not a wider bench pitch or a scaled-down model — the iMac is built
-true-to-size (547mm wide) and the table bench pitch (`shared/plan.ts`) is
-0.5m, so it won't fit as many per row as a phone does. Keyboards/folios were
-tinting to the tablet's colour (wrong — real ones are white/black
-regardless); fixed in the verification pass.
+Keyboards/folios were tinting to the tablet's colour (wrong — real ones are
+white/black regardless); fixed in the verification pass.
+
+**Step 4, table/wall/bay placement, 2026-10-12** (`639dedc`): `src/shared/assignments.ts`
+is pure data (table id/side/wall-slot -> model id), drawing on
+`layout.json`/`world.ts`/`plan.ts` without moving them, matching
+`references/table-map.md`'s own pattern — a proposal, not final, for Ritesh
+to correct. Covers all 11 product tables, the wall bench's 5 desktop/2
+monitor/3 headphone slots, and all 6 bay ledges. The desktop wall honours
+"fewer iMacs" (mostly Mac mini/Studio, iMac the occasional one — the iMac
+is true-to-size against a 0.5m bench pitch that was never widened). Colour
+is still the old cycling placeholder hex, not a real Apple colour name — no
+one has sourced a hex value for "Burgundy" or "Space Black" yet, on
+purpose. Verified live at several in-store camera angles, console clean.
 
 **Not yet:** accessories (cases, chargers, bands — deferred, lower priority
-per the customer-journey scenarios), table assignment (Step 4), inspect-view
-integration (Step 5, D26-28 — not built at all yet, this is bigger than a
-"later" tweak), the storage-picker conversation step ADR 5 left open.
+per the customer-journey scenarios), real per-unit colour (needs a sourced
+name-to-hex mapping), inspect-view integration (Step 5, D26-28 — not built
+at all yet, this is bigger than a "later" tweak), the storage-picker
+conversation step ADR 5 left open, Hermès Watch lines left out of the
+catalogue (a second real brand, a different question from D37).
 
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
