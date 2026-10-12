@@ -497,7 +497,15 @@ function build(): void {
     meta.set(c.id, c);
     if (c.role === "customer") continue;
     const post = POSTS[c.id];
-    const tl = new Timeline(c.id, "staff", post, c.role === "technician" ? BENCH_FACE[c.id] : { x: post.x, z: post.z + (post.z < 0 ? 2 : 1) }, idleFor(c));
+    // the idle default (used whenever `stand()` has no explicit face — the
+    // brief wait before an actor's first scripted action, including right
+    // after the day wraps at CYCLE and every staff member resets to it at
+    // once): face toward the front of the shop, where customers actually
+    // approach from, not deeper into the store. The old `post.z + ...` had
+    // every role — greeter included — facing away from their own door
+    // (Ritesh, 2026-10-12: "all the staff suddenly turned to face the back
+    // of the store and went still").
+    const tl = new Timeline(c.id, "staff", post, c.role === "technician" ? BENCH_FACE[c.id] : { x: post.x, z: post.z - (post.z < 0 ? 2 : 1) }, idleFor(c));
     staff.set(c.id, tl);
   }
   const greeter = staff.get("greeter-1")!;

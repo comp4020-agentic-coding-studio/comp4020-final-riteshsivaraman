@@ -157,6 +157,29 @@ describe("where heads look", () => {
   });
 });
 
+describe("idle staff face the shop floor, not away from it", () => {
+  // Regression: every non-technician staff role's idle-before-their-first-
+  // action default used to point deeper into the store (post.z + ...) rather
+  // than toward the front customers approach from — so at the start of every
+  // CYCLE, when every staff member is simultaneously in that default idle
+  // stand with nothing scheduled yet, they all turned to face the back of
+  // the store at once and froze there (Ritesh, 2026-10-12, reported live).
+  const nonTechStaff = CAST.filter((c) => c.role !== "customer" && c.role !== "technician").map((c) => c.id);
+
+  it("has a gaze that points toward the front of the shop just after the day's cycle restarts", () => {
+    let checked = 0;
+    for (const id of nonTechStaff) {
+      // a moment just after a wrap — everyone's day-start idle stand, before
+      // any scheduled walk has begun
+      const m = momentOf(id, CYCLE * 1000 * 3 + 50);
+      if (!m.present || !m.gaze) continue;
+      expect(m.gaze.z, id).toBeLessThan(m.z);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+});
+
 describe("the back room", () => {
   it("has stock staff restock a shelf they are facing, never empty floor", () => {
     let seen = 0;
