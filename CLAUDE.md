@@ -176,6 +176,14 @@ find every resource by reading this file, not by discovering it mid-task.
 - `docs/adr/0004-cases-and-moves.md` — ADR 4 (draft): a durable case per customer
   goal and conversations as moves with preconditions; either party can start.
   Supersedes ADR 3's "character only talks if the visitor starts". Reasoning `[TK]`.
+- `docs/adr/0006-behaviour-loop-and-conversation-engine.md` — ADR 6 (draft,
+  from a grilling session): resolves D32's open timetable-vs-reactive
+  behaviour decision as "timetable + interruptible", one generic
+  idle/converse/leave loop shared by every customer purpose and staff role
+  (repair and pickup excepted), and concretises ADR 4's "moves with
+  preconditions" as slot-filling with a per-script ordering policy instead of
+  an authored node graph. D40's NPC-auto-claim wiring question and build
+  sequencing remain open. Reasoning `[TK]`. See SCOPE.md D41.
 - `docs/data-overview.html` — diagram of where every kind of data lives today.
 - `src/shared/assignments.ts` — maps every table id+side, wall desktop/
   monitor/headphone slot, and bay ledge to a specific real model id (pure
