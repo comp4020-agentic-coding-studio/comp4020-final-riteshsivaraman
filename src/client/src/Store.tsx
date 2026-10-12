@@ -42,6 +42,11 @@ const INSPECT_RADIUS = 0.5; // metres, close enough to read a screen
 // a bit in front, not bird's-eye, not level with the screen
 const INSPECT_TARGET = new Vector3();
 const INSPECT_OFFSET = new Vector3();
+const PROJECT_TMP = new Vector3();
+// device-targeting reticle point, in normalised device coordinates
+// (-1..1, y up): low and centred, not the crosshair-dead-centre of the view
+const TARGET_NDC_X = 0;
+const TARGET_NDC_Y = -0.55;
 
 function Player() {
   const { camera, gl } = useThree();
@@ -300,7 +305,12 @@ function Interact() {
     const fx = -Math.sin(yaw);
     const fz = -Math.cos(yaw);
 
-    let bestDevice: { slot: DeviceSlot; d: number } | null = null;
+    // Among the devices in range and roughly ahead, the target is whichever
+    // one's on-screen position is closest to a point low and centred in the
+    // view (Ritesh, 2026-10-12) — so turning to look at a different phone on
+    // the same table re-picks it, the way aiming a reticle would, rather than
+    // always locking onto whichever is nearest in the world.
+    let bestDevice: { slot: DeviceSlot; sd: number } | null = null;
     if (!net.turn && !net.myInspectSlot && net.status === "open") {
       for (const s of DEVICE_SLOTS) {
         if (s.kind !== "phone" || net.inspections.has(s.id)) continue;
@@ -308,8 +318,13 @@ function Interact() {
         const dz = s.z - net.me.z;
         const d = Math.hypot(dx, dz);
         if (d > DEVICE_HINT_RANGE) continue;
-        if (d > 0.3 && (dx * fx + dz * fz) / d < 0.3) continue;
-        if (!bestDevice || d < bestDevice.d) bestDevice = { slot: s, d };
+        if (d > 0.3 && (dx * fx + dz * fz) / d <= 0) continue; // behind you
+        PROJECT_TMP.set(s.x, STORE_Y + TABLE_H + 0.1, s.z).project(camera);
+        if (PROJECT_TMP.z > 1) continue; // behind the near/far clip
+        const sdx = PROJECT_TMP.x - TARGET_NDC_X;
+        const sdy = PROJECT_TMP.y - TARGET_NDC_Y;
+        const sd = sdx * sdx + sdy * sdy;
+        if (!bestDevice || sd < bestDevice.sd) bestDevice = { slot: s, sd };
       }
     }
     const nextDevice = bestDevice ? { slotId: bestDevice.slot.id, name: nameOfSlot(bestDevice.slot) } : null;
