@@ -350,6 +350,19 @@ phone-only gate is gone on both sides — any product-table device (tablet,
 watch, laptop, earbuds) now goes through the same inspect mechanism, since
 nothing about it was actually phone-specific beyond that one check.
 
+**Inspect, third round, and a test-infra fix, 2026-10-13** (`f86a82a`,
+`903f0d4`): range widened slightly (client 0.8m -> 1.15m, server 1.0m ->
+1.4m), E now also ends an inspection, and putting a device down is no longer
+a snap — it eases back to standing using the same rate the pan-in uses,
+mirrored, not a separate animation. Resolves the "known cut" noted two
+entries up. Along the way, re-testing surfaced that D40's greeter-approach
+had made `conversations-live.test.ts` flaky at roughly 2-in-3 (not the rare
+pre-existing kind): vitest runs test files in parallel by default, and every
+`*-live.test.ts` shares one real running app, so another file's customer
+near the greeter could auto-approach it before this test's own customer
+reached it. Fixed with `fileParallelism: false` in vitest.config.ts (whole
+suite: ~2s -> ~8s, worth it) — 5 consecutive clean runs after.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
