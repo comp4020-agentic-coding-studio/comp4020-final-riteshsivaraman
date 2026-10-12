@@ -220,10 +220,11 @@ export function dutyMessage(ctx: Ctx): Outgoing {
 // ---- inspecting a device (D39, extended 2026-10-12 to every tabled device, stays on the table) ----
 
 // Genuinely within arm's reach, not just "somewhere near the table" (Ritesh,
-// 2026-10-12: "especially not on the other end of the table") — the client's
-// own DEVICE_HINT_RANGE is tighter still, so this is the hard server-side
-// gate, with a little slack for latency between the two.
-export const INSPECT_RANGE = 1.0;
+// 2026-10-12: "especially not on the other end of the table", then "a bit of
+// a larger distance threshold") — the client's own DEVICE_HINT_RANGE is
+// tighter still, so this is the hard server-side gate, with a little slack
+// for latency between the two.
+export const INSPECT_RANGE = 1.4;
 
 interface InspectionRow {
   id: string;

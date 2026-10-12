@@ -53,7 +53,7 @@ function Hud() {
       </div>
       <div className="hud-hint">
         {live.myInspectSlot
-          ? "Drag to look around the device · tap away or Esc to put it down"
+          ? "Drag to look around the device · E, tap away, or Esc to put it down"
           : "Drag the view to look around · W A S D to walk · arrows turn · E to talk"}
       </div>
       {waiting && (

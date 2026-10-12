@@ -7,6 +7,7 @@ import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { NPC_DESIGNATION, NPC_LABEL, scriptFor } from "../../shared/duty.ts";
 import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { poseChanged } from "../../shared/pose.ts";
+import { wrap } from "../../shared/steering.ts";
 import { designationOf, EMPLOYEE_COLOUR, STAFF_SHIRT } from "../../shared/profile.ts";
 import { avoidPeople } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
@@ -58,6 +59,9 @@ function Player() {
   const orbit = useRef({ yaw: 0, pitch: -0.25 });
   const wasInspecting = useRef<string | null>(null);
   const standPose = useRef({ ry: 0, pitch: 0 });
+  // true while easing back out of an inspection — the same motion as panning
+  // in, run in reverse (Ritesh, 2026-10-12), not a snap
+  const exiting = useRef(false);
 
   useEffect(() => {
     // `?at=x,z,yawDegrees` starts the camera elsewhere, for screenshots and
@@ -71,7 +75,7 @@ function Player() {
     camera.rotation.set(start && start.length === 4 ? (start[3] * Math.PI) / 180 : 0, start ? (start[2] * Math.PI) / 180 : SPAWN.ry, 0);
     const down = (e: KeyboardEvent) => {
       keys.add(e.code);
-      if (e.code === "Escape" && net.myInspectSlot) net.inspectEnd();
+      if ((e.code === "Escape" || e.code === "KeyE") && net.myInspectSlot) net.inspectEnd();
     };
     const up = (e: KeyboardEvent) => keys.delete(e.code);
     const blur = () => keys.clear();
@@ -151,11 +155,30 @@ function Player() {
       return;
     }
     if (wasInspecting.current) {
-      // put down: back to standing where you actually are, looking the way you were
+      // put down: the exact reverse of the pan in (Ritesh, 2026-10-12), eased
+      // back to standing where you actually are, looking the way you were —
+      // not a snap
+      exiting.current = true;
       wasInspecting.current = null;
-      camera.position.set(net.me.x, STORE_Y + EYE_HEIGHT, net.me.z);
-      camera.rotation.order = "YXZ";
-      camera.rotation.set(standPose.current.pitch, standPose.current.ry, 0);
+    }
+    if (exiting.current) {
+      const ease = 1 - Math.exp(-10 * dt);
+      const ty = STORE_Y + EYE_HEIGHT;
+      camera.position.x += (net.me.x - camera.position.x) * ease;
+      camera.position.y += (ty - camera.position.y) * ease;
+      camera.position.z += (net.me.z - camera.position.z) * ease;
+      camera.rotation.y += wrap(standPose.current.ry - camera.rotation.y) * ease;
+      camera.rotation.x += (standPose.current.pitch - camera.rotation.x) * ease;
+      const atPos = Math.hypot(camera.position.x - net.me.x, camera.position.y - ty, camera.position.z - net.me.z) < 0.01;
+      const atRot = Math.abs(wrap(standPose.current.ry - camera.rotation.y)) < 0.01 && Math.abs(standPose.current.pitch - camera.rotation.x) < 0.01;
+      if (atPos && atRot) {
+        exiting.current = false;
+        camera.position.set(net.me.x, ty, net.me.z);
+        camera.rotation.order = "YXZ";
+        camera.rotation.set(standPose.current.pitch, standPose.current.ry, 0);
+      } else {
+        return; // still easing out: movement stays suspended, same as panning in
+      }
     }
 
     // in a conversation you stand and read; the keys pick from the menu
@@ -285,7 +308,7 @@ const TALK_HINT_RANGE = 2.6;
 // genuinely in front of you, within arm's reach — not the far end of the
 // same table (Ritesh, 2026-10-12: "especially not on the other end of the
 // table"), kept a little under the server's own INSPECT_RANGE
-const DEVICE_HINT_RANGE = 0.8;
+const DEVICE_HINT_RANGE = 1.15; // Ritesh, 2026-10-12: "a bit of a larger distance threshold" (was 0.8)
 const DEVICE_HINT_COS = 0.5; // within about a 60° cone of where you're looking
 // mirrors furniture.tsx's own override, so the hint names the same model it draws
 const PILOT_PHONE_MODEL = new URLSearchParams(location.search).get("pilotPhone") ?? undefined;
