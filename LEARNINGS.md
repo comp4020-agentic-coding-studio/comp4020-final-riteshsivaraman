@@ -153,6 +153,30 @@ decisions (this one anchors a C9 grading criterion), an unanswered question
 needs to stay visibly unanswered (`[TK]`), not get smoothed over by my own
 next-most-plausible guess just because the conversation moved on.
 
+## A rotation or heading sign is wrong in a way that reading the code won't catch — three separate times in one session
+
+[`2ed2c7a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/2ed2c7a),
+[`a3b8070`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a3b8070),
+[`df52978`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/df52978)
+
+Three unrelated bugs this session were the same shape: a rotation or offset
+sign that was backwards from what the surrounding reasoning assumed — the
+idle-staff heading default (pointed into the store instead of toward the
+front), the phone-lean tilt (flipped once, Ritesh caught it live, I'd only
+checked a side-profile render that I misjudged), and the inspect camera's
+pitch convention (a "negative = look down" value fed into a formula where
+positive meant "camera above the target," so the default camera ended up
+below table height looking up — the opposite of what the code comment next
+to it claimed). In every case the math *looked* right on a read-through; the
+only thing that caught it was an actual rendered check — a live screenshot,
+or (for the staff heading) a test that was made to fail against the old code
+first. Lesson: for anything involving a sign on a rotation, a heading, or a
+camera offset, "I reasoned through the trig and it should point the right
+way" is not evidence. The only acceptable check is rendering it and looking,
+and for the kind of thing a human will eyeball live anyway (device tilt, NPC
+facing), a quick screenshot before calling it done would have caught two of
+these three before Ritesh had to.
+
 ## Confident, multi-source web coverage about a physical design detail can still be flat wrong
 
 [`255ce19`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/255ce19)
