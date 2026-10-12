@@ -116,6 +116,36 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX inspections_open ON inspections (slot_id, ended_at);
   `,
+  // 6: a customer's goal outlives any one conversation (SCOPE D42, ADR 4
+  // option B, built): a `case` (buying a phone, a repair, a pickup) has an
+  // owner that a handoff reassigns, and `case_facts` holds what has been
+  // learned so the next owner does not have to re-ask. `conversations`
+  // becomes one exchange within a case, many per case; the column is
+  // nullable so every conversation written before this step stays valid.
+  `
+  CREATE TABLE cases (
+    id          TEXT PRIMARY KEY,
+    visitor_id  TEXT NOT NULL REFERENCES visitors(id),
+    kind        TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'open',
+    owner_id    TEXT,
+    owner_kind  TEXT,
+    deadline_at INTEGER,
+    created_at  INTEGER NOT NULL,
+    ended_at    INTEGER
+  );
+  CREATE INDEX cases_visitor ON cases (visitor_id, ended_at);
+  CREATE INDEX cases_owner ON cases (owner_id, status);
+  CREATE TABLE case_facts (
+    case_id    TEXT NOT NULL REFERENCES cases(id),
+    key        TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    learned_by TEXT,
+    learned_at INTEGER NOT NULL,
+    PRIMARY KEY (case_id, key)
+  );
+  ALTER TABLE conversations ADD COLUMN case_id TEXT REFERENCES cases(id);
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

@@ -62,6 +62,34 @@ Open (nothing here has a default I will pick quietly):
 - `[TK]` whether trade-in, care plan and set-up are in the first build.
 - `[TK]` whether the basket and ticket survive a restart of the visit (database rows) or only the exchange.
 
+## Addendum: option B confirmed and the schema built (2026-10-13)
+
+SCOPE D42: option B is confirmed, against the cheaper alternative of adding
+an owner+facts blob directly to `player_state` (rejected — stays 1:1 with
+one visitor, can't outlive the visit or later cover two visitors in one
+case). Migration 6 adds `cases` (owner, status, a deadline column) and
+`case_facts` (one fact per row, who learned it and when); `conversations`
+gains a nullable `case_id`. `src/server/cases.ts` is the pure data layer
+(`openCase`, `handOffCase`, `setFact`, `factsOf`), covered by
+`spec/cases.test.ts`; not yet wired into `service.ts`'s claim/handOn/open
+flow, which is the next step, and that step is what will write the handoff's
+`events` row. The storage-model row above (current-state tables vs
+event-sourced) is resolved by this: current-state tables, matching every
+other table in this schema.
+
+Also corrects a claim made earlier in the same session: a staff-to-staff
+handoff already existed before this (`handOn` in `service.ts`, tested) —
+a single 140-character free-text note, written only from an explicit human
+"Hand on" action. It never fired from a conversation script itself (T1's
+Mira-walks-Aisha-to-Dan, T7's "Dan sets a note for Priya" are both
+in-script handoffs), and a receiving script could not read it
+programmatically. `case_facts` is the structured, scriptable version of the
+same idea, not a new concept.
+
+Still open, not resolved by this: which mission/role gets a written-out slot
+script first; multi-person parties sharing one conversation (T3); staff-to-
+staff consultation mid-conversation while the customer waits (T3).
+
 ## Why this
 
 [TK] Ritesh's reasoning.

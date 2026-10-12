@@ -175,7 +175,15 @@ find every resource by reading this file, not by discovering it mid-task.
   script. Prices and policies in it are `[TK]`/`[verify]`.
 - `docs/adr/0004-cases-and-moves.md` — ADR 4 (draft): a durable case per customer
   goal and conversations as moves with preconditions; either party can start.
-  Supersedes ADR 3's "character only talks if the visitor starts". Reasoning `[TK]`.
+  Supersedes ADR 3's "character only talks if the visitor starts". **Option B
+  confirmed and schema built 2026-10-13 (SCOPE D42)** — see the addendum.
+  Reasoning `[TK]`.
+- `src/server/cases.ts` — the case/case_facts data layer ADR 4's addendum
+  describes: `openCase`, `handOffCase`, `setFact`, `factsOf`. Pure, like
+  `stock.ts`; not yet wired into `service.ts`'s claim/handOn/open flow, and
+  writes no `events` row itself — that belongs at the call site once wired.
+  Migration 6 (`src/server/migrate.ts`) adds its tables. Read before touching
+  `cases`, `case_facts`, or `conversations.case_id`.
 - `docs/adr/0006-behaviour-loop-and-conversation-engine.md` — ADR 6 (draft,
   from a grilling session): resolves D32's open timetable-vs-reactive
   behaviour decision as "timetable + interruptible", one generic
