@@ -286,6 +286,62 @@ joins mid-inspection.
   `Actor.tsx`/`CharacterStage.tsx` held-device offset mismatch from the
   character-pairing pilot above.
 
+**Live-feedback fix batch, 2026-10-12** (`2ed2c7a` through `efbc270`): Ritesh
+ran the build live and reported a punch list in one message. Triaged into a
+priority list rather than fixed blind; all of the following are done and
+green (285 tests):
+- **Staff freeze bug** (`2ed2c7a`): every non-technician staff role's idle-
+  before-first-action default faced deeper into the store instead of toward
+  the front, so at the start of each 480s day cycle, before any customer had
+  arrived, every staff member simultaneously stood facing the back wall.
+  Confirmed by reverting the fix and watching the new test go red for the
+  right reason first.
+- **NPCs shoving visitors** (`a3b8070`): `settledPeople()` only ever
+  separated NPCs from each other, never from real visitors, so an NPC's
+  drawn position glided straight through anyone standing in its path.
+  Cosmetic/client-side fix — the authoritative path stays a pure function
+  of time.
+- **Phones leaning on their stand** (`a3b8070`): a reference photo showed
+  phones reclined against their security-tether stand, not standing bolt
+  upright; the real per-model geometry had never had this applied (only the
+  placeholder fallback had). Got the lean direction backwards on the first
+  try — fixed once Ritesh caught it live, verified against a close-up
+  screenshot the second time, not just a side-profile render.
+- **Screen glint** (`a3b8070`): lower roughness, higher env intensity on the
+  screen material, for a more visible moving specular highlight.
+- **Inspect-feature polish** (`df52978`, `efbc270`): the orbit camera's pitch
+  sign was backwards — a "look down" value was feeding an offset formula
+  where positive means "above the target" — so the default actually put the
+  camera BELOW table height looking up, the exact kneeling problem D26 was
+  meant to avoid, just relocated. Fixed, plus: a pulsing highlight ring on
+  the targeted device (there wasn't one), "Press E to inspect `<real name>`"
+  instead of just "inspect" (resolved from the catalogue via the same
+  table-assignment lookup furniture.tsx draws from), the "You looking" label
+  no longer shown to the person doing the looking, and — a later correction
+  — the targeted device is now picked by screen-space closest-to-a-low-
+  centred-point rather than nearest-in-the-world, so turning your head to
+  look at a different phone on the same table re-targets it.
+- **Table height** (`23f1fdb`): 0.9m -> 0.95m, one constant, propagated
+  everywhere automatically; drawings-match-model check stayed green.
+- **Leaving a conversation** (`ea9e667`): there was no way to walk away
+  mid-conversation (Esc only worked once one had already ended some other
+  way) for either a customer or an employee. New `talk_leave` message,
+  reuses the existing `finish()` path, visible "Esc to step away" hint.
+- **D40, NPCs act without a human online** (`6a63451`): the greeter now
+  approaches a nearby customer who hasn't asked for anything yet, once —
+  checked on their own `move` messages, no new timer, and the walk-over
+  needed no new code (reuses the Engagement animation already built for
+  human claim). A second piece — an idle NPC auto-claiming someone already
+  `waiting_for_help` — is written and unit-tested but **not wired in**:
+  discovered via 24 failing tests that with today's scripts (greeter, phones
+  only) it would only ever act on `specialist:phones`, which this project's
+  own tests and D35 clearly intend as a human-staff interaction showcase.
+  Recorded as an open question in SCOPE D40 rather than guessed through.
+  Separately: genius/stock/technician still have no conversation script at
+  all (D34, "first slice: the greeter and the phones specialist") — that's
+  why "the Genius Bar ignores me" can't be fully fixed by behaviour-engine
+  work alone; it needs content (a genius script) written first.
+
 **Docs that still describe Seen:** `README.md`, `PROCESS.md`,
 `reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
 `.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
