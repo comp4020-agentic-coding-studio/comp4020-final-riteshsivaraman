@@ -29,6 +29,7 @@ import {
 } from "../../../shared/world.ts";
 import { BAY_LEDGES, BAY_SHELVES, LEDGE_DEPTH, STOOL_SEAT_H } from "../../../shared/plan.ts";
 import { BAY_LEDGE_MODELS, TABLE_ASSIGNMENTS } from "../../../shared/assignments.ts";
+import { DEVICE_SLOTS } from "../../../shared/slots.ts";
 import { DEVICE_COLOURS, BOX_COLOURS, FACE_X, BlobShadow, Sign, blobTexture, type Cuboid, type Kind } from "./common.tsx";
 import { Device } from "./Device.tsx";
 import {
@@ -266,17 +267,10 @@ export function Table({ box: t }: { box: TableSpec }) {
   const m = mats();
   const bed = isWatchBed(t);
   const geo = useMemo(() => tableGeometry(t, bed), [t, bed]);
-  const kinds = t.products as readonly Kind[];
-  const inset = 0.2; // a product stands this far in from its edge
-  const perSide = Math.max(1, Math.floor((t.d - 0.5) / 0.42) + 1);
-  const along = (i: number): number => (perSide === 1 ? 0 : (i / (perSide - 1) - 0.5) * (t.d - 0.7));
   const assigned = TABLE_ASSIGNMENTS[t.id];
-  const items = t.service
-    ? []
-    : [
-        ...Array.from({ length: perSide }, (_, i) => ({ x: t.x - (t.w / 2 - inset), z: t.z + along(i), rotY: -Math.PI / 2, kind: kinds[0], side: "-x" as const })),
-        ...Array.from({ length: perSide }, (_, i) => ({ x: t.x + (t.w / 2 - inset), z: t.z + along(i), rotY: Math.PI / 2, kind: kinds[1], side: "+x" as const })),
-      ];
+  // positions come from shared/slots.ts (D28's stable slot id), not computed
+  // here, so the server's inspect range-check always agrees with what is drawn
+  const items = DEVICE_SLOTS.filter((s) => s.tableId === t.id);
   return (
     <group>
       <group position={[t.x, 0, t.z]}>
@@ -286,8 +280,8 @@ export function Table({ box: t }: { box: TableSpec }) {
       {bed && <WatchBed t={t} />}
       {items.map((it, i) => (
         <Device
-          key={i}
-          kind={it.kind}
+          key={it.id}
+          kind={it.kind as Kind}
           x={it.x}
           y={t.h}
           z={it.z}
