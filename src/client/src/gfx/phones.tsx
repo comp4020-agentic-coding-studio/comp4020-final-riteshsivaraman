@@ -78,6 +78,11 @@ import {
 } from "./phones-geo.ts";
 
 
+// A phone on a table stand leans back against it, screen angled up toward a
+// standing customer, rather than standing bolt upright (reference photo,
+// Ritesh 2026-10-12). Radians, negative tilts the top away from the aisle.
+export const PHONE_LEAN = -0.3;
+
 // Original screen artwork for the products: wallpapers, app tiles, a clock
 // face. Drawn once per kind and colour variant and shared by every device.
 export const SCREEN_WALLPAPERS: Array<[string, string, string]> = [
@@ -400,7 +405,10 @@ const lathes = new Map<string, LatheGeometry>();
 // `screenMaterial`, kept here since phones' screen textures are generated
 // per-call, not cached by a (design, format) key.
 function ScreenGlass({ map }: { map: CanvasTexture }) {
-  return <meshStandardMaterial color="#000000" emissive="#ffffff" emissiveMap={map} roughness={0.08} metalness={0} envMapIntensity={0.9} toneMapped={false} />;
+  // low roughness + a strong env intensity so the cover glass throws a real,
+  // moving specular glint as you change angle (Ritesh, 2026-10-12), not just
+  // the emissive content underneath
+  return <meshStandardMaterial color="#000000" emissive="#ffffff" emissiveMap={map} roughness={0.04} metalness={0} envMapIntensity={1.4} toneMapped={false} />;
 }
 
 // The three finish buckets of a built model, one mesh (one draw call) each.
@@ -467,17 +475,25 @@ export function PhoneDevice({
   return (
     <group position={[x, y, z]} rotation={[0, rotY, 0]}>
       {kind === "phone" && spec && built && (
-        <group position={[0, spec.length / 2 + 0.012, 0]}>
-          <FinishMeshes parts={built} />
-          <mesh position={[scr?.offsetX ?? 0, 0, spec.thickness / 2 + 0.0004]}>
-            <planeGeometry args={[screenW, screenH]} />
-            <ScreenGlass map={screenTexture("phone", SCREEN_VARIANT(colour), screenMode, { aspect: screenH / screenW, cutout: scr?.cutout })} />
-          </mesh>
-          <mesh position={[0, -spec.length / 2 - 0.006, 0]}>
+        <>
+          {/* the stand sits flat on the table; only the phone leans back
+              against it (reference photo, Ritesh 2026-10-12) — a phone
+              standing bolt upright meant looking at its screen face-on
+              required crouching to table height */}
+          <mesh position={[0, 0.006, 0]}>
             <cylinderGeometry args={[0.05, 0.05, 0.012, 20]} />
             {std(STAND, 0.5, 0.4)}
           </mesh>
-        </group>
+          <group position={[0, 0.012, 0]} rotation={[PHONE_LEAN, 0, 0]}>
+            <group position={[0, spec.length / 2, 0]}>
+              <FinishMeshes parts={built} />
+              <mesh position={[scr?.offsetX ?? 0, 0, spec.thickness / 2 + 0.0004]}>
+                <planeGeometry args={[screenW, screenH]} />
+                <ScreenGlass map={screenTexture("phone", SCREEN_VARIANT(colour), screenMode, { aspect: screenH / screenW, cutout: scr?.cutout })} />
+              </mesh>
+            </group>
+          </group>
+        </>
       )}
       {kind === "phone" && !spec && (
         <>

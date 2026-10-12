@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
-import { avoidPeople, nonVisitorPeople } from "../src/shared/people.ts";
+import { avoidPeople, nonVisitorPeople, settledPeople } from "../src/shared/people.ts";
 import { BODY_RADIUS, separateFromPeople } from "../src/shared/world.ts";
 
 // Promise: people are solid (Ritesh, 2026-10-11, "have collision between
@@ -55,8 +55,6 @@ it("counts other visitors as solid too", () => {
 
 // NPC with NPC (Ritesh, 2026-10-11): staff, customers and first-floor walkers
 // are settled in a fixed order, so no two stand inside each other.
-import { settledPeople } from "../src/shared/people.ts";
-
 it("never lets two NPCs or walkers stand inside each other", () => {
   let worst = Infinity;
   let pairs = 0;
@@ -73,6 +71,25 @@ it("never lets two NPCs or walkers stand inside each other", () => {
   }
   expect(pairs).toBeGreaterThan(1000);
   expect(worst, "the closest two ever got").toBeGreaterThanOrEqual(BODY_RADIUS * 2 - 0.05);
+});
+
+// Regression: an NPC's drawn position used to ignore real visitors entirely
+// (only other NPCs), so it glided straight through someone standing in its
+// path — reading as the visitor being shoved aside every frame as the NPC
+// advanced (Ritesh, 2026-10-12: "some npc just shove you to walk around").
+it("gives way to a visitor standing exactly where an NPC's raw path says it should be", () => {
+  let checked = 0;
+  for (let t = 0; t < 60_000; t += 2000) {
+    for (const n of NPCS) {
+      const raw = npcPose(n, T0 + t);
+      if (!raw.present || n.working) continue; // working NPCs hold their post for everyone
+      const settled = settledPeople(T0 + t, [{ x: raw.x, z: raw.z }]).npc.get(n.id);
+      if (!settled) continue;
+      expect(Math.hypot(settled.x - raw.x, settled.z - raw.z), n.id).toBeGreaterThanOrEqual(MIN - 1e-9);
+      checked++;
+    }
+  }
+  expect(checked).toBeGreaterThan(50);
 });
 
 it("is the same answer every time for the same moment", () => {

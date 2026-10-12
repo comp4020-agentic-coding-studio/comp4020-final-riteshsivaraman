@@ -27,7 +27,10 @@ export function Npcs() {
 
   useFrame(() => {
     const now = AT !== null ? Number(AT) * 1000 : net.serverNow();
-    const settled = settledPeople(now).npc;
+    // real visitors are obstacles too, so an NPC visually gives way instead
+    // of gliding straight through someone standing in its path
+    const visitors = [net.me, ...[...net.remotes.values()].map((r) => ({ x: r.x, z: r.z }))];
+    const settled = settledPeople(now, visitors).npc;
     root.current?.children.forEach((child, i) => {
       const def = NPCS[i];
       let raw: { x: number; z: number; ry: number; walking: boolean; present: boolean; mode: ActorState["mode"]; mood: string; seated: boolean; device: boolean; intent: string; gaze?: { x: number; y: number; z: number } } = npcPose(def, now);

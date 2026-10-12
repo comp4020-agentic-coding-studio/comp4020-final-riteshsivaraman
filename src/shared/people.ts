@@ -24,10 +24,18 @@ export interface SettledPeople {
   walkway: Map<string, Settled>; // mall walker id -> same, for those on the store's floor
 }
 
-export function settledPeople(nowMs: number): SettledPeople {
+// `visitors`: real visitors to treat as fixed obstacles too, so an NPC's
+// drawn position gives way to someone standing in its path instead of
+// visually walking straight through them (Ritesh, 2026-10-12: "some npc just
+// shove you to walk around... have npc treat other people as obstacles
+// too"). Cosmetic only — an NPC's authoritative path (npcPose/routePose) is
+// still a pure function of time alone, unaffected by where visitors stand;
+// this only changes where it is drawn. Defaults to none, so every existing
+// caller (nonVisitorPeople, resolving a visitor's own position) is unchanged.
+export function settledPeople(nowMs: number, visitors: ReadonlyArray<{ x: number; z: number }> = []): SettledPeople {
   const npc = new Map<string, Settled>();
   const walkway = new Map<string, Settled>();
-  const placed: Settled[] = [];
+  const placed: Settled[] = visitors.map((v) => ({ x: v.x, z: v.z }));
   const place = (x: number, z: number, staff: boolean, fixed: boolean): Settled => {
     let p = { x, z };
     if (!fixed) {
