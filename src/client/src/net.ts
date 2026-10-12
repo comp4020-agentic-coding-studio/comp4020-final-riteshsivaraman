@@ -7,6 +7,7 @@ import type {
   CustomerView,
   Engagement,
   Identity,
+  Inspection,
   Present,
   Role,
   ServerMessage,
@@ -98,6 +99,13 @@ class Net {
   notice: { text: string; at: number } | null = null;
   // who is close enough to talk to, set by the scene
   hint: { id: string; name: string } | null = null;
+  // devices being inspected right now, by slot id (D39) — server-authoritative,
+  // so another visitor sees the same thing live, including one who joins mid-look
+  inspections = new Map<string, Inspection>();
+  // the slot id you yourself are inspecting, or null
+  myInspectSlot: string | null = null;
+  // the nearest free, in-range device, set by the scene
+  deviceHint: { slotId: string } | null = null;
 
   private socket: WebSocket | null = null;
   private listeners = new Set<() => void>();
@@ -178,6 +186,8 @@ class Net {
         this.offDuty = new Set(message.offDuty);
         this.engaged = new Map(message.engaged.map((e) => [e.npcId, e]));
         this.released.clear();
+        this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
+        this.myInspectSlot = message.inspecting.find((i) => i.visitorId === message.you.id)?.slotId ?? null;
         this.remotes.clear();
         for (const o of message.others) this.addRemote(o);
         this.status = "open";
@@ -237,6 +247,14 @@ class Net {
       case "notice":
         this.notice = { text: message.text, at: Date.now() };
         return true;
+      case "inspecting":
+        this.inspections.set(message.slotId, message);
+        if (message.visitorId === this.you?.id) this.myInspectSlot = message.slotId;
+        return true;
+      case "inspect_ended":
+        this.inspections.delete(message.slotId);
+        if (this.myInspectSlot === message.slotId) this.myInspectSlot = null;
+        return true;
     }
   }
 
@@ -256,6 +274,19 @@ class Net {
 
   talkStart(withId: string): void {
     this.send({ type: "talk_start", withId });
+  }
+
+  inspectStart(slotId: string): void {
+    this.send({ type: "inspect_start", slotId });
+  }
+
+  inspectEnd(): void {
+    if (!this.myInspectSlot) return;
+    this.send({ type: "inspect_end" });
+    // leave at once locally; the server's inspect_ended confirms it, but
+    // waiting for the round trip would leave the camera stuck mid-ease
+    this.myInspectSlot = null;
+    this.changed();
   }
 
   choose(choice: string): void {

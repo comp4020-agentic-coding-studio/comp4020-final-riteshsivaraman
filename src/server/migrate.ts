@@ -99,6 +99,23 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE stock_new RENAME TO stock;
   ALTER TABLE reservations ADD COLUMN storage TEXT NOT NULL DEFAULT '';
   `,
+  // 5: who is inspecting a device right now (D39, first pass: phone only, the
+  // device stays on the table). One open row per slot: starting a second
+  // inspection on an occupied slot is refused at the service layer, not by
+  // this schema, so the race is caught with the same transactional
+  // read-then-write the stock code already uses. `ended_at` closes the row;
+  // closed rows are kept (not deleted) as the event history a later
+  // "who looked at this today" feature could read.
+  `
+  CREATE TABLE inspections (
+    id         TEXT PRIMARY KEY,
+    slot_id    TEXT NOT NULL,
+    visitor_id TEXT NOT NULL REFERENCES visitors(id),
+    started_at INTEGER NOT NULL,
+    ended_at   INTEGER
+  );
+  CREATE INDEX inspections_open ON inspections (slot_id, ended_at);
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

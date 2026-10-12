@@ -14,9 +14,10 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, npcsOffDuty, scriptFor } from "../shared/duty.ts";
 import { NPCS, npcPose } from "../shared/npcs.ts";
-import type { CustomerView, Engagement, ServerMessage, StaffTurnView, TurnView } from "../shared/protocol.ts";
+import type { CustomerView, Engagement, Inspection, ServerMessage, StaffTurnView, TurnView } from "../shared/protocol.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
+import { DEVICE_SLOT_BY_ID } from "../shared/slots.ts";
 import { takeOne } from "./stock.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
@@ -216,6 +217,58 @@ export function dutyMessage(ctx: Ctx): Outgoing {
   return { to: "all", message: { type: "duty", offDuty: offDuty(ctx) } };
 }
 
+// ---- inspecting a device (D39, first pass: phone only, stays on the table) ----
+
+export const INSPECT_RANGE = 2.0; // metres: D26's "about 1.5 m" plus a step of slack
+
+interface InspectionRow {
+  id: string;
+  slot_id: string;
+  visitor_id: string;
+  started_at: number;
+  ended_at: number | null;
+}
+
+export function inspections(db: Database.Database): Inspection[] {
+  const rows = db.prepare("SELECT * FROM inspections WHERE ended_at IS NULL").all() as InspectionRow[];
+  return rows.map((r) => ({ slotId: r.slot_id, visitorId: r.visitor_id, since: r.started_at }));
+}
+
+function openInspectionOf(db: Database.Database, visitorId: string): InspectionRow | undefined {
+  return db.prepare("SELECT * FROM inspections WHERE ended_at IS NULL AND visitor_id = ?").get(visitorId) as InspectionRow | undefined;
+}
+
+// Ends whatever the visitor is currently inspecting, if anything. Used both
+// for an explicit `inspect_end` and as cleanup (switching devices, starting a
+// conversation, leaving the store) — always the same close-and-log path, so
+// there is one place that can leave a row open by mistake, not several.
+export function endInspect(ctx: Ctx, visitorId: string, why: string): Outgoing[] {
+  const row = openInspectionOf(ctx.db, visitorId);
+  if (!row) return [];
+  ctx.db.prepare("UPDATE inspections SET ended_at = ? WHERE id = ?").run(ctx.now, row.id);
+  log(ctx, visitorId, "inspect_end", { slotId: row.slot_id, why });
+  return [{ to: "all", message: { type: "inspect_ended", slotId: row.slot_id } }];
+}
+
+export function startInspect(ctx: Ctx, visitorId: string, slotId: string): Outgoing[] {
+  const slot = DEVICE_SLOT_BY_ID.get(slotId);
+  if (!slot) return [notice(visitorId, "There is nothing there to look at.")];
+  if (slot.kind !== "phone") return [notice(visitorId, "Only phones can be inspected so far.")];
+  const here = ctx.position(visitorId);
+  if (!here) return [];
+  if (dist(here, slot) > INSPECT_RANGE) return [notice(visitorId, "Walk a little closer first.")];
+  const busy = ctx.db.prepare("SELECT 1 FROM inspections WHERE ended_at IS NULL AND slot_id = ? AND visitor_id != ?").get(slotId, visitorId);
+  if (busy) return [notice(visitorId, "Someone else is already looking at that.")];
+  const already = openInspectionOf(ctx.db, visitorId);
+  if (already && already.slot_id === slotId) return []; // already inspecting this one
+
+  const out: Outgoing[] = [...endInspect(ctx, visitorId, "switched device")];
+  ctx.db.prepare("INSERT INTO inspections (id, slot_id, visitor_id, started_at) VALUES (?, ?, ?, ?)").run(randomUUID(), slotId, visitorId, ctx.now);
+  log(ctx, visitorId, "inspect_start", { slotId });
+  out.push({ to: "all", message: { type: "inspecting", slotId, visitorId, since: ctx.now } });
+  return out;
+}
+
 // ---- the staff's view of the customers ----
 
 export function customersView(ctx: Ctx): CustomerView[] {
@@ -264,6 +317,7 @@ export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
   const out: Outgoing[] = [];
   const open = openConversationOf(ctx.db, visitorId);
   if (open) out.push(...finish(ctx, open, `${nameOf(ctx, visitorId)} left`, "left"));
+  out.push(...endInspect(ctx, visitorId, "left the store"));
   releaseReservationsOf(ctx, visitorId, "left the store");
   if (stateOf(ctx.db, visitorId)) {
     setState(ctx, visitorId, { state: "leaving", with_id: null });
@@ -277,13 +331,16 @@ export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
 
 export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoing[] {
   releaseExpired(ctx);
+  // trying to talk to someone puts down whatever device you were looking at,
+  // whether or not the conversation actually starts
+  const putDown = endInspect(ctx, customerId, "started a conversation");
   const st = stateOf(ctx.db, customerId);
-  if (!st) return [notice(customerId, "Only customers can start a conversation.")];
+  if (!st) return [...putDown, notice(customerId, "Only customers can start a conversation.")];
   if (!(["arriving", "browsing", "waiting_for_help"] as PlayerStateName[]).includes(st.state)) {
-    return [notice(customerId, "Finish what you are doing first.")];
+    return [...putDown, notice(customerId, "Finish what you are doing first.")];
   }
   const here = ctx.position(customerId);
-  if (!here) return [];
+  if (!here) return putDown;
 
   let designation: string | undefined;
   let withKind: "npc" | "visitor";
@@ -295,21 +352,21 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
     target = ctx.position(employee.id);
   } else {
     const npc = NPCS.find((n) => n.id === withId);
-    if (!npc) return [notice(customerId, "There is nobody there to talk to.")];
+    if (!npc) return [...putDown, notice(customerId, "There is nobody there to talk to.")];
     withKind = "npc";
     designation = NPC_DESIGNATION[withId];
-    if (offDuty(ctx).includes(withId)) return [notice(customerId, `${NPC_LABEL[withId] ?? "They"} is not on today; ask the person standing in for them.`)];
+    if (offDuty(ctx).includes(withId)) return [...putDown, notice(customerId, `${NPC_LABEL[withId] ?? "They"} is not on today; ask the person standing in for them.`)];
     const pose = npcPose(npc, ctx.now);
-    if (!pose.present) return [notice(customerId, "They are not in the store right now.")];
+    if (!pose.present) return [...putDown, notice(customerId, "They are not in the store right now.")];
     target = pose;
   }
   const script = designation ? scriptFor(designation) : null;
-  if (!script) return [notice(customerId, `${nameOf(ctx, withId)} has nothing to talk about yet.`)];
-  if (!target || dist(here, target) > TALK_RANGE) return [notice(customerId, "Walk a little closer first.")];
+  if (!script) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} has nothing to talk about yet.`)];
+  if (!target || dist(here, target) > TALK_RANGE) return [...putDown, notice(customerId, "Walk a little closer first.")];
   const busy = ctx.db.prepare("SELECT 1 FROM conversations WHERE ended_at IS NULL AND with_id = ?").get(withId);
-  if (busy) return [notice(customerId, `${nameOf(ctx, withId)} is with someone else. Please wait a moment.`)];
+  if (busy) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} is with someone else. Please wait a moment.`)];
 
-  return open(ctx, customerId, withId, withKind, script, here);
+  return [...putDown, ...open(ctx, customerId, withId, withKind, script, here)];
 }
 
 function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "visitor", script: ScriptId, at: { x: number; z: number }): Outgoing[] {

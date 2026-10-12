@@ -51,7 +51,11 @@ function Hud() {
           <>Connecting…</>
         )}
       </div>
-      <div className="hud-hint">Drag the view to look around · W A S D to walk · arrows turn · E to talk</div>
+      <div className="hud-hint">
+        {live.myInspectSlot
+          ? "Drag to look around the device · tap away or Esc to put it down"
+          : "Drag the view to look around · W A S D to walk · arrows turn · E to talk"}
+      </div>
       {waiting && (
         <div className="chip-status">
           Waiting for {POST_LABEL[live.needs!] ?? live.needs} · {mmss(Date.now() - live.stateSince)}
@@ -64,6 +68,7 @@ function Hud() {
         </button>
       )}
       {live.hint && !live.turn && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
+      {!live.hint && live.deviceHint && !live.turn && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect</div>}
       {live.notice && Date.now() - live.notice.at < 4000 && <div className="toast">{live.notice.text}</div>}
     </div>
   );

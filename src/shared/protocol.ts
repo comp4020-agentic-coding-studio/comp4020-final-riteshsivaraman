@@ -68,6 +68,15 @@ export interface Engagement {
   at: { x: number; z: number }; // where the visitor stood when it began
 }
 
+// Someone inspecting a device (D39, first pass: phone only, stays on the
+// table). One per slot, server-authoritative, mirroring Engagement, so a
+// visitor who joins mid-inspection still sees it (welcome.inspections).
+export interface Inspection {
+  slotId: string;
+  visitorId: string;
+  since: number; // server time
+}
+
 // Who a visitor is acting as. Customers stay on the shop floor; staff may also
 // go behind the bar and into the back room. For now a dev button switches
 // between them (the server trusts the claim); real roles come later.
@@ -84,6 +93,10 @@ export type ClientMessage =
   | { type: "staff_respond"; conversationId: string; action: "reply" | "hand_to_genius" | "end" }
   | { type: "claim"; customerId: string }
   | { type: "hand_on"; customerId: string; to: string; note?: string }
+  // look at a device on a table (E near it); ends on Esc, tap-away, walking
+  // off, or starting anything else
+  | { type: "inspect_start"; slotId: string }
+  | { type: "inspect_end" }
   // Sent as an ordinary message just before closing. A clean WebSocket close
   // takes about 5 s to reach the server through Fly's proxy (measured), while
   // a message arrives at once, so this is what makes a departure prompt.
@@ -105,6 +118,7 @@ export type ServerMessage =
       state: PlayerStateName | null;
       offDuty: string[];
       engaged: Engagement[];
+      inspecting: Inspection[];
     }
   | { type: "joined"; visitor: Present }
   | { type: "moved"; id: string; x: number; z: number; ry: number }
@@ -117,6 +131,8 @@ export type ServerMessage =
   | { type: "duty"; offDuty: string[] }
   | ({ type: "engaged" } & Engagement)
   | { type: "released"; npcId: string }
+  | ({ type: "inspecting" } & Inspection)
+  | { type: "inspect_ended"; slotId: string }
   | { type: "notice"; text: string };
 
 // The walkable shop floor. Positions are clamped to the walkable areas in

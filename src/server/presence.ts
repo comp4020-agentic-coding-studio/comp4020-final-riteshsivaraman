@@ -17,10 +17,13 @@ import {
   claim,
   customersView,
   dutyMessage,
+  endInspect,
   engagements,
   enter,
   handOn,
+  inspections,
   leaveStore,
+  startInspect,
   startTalk,
   staffRespond,
   stateOf,
@@ -223,6 +226,7 @@ export function handleConnection(socket: WebSocket): void {
         state: stateOf(db, me.id)?.state ?? null,
         offDuty: (dutyMessage(ctx).message as { offDuty: string[] }).offDuty,
         engaged: engagements(db),
+        inspecting: inspections(db),
       });
       broadcast({ type: "joined", visitor: present(me) }, me.id);
       // someone has come in: the posts held, and the customers employees see
@@ -257,6 +261,14 @@ export function handleConnection(socket: WebSocket): void {
     }
     if (me && message.type === "hand_on" && typeof message.customerId === "string" && typeof message.to === "string") {
       deliver(handOn(serviceCtx(), me.id, message.customerId, message.to, typeof message.note === "string" ? message.note : undefined));
+      return;
+    }
+    if (me && message.type === "inspect_start" && typeof message.slotId === "string") {
+      deliver(startInspect(serviceCtx(), me.id, message.slotId));
+      return;
+    }
+    if (me && message.type === "inspect_end") {
+      deliver(endInspect(serviceCtx(), me.id, "stopped inspecting"));
       return;
     }
 

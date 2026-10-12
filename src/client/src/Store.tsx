@@ -1,7 +1,7 @@
 import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
-import { PMREMGenerator } from "three";
+import { PMREMGenerator, Vector3 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Group } from "three";
 import { NPC_DESIGNATION, NPC_LABEL, scriptFor } from "../../shared/duty.ts";
@@ -10,7 +10,8 @@ import { poseChanged } from "../../shared/pose.ts";
 import { designationOf, EMPLOYEE_COLOUR, STAFF_SHIRT } from "../../shared/profile.ts";
 import { avoidPeople } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
-import { clampToWalkable, resolveCollisions } from "../../shared/world.ts";
+import { clampToWalkable, resolveCollisions, TABLE_H } from "../../shared/world.ts";
+import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID } from "../../shared/slots.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
 import { Npcs } from "./Npcs.tsx";
 import { Actor, type ActorState } from "./gfx/Actor.tsx";
@@ -33,11 +34,20 @@ const keys = new Set<string>();
 
 // First person: the camera is the visitor's eyes. Keys move you relative to
 // where you are looking, and collisions use the same boxes the scene draws.
+const INSPECT_RADIUS = 0.45; // metres, close enough to read a screen
+const INSPECT_TARGET = new Vector3();
+const INSPECT_OFFSET = new Vector3();
+
 function Player() {
   const { camera, gl } = useThree();
   const lastSent = useRef(0);
   const sent = useRef<Pose | null>(null);
   const velocity = useRef({ x: 0, z: 0 });
+  // inspecting a device (D39): orbit angles the drag controls, and the
+  // standing pose to snap back to when it ends
+  const orbit = useRef({ yaw: 0, pitch: -0.25 });
+  const wasInspecting = useRef<string | null>(null);
+  const standPose = useRef({ ry: 0, pitch: 0 });
 
   useEffect(() => {
     // `?at=x,z,yawDegrees` starts the camera elsewhere, for screenshots and
@@ -49,7 +59,10 @@ function Player() {
     camera.position.set(start ? start[0] : SPAWN.x, STORE_Y + EYE_HEIGHT, start ? start[1] : SPAWN.z);
     camera.rotation.order = "YXZ";
     camera.rotation.set(start && start.length === 4 ? (start[3] * Math.PI) / 180 : 0, start ? (start[2] * Math.PI) / 180 : SPAWN.ry, 0);
-    const down = (e: KeyboardEvent) => keys.add(e.code);
+    const down = (e: KeyboardEvent) => {
+      keys.add(e.code);
+      if (e.code === "Escape" && net.myInspectSlot) net.inspectEnd();
+    };
     const up = (e: KeyboardEvent) => keys.delete(e.code);
     const blur = () => keys.clear();
     window.addEventListener("keydown", down);
@@ -62,18 +75,29 @@ function Player() {
     canvas.style.cursor = "grab";
     canvas.style.touchAction = "none";
     let dragging = false;
+    let dragDistance = 0;
     const press = (e: PointerEvent) => {
       dragging = true;
+      dragDistance = 0;
       canvas.setPointerCapture?.(e.pointerId);
       canvas.style.cursor = "grabbing";
     };
     const drag = (e: PointerEvent) => {
       if (!dragging) return;
+      dragDistance += Math.abs(e.movementX) + Math.abs(e.movementY);
+      if (net.myInspectSlot) {
+        // looking at a device: drag orbits it instead of turning your head
+        orbit.current.yaw -= e.movementX * 0.006;
+        orbit.current.pitch = Math.max(-0.9, Math.min(0.6, orbit.current.pitch - e.movementY * 0.006));
+        return;
+      }
       camera.rotation.y -= e.movementX * 0.003;
       camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x - e.movementY * 0.003));
     };
     const release = (e: PointerEvent) => {
       dragging = false;
+      // a tap, not a drag, while inspecting: tap-away puts the device down (D26)
+      if (net.myInspectSlot && dragDistance < 4) net.inspectEnd();
       canvas.releasePointerCapture?.(e.pointerId);
       canvas.style.cursor = "grab";
     };
@@ -94,6 +118,36 @@ function Player() {
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
+
+    // Inspecting a device (D39): the device stays on the table; your own
+    // position doesn't change (others still see you standing there), only
+    // the camera eases in close and orbits on drag. Ends the frame early —
+    // normal walking/looking is fully suspended while this is going on.
+    const slot = net.myInspectSlot ? DEVICE_SLOT_BY_ID.get(net.myInspectSlot) : undefined;
+    if (slot) {
+      if (wasInspecting.current !== slot.id) {
+        wasInspecting.current = slot.id;
+        orbit.current = { yaw: slot.rotY, pitch: -0.25 };
+        standPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
+      }
+      INSPECT_TARGET.set(slot.x, STORE_Y + TABLE_H + 0.15, slot.z);
+      const cp = Math.cos(orbit.current.pitch);
+      INSPECT_OFFSET.set(Math.sin(orbit.current.yaw) * cp, Math.sin(orbit.current.pitch), Math.cos(orbit.current.yaw) * cp).multiplyScalar(INSPECT_RADIUS);
+      const ease = 1 - Math.exp(-10 * dt);
+      camera.position.x += (INSPECT_TARGET.x + INSPECT_OFFSET.x - camera.position.x) * ease;
+      camera.position.y += (INSPECT_TARGET.y + INSPECT_OFFSET.y - camera.position.y) * ease;
+      camera.position.z += (INSPECT_TARGET.z + INSPECT_OFFSET.z - camera.position.z) * ease;
+      camera.lookAt(INSPECT_TARGET);
+      return;
+    }
+    if (wasInspecting.current) {
+      // put down: back to standing where you actually are, looking the way you were
+      wasInspecting.current = null;
+      camera.position.set(net.me.x, STORE_Y + EYE_HEIGHT, net.me.z);
+      camera.rotation.order = "YXZ";
+      camera.rotation.set(standPose.current.pitch, standPose.current.ry, 0);
+    }
+
     // in a conversation you stand and read; the keys pick from the menu
     const talking = net.turn !== null;
     const forward = talking ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
@@ -214,24 +268,48 @@ function Remotes() {
 
 // "Press E to talk": the nearest person in front of you who has something to
 // say, within a couple of metres. Only for customers who are free to talk.
+// "Press E to inspect" (D39, pilot: phone only) works the same way, for
+// anyone free to look — talking takes priority if both are in range at once.
 const TALK_HINT_RANGE = 2.6;
+const DEVICE_HINT_RANGE = 1.6; // D26's "about 1.5 m", kept under the server's slack
 function Interact() {
   const { camera } = useThree();
   useEffect(() => {
     const press = (e: KeyboardEvent) => {
-      if (e.code === "KeyE" && net.hint && !net.turn && !e.repeat) net.talkStart(net.hint.id);
+      if (e.code !== "KeyE" || e.repeat || net.turn) return;
+      if (net.hint) net.talkStart(net.hint.id);
+      else if (net.deviceHint && !net.myInspectSlot) net.inspectStart(net.deviceHint.slotId);
     };
     window.addEventListener("keydown", press);
     return () => window.removeEventListener("keydown", press);
   }, []);
 
   useFrame(() => {
+    const yaw = camera.rotation.y;
+    const fx = -Math.sin(yaw);
+    const fz = -Math.cos(yaw);
+
+    let bestDevice: { slotId: string; d: number } | null = null;
+    if (!net.turn && !net.myInspectSlot && net.status === "open") {
+      for (const s of DEVICE_SLOTS) {
+        if (s.kind !== "phone" || net.inspections.has(s.id)) continue;
+        const dx = s.x - net.me.x;
+        const dz = s.z - net.me.z;
+        const d = Math.hypot(dx, dz);
+        if (d > DEVICE_HINT_RANGE) continue;
+        if (d > 0.3 && (dx * fx + dz * fz) / d < 0.3) continue;
+        if (!bestDevice || d < bestDevice.d) bestDevice = { slotId: s.id, d };
+      }
+    }
+    const nextDevice = bestDevice ? { slotId: bestDevice.slotId } : null;
+    if (nextDevice?.slotId !== net.deviceHint?.slotId) {
+      net.deviceHint = nextDevice;
+      net.changed();
+    }
+
     let best: { id: string; name: string; d: number } | null = null;
     const free = net.state === "arriving" || net.state === "browsing" || net.state === "waiting_for_help";
     if (net.identity.kind === "customer" && free && !net.turn && net.status === "open") {
-      const yaw = camera.rotation.y;
-      const fx = -Math.sin(yaw);
-      const fz = -Math.cos(yaw);
       const consider = (id: string, name: string, x: number, z: number) => {
         const dx = x - net.me.x;
         const dz = z - net.me.z;
@@ -261,6 +339,31 @@ function Interact() {
     }
   });
   return null;
+}
+
+// Who is looking at what, right now (D39): server-authoritative, so a visitor
+// who joins mid-inspection still sees it, matching how NPC engagement works.
+// This is the only visible trace of "someone's always watching" another
+// visitor's own browsing, not just staff watching customers.
+function InspectMarkers() {
+  const live = useNet();
+  return (
+    <>
+      {[...live.inspections.values()].map((i) => {
+        const slot = DEVICE_SLOT_BY_ID.get(i.slotId);
+        if (!slot) return null;
+        const name = i.visitorId === live.you?.id ? "You" : (live.remotes.get(i.visitorId)?.info.name ?? "Someone");
+        return (
+          <Html key={i.slotId} position={[slot.x, STORE_Y + TABLE_H + 0.42, slot.z]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
+            <div className="name-tag">
+              <b>{name}</b>
+              <span>looking</span>
+            </div>
+          </Html>
+        );
+      })}
+    </>
+  );
 }
 
 // Soft reflections on glass, metal and the polished floor, from a small
@@ -304,6 +407,7 @@ export function Store() {
       <Remotes />
       <Npcs />
       <Interact />
+      <InspectMarkers />
       <Player />
     </Canvas>
   );
