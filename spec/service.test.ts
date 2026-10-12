@@ -11,6 +11,7 @@ import {
   enter,
   handOn,
   HOLD_MS,
+  leaveConversation,
   leaveStore,
   releaseExpired,
   startTalk,
@@ -312,6 +313,44 @@ describe("employees", () => {
     expect(db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id)).not.toEqual({ ended_at: null });
     expect(last(out, "c1", "turn")?.ended).toBe(true);
     expect(stateOf(db, "c1")?.state).toBe("browsing");
+  });
+});
+
+describe("walking away mid-conversation (Esc, either side)", () => {
+  it("lets a customer leave an NPC conversation without finishing it", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    const id = last(startTalk(ctx(), "c1", "greeter-1"), "c1", "turn")!.conversationId;
+    const out = leaveConversation(ctx(), "c1");
+    expect(last(out, "c1", "turn")).toMatchObject({ ended: true });
+    expect(last(out, "all", "released")).toMatchObject({ npcId: "greeter-1" });
+    expect(stateOf(db, "c1")?.state).toBe("browsing");
+    expect(db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id)).not.toEqual({ ended_at: null });
+    expect(eventTypes()).toContain("conversation_ended");
+  });
+
+  it("lets a customer leave a human employee's conversation", () => {
+    const e = { x: -4, z: -3 };
+    addVisitor("c1", "Pebble", { x: e.x + 1, z: e.z });
+    addVisitor("e1", "Sam", e, "specialist", "phones");
+    startTalk(ctx(), "c1", "e1");
+    const out = leaveConversation(ctx(), "c1");
+    expect(last(out, "c1", "turn")).toMatchObject({ ended: true });
+  });
+
+  it("lets the employee leave too, not just the customer", () => {
+    const e = { x: -4, z: -3 };
+    addVisitor("c1", "Pebble", { x: e.x + 1, z: e.z });
+    addVisitor("e1", "Sam", e, "specialist", "phones");
+    startTalk(ctx(), "c1", "e1");
+    const out = leaveConversation(ctx(), "e1");
+    expect(last(out, "c1", "turn")).toMatchObject({ ended: true });
+    expect(stateOf(db, "c1")?.state).toBe("browsing");
+  });
+
+  it("is a no-op for someone in no conversation", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+    expect(leaveConversation(ctx(), "c1")).toEqual([]);
   });
 });
 

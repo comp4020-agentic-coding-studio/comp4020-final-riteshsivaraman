@@ -4,7 +4,9 @@ import { useNet } from "./net.ts";
 // The conversation box, at the bottom of the screen like a Pokemon text box:
 // who is speaking, what they say, and your choices as numbered buttons (press
 // 1 to 9, or click). When it is the employee's turn it says so, and when it has
-// ended Space, Enter or Esc closes it. The mouse is never captured, so it stays visible.
+// ended Space, Enter or Esc closes it. Esc also works mid-conversation, before
+// it has ended (Ritesh, 2026-10-12: there was previously no way to walk away
+// without finishing it). The mouse is never captured, so it stays visible.
 export function Talk() {
   const net = useNet();
   const turn = net.turn;
@@ -21,6 +23,11 @@ export function Talk() {
         }
         return;
       }
+      if (e.code === "Escape") {
+        e.preventDefault();
+        net.talkLeave();
+        return;
+      }
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= t.choices.length && t.awaiting === "customer") net.choose(t.choices[n - 1].id);
     };
@@ -33,6 +40,7 @@ export function Talk() {
     <div className="talk" role="dialog" aria-label={`Conversation with ${turn.withName}`}>
       <div className="talk-name">{turn.withName}</div>
       <p className="talk-say">{turn.say}</p>
+      {!turn.ended && <div className="talk-leave-hint"><kbd>Esc</kbd> to step away</div>}
       {turn.awaiting === "staff" && !turn.ended && <div className="talk-wait">Waiting for {turn.withName}…</div>}
       {!turn.ended && turn.awaiting === "customer" && (
         <div className="talk-choices">

@@ -22,6 +22,7 @@ import {
   enter,
   handOn,
   inspections,
+  leaveConversation,
   leaveStore,
   startInspect,
   startTalk,
@@ -247,6 +248,10 @@ export function handleConnection(socket: WebSocket): void {
     }
     if (me && message.type === "talk_choose" && typeof message.conversationId === "string" && typeof message.choice === "string") {
       deliver(chooseTurn(serviceCtx(), me.id, message.conversationId, message.choice));
+      return;
+    }
+    if (me && message.type === "talk_leave") {
+      deliver(leaveConversation(serviceCtx(), me.id));
       return;
     }
     if (me && message.type === "staff_respond" && typeof message.conversationId === "string") {

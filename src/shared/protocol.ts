@@ -89,6 +89,8 @@ export type ClientMessage =
   // start a conversation with an NPC or an employee (E near them)
   | { type: "talk_start"; withId: string }
   | { type: "talk_choose"; conversationId: string; choice: string }
+  // walk away mid-conversation, from either side (Esc)
+  | { type: "talk_leave" }
   // an employee's side
   | { type: "staff_respond"; conversationId: string; action: "reply" | "hand_to_genius" | "end" }
   | { type: "claim"; customerId: string }

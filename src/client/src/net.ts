@@ -295,6 +295,10 @@ class Net {
     }
   }
 
+  talkLeave(): void {
+    if (this.turn && !this.turn.ended) this.send({ type: "talk_leave" });
+  }
+
   closeTurn(): void {
     if (this.turn?.ended) {
       this.turn = null;

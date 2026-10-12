@@ -411,6 +411,16 @@ kbd {
   color: #555;
   font-style: italic;
 }
+.talk-leave-hint {
+  position: absolute;
+  top: -15px;
+  right: 16px;
+  background: #1d1f23;
+  color: #aaa;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
 .talk-choices {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -521,6 +521,21 @@ function finish(ctx: Ctx, row: ConvRow, say: string, why: string): Outgoing[] {
   return out;
 }
 
+// Either side can walk away mid-conversation (Ritesh, 2026-10-12: "whether
+// you're a customer or employee, nobody can ever walk away from a
+// conversation without ending it" — Talk.tsx's own Escape only worked once a
+// conversation had already ended some other way). Reuses the same `finish()`
+// every other way of ending one already goes through.
+export function leaveConversation(ctx: Ctx, visitorId: string): Outgoing[] {
+  const row = openConversationOf(ctx.db, visitorId);
+  if (!row) return [];
+  if (row.customer_id === visitorId) return finish(ctx, row, "You stepped away.", "customer left");
+  if (row.with_kind === "visitor" && row.with_id === visitorId) {
+    return finish(ctx, row, `${nameOf(ctx, visitorId)} had to step away. Ask again if you need anything.`, "staff left");
+  }
+  return [];
+}
+
 // ---- employees coordinating ----
 
 export function claim(ctx: Ctx, staffId: string, customerId: string): Outgoing[] {
