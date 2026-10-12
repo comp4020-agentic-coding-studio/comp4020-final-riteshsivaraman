@@ -1,12 +1,15 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { Group } from "three";
 import { appearanceFor } from "../../../shared/appearance.ts";
 import { BEHAVIOURS, BETWEEN_INTERACTIONS, durationFor, pickBehaviour, pickMood, type Behaviour } from "../../../shared/behaviour.ts";
 import { KINDS, layout, stepInteractions, zoneOf, type Active, type SimAgent } from "../../../shared/interaction.ts";
 import { freePoint, goalBlocked, headingTo, pushOutOfHard, stepWalker, type Obstacle, type Walker } from "../../../shared/steering.ts";
 import { separateFromPeople } from "../../../shared/world.ts";
 import { BEARD_CHOICES, BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, FACE_SHAPES, poseCharacter, SHADINGS, type Character, type Mood } from "./character.ts";
+import { Device } from "./Device.tsx";
+import { HELD_DEVICE } from "./Actor.tsx";
 
 // Dev only (`?stage=1`): a full-body person on a stage. New character gives a
 // random person, Next expression cycles the face, Walk starts the walk cycle,
@@ -204,7 +207,30 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
     const blink = (t.current + offset * 0.7 + 1.7) % 3.4 < 0.12 ? 1.2 : 0; // eyes open at t = 0
     poseCharacter(char, { t: t.current, dt: snapPose ? 1 : dt, walk: walk.current, phase: phase.current, mode: directed ? (wantWalk ? "walk" : mode.current) : mode.current, seed: offset * 7 + seed }, m, blink);
   });
-  return <primitive object={char.root} />;
+  const held = char.deviceKind ? HELD_DEVICE[char.deviceKind] : undefined;
+  const devRef = useRef<Group>(null);
+  // see Actor.tsx: a `<primitive>` here would reparent the bone itself, so
+  // the held device is attached imperatively instead.
+  useEffect(() => {
+    const group = devRef.current;
+    if (!group) return;
+    char.bones.dev.add(group);
+    return () => {
+      char.bones.dev.remove(group);
+    };
+  }, [char]);
+  return (
+    <>
+      <primitive object={char.root} />
+      {held && (
+        <group ref={devRef}>
+          <group position={[0.01, 0.1, 0.02]} rotation={[-1.7, 0, 0.25]}>
+            <Device kind={char.deviceKind === "tablet" ? "tablet" : "phone"} model={held.model} colour={held.colour} x={0} y={0} z={0} rotY={0} />
+          </group>
+        </group>
+      )}
+    </>
+  );
 }
 
 // Runs interactions between the people on the stage. The decisions (who starts
@@ -367,7 +393,7 @@ export function CharacterStage() {
   const [close, setClose] = useState(() => new URLSearchParams(location.search).has("close"));
   const id = `person-${seed}`;
   const look = useMemo(() => appearanceFor(id), [id]);
-  const single = useMemo(() => buildCharacter(look, shirtFor(id), { eyes, body, face, shading, beard }), [look, id, eyes, body, face, shading, beard]);
+  const single = useMemo(() => buildCharacter(look, shirtFor(id), { eyes, body, face, shading, beard, device: "phone" }), [look, id, eyes, body, face, shading, beard]);
   // The whole pool is built once (60 people, one mesh each); the slider only
   // decides how many are on the stage. They are scattered through one fixed
   // arena, clear of the tables and of each other.

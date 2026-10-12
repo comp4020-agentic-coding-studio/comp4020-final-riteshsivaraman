@@ -1,10 +1,19 @@
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
-import { Euler, Quaternion, Vector3 } from "three";
+import { useEffect, useMemo, useRef } from "react";
+import { Euler, type Group, Quaternion, Vector3 } from "three";
 import { gazeAt } from "../../../shared/gaze.ts";
 import { lookFor, type LookChoice } from "../../../shared/look.ts";
 import type { Behaviour } from "../../../shared/behaviour.ts";
 import { buildCharacter, EXPRESSIONS, poseCharacter, type Mood } from "./character.ts";
+import { Device } from "./Device.tsx";
+
+// The real model a held device is (Ritesh, 2026-10-12: pair character
+// actions with real objects, not an invented generic slab). One fixed
+// model per kind for this pilot; varying it per character is a follow-up.
+export const HELD_DEVICE: Record<"phone" | "tablet", { model: string; colour: string }> = {
+  phone: { model: "iphone-18-pro", colour: "#d8d7d2" },
+  tablet: { model: "ipad-mini", colour: "#2b2f36" },
+};
 
 // A person in the store, drawn as a character. The parent moves and turns the
 // group; this poses the body from a small state: walking or not, what they are
@@ -88,5 +97,30 @@ export function Actor({
     }
     poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device, gaze }, m, blink);
   });
-  return <primitive object={char.root} />;
+  const held = char.deviceKind ? HELD_DEVICE[char.deviceKind] : undefined;
+  const devRef = useRef<Group>(null);
+  // `char.bones.dev` already has a parent (the forearm bone) inside
+  // `char.root`'s own hierarchy — rendering `<primitive object={...}>` for it
+  // here would *reparent* it to this component's own output instead (R3F
+  // attaches a primitive to its JSX parent on mount), tearing it out of the
+  // skeleton. Attaching the held device imperatively, after both are
+  // mounted, keeps the bone's existing parent and its pose-driven transform.
+  useEffect(() => {
+    const group = devRef.current;
+    if (!group) return;
+    char.bones.dev.add(group);
+    return () => {
+      char.bones.dev.remove(group);
+    };
+  }, [char]);
+  return (
+    <>
+      <primitive object={char.root} />
+      {held && (
+        <group ref={devRef}>
+          <Device kind={char.deviceKind === "tablet" ? "tablet" : "phone"} model={held.model} colour={held.colour} x={0} y={0} z={0} rotY={0} />
+        </group>
+      )}
+    </>
+  );
 }

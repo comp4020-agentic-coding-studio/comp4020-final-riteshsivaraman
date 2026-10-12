@@ -128,6 +128,7 @@ export interface Character {
   heads: number; // how many heads tall
   lidBias: number; // some eye styles sit with the lids a little lower
   pose: Record<string, number>; // smoothed pose targets, so behaviours blend
+  deviceKind?: "phone" | "tablet"; // what a real Device should be mounted at bones.dev, if anything
 }
 
 const SIDES = [-1, 1] as const;
@@ -460,17 +461,12 @@ export function buildCharacter(
     add(new IcosahedronGeometry(1, 1), head, hair, hm(0, 0.095, 0.075, sc(0.04)));
   }
 
-  // the device: a slim slab with a lit screen on the face that looks up at
-  // them when the forearm is raised (local -z), bound to the hand bone
-  if (opts.device) {
-    const tablet = opts.device === "tablet";
-    const w = tablet ? 0.2 : 0.072;
-    const h = tablet ? 0.15 : 0.15;
-    const body = new BoxGeometry(w, h, 0.01);
-    add(body, dev, new Color(tablet ? "#9aa0a8" : "#23262d"), at(hand.x - 0.01, hand.y + h * 0.35, hand.z - 0.015));
-    const screen = new BoxGeometry(w - 0.012, h - 0.014, 0.002);
-    add(screen, dev, new Color("#bfe0ff").multiplyScalar(1.9), at(hand.x - 0.01, hand.y + h * 0.35, hand.z - 0.015 - 0.0055));
-  }
+  // The device itself is not baked into this mesh: `bones.dev` is a bare
+  // attachment point (positioned here, at the hand) that Actor.tsx mounts a
+  // real Device (phones-geo.ts / computers-geo.ts) onto, scaled by the same
+  // 0-to-1 "is it out" animation this bone has always carried. A real model
+  // pairs the "device" behaviour with an actual catalogued object instead of
+  // an invented generic slab (Ritesh, 2026-10-12).
 
   // staff uniform: a cap in the role's colour, and a badge on the chest
   if (opts.uniform?.cap) {
@@ -628,6 +624,7 @@ export function buildCharacter(
     heads: 1.72 / (0.216 * S),
     lidBias,
     pose: {},
+    deviceKind: opts.device,
   };
 }
 
