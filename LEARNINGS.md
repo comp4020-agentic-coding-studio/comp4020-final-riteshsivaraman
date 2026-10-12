@@ -29,6 +29,29 @@ not however the tool defaults to doing it -- a reload-based check tests a
 different, stricter thing than what was asked for, and a failure there
 isn't evidence of anything.
 
+## A "this doesn't exist" gap claim needs a grep across the whole subsystem, not just the one file already open
+
+[`9e511ca`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9e511ca),
+corrected in
+[`e3ab3cb`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/e3ab3cb)
+
+Checking the behaviour-loop/conversation design against the seven
+`customer-journeys.md` transcripts, I claimed a staff-to-staff handoff
+mechanism didn't exist, reasoning only from `conversation.ts`'s `Effect`
+type (`{needs: string}`, no free-text field). It was wrong: `service.ts`
+already had `handOn(staffId, customerId, to, note?)`, tested, writing a
+sanitised note into `player_state`. The real gap was narrower (it only
+fires from an explicit human action, never from a conversation script, and
+carries one opaque string, not structured facts) — but "doesn't exist at
+all" was a stronger, false claim that survived into a published artifact
+and a SCOPE.md decision before being caught, only because building the fix
+required actually reading `service.ts` first. Lesson: before writing "X
+isn't built" into a design doc, grep the whole subsystem the claim is
+about (here: `grep -n handOn\|note src/server/service.ts`), not just the
+one file the current line of reasoning happened to have open — a confident
+negative claim is exactly the kind of thing `[TK]`/don't-invent should have
+caught before it got documented, not after.
+
 ## Hono sub-app routes don't match a trailing slash on the mount path
 
 `draftRoutes.post("/", ...)` mounted at `app.route("/api/drafts", draftRoutes)`
