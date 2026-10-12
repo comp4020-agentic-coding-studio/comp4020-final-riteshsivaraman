@@ -333,15 +333,15 @@ export function Monitor({ x, z, side, model, screenMode, y = 0.95, rotY }: { x: 
     <group position={[x, y, z]} rotation={[0, rotY ?? benchRot(side), 0]}>
       <mesh position={[0, 0.02, 0]}>
         <boxGeometry args={[0.3, 0.03, 0.2]} />
-        <meshStandardMaterial color="#2a2d33" />
+        <meshStandardMaterial color="#2a2d33" roughness={0.18} metalness={0.7} />
       </mesh>
       <mesh position={[0, 0.3, -0.02]}>
         <boxGeometry args={[0.04, 0.55, 0.04]} />
-        <meshStandardMaterial color="#2a2d33" />
+        <meshStandardMaterial color="#2a2d33" roughness={0.18} metalness={0.7} />
       </mesh>
       <mesh position={[0, 0.5, 0]}>
         <boxGeometry args={[0.7, 0.42, 0.04]} />
-        <meshStandardMaterial color="#15171b" />
+        <meshStandardMaterial color="#15171b" roughness={0.18} metalness={0.7} />
       </mesh>
       <mesh position={[0, 0.5, 0.022]}>
         <planeGeometry args={[0.64, 0.36]} />
@@ -381,15 +381,15 @@ export function Desktop({ x, z, side, model, colour, screenMode, y = 0.95, rotY 
     <group position={[x, y, z]} rotation={[0, rotY ?? benchRot(side), 0]}>
       <mesh position={[0, 0.01, 0]}>
         <boxGeometry args={[0.22, 0.02, 0.16]} />
-        <meshStandardMaterial color="#c9ced3" />
+        <meshStandardMaterial color="#c9ced3" roughness={0.18} metalness={0.7} />
       </mesh>
       <mesh position={[0, 0.17, 0]}>
         <boxGeometry args={[0.04, 0.3, 0.03]} />
-        <meshStandardMaterial color="#c9ced3" />
+        <meshStandardMaterial color="#c9ced3" roughness={0.18} metalness={0.7} />
       </mesh>
       <mesh position={[0, 0.4, 0]}>
         <boxGeometry args={[0.5, 0.34, 0.03]} />
-        <meshStandardMaterial color="#d9dce0" />
+        <meshStandardMaterial color="#d9dce0" roughness={0.18} metalness={0.7} />
       </mesh>
       <mesh position={[0, 0.4, 0.017]}>
         <planeGeometry args={[0.46, 0.3]} />

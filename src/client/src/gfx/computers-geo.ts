@@ -210,7 +210,9 @@ function atlas(): CanvasTexture {
   return atlasTex;
 }
 
-// One body material per finish: brushed metal, fairly glossy.
+// One body material per finish: brushed aluminium, glossy enough to pick up
+// the store's environment reflections (Ritesh, 2026-10-12: fix the bland
+// matte look — matches the same pass over phones.tsx's FinishMeshes).
 const bodyMats = new Map<string, MeshStandardMaterial>();
 export function bodyMaterial(colour: string): MeshStandardMaterial {
   let m = bodyMats.get(colour);
@@ -219,8 +221,9 @@ export function bodyMaterial(colour: string): MeshStandardMaterial {
     color: new Color(colour),
     map: atlas(),
     vertexColors: true,
-    metalness: 0.6,
-    roughness: 0.3,
+    metalness: 0.75,
+    roughness: 0.16,
+    envMapIntensity: 1.05,
   });
   bodyMats.set(colour, m);
   return m;
