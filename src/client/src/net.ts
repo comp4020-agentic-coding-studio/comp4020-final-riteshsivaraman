@@ -105,7 +105,7 @@ class Net {
   // the slot id you yourself are inspecting, or null
   myInspectSlot: string | null = null;
   // the nearest free, in-range device, set by the scene
-  deviceHint: { slotId: string } | null = null;
+  deviceHint: { slotId: string; name: string } | null = null;
 
   private socket: WebSocket | null = null;
   private listeners = new Set<() => void>();

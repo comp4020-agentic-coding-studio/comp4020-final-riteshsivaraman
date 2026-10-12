@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { PMREMGenerator, Vector3 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import type { Group } from "three";
+import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { NPC_DESIGNATION, NPC_LABEL, scriptFor } from "../../shared/duty.ts";
 import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { poseChanged } from "../../shared/pose.ts";
@@ -11,7 +11,9 @@ import { designationOf, EMPLOYEE_COLOUR, STAFF_SHIRT } from "../../shared/profil
 import { avoidPeople } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions, TABLE_H } from "../../shared/world.ts";
-import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID } from "../../shared/slots.ts";
+import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
+import { TABLE_ASSIGNMENTS } from "../../shared/assignments.ts";
+import { productById } from "../../shared/catalogue.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
 import { Npcs } from "./Npcs.tsx";
 import { Actor, type ActorState } from "./gfx/Actor.tsx";
@@ -34,7 +36,10 @@ const keys = new Set<string>();
 
 // First person: the camera is the visitor's eyes. Keys move you relative to
 // where you are looking, and collisions use the same boxes the scene draws.
-const INSPECT_RADIUS = 0.45; // metres, close enough to read a screen
+const INSPECT_RADIUS = 0.5; // metres, close enough to read a screen
+// orbit pitch is signed so positive = camera above the target (looking down
+// at it); the default is "looking over it" (Ritesh, 2026-10-12) — above and
+// a bit in front, not bird's-eye, not level with the screen
 const INSPECT_TARGET = new Vector3();
 const INSPECT_OFFSET = new Vector3();
 
@@ -88,7 +93,7 @@ function Player() {
       if (net.myInspectSlot) {
         // looking at a device: drag orbits it instead of turning your head
         orbit.current.yaw -= e.movementX * 0.006;
-        orbit.current.pitch = Math.max(-0.9, Math.min(0.6, orbit.current.pitch - e.movementY * 0.006));
+        orbit.current.pitch = Math.max(-0.1, Math.min(1.3, orbit.current.pitch - e.movementY * 0.006));
         return;
       }
       camera.rotation.y -= e.movementX * 0.003;
@@ -127,7 +132,7 @@ function Player() {
     if (slot) {
       if (wasInspecting.current !== slot.id) {
         wasInspecting.current = slot.id;
-        orbit.current = { yaw: slot.rotY, pitch: -0.25 };
+        orbit.current = { yaw: slot.rotY, pitch: 0.45 };
         standPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
       }
       INSPECT_TARGET.set(slot.x, STORE_Y + TABLE_H + 0.15, slot.z);
@@ -272,6 +277,12 @@ function Remotes() {
 // anyone free to look — talking takes priority if both are in range at once.
 const TALK_HINT_RANGE = 2.6;
 const DEVICE_HINT_RANGE = 1.6; // D26's "about 1.5 m", kept under the server's slack
+// mirrors furniture.tsx's own override, so the hint names the same model it draws
+const PILOT_PHONE_MODEL = new URLSearchParams(location.search).get("pilotPhone") ?? undefined;
+const nameOfSlot = (slot: DeviceSlot): string => {
+  const modelId = PILOT_PHONE_MODEL ?? TABLE_ASSIGNMENTS[slot.tableId]?.[slot.side];
+  return (modelId && productById(modelId)?.name) || "device";
+};
 function Interact() {
   const { camera } = useThree();
   useEffect(() => {
@@ -289,7 +300,7 @@ function Interact() {
     const fx = -Math.sin(yaw);
     const fz = -Math.cos(yaw);
 
-    let bestDevice: { slotId: string; d: number } | null = null;
+    let bestDevice: { slot: DeviceSlot; d: number } | null = null;
     if (!net.turn && !net.myInspectSlot && net.status === "open") {
       for (const s of DEVICE_SLOTS) {
         if (s.kind !== "phone" || net.inspections.has(s.id)) continue;
@@ -298,10 +309,10 @@ function Interact() {
         const d = Math.hypot(dx, dz);
         if (d > DEVICE_HINT_RANGE) continue;
         if (d > 0.3 && (dx * fx + dz * fz) / d < 0.3) continue;
-        if (!bestDevice || d < bestDevice.d) bestDevice = { slotId: s.id, d };
+        if (!bestDevice || d < bestDevice.d) bestDevice = { slot: s, d };
       }
     }
-    const nextDevice = bestDevice ? { slotId: bestDevice.slotId } : null;
+    const nextDevice = bestDevice ? { slotId: bestDevice.slot.id, name: nameOfSlot(bestDevice.slot) } : null;
     if (nextDevice?.slotId !== net.deviceHint?.slotId) {
       net.deviceHint = nextDevice;
       net.changed();
@@ -345,19 +356,43 @@ function Interact() {
 // who joins mid-inspection still sees it, matching how NPC engagement works.
 // This is the only visible trace of "someone's always watching" another
 // visitor's own browsing, not just staff watching customers.
+// The device "Press E to inspect [name]" is about to target, highlighted —
+// local only (it's a cursor, not something other visitors need to see).
+function DeviceHintGlow() {
+  const live = useNet();
+  const ref = useRef<Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const mat = ref.current.material as MeshBasicMaterial;
+    mat.opacity = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 4);
+  });
+  if (!live.deviceHint) return null;
+  const slot = DEVICE_SLOT_BY_ID.get(live.deviceHint.slotId);
+  if (!slot) return null;
+  return (
+    <mesh ref={ref} position={[slot.x, STORE_Y + TABLE_H + 0.002, slot.z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.09, 0.12, 32]} />
+      <meshBasicMaterial color="#ffffff" transparent opacity={0.5} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
 function InspectMarkers() {
   const live = useNet();
   return (
     <>
       {[...live.inspections.values()].map((i) => {
+        // not your own: it would float right in the middle of your own close-up
+        // view, and you already know you're the one looking
+        if (i.visitorId === live.you?.id) return null;
         const slot = DEVICE_SLOT_BY_ID.get(i.slotId);
         if (!slot) return null;
-        const name = i.visitorId === live.you?.id ? "You" : (live.remotes.get(i.visitorId)?.info.name ?? "Someone");
+        const name = live.remotes.get(i.visitorId)?.info.name ?? "Someone";
         return (
           <Html key={i.slotId} position={[slot.x, STORE_Y + TABLE_H + 0.42, slot.z]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
             <div className="name-tag">
               <b>{name}</b>
-              <span>looking</span>
+              <span>is looking at this</span>
             </div>
           </Html>
         );
@@ -408,6 +443,7 @@ export function Store() {
       <Npcs />
       <Interact />
       <InspectMarkers />
+      <DeviceHintGlow />
       <Player />
     </Canvas>
   );

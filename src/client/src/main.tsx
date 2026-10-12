@@ -68,7 +68,7 @@ function Hud() {
         </button>
       )}
       {live.hint && !live.turn && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
-      {!live.hint && live.deviceHint && !live.turn && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect</div>}
+      {!live.hint && live.deviceHint && !live.turn && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect {live.deviceHint.name}</div>}
       {live.notice && Date.now() - live.notice.at < 4000 && <div className="toast">{live.notice.text}</div>}
     </div>
   );
