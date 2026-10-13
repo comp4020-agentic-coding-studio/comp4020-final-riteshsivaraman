@@ -76,12 +76,17 @@ Reply with ONLY compact JSON, no markdown fence:
 {"type": "...", "value": "<exact option text for this question, only if type is answer>", "reply": "<one short in-character Dan sentence, only if type is not_sure, question, or unclear>", "extra": {"<slot key>": "<its exact option text>", ...}}
 Omit "extra" entirely if nothing else was volunteered.`;
   try {
-    const res = await ai.models.generateContent({ model: MODEL, contents: prompt });
+    // A stalled connection (proxy, flaky network) must still fall back
+    // within a few seconds, not hang until someone Ctrl-Cs the game --
+    // the SDK's own timeout plus a manual backstop race, belt and braces.
+    const call = ai.models.generateContent({ model: MODEL, contents: prompt, config: { httpOptions: { timeout: 8000 } } });
+    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("ai timeout")), 9000));
+    const res = await Promise.race([call, timeout]);
     const text = (res.text ?? "").trim().replace(/^```json\s*|```$/g, "");
     const parsed = JSON.parse(text) as Interpretation;
     if (!["answer", "not_sure", "question", "unclear"].includes(parsed.type)) return null;
     return parsed;
   } catch {
-    return null; // quota, network, or bad JSON -- caller falls back to the menu
+    return null; // quota, network, timeout, or bad JSON -- caller falls back to the menu
   }
 }

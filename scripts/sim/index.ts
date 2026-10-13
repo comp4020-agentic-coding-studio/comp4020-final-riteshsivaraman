@@ -118,6 +118,7 @@ async function askSlot(c: SimCase, slot: SlotKey, product: Product): Promise<voi
     const utterance = await ask("> ");
     const result = await interpret({ question, options, utterance, context: contextLine(c.facts), otherSlots: otherOpenSlots(c, product, slot) });
     if (!result) {
+      log("the AI call timed out or failed -- switching to the menu for this one");
       setFact(c, slot, await menu(question, options)); // AI failed mid-turn -- clean fallback, not a crash
       return;
     }
@@ -165,7 +166,10 @@ async function chooseProduct(c: SimCase): Promise<Product> {
       utterance,
       context: `Models we carry: ${catalogueLine}`,
     });
-    if (!result) return chooseProductByMenu(c);
+    if (!result) {
+      log("the AI call timed out or failed -- switching to the menu for this one");
+      return chooseProductByMenu(c);
+    }
 
     if (result.type === "answer" && result.value) {
       const match = SIM_PRODUCTS.find((p) => p.name === result.value);
@@ -187,9 +191,14 @@ async function chooseProduct(c: SimCase): Promise<Product> {
       for (;;) {
         const follow = await ask("> ");
         const pick = await interpret({ question: "which model", options: [a.name, b.name], utterance: follow, context: compareLine(a, b) });
-        if (pick?.type === "answer" && pick.value === a.name) return a;
-        if (pick?.type === "answer" && pick.value === b.name) return b;
-        if (pick?.type === "question" || pick?.type === "unclear") {
+        if (!pick) {
+          log("the AI call timed out or failed -- switching to the menu for this one");
+          const choice = await menu(`Shall we go with the ${a.name}, or the ${b.name}?`, [a.name, b.name]);
+          return choice === a.name ? a : b;
+        }
+        if (pick.type === "answer" && pick.value === a.name) return a;
+        if (pick.type === "answer" && pick.value === b.name) return b;
+        if (pick.type === "question" || pick.type === "unclear") {
           say("Dan", pick.reply || compareLine(a, b));
           continue;
         }
