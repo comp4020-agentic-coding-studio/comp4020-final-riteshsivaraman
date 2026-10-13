@@ -7,7 +7,7 @@ import { BEHAVIOURS, BETWEEN_INTERACTIONS, durationFor, pickBehaviour, pickMood,
 import { KINDS, layout, stepInteractions, zoneOf, type Active, type SimAgent } from "../../../shared/interaction.ts";
 import { freePoint, goalBlocked, headingTo, pushOutOfHard, stepWalker, type Obstacle, type Walker } from "../../../shared/steering.ts";
 import { separateFromPeople } from "../../../shared/world.ts";
-import { BEARD_CHOICES, BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, FACE_SHAPES, poseCharacter, SHADINGS, type Character, type Mood } from "./character.ts";
+import { BEARD_CHOICES, BODY_STYLES, buildCharacter, EXPRESSIONS, EYE_STYLES, FACE_SHAPES, FEEL_MATHS, follow, MOTION_FEELS, poseCharacter, SHADINGS, setMotionFeel, type Character, type Mood } from "./character.ts";
 import { Device } from "./Device.tsx";
 import { HELD_DEVICE } from "./Actor.tsx";
 
@@ -201,11 +201,13 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
       walk.current += ((wantWalk ? 1 : 0) - walk.current) * (1 - Math.exp(-6 * dt));
       phase.current += dt * (3 + walk.current * 2.4) * (walk.current > 0.05 ? 1 : 0);
     }
-    const k = 1 - Math.exp(-9 * dt);
     const m = mood.current;
-    for (const key of ["browY", "browTilt", "lid", "curve", "open", "width"] as const) m[key] += (target[key] - m[key]) * k;
+    for (const key of ["browY", "browTilt", "lid", "curve", "open", "width"] as const) follow(m as unknown as Record<string, number>, key, target[key], false, snapPose ? 1 : dt);
     const blink = (t.current + offset * 0.7 + 1.7) % 3.4 < 0.12 ? 1.2 : 0; // eyes open at t = 0
-    poseCharacter(char, { t: t.current, dt: snapPose ? 1 : dt, walk: walk.current, phase: phase.current, mode: directed ? (wantWalk ? "walk" : mode.current) : mode.current, seed: offset * 7 + seed }, m, blink);
+    // a handshake: the hands meet halfway to the other member of the interaction
+    const partner = agent?.plan ? agent.plan.plan.members.map((id) => agents[id]).find((o) => o && o !== agent) : undefined;
+    const meet = partner ? { x: (root.position.x + partner.char.root.position.x) / 2, z: (root.position.z + partner.char.root.position.z) / 2 } : undefined;
+    poseCharacter(char, { t: t.current, dt: snapPose ? 1 : dt, walk: walk.current, phase: phase.current, mode: directed ? (wantWalk ? "walk" : mode.current) : mode.current, seed: offset * 7 + seed, meet }, m, blink);
   });
   const held = char.deviceKind ? HELD_DEVICE[char.deviceKind] : undefined;
   const devRef = useRef<Group>(null);
@@ -224,8 +226,8 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
       <primitive object={char.root} />
       {held && (
         <group ref={devRef}>
-          <group position={[0.01, 0.1, 0.02]} rotation={[-1.7, 0, 0.25]}>
-            <Device kind={char.deviceKind === "tablet" ? "tablet" : "phone"} model={held.model} colour={held.colour} x={0} y={0} z={0} rotY={0} />
+          <group position={[0, 0.02, 0.024]}>
+            <Device kind={char.deviceKind === "tablet" ? "tablet" : "phone"} model={held.model} colour={held.colour} x={0} y={0} z={0} rotY={0} held />
           </group>
         </group>
       )}
@@ -344,9 +346,16 @@ function Camera({ crowd, close, near }: { crowd: boolean; close: boolean; near: 
     else if (crowd) camera.position.set(0, 10, -17);
     else if (close) camera.position.set(0, 1.52, -1.15);
     else camera.position.set(0, 1.1, -4.6);
-    controls.current?.target.set(0, ty, tz);
+    let at: [number, number, number] = [0, ty, tz];
+    // `?cam=x,y,z&at=x,y,z` puts the camera anywhere, for close looks at hands
+    const q = new URLSearchParams(location.search);
+    const cam = q.get("cam")?.split(",").map(Number);
+    const aim = q.get("at")?.split(",").map(Number);
+    if (cam?.length === 3) camera.position.set(cam[0], cam[1], cam[2]);
+    if (aim?.length === 3) at = [aim[0], aim[1], aim[2]];
+    controls.current?.target.set(...at);
     controls.current?.update();
-    camera.lookAt(0, ty, tz);
+    camera.lookAt(...at);
   }, [crowd, close, near, camera]);
   return <OrbitControls ref={controls as never} enablePan={false} minDistance={0.8} maxDistance={16} />;
 }
@@ -380,7 +389,8 @@ export function CharacterStage() {
   const [behaveIx, setBehaveIx] = useState(() => Number(new URLSearchParams(location.search).get("behave") ?? 0));
   const [independent, setIndependent] = useState(() => new URLSearchParams(location.search).has("indep"));
   const behaviour = BEHAVIOURS[behaveIx % BEHAVIOURS.length];
-  const [eyeIx, setEyeIx] = useState(() => Number(new URLSearchParams(location.search).get("eyes") ?? EYE_STYLES.indexOf("round")));
+  // how motion feels: the law that chases each pose target (see `follow`)
+  const [feelIx, setFeelIx] = useState(() => Number(new URLSearchParams(location.search).get("feel") ?? 0));
   const [bodyIx, setBodyIx] = useState(() => Number(new URLSearchParams(location.search).get("body") ?? 0));
   const [faceIx, setFaceIx] = useState(() => Number(new URLSearchParams(location.search).get("face") ?? 0));
   const [shadeIx, setShadeIx] = useState(() => Number(new URLSearchParams(location.search).get("shade") ?? SHADINGS.indexOf("toon")));
@@ -388,7 +398,9 @@ export function CharacterStage() {
   const beard = BEARD_CHOICES[beardIx % BEARD_CHOICES.length];
   const face = FACE_SHAPES[faceIx % FACE_SHAPES.length];
   const shading = SHADINGS[shadeIx % SHADINGS.length];
-  const eyes = EYE_STYLES[eyeIx % EYE_STYLES.length];
+  const eyes = "toy" as const; // the look is fixed (Ritesh, 2026-10-13)
+  const feel = MOTION_FEELS[feelIx % MOTION_FEELS.length];
+  setMotionFeel(feel);
   const body = BODY_STYLES[bodyIx % BODY_STYLES.length];
   const [close, setClose] = useState(() => new URLSearchParams(location.search).has("close"));
   const id = `person-${seed}`;
@@ -460,7 +472,7 @@ export function CharacterStage() {
       if (e.key === "w") setWalking((v) => !v);
       if (e.key === "c") setCrowd((v) => !v);
       if (e.key === "f") setClose((v) => !v);
-      if (e.key === "o") setEyeIx((i) => i + 1);
+      if (e.key === "j") setFeelIx((i) => i + 1);
       if (e.key === "b") setBodyIx((i) => i + 1);
       if (e.key === "s") setFaceIx((i) => i + 1);
       if (e.key === "t") setShadeIx((i) => i + 1);
@@ -528,7 +540,7 @@ export function CharacterStage() {
           <button style={btn} onClick={() => setBehaveIx((i) => i + 1)}>Behaviour: {behaviour} (V)</button>
         )}
         <button style={btn} onClick={() => setClose((v) => !v)}>{close ? "Full body (F)" : "Face close-up (F)"}</button>
-        <button style={btn} onClick={() => setEyeIx((i) => i + 1)}>Eyes: {eyes} (O)</button>
+        <button style={btn} onClick={() => setFeelIx((i) => i + 1)} title={FEEL_MATHS[feel]}>Motion: {feel} (J)</button>
         <button style={btn} onClick={() => setBodyIx((i) => i + 1)}>Body: {body} (B)</button>
         <button style={btn} onClick={() => setFaceIx((i) => i + 1)}>Face: {face} (S)</button>
         <button style={btn} onClick={() => setShadeIx((i) => i + 1)}>Shading: {shading} (T)</button>
@@ -542,7 +554,7 @@ export function CharacterStage() {
         ) : (
           <>
             <div>
-              <strong>{expr.name}</strong> · doing <strong>{behaviour}</strong> · eyes <strong>{eyes}</strong> · body <strong>{body}</strong> ({single.heads.toFixed(1)} heads) · face <strong>{single.face}</strong> · {shading} · seed {seed} · {stats} ({single.triangles.toFixed(0)} triangles in this person)
+              <strong>{expr.name}</strong> · doing <strong>{behaviour}</strong> · motion <strong>{feel}</strong>: {FEEL_MATHS[feel]} · body <strong>{body}</strong> ({single.heads.toFixed(1)} heads) · face <strong>{single.face}</strong> · {shading} · seed {seed} · {stats} ({single.triangles.toFixed(0)} triangles in this person)
             </div>
             <div>
               height {(1.72 * look.height).toFixed(2)} m · build {look.build.toFixed(2)} · shoulder:hip {look.shoulderHip.toFixed(2)} · hair {look.hairStyle} · head {look.faceWidth.toFixed(2)} wide, jaw {look.jaw.toFixed(2)}

@@ -103,7 +103,7 @@ export const EXPRESSIONS: Array<Mood & { name: string }> = [
   { name: "curious", browY: 0.016, browTilt: 0.3, lid: -0.5, curve: 0.15, open: 0, width: 0.85 },
   { name: "focused", browY: -0.006, browTilt: -0.5, lid: 0.3, curve: -0.1, open: 0, width: 0.8 },
   { name: "surprised", browY: 0.024, browTilt: 0.15, lid: -0.9, curve: 0, open: 1.2, width: 0.6 },
-  { name: "worried", browY: 0.008, browTilt: 0.75, lid: 0.05, curve: -1.0, open: 0, width: 0.9 },
+  { name: "worried", browY: 0.006, browTilt: 0.6, lid: 0.05, curve: -1.0, open: 0, width: 0.9 },
 ];
 
 export interface BoneSet {
@@ -116,6 +116,7 @@ export interface BoneSet {
   mouthOpen: Bone;
   sh: [Bone, Bone];
   el: [Bone, Bone];
+  wr: [Bone, Bone]; // the wrists: the hand turns about the forearm here
   hip: [Bone, Bone];
   kn: [Bone, Bone];
   dev: Bone; // the device in the right hand: scaled to nothing when it is put away
@@ -132,6 +133,9 @@ export interface Character {
   heads: number; // how many heads tall
   lidBias: number; // some eye styles sit with the lids a little lower
   pose: Record<string, number>; // smoothed pose targets, so behaviours blend
+  shoulderY: number; // figure-local height of the shoulders, for reaching
+  shoulderX: number; // and how far out the right shoulder is
+  armReach: number; // shoulder to the middle of the hand with the arm straight
   deviceKind?: "phone" | "tablet"; // what a real Device should be mounted at bones.dev, if anything
 }
 
@@ -265,7 +269,7 @@ export function buildCharacter(
   opts: { body?: BodyStyle; eyes?: EyeStyle; face?: FaceShape; shading?: Shading; beard?: BeardChoice; uniform?: { cap?: string; badge?: string }; device?: "phone" | "tablet" } = {},
 ): Character {
   const bodyStyle = opts.body ?? "friendly";
-  const eyeStyle = opts.eyes ?? "round";
+  const eyeStyle = opts.eyes ?? "toy";
   // "toy" and "peg": marks on a clean, chunky head (plain black eyes, a dash
   // for a mouth, a pointed nose), no sockets, lips, lashes, teeth or tongue
   const toy = eyeStyle === "toy" || eyeStyle === "peg";
@@ -361,9 +365,13 @@ export function buildCharacter(
   const el = SIDES.map((_, i) => mk(`el${i}`, elbowPt[i].x, elbowPt[i].y, 0, sh[i])) as [Bone, Bone];
   const hip = SIDES.map((s) => mk(`hip${s}`, s * legX, Y(0.88), 0, root)) as [Bone, Bone];
   const kn = SIDES.map((s, i) => mk(`kn${s}`, s * legX, Y(0.48), 0, hip[i])) as [Bone, Bone];
+  // a wrist under each forearm: the hand (palm, fingers, thumb) rides it, so it
+  // can roll about the forearm, e.g. palm to the side for a handshake
+  const wr = SIDES.map((_, i) => mk(`wr${i}`, wristPt[i].x, wristPt[i].y, wristPt[i].z, el[i])) as [Bone, Bone];
   // a bone at the right hand for a device; scaling it 0 to 1 takes it out
-  const hand = wristPt[1].clone().addScaledVector(wristPt[1].clone().sub(elbowPt[1]).normalize(), 0.09);
-  const dev = mk("dev", hand.x - 0.01, hand.y, hand.z - 0.015, el[1]);
+  // the middle of the right hand; Actor mounts the device a little in front
+  const hand = wristPt[1].clone().addScaledVector(wristPt[1].clone().sub(elbowPt[1]).normalize(), 0.065);
+  const dev = mk("dev", hand.x, hand.y, hand.z, wr[1]);
   const idx = (b: Bone): number => list.indexOf(b);
 
   // ---- parts ----
@@ -413,9 +421,9 @@ export function buildCharacter(
     add(tube(sp, ep, 0.049, 0.039, 8), sh[i], shirt);
     add(new IcosahedronGeometry(0.039, 0), el[i], shirt, at(ep.x, ep.y, ep.z));
     add(tube(ep, wp, 0.036, 0.027, 8), el[i], skin);
-    add(along(0.05, 0.075, 0.025, wp.clone().addScaledVector(handDir, 0.035), handDir), el[i], skin);
-    add(along(0.046, 0.058, 0.018, wp.clone().addScaledVector(handDir, 0.096).add(new Vector3(0, 0, -0.005)), handDir), el[i], dark(skin, 0.97));
-    add(along(0.017, 0.05, 0.017, wp.clone().addScaledVector(handDir, 0.05).add(new Vector3(-s * 0.03, 0, -0.012)), handDir), el[i], skin);
+    add(along(0.05, 0.075, 0.025, wp.clone().addScaledVector(handDir, 0.035), handDir), wr[i], skin);
+    add(along(0.046, 0.058, 0.018, wp.clone().addScaledVector(handDir, 0.096).add(new Vector3(0, 0, -0.005)), handDir), wr[i], dark(skin, 0.97));
+    add(along(0.017, 0.05, 0.017, wp.clone().addScaledVector(handDir, 0.05).add(new Vector3(-s * 0.03, 0, -0.012)), handDir), wr[i], skin);
 
     // leg: thigh, knee, calf, shoe
     const lx = s * legX;
@@ -485,6 +493,15 @@ export function buildCharacter(
       if (vz < z && vz < 0 && Math.abs(headPos.getX(k) - x) <= hw && Math.abs(headPos.getY(k) - y) <= hh) z = vz;
     }
     return Number.isFinite(z) ? z : EYE.z;
+  };
+  // How far a mark at (x, y) must turn about the vertical to lie along the
+  // head: the head curves away sideways, so a flat bar or disc seated at one
+  // point would float at its outer end or sink at its inner one.
+  const yawAt = (x: number, y: number): number => {
+    const d = 0.008;
+    const a = surfaceZ(x - d, y, 0, 0);
+    const b = surfaceZ(x + d, y, 0, 0);
+    return -Math.atan((b - a) / (2 * d));
   };
   // A mark may sit this far behind the most forward facet and no further
   // (`sink`, about half its thickness): it is pulled forward if it would be
@@ -562,7 +579,8 @@ export function buildCharacter(
       const g = new CircleGeometry(1, 14);
       g.scale(w, h, 1);
       g.rotateY(Math.PI);
-      add(g, lids, ink, hm(ex, eyeY, surfaceZ(ex, eyeY, w, h) - 0.0007));
+      g.rotateY(yawAt(ex, eyeY));
+      add(g, lids, ink, hm(ex, eyeY, surfaceZ(ex, eyeY, 0.002, h * 0.6) - 0.0007));
     } else if (eyeStyle === "bean") {
       // tall dark ovals, a classic cartoon eye
       lashTube = 0.0012;
@@ -638,7 +656,9 @@ export function buildCharacter(
     const s = SIDES[i];
     if (toy) {
       // a straight dark dash, tilted and lifted by the brow bone like any other
-      add(new BoxGeometry(0.03 * look.eyeSize, 0.0052, 0.004), browBones[i], new Color("#241c19"), hm(s * eyeX, browY, surfaceZ(s * eyeX, browY, 0.015, 0.006) - 0.0022));
+      const bar = new BoxGeometry(0.03 * look.eyeSize, 0.0052, 0.004);
+      bar.rotateY(yawAt(s * eyeX, browY));
+      add(bar, browBones[i], new Color("#241c19"), hm(s * eyeX, browY, surfaceZ(s * eyeX, browY, 0.003, 0.006) - 0.0022));
       continue;
     }
     add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, browY, onTop(browZ, s * eyeX, browY, 0.026, 0.016, 0.002)));
@@ -663,14 +683,17 @@ export function buildCharacter(
     const ink = new Color("#241c19");
     // the dash bends by scaling about the mouth bone, so its ends can lift
     // forward as it curves: sit it on the most forward facet along its width
-    const dashZ = surfaceZ(0, mouthY, 0.025, 0.014) - 0.0016;
+    const dashZ = surfaceZ(0, mouthY, 0.025, 0.005) - 0.0016;
     add(dash, mouth, ink, hm(0, mouthY + 0.05, dashZ));
     // the opening is an oval (a flat ellipse the mouthOpen bone stretches
     // taller as it opens: a tall "O" when shocked)
     const hole = new CircleGeometry(1, 16);
     hole.scale(0.011, 0.004, 1);
     hole.rotateY(Math.PI);
-    add(hole, mouthOpen, ink, hm(0, mouthY - 0.002, dashZ - 0.0004));
+    // it grows down over the lower lip and chin, so it is seated against those
+    // too (a narrow, tall patch that stops short of the nose)
+    const holeZ = Math.min(dashZ, surfaceZ(0, mouthY - 0.006, 0.016, 0.01) - 0.0016) - 0.0004;
+    add(hole, mouthOpen, ink, hm(0, mouthY - 0.002, holeZ));
   } else {
     arc(0.024, 0.0032, "#a8514f", 0.0014);
     arc(0.026, 0.0046, "#c46a66", -0.0022);
@@ -694,7 +717,7 @@ export function buildCharacter(
 
   return {
     root: group,
-    bones: { root, spine, head, brow: browBones, lids, mouth, mouthOpen, sh, el, hip, kn, dev },
+    bones: { root, spine, head, brow: browBones, lids, mouth, mouthOpen, sh, el, wr, hip, kn, dev },
     triangles: merged.getAttribute("position").count / 3,
     look,
     body: bodyStyle,
@@ -703,6 +726,9 @@ export function buildCharacter(
     heads: 1.72 / (0.216 * S),
     lidBias,
     pose: {},
+    shoulderY: shoulderPt[0].y,
+    shoulderX: shoulderX,
+    armReach: elbowPt[1].distanceTo(shoulderPt[1]) + wristPt[1].distanceTo(elbowPt[1]) + 0.065,
     deviceKind: opts.device,
   };
 }
@@ -720,13 +746,161 @@ export interface PoseInput {
   // sideways and up or down at once. The behaviour's own head movement
   // becomes a small idle drift around it.
   gaze?: { yaw: number; pitch: number };
+  // a world point (x, z) the hands meet at, for a handshake: halfway to the
+  // partner. Without it they reach to an arm's length ahead.
+  meet?: { x: number; z: number };
 }
 
 // Bones from a behaviour, a walk cycle and a mood. Signs, for a hanging limb
 // that points down: a positive x rotation swings it forward (-z) and a
 // negative one back; a z rotation of the +x arm that is positive swings it
 // out and up. A head or torso tips forward with a negative x rotation.
-// Targets are smoothed, so one behaviour melts into the next.
+// ---- reaching: a two-bone solve for an arm ----
+// The shoulder bone takes one rotation and the elbow bends about x, so the
+// hand's centre lands at `goal` (figure-local). The elbow angle comes from the
+// distance (bisection: it only ever shrinks as the elbow bends); the shoulder
+// turns the whole bent arm onto the goal's direction, then twists about that
+// line so the elbow hangs low and a little out. Blended into the existing
+// pose by `w`, so a reach eases in and out like everything else.
+const ikTmp = new Vector3();
+const ikH = new Vector3();
+const ikAxis = new Vector3();
+const ikE = new Vector3();
+const ikG = new Vector3();
+const ikQ = new Quaternion();
+const ikQ2 = new Quaternion();
+// the hand rolled this far about the forearm turns the palm from facing the
+// thigh to facing the middle, thumb up, as it does for a handshake
+const HAND_ROLL = 1.45;
+// a held device leans back from vertical by this much, screen toward the face
+const DEVICE_TILT = -0.8;
+function reachWith(c: Character, i: 0 | 1, goal: Vector3, w: number): void {
+  const b = c.bones;
+  const sh = b.sh[i];
+  const el = b.el[i];
+  const wr = b.wr[i];
+  ikTmp.copy(goal);
+  c.root.localToWorld(ikTmp);
+  b.spine.worldToLocal(ikTmp);
+  ikTmp.sub(sh.position); // shoulder to goal, in the spine's frame
+  const u0 = el.position;
+  const handLen = 0.065; // wrist to the middle of the hand
+  const f0 = wr.position;
+  const fh = ikE.copy(f0).addScaledVector(ikAxis.copy(f0).normalize(), handLen).clone();
+  const reach = (th: number): Vector3 => {
+    const cs = Math.cos(th);
+    const sn = Math.sin(th);
+    return ikH.set(u0.x + fh.x, u0.y + fh.y * cs - fh.z * sn, u0.z + fh.y * sn + fh.z * cs);
+  };
+  const dist = ikTmp.length();
+  let lo = 0;
+  let hi = 2.5;
+  let th: number;
+  if (dist >= reach(0).length()) th = 0;
+  else if (dist <= reach(hi).length()) th = hi;
+  else {
+    for (let n = 0; n < 24; n++) {
+      const mid = (lo + hi) / 2;
+      if (reach(mid).length() > dist) lo = mid;
+      else hi = mid;
+    }
+    th = (lo + hi) / 2;
+  }
+  const bent = reach(th).clone();
+  ikQ.setFromUnitVectors(bent.normalize(), ikAxis.copy(ikTmp).normalize());
+  // twist about the line to the goal so the elbow is as low as it can be
+  const axis = ikAxis.copy(ikTmp).normalize();
+  ikE.copy(u0).applyQuaternion(ikQ);
+  ikG.set(i === 0 ? -0.35 : 0.35, -1, 0.25).normalize();
+  const ep = ikE.addScaledVector(axis, -ikE.dot(axis));
+  const gp = ikG.addScaledVector(axis, -ikG.dot(axis));
+  if (ep.lengthSq() > 1e-6 && gp.lengthSq() > 1e-6) {
+    const ang = Math.atan2(axis.dot(ikTmp.copy(ep).cross(gp)), ep.dot(gp));
+    ikQ2.setFromAxisAngle(axis, ang);
+    ikQ.premultiply(ikQ2);
+  }
+  sh.quaternion.slerp(ikQ, w);
+  el.rotation.x += (th - el.rotation.x) * w;
+}
+
+// ---- how motion feels ----
+// Every behaviour only says where each joint should be (a target). The
+// "feel" is the law that chases that target, and swapping the law changes the
+// whole character of the movement without touching a single pose:
+//
+//   brisk    first-order lag, x' = k (target - x). A decaying exponential: the
+//            fastest start, no overshoot, the "cubic ease-out" of UI work.
+//   snappy   second-order spring, damping ratio 0.6: reaches fast, overshoots
+//            once and settles. The ease-out-back curve.
+//   fluid    critically damped spring (ratio 1): the quickest approach with no
+//            overshoot, and it also eases in, so nothing starts with a jerk.
+//   smooth   three first-order lags in a row: an S-shaped step with zero
+//            velocity AND zero acceleration at the start, a bell-shaped speed.
+//            An approximation of the minimum-jerk reach (Hogan 1982, a quintic
+//            polynomial) that still follows a moving target.
+//   bouncy   underdamped spring, ratio 0.35: overshoots and rocks to a stop.
+//   elastic  ratio 0.15: rings for several cycles, a damped sine. Cartoon.
+//   robot    constant speed limit: a linear ramp, then an abrupt stop.
+export type MotionFeel = "brisk" | "snappy" | "fluid" | "smooth" | "bouncy" | "elastic" | "robot";
+export const MOTION_FEELS: MotionFeel[] = ["bouncy", "fluid", "brisk", "snappy", "smooth", "elastic", "robot"];
+export const FEEL_MATHS: Record<MotionFeel, string> = {
+  brisk: "first-order lag (exponential)",
+  snappy: "spring, damping 0.6 (ease-out-back)",
+  fluid: "critically damped spring",
+  smooth: "3 chained lags (about minimum-jerk)",
+  bouncy: "underdamped spring, damping 0.35",
+  elastic: "very underdamped spring, damping 0.15",
+  robot: "constant speed limit (linear)",
+};
+let currentFeel: MotionFeel = "bouncy";
+export const getMotionFeel = (): MotionFeel => currentFeel;
+export const setMotionFeel = (f: MotionFeel): void => {
+  currentFeel = f;
+};
+
+// One step of the current law for `key`. The position is `st[key]`; whatever
+// else a law needs (velocity, lag stages) is kept beside it as `st["~" + key]`
+// and `st["~~" + key]`. A step of 0.2 s or more (a still picture) snaps.
+export function follow(st: Record<string, number>, key: string, target: number, walking: boolean, dt: number, feel: MotionFeel = currentFeel): void {
+  if (dt >= 0.2 || st[key] === undefined) {
+    st[key] = target;
+    st["~" + key] = 0;
+    st["~~" + key] = 0;
+    return;
+  }
+  const stride = walking ? 1.35 : 1; // a faster response in stride
+  let x = st[key];
+  if (feel === "brisk") {
+    x += (target - x) * (1 - Math.exp(-15 * stride * dt));
+  } else if (feel === "robot") {
+    const step = 3.2 * stride * dt;
+    x += Math.max(-step, Math.min(step, target - x));
+  } else if (feel === "smooth") {
+    // three equal lags: stage a chases the target, b chases a, x chases b
+    const k = 1 - Math.exp(-17 * stride * dt);
+    const a = (st["~" + key] ?? x) + (target - (st["~" + key] ?? x)) * k;
+    const b = (st["~~" + key] ?? x) + (a - (st["~~" + key] ?? x)) * k;
+    x += (b - x) * k;
+    st["~" + key] = a;
+    st["~~" + key] = b;
+  } else {
+    const [omega, zeta] = { snappy: [20, 0.6], fluid: [11, 1], bouncy: [13, 0.35], elastic: [11, 0.15] }[feel];
+    // a stride must not wobble, so damping is raised while walking
+    const z = walking ? Math.min(1, zeta + 0.35) : zeta;
+    const w = omega * stride;
+    let v = st["~" + key] ?? 0;
+    const n = Math.max(1, Math.ceil(dt / 0.008));
+    const h = dt / n;
+    for (let i = 0; i < n; i++) {
+      v += (w * w * (target - x) - 2 * z * w * v) * h;
+      x += v * h;
+    }
+    st["~" + key] = v;
+  }
+  st[key] = x;
+}
+
+// Targets are chased by the current motion feel (see `follow`).
 export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number): void {
   const b = c.bones;
   const st = c.pose;
@@ -746,7 +920,13 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   const T: Record<string, number> = {
     shLx: 0.07, shRx: 0.07, shLz: 0.06, shRz: 0.06, shLy: 0, shRy: 0, elL: 0.18, elR: 0.18,
     lean: 0, pitch: 0, yaw: 0, tilt: 0, open: 0, lid: 0, curve: 0,
+    // how far each hand is reaching to a point (0 free, 1 on it), and how far it
+    // is rolled about the forearm
+    reachR: 0, reachL: 0, rollR: 0, rollL: 0,
   };
+  // where each reaching hand goes, figure-local (the figure faces -z)
+  let handR: Vector3 | undefined;
+  let handL: Vector3 | undefined;
   if (walking || p.mode === "walk") {
     T.shLx = arm;
     T.shRx = -arm;
@@ -859,11 +1039,24 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
         break;
       }
       case "handshake":
-        // the right hand out, a small pump
-        T.shRx = 1.2 + Math.sin(t * 9 + sd) * 0.07;
-        T.elR = 0.5 + Math.sin(t * 9 + sd + 1) * 0.08;
-        T.shRz = -0.05;
-        T.lean = 0.06;
+        // the right hand out to the middle of the two of them, palm to the
+        // side and thumb up, a small pump. The partner stands about 0.9 m off
+        // facing back, and reaches to the same spot, so the hands meet there.
+        T.shRx = 1.2;
+        T.elR = 0.5;
+        T.reachR = 1;
+        T.rollR = HAND_ROLL;
+        handR = new Vector3(0.014, c.shoulderY - 0.29 + Math.sin(t * 9 + sd) * 0.022, -0.45);
+        if (p.meet) {
+          // to the real middle: world point to the figure's frame, at hand height
+          c.root.getWorldPosition(ikTmp);
+          const y = handR.y;
+          handR.set(p.meet.x, ikTmp.y + y, p.meet.z);
+          c.root.worldToLocal(handR);
+          handR.set(handR.x + 0.014, y, handR.z); // palms touch, not overlap
+        }
+        // out of reach standing straight: lean in to close the gap
+        T.lean = 0.06 + Math.min(0.4, Math.max(0, Math.hypot(handR.x - c.shoulderX, handR.y - c.shoulderY, handR.z) - c.armReach * 0.9) / 0.5);
         T.pitch = 0.04;
         T.curve = 0.3;
         break;
@@ -899,8 +1092,16 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
         T.shRy = 0.3;
         T.elR = 1.65;
         T.shLx = 0.95;
-        T.shLy = -0.35 + Math.sin(t * 5 + sd) * 0.1;
+        T.shLy = -0.35;
         T.elL = 1.95;
+        T.reachR = 1;
+        T.reachL = 1;
+        // held at the chest, a little to the right, the screen to the face; the
+        // left hand is between the screen and the body, thumb tapping it
+        handR = new Vector3(0.07, c.shoulderY - 0.12, -0.31);
+        handL = new Vector3(0.0 + Math.sin(t * 5 + sd) * 0.012, c.shoulderY - 0.19 + Math.max(0, Math.sin(t * 3.1 + sd)) * 0.02, -0.235);
+        T.rollR = 0;
+        T.rollL = -0.9;
         T.pitch = 0.4;
         T.lean = 0.07;
         T.curve = 0.25;
@@ -920,11 +1121,7 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
     T.yaw = p.gaze.yaw + T.yaw * 0.25;
     T.pitch = p.gaze.pitch * 0.9 - T.lean + T.pitch * 0.1;
   }
-  const k = 1 - Math.exp(-(walking ? 14 : 7) * p.dt);
-  for (const key of Object.keys(T)) {
-    const cur = st[key] ?? T[key];
-    st[key] = cur + (T[key] - cur) * k;
-  }
+  for (const key of Object.keys(T)) follow(st, key, T[key], walking, p.dt);
 
   // sitting and the device ease in and out like everything else
   const wantSeat = p.seated ? 1 : 0;
@@ -955,6 +1152,28 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   b.spine.rotation.z = -weight * 1.1;
   b.head.rotation.set(-st.pitch, st.yaw, st.tilt + weight * 0.9);
 
+  // hands: reach for a point with a two-bone solve, blended over the pose
+  // above by how far the hand is reaching; and roll about the forearm
+  const wasReaching = (st.reachR ?? 0) > 0.003 || (st.reachL ?? 0) > 0.003;
+  if (wasReaching) c.root.updateMatrixWorld(true);
+  for (const i of [0, 1] as const) {
+    const w = Math.min(1, Math.max(0, i === 0 ? st.reachL ?? 0 : st.reachR ?? 0));
+    const goal = i === 0 ? handL : handR;
+    if (w > 0.003 && goal) reachWith(c, i, goal, w);
+    const forearm = b.wr[i].position;
+    b.wr[i].quaternion.setFromAxisAngle(ikAxis.copy(forearm).normalize(), i === 0 ? st.rollL ?? 0 : st.rollR ?? 0);
+  }
+
+  // the held device is turned so its screen faces the holder's face, tilted
+  // back against the body whatever the arm is doing: its world turn is the
+  // spine's, tipped by DEVICE_TILT (the bone's own turn is undone first)
+  if (st.dev > 0.02) {
+    c.root.updateMatrixWorld(true);
+    b.wr[1].getWorldQuaternion(ikQ);
+    b.spine.getWorldQuaternion(ikQ2);
+    b.dev.quaternion.copy(ikQ.invert()).multiply(ikQ2).multiply(ikQ.setFromAxisAngle(ikAxis.set(1, 0, 0), DEVICE_TILT));
+  }
+
   // face: lids (with a blink and the eye style's resting droop), brows (lift
   // and tilt, inner ends up is positive), mouth as an arc plus an opening;
   // a behaviour can add to the mood (a laugh opens the mouth and squints)
@@ -978,5 +1197,6 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   // a toy mouth is one dash, which gives way to the oval as it opens wide
   const dashFade = c.eyes === "toy" || c.eyes === "peg" ? 1 - Math.min(1, Math.max(0, (open - 0.5) * 2)) : 1;
   b.mouth.scale.set(Math.max(0.0001, mw * (1 - open * 0.5) * dashFade), bend * (1 - open * 0.6), 1);
-  b.mouthOpen.scale.set(0.5 + open * 1.0, 0.1 + open * 2.4, 1);
+  // (not taller than the gap under the nose: a tall oval runs up into it)
+  b.mouthOpen.scale.set(0.5 + open * 1.0, 0.1 + open * 1.45, 1);
 }

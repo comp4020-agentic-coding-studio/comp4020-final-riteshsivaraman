@@ -4,7 +4,7 @@ import { Euler, type Group, Quaternion, Vector3 } from "three";
 import { gazeAt } from "../../../shared/gaze.ts";
 import { lookFor, type LookChoice } from "../../../shared/look.ts";
 import type { Behaviour } from "../../../shared/behaviour.ts";
-import { buildCharacter, EXPRESSIONS, poseCharacter, type Mood } from "./character.ts";
+import { buildCharacter, EXPRESSIONS, follow, poseCharacter, type Mood } from "./character.ts";
 import { Device } from "./Device.tsx";
 
 // The real model a held device is (Ritesh, 2026-10-12: pair character
@@ -62,9 +62,9 @@ export function Actor({
     return buildCharacter(appearance, colour, {
       uniform,
       device: uniform ? "tablet" : "phone",
-      // everyone in the store is drawn the same way: toon body, round eyes
+      // everyone in the store is drawn the same way: toon body, toy face
       body: "toon",
-      eyes: "round",
+      eyes: "toy",
       face: look?.face,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,9 +83,8 @@ export function Actor({
     const pace = s.speed !== undefined ? Math.min(1.6, Math.max(0.6, s.speed / 1.1)) : 1;
     phase.current += dt * (3 + walk.current * 2.4) * pace * (walk.current > 0.05 ? 1 : 0);
     const target = EXPRESSIONS.find((e) => e.name === s.mood) ?? EXPRESSIONS[0];
-    const k = 1 - Math.exp(-8 * dt);
     const m = mood.current;
-    for (const key of ["browY", "browTilt", "lid", "curve", "open", "width"] as const) m[key] += (target[key] - m[key]) * k;
+    for (const key of ["browY", "browTilt", "lid", "curve", "open", "width"] as const) follow(m as unknown as Record<string, number>, key, target[key], false, SNAP ? 1 : dt);
     const blink = (t.current + seed * 0.013 + 1.7) % 3.4 < 0.12 ? 1.2 : 0;
     // the head: where the body stands and faces, in the world, against the point
     let gaze: { yaw: number; pitch: number } | undefined;
@@ -95,7 +94,13 @@ export function Actor({
       euler.setFromQuaternion(quat, "YXZ");
       gaze = gazeAt({ x: tmp.x, z: tmp.z, ry: euler.y }, s.gaze);
     }
-    poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device, gaze }, m, blink);
+    // a handshake: the hands meet halfway to whoever they are facing
+    let meet: { x: number; z: number } | undefined;
+    if (s.mode === "handshake" && s.gaze && char.root.parent) {
+      char.root.parent.getWorldPosition(tmp);
+      meet = { x: (tmp.x + s.gaze.x) / 2, z: (tmp.z + s.gaze.z) / 2 };
+    }
+    poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device, gaze, meet }, m, blink);
   });
   const held = char.deviceKind ? HELD_DEVICE[char.deviceKind] : undefined;
   const devRef = useRef<Group>(null);
@@ -118,7 +123,12 @@ export function Actor({
       <primitive object={char.root} />
       {held && (
         <group ref={devRef}>
-          <Device kind={char.deviceKind === "tablet" ? "tablet" : "phone"} model={held.model} colour={held.colour} x={0} y={0} z={0} rotY={0} />
+          {/* the dev bone is turned each frame so +z (the screen) faces the
+              holder; the device sits just in front of the hand, which is
+              behind it */}
+          <group position={[0, 0.02, 0.024]}>
+            <Device kind={char.deviceKind === "tablet" ? "tablet" : "phone"} model={held.model} colour={held.colour} x={0} y={0} z={0} rotY={0} held />
+          </group>
         </group>
       )}
     </>
