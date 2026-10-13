@@ -9,7 +9,10 @@
 // official SDK) -- see the commit that introduces this file.
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-flash-latest";
+// "gemini-flash-latest" was hitting 503s (model overloaded) in practice;
+// 2.5 flash is a stable, confirmed-free, confirmed-available model instead
+// (checked live against this account's own models.list(), not guessed).
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const key = process.env.GEMINI_API_KEY;
 
 export function aiAvailable(): boolean {
