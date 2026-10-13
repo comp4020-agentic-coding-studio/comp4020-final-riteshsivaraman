@@ -79,8 +79,11 @@ Omit "extra" entirely if nothing else was volunteered.`;
     // A stalled connection (proxy, flaky network) must still fall back
     // within a few seconds, not hang until someone Ctrl-Cs the game --
     // the SDK's own timeout plus a manual backstop race, belt and braces.
-    const call = ai.models.generateContent({ model: MODEL, contents: prompt, config: { httpOptions: { timeout: 8000 } } });
-    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("ai timeout")), 9000));
+    // Google's API rejects anything under 10s outright (INVALID_ARGUMENT,
+    // found live: "Manually set deadline 8s is too short"), so 10s is the
+    // floor, not a choice.
+    const call = ai.models.generateContent({ model: MODEL, contents: prompt, config: { httpOptions: { timeout: 10_000 } } });
+    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("ai timeout")), 11_000));
     const res = await Promise.race([call, timeout]);
     const text = (res.text ?? "").trim().replace(/^```json\s*|```$/g, "");
     const parsed = JSON.parse(text) as Interpretation;
