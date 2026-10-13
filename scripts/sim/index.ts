@@ -6,9 +6,10 @@
 import { priceOf, SIM_PRODUCTS } from "./catalogue.ts";
 import { closeCase, handOff, openCase, setFact } from "./case.ts";
 import { ask, closeIo, log, menu, say } from "./io.ts";
-import { type NpcCustomer, runAmbientConversation, spawnCustomer } from "./npc.ts";
+import { type NpcCustomer, noticeDelay, runAmbientConversation, spawnCustomer } from "./npc.ts";
 import { makeRng, pick, roll, type Rng } from "./rng.ts";
 import { nextSlot, npcAnswer, optionsFor, questionFor, type SlotKey } from "./slots.ts";
+import { rollTraits, type Traits } from "./traits.ts";
 
 async function main(): Promise<void> {
   const seedArg = process.argv.find((a) => a.startsWith("--seed="));
@@ -18,19 +19,25 @@ async function main(): Promise<void> {
 
   console.log("\n=== the store (terminal prototype) ===\n");
 
+  // Staff get their own traits too, rolled once per run so Mira and Dan's
+  // own attentiveness stays consistent across every customer they see.
+  const mira = rollTraits(rng);
+  const dan = rollTraits(rng);
+
   // One or two customers doing their own thing in the background, whether
   // or not you're playing one of them -- this is "everyone else is an NPC."
-  for (let i = 0; i < 2; i++) runAmbientConversation(rng, "Dan", spawnCustomer(rng, 900 + i));
+  for (let i = 0; i < 2; i++) runAmbientConversation(rng, "Dan", dan, spawnCustomer(rng, 900 + i));
 
   const role = await menu("\nWho are you?", ["Customer", "Employee"]);
-  if (role === "Customer") await playCustomer(rng);
-  else await playEmployee(rng);
+  if (role === "Customer") await playCustomer(rng, mira);
+  else await playEmployee(rng, mira);
 
   closeIo();
 }
 
-async function playCustomer(rng: Rng): Promise<void> {
+async function playCustomer(rng: Rng, mira: Traits): Promise<void> {
   const name = (await ask("\nYour name? ")) || "Visitor";
+  noticeDelay(rng, mira, "Mira");
   say("Mira (greeter)", `Hi, welcome in. Is there something in particular you're after today?`);
   const need = await menu("", ["I need a phone", "Just looking"]);
   if (need === "Just looking") {
@@ -61,11 +68,13 @@ async function playCustomer(rng: Rng): Promise<void> {
   say("Dan", "Done. Enjoy it!");
 }
 
-async function playEmployee(rng: Rng): Promise<void> {
+async function playEmployee(rng: Rng, mira: Traits): Promise<void> {
   const myRole = await menu("Which post?", ["Greeter", "Specialist: phones"]);
   const customer = spawnCustomer(rng, 1);
 
   if (myRole === "Greeter") {
+    // You're playing Mira's own post, so your own attentiveness is your
+    // choice below, not a roll -- nothing here rolls against you.
     say("(system)", `${customer.name} walks in.`);
     const greet = await menu(`Greet ${customer.name}?`, ["Greet them", "Let someone else get it"]);
     if (greet !== "Greet them") {
@@ -82,6 +91,7 @@ async function playEmployee(rng: Rng): Promise<void> {
     return;
   }
 
+  noticeDelay(rng, mira, "Mira");
   say("Mira (NPC)", `Got one for you -- ${customer.name}, wants a phone.`);
   const c = openCase(customer.id, "phone", "mira");
   setFact(c, "referred_by", "mira");

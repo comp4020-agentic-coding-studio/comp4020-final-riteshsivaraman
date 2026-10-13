@@ -19,13 +19,28 @@ export function spawnCustomer(rng: Rng, idSeed: number): NpcCustomer {
   return { id: `npc-${idSeed}`, name: pick(rng, NAMES), traits: rollTraits(rng), product: pick(rng, SIM_PRODUCTS) };
 }
 
+// Staff noticing a waiting customer promptly is itself probabilistic (the
+// sim's fourth hook): low attentiveness means a short, visible delay before
+// anyone comes over, echoing T2's "nobody comes" -- never a permanent
+// block, just friction, since a staff approach is only ever the secondary
+// way a conversation starts (ADR 6; a customer's own request is the main
+// one, and isn't gated on anyone's attentiveness).
+export function noticeDelay(rng: Rng, staff: Traits, who: string): void {
+  let tries = 0;
+  while (tries < 2 && !roll(rng, 0.35 + staff.attentiveness * 0.65)) {
+    log(`${who} is busy with someone else -- nobody comes over yet.`);
+    tries++;
+  }
+}
+
 // Runs a whole conversation for an NPC customer against an NPC staff
 // member, entirely automatically -- this is what "everyone else is an NPC"
 // looks like with no human in the loop. Same slots, same ordering policy,
 // same probabilistic hooks as the human-played flow in index.ts; both
 // sides are rolled instead of asked.
-export function runAmbientConversation(rng: Rng, staffName: string, customer: NpcCustomer): SimCase {
+export function runAmbientConversation(rng: Rng, staffName: string, staffTraits: Traits, customer: NpcCustomer): SimCase {
   const c = openCase(customer.id, "phone", staffName);
+  noticeDelay(rng, staffTraits, staffName);
   log(`${staffName} greets ${customer.name}.`);
   let slot: SlotKey | null;
   while ((slot = nextSlot(c.facts))) {
