@@ -461,23 +461,36 @@ export function buildCharacter(
     toy ? 3 : 4,
     toy,
   );
-  // Where the head's real, faceted surface is in front of (x, y), head-local.
-  // The toy face's marks sit on this instead of a guessed depth, so a facet
-  // can't poke through them. Over a mark's extent we take the most forward
-  // facet, then sit the mark a hair proud of it.
+  // Where the head's real, faceted surface is in front of (x, y), head-local:
+  // the most forward point of any facet under a mark's footprint (half-width
+  // hw, half-height hh). The surface is piecewise flat, so its most forward
+  // point over a patch is either a head vertex inside it or on its border:
+  // we check both, so no facet can end up in front of a mark placed with this.
   const probe = new Mesh(headGeo, new MeshBasicMaterial({ side: DoubleSide }));
   const ray = new Raycaster();
   const rayFrom = new Vector3();
   const rayDir = new Vector3(0, 0, 1);
+  const headPos = headGeo.getAttribute("position");
   const surfaceZ = (x: number, y: number, hw = 0, hh = 0): number => {
     let z = Infinity;
-    for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
-      ray.set(rayFrom.set(x + dx * hw, y + dy * hh, -1), rayDir);
-      const hit = ray.intersectObject(probe, false)[0];
-      if (hit) z = Math.min(z, hit.point.z);
+    for (let i = -2; i <= 2; i++) {
+      for (let j = -2; j <= 2; j++) {
+        ray.set(rayFrom.set(x + (i / 2) * hw, y + (j / 2) * hh, -1), rayDir);
+        const hit = ray.intersectObject(probe, false)[0];
+        if (hit) z = Math.min(z, hit.point.z);
+      }
+    }
+    for (let k = 0; k < headPos.count; k++) {
+      const vz = headPos.getZ(k);
+      if (vz < z && vz < 0 && Math.abs(headPos.getX(k) - x) <= hw && Math.abs(headPos.getY(k) - y) <= hh) z = vz;
     }
     return Number.isFinite(z) ? z : EYE.z;
   };
+  // A mark may sit this far behind the most forward facet and no further
+  // (`sink`, about half its thickness): it is pulled forward if it would be
+  // deeper, never pushed back.
+  const onTop = (z: number, x: number, y: number, hw: number, hh: number, sink: number): number =>
+    Math.min(z, surfaceZ(x, y, hw, hh) + sink);
   add(headGeo, head, null, hm());
   for (const s of SIDES) {
     add(new IcosahedronGeometry(0.026, 1), head, skin, hm(s * 0.081 * fw, -0.012 * Fy, 0.006, sc(0.4, 1, 0.75)));
@@ -522,16 +535,17 @@ export function buildCharacter(
       g.rotateY(Math.PI);
       add(g, head, c, hm(ex + (o.dx ?? 0), eyeY + (o.dy ?? 0), eyeZ + front(rho) - (o.lift ?? 0)));
     };
+    const flatZ = onTop(eyeZ - eyeR * 0.82, ex, eyeY, eyeR * 1.1, eyeR * 1.3, 0.0004);
     const oval = (w: number, h: number, c: Color, dx = 0, dy = 0, lift = 0): void => {
       const g = new CircleGeometry(1, 14);
       g.scale(w, h, 1);
       g.rotateY(Math.PI);
-      add(g, head, c, hm(ex + dx, eyeY + dy, eyeZ - eyeR * 0.82 - lift));
+      add(g, head, c, hm(ex + dx, eyeY + dy, flatZ - lift));
     };
     const spot = (r: number, dx: number, dy: number, lift: number): void => {
       const g = new CircleGeometry(r, 8);
       g.rotateY(Math.PI);
-      add(g, head, white, hm(ex + dx, eyeY + dy, eyeZ - eyeR * 0.82 - lift));
+      add(g, head, white, hm(ex + dx, eyeY + dy, flatZ - lift));
     };
     const ink = new Color("#241c19");
     if (eyeStyle === "dots") {
@@ -565,7 +579,7 @@ export function buildCharacter(
       // closed, smiling eyes: an upward arch for each
       const arch = new TorusGeometry(0.0085 * look.eyeSize, 0.0013, 3, 8, Math.PI * 0.85);
       arch.rotateZ(Math.PI / 2 - Math.PI * 0.425);
-      add(arch, head, ink, hm(ex, eyeY - 0.0035, eyeZ - eyeR * 0.82));
+      add(arch, head, ink, hm(ex, eyeY - 0.0035, flatZ));
     } else if (eyeStyle === "round") {
       // big white eyes with a plain dot for the pupil
       lashTube = 0.0012;
@@ -605,7 +619,7 @@ export function buildCharacter(
   }
   // nostrils under the tip of the nose
   for (const s of toy ? [] : SIDES) {
-    add(new SphereGeometry(0.0034, 5, 4), head, dark(skin, 0.45), hm(s * 0.0072 * look.noseSize, -0.0425 * Fy, -0.1035 - 0.004 * shape.square, sc(1, 0.6, 1)));
+    add(new SphereGeometry(0.0034, 5, 4), head, dark(skin, 0.45), hm(s * 0.0072 * look.noseSize, -0.0425 * Fy, onTop(-0.1035 - 0.004 * shape.square, s * 0.0072 * look.noseSize, -0.0425 * Fy, 0.004, 0.004, 0.0017), sc(1, 0.6, 1)));
   }
 
   // lids: a cap over each eye and a dark lash line along its rim
@@ -627,15 +641,19 @@ export function buildCharacter(
       add(new BoxGeometry(0.03 * look.eyeSize, 0.0052, 0.004), browBones[i], new Color("#241c19"), hm(s * eyeX, browY, surfaceZ(s * eyeX, browY, 0.015, 0.006) - 0.0022));
       continue;
     }
-    add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, browY, browZ));
+    add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, browY, onTop(browZ, s * eyeX, browY, 0.026, 0.016, 0.002)));
   }
 
   // lips: an upper and a fuller lower arc that scale together into a smile or
   // a frown, and a dark opening that grows with the jaw
+  // the lips widen with the smile, so probe a footprint wider than at rest
+  const lipZ = onTop(mouthZ, 0, mouthY + 0.004, 0.034, 0.012, 0.0022);
+  // the opening grows tall when it opens, under the lower lip and chin
+  const openZ = onTop(mouthZ, 0, mouthY - 0.004, 0.022, 0.026, 0.0022);
   const arc = (radius: number, tubeR: number, colour: string, dy: number): void => {
     const t = new TorusGeometry(radius, tubeR, 4, 14, 1.6);
     t.rotateZ(-Math.PI / 2 - 0.8);
-    add(t, mouth, new Color(colour), hm(0, mouthY + radius + dy, mouthZ));
+    add(t, mouth, new Color(colour), hm(0, mouthY + radius + dy, lipZ));
   };
   if (toy) {
     // one dark, nearly flat dash that still bends into a smile or a frown, and
@@ -656,8 +674,7 @@ export function buildCharacter(
   } else {
     arc(0.024, 0.0032, "#a8514f", 0.0014);
     arc(0.026, 0.0046, "#c46a66", -0.0022);
-    add(new SphereGeometry(0.008, 8, 6), mouthOpen, new Color("#4a1c20"), hm(0, mouthY - 0.002, mouthZ + 0.0015, sc(2.4, 0.9, 1)));
-    add(new BoxGeometry(0.02, 0.005, 0.004), mouthOpen, new Color("#f4efe8").multiplyScalar(1.4), hm(0, mouthY + 0.0035, mouthZ - 0.0018));
+    add(new SphereGeometry(0.008, 8, 6), mouthOpen, new Color("#4a1c20"), hm(0, mouthY - 0.002, openZ + 0.0015, sc(2.4, 0.9, 1)));
   }
 
   // ---- one mesh, one skeleton ----
