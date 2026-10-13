@@ -223,3 +223,22 @@ layout claim as provisional until checked against an actual photo, and
 saying so out loud rather than reporting it as settled. (Written into
 `references/product-line.md`'s sourcing note for the rest of the product-line
 build, so later sessions building other families don't repeat it.)
+
+## "It's fixed" about a visual defect means nothing until something renders it, and one detector only checks one direction of the defect
+
+[`0f564d4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/0f564d4),
+[`9b74a21`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9b74a21)
+
+Asked twice to stop face marks (mouth, brows) from having polygons poke
+through them, the assistant reported fixes it could not see: its browser tool
+has WebGL off, so every "done" was reasoning from numbers. The turn that
+changed this was the assistant finding headless Chrome with SwiftShader could
+render the stage to a PNG. That immediately showed a defect the earlier
+"checks" had missed: marks floating 2 to 3 cm off the face on some people. The
+first detector measured "mark hidden behind the head surface" (404 cells
+before the fix, 0 after) and passed while marks hovered in front of it; the
+cause was a probe footprint tall enough to reach the nose's lower slope, so
+the mouth was seated against the nose tip. Lesson: for "X pokes through Y"
+ask for the opposite failure too (X floats off Y) and for a render the agent
+actually looked at, not a green number; a metric for only one direction of a
+defect passes the other.
