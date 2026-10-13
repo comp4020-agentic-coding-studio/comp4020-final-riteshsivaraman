@@ -15,7 +15,13 @@
 // no purchase, 1,000/day after a one-time $10 (a lifetime threshold, not
 // a balance that's spent) -- checked live against its own docs and
 // models endpoint, not guessed. Plain fetch; no SDK dependency needed.
-const MODEL = process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free";
+// google/gemma-4-31b-it:free is routed through Google AI Studio behind the
+// scenes and hit a 429 from *that* shared pool (every OpenRouter free user
+// of it, not just our own 20/min) within seconds of real use. Liquid's LFM
+// isn't Google-backed, and its own listing describes it as built for
+// "agent workflows, data extraction" -- closer to what interpret() does
+// than a general chat model.
+const MODEL = process.env.OPENROUTER_MODEL || "liquid/lfm-2.5-2.6b:free";
 const key = process.env.OPENROUTER_API_KEY;
 
 export function aiAvailable(): boolean {
