@@ -650,7 +650,7 @@ export function buildCharacter(
     // the opening is an oval (a flat ellipse the mouthOpen bone stretches
     // taller as it opens: a tall "O" when shocked)
     const hole = new CircleGeometry(1, 16);
-    hole.scale(0.0053, 0.0044, 1);
+    hole.scale(0.0082, 0.003, 1);
     hole.rotateY(Math.PI);
     add(hole, mouthOpen, ink, hm(0, mouthY - 0.002, dashZ - 0.0004));
   } else {
