@@ -302,7 +302,8 @@ file, a diff, a commit, a drawing, a running page), open all of it for him
 before sending the list: `code <path>` in VS Code, `open <path>` otherwise,
 the diff written to a scratch file and opened, the dev server's URL if it
 needs a browser. Never hand him a path or hash to go and find. Say in the
-report what was opened.
+report what was opened. **Any URL or page opens in Safari, never Brave or the
+default browser:** `open -a Safari <url>`, not a bare `open <url>`.
 
 End every response with one or two lessons from the COMP4020 lecture notes
 relevant to whatever comes next — not necessarily the most recent lecture,
