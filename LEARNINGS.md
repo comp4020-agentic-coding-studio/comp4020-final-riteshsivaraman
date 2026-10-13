@@ -29,6 +29,27 @@ not however the tool defaults to doing it -- a reload-based check tests a
 different, stricter thing than what was asked for, and a failure there
 isn't evidence of anything.
 
+## A piped smoke test of an interactive CLI can fail for the test's own reason, not the tool's
+
+[`1ae8e01`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/1ae8e01)
+
+Building `scripts/sim/` (SCOPE D43), my first "does this work" check piped
+scripted answers (`printf "1\nAisha\n..." | tsx scripts/sim/index.ts`) and it
+hung or showed a shifted answer (a customer named "1"). That looked exactly
+like a bug in the sim's input handling, and almost got reported as one.
+Isolated with a three-question `readline/promises` test script: the first
+`question()` resolves correctly against piped input, but a second
+sequential call on the same non-TTY stream drops the line entirely — a
+Node quirk with bulk/non-interactive stdin, unrelated to anything in the
+sim's own code. Confirmed by driving the same binary through a real
+pseudo-terminal (Python's `pty` module) instead of a plain pipe: every
+answer landed correctly. Lesson: "verify for real, not reported" cuts both
+ways — a failing check is evidence of a real bug only if the check itself
+is a valid simulation of how the feature is actually used; for an
+interactive terminal program, a bulk pipe isn't a human typing, and a pty
+is the cheap way to tell which one you're looking at before writing up a
+false gap.
+
 ## A "this doesn't exist" gap claim needs a grep across the whole subsystem, not just the one file already open
 
 [`9e511ca`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9e511ca),
