@@ -74,9 +74,13 @@ function beardMargin(nx: number, ny: number, nz: number, style: BeardStyle): num
       m = Math.min(0.3 - ax, -0.64 - ny, 0.2 - nz > 0 ? 1 : -1);
       break;
     case "full": {
-      const jaw = -0.27 - ny;
-      const sideburn = Math.min(ax - 0.8, 0.12 - ny);
-      m = Math.max(jaw, sideburn);
+      // a band that follows the jaw: sideburns down the cheek edge (the inner
+      // edge slants in towards the chin) and the chin itself, leaving the
+      // cheeks and the mouth bare
+      const edge = 0.65 + 0.5 * ny;
+      const band = Math.min(ax - edge, 0.1 - ny);
+      const chin = -0.72 - ny;
+      m = Math.max(band, chin);
       break;
     }
     default: // stubble: the lower face, the same area as a full beard
