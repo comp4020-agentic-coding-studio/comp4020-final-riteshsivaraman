@@ -182,7 +182,10 @@ find every resource by reading this file, not by discovering it mid-task.
   D43: a throwaway terminal prototype of the loop/case/slot design, option B
   (cheap and disposable, not the shipped engine — `src/server/cases.ts`
   below is the real one). Play as customer or employee; NPCs get seeded
-  traits so their randomness is personality, not per-turn dice. Read before
+  traits so their randomness is personality, not per-turn dice. The
+  customer POV takes free text via an optional Gemini bridge (`ai.ts`,
+  key in `mise.local.toml`, same fallback-when-unavailable shape as D8);
+  the employee POV's NPC-customer side is still menu-only. Read before
   deciding whether/how to port its validated design into the real engine.
 - `src/server/cases.ts` — the case/case_facts data layer ADR 4's addendum
   describes: `openCase`, `handOffCase`, `setFact`, `factsOf`. Pure, like
