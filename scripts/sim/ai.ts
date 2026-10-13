@@ -23,6 +23,20 @@ export function aiAvailable(): boolean {
 
 const ai = aiAvailable() ? new GoogleGenAI({ apiKey: key }) : null;
 
+// This account's free tier allows 5 requests per minute (checked live,
+// 2026-10-14) -- a single conversation can easily need more than 5 calls,
+// so calls are paced to stay under that rather than bursting and hitting
+// 429s mid-conversation. 13s gives a one-second margin over the 12s a
+// strict 5/min would allow.
+const MIN_INTERVAL_MS = 13_000;
+let lastCallAt = 0;
+
+async function paceCall(): Promise<void> {
+  const wait = lastCallAt + MIN_INTERVAL_MS - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastCallAt = Date.now();
+}
+
 // Dan's voice, anchored to the actual transcripts (docs/customer-journeys.md)
 // rather than described in the abstract: short sentences, a real trade-off
 // instead of a feature list, admits what he doesn't know instead of
@@ -57,6 +71,9 @@ export async function interpret(args: {
   otherSlots?: Record<string, readonly string[]>;
 }): Promise<Interpretation | null> {
   if (!ai) return null;
+  const wait = lastCallAt + MIN_INTERVAL_MS - Date.now();
+  if (wait > 1000) console.error(`[ai] pacing to stay under the free tier's 5/min limit -- waiting ${Math.ceil(wait / 1000)}s`);
+  await paceCall();
   const otherSlotsBlock = args.otherSlots
     ? `\nOther things they might volunteer unprompted, each with its real options -- capture any of these only if they clearly said so, in "extra":\n${Object.entries(
         args.otherSlots,
