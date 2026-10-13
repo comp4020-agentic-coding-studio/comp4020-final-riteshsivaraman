@@ -168,9 +168,30 @@ async function chooseProduct(c: SimCase): Promise<Product> {
 
     if (result.type === "not_sure") {
       say("Dan", result.reply || "No worries, let's narrow it down. What's it mostly for, and roughly what's your budget?");
-      const need = await ask("> ");
-      const budgetGuess = await interpret({ question: "budget", options: BUDGET_OPTIONS, utterance: need, context: catalogueLine });
-      const budgetAnswer = budgetGuess?.type === "answer" && budgetGuess.value ? budgetGuess.value : BUDGET_OPTIONS[1];
+      // Bounded loop, not a single-shot grab: whatever comes next might
+      // genuinely be a question ("how much is the pro?"), not a budget at
+      // all -- answer it and keep listening instead of silently forcing a
+      // default budget onto an unrelated reply.
+      let budgetAnswer: string | undefined;
+      for (let tries = 0; tries < 4 && !budgetAnswer; tries++) {
+        const need = await ask("> ");
+        const budgetGuess = await interpret({ question: "roughly what's your budget?", options: BUDGET_OPTIONS, utterance: need, context: catalogueLine });
+        if (!budgetGuess) {
+          log("the AI call timed out or failed -- switching to the menu for this one");
+          budgetAnswer = await menu("Roughly what's your budget?", BUDGET_OPTIONS);
+          break;
+        }
+        if (budgetGuess.type === "answer" && budgetGuess.value && BUDGET_OPTIONS.includes(budgetGuess.value as (typeof BUDGET_OPTIONS)[number])) {
+          say("Dan", budgetGuess.reply || `Got it, ${budgetGuess.value}.`);
+          budgetAnswer = budgetGuess.value;
+        } else if (budgetGuess.type === "not_sure" && budgetGuess.value && BUDGET_OPTIONS.includes(budgetGuess.value as (typeof BUDGET_OPTIONS)[number])) {
+          say("Dan", budgetGuess.reply || `I'd aim around ${budgetGuess.value}.`);
+          budgetAnswer = budgetGuess.value;
+        } else {
+          say("Dan", budgetGuess.reply || `Roughly what's your budget -- ${BUDGET_OPTIONS.join(", ")}?`);
+        }
+      }
+      budgetAnswer ??= BUDGET_OPTIONS[1]; // only after real turns were spent trying, never a silent first-guess default
       setFact(c, "budget", budgetAnswer);
       const [a, b] = shortlistFor(budgetAnswer);
       say("Dan", `Two that'd suit: ${candidateLine(a)}, or ${candidateLine(b)}. ${compareLine(a, b)} Which sounds better -- or ask me anything first.`);
