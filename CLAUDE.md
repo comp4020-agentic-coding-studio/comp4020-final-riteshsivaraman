@@ -186,9 +186,14 @@ find every resource by reading this file, not by discovering it mid-task.
   customer POV takes free text via an optional OpenRouter bridge (`ai.ts`,
   key in `mise.local.toml` as `OPENROUTER_API_KEY`, same fallback-when-
   unavailable shape as D8 — switched from Gemini after its free tier
-  turned out to be 5 req/min and model availability shifted mid-session);
-  the employee POV's NPC-customer side is still menu-only. Read before
-  deciding whether/how to port its validated design into the real engine.
+  turned out to be 5 req/min and model availability shifted mid-session).
+  Slot-filling is a genuinely non-linear turn (`interpretTurn`, every open
+  slot on the table each turn, any order, several at once or none), not a
+  for-loop over a fixed question list — `SLOT_ORDER` is only the engine's
+  own fallback shape now. Needs a large free model (120B tested); a small
+  one narrated answers it never actually recorded. The employee POV's
+  NPC-customer side is still menu-only. Read before deciding whether/how
+  to port its validated design into the real engine.
 - `src/server/cases.ts` — the case/case_facts data layer ADR 4's addendum
   describes: `openCase`, `handOffCase`, `setFact`, `factsOf`. Pure, like
   `stock.ts`; not yet wired into `service.ts`'s claim/handOn/open flow, and

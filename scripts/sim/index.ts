@@ -4,7 +4,7 @@
 // real engine. Not wired to the real server, SQLite, or the 3D client --
 // run it with `pnpm sim`.
 import type { Product } from "../../src/shared/catalogue.ts";
-import { aiAvailable, interpret } from "./ai.ts";
+import { aiAvailable, interpret, interpretTurn, type OpenSlot } from "./ai.ts";
 import { priceOf, SIM_PRODUCTS } from "./catalogue.ts";
 import { closeCase, handOff, openCase, setFact, type SimCase } from "./case.ts";
 import { ask, closeIo, log, menu, say } from "./io.ts";
@@ -54,11 +54,7 @@ async function playCustomer(rng: Rng, mira: Traits): Promise<void> {
   say("Dan (phones)", `Hi ${name}, I'm Dan. So, what are you after?`);
 
   const product = await chooseProduct(c);
-
-  let slot: SlotKey | null;
-  while ((slot = nextSlot(c.facts))) {
-    await askSlot(c, slot, product);
-  }
+  await fillRemainingSlots(c, product);
 
   const price = priceOf(product, c.facts.storage);
   say("Dan", `Good choices. That's the ${product.name}, ${c.facts.colour}, ${c.facts.storage} -- $${price}. Tap to pay?`);
@@ -80,81 +76,62 @@ function contextLine(facts: Record<string, string>): string {
   return known || "nothing yet";
 }
 
-// Every other not-yet-filled slot, with its real options -- what a
-// customer who volunteers more than was asked (T7) can have captured
-// alongside the question actually asked.
-function otherOpenSlots(c: SimCase, product: Product, exclude: SlotKey): Record<string, readonly string[]> {
-  const out: Record<string, readonly string[]> = {};
-  for (const k of SLOT_ORDER) if (k !== exclude && c.facts[k] === undefined) out[k] = optionsFor(k, product);
-  return out;
+// Every not-yet-filled slot, with its real question and options -- the
+// whole table a single turn can draw from. Rebuilt every turn, since
+// what's open shrinks as things get settled.
+function openSlotList(c: SimCase, product: Product): OpenSlot[] {
+  return SLOT_ORDER.filter((k) => c.facts[k] === undefined).map((k) => ({ key: k, question: questionFor(k, c.facts), options: optionsFor(k, product) }));
 }
 
-// Only keeps an extra that's a real option for its own slot -- the
-// interpreter's output is never trusted into state unchecked.
-function applyValidExtras(c: SimCase, product: Product, extra: Record<string, string> | undefined): void {
-  if (!extra) return;
-  for (const [key, value] of Object.entries(extra)) {
-    if ((SLOT_ORDER as string[]).includes(key) && c.facts[key] === undefined && optionsFor(key as SlotKey, product).includes(value)) {
-      setFact(c, key as SlotKey, value);
-    }
-  }
-}
-
-// Asks one slot. With no AI key, this is the plain menu it always was
-// (SCOPE D8's fallback). With one, you can type freely: answer, say "not
-// sure" and get a real default explained rather than forced, ask Dan
-// something back and have the same question put to you again afterward,
-// or volunteer other facts in the same breath and have them land too.
-async function askSlot(c: SimCase, slot: SlotKey, product: Product): Promise<void> {
-  const question = questionFor(slot, c.facts);
-  const options = optionsFor(slot, product);
+// The actual fix for "this isn't a non-linear conversation": not a
+// for-loop over SLOT_ORDER asking one fixed question at a time, but one
+// shared turn that puts every still-open item on the table at once. A
+// single utterance can answer several of them, none of them, revisit
+// nothing in particular, or just ask something back -- what happens next
+// comes out of interpretTurn's own judgement, not a script walking a
+// list. SLOT_ORDER still decides what the engine itself would ask next if
+// nothing else were driving the conversation, but the model can route
+// around it freely; it's a fallback shape, not the conversation's shape.
+async function fillRemainingSlots(c: SimCase, product: Product): Promise<void> {
   if (!aiAvailable()) {
-    setFact(c, slot, await menu(question, options));
+    let slot: SlotKey | null;
+    while ((slot = nextSlot(c.facts))) setFact(c, slot, await menu(questionFor(slot, c.facts), optionsFor(slot, product)));
     return;
   }
 
-  say("Dan", `${question} (type freely, or say you're not sure)`);
-  // A bounded number of turns, not a one-shot follow-up: "not sure" and
-  // "question" both genuinely continue the same conversation -- a weak
-  // free model asking a confused "?" back shouldn't get silently defaulted
-  // past, but it also can't loop forever on a model that keeps missing.
-  for (let tries = 0; tries < 4; tries++) {
+  const first = openSlotList(c, product)[0];
+  say("Dan", `${first.question} And feel free to bring up anything else, ask me something, or say you're not sure -- in any order.`);
+
+  let staleTurns = 0;
+  while (nextSlot(c.facts)) {
     const utterance = await ask("> ");
-    const result = await interpret({ question, options, utterance, context: contextLine(c.facts), otherSlots: otherOpenSlots(c, product, slot) });
+    const result = await interpretTurn({ openSlots: openSlotList(c, product), context: contextLine(c.facts), utterance });
     if (!result) {
-      log("the AI call timed out or failed -- switching to the menu for this one");
-      setFact(c, slot, await menu(question, options)); // AI failed mid-turn -- clean fallback, not a crash
-      return;
-    }
-    applyValidExtras(c, product, result.extra);
-
-    if (result.type === "answer" && result.value && options.includes(result.value)) {
-      say("Dan", result.reply || `Got it, ${result.value}.`); // a real conversation acknowledges what you said
-      setFact(c, slot, result.value);
+      log("the AI call timed out or failed -- switching to the menu for the rest");
+      let slot: SlotKey | null;
+      while ((slot = nextSlot(c.facts))) setFact(c, slot, await menu(questionFor(slot, c.facts), optionsFor(slot, product)));
       return;
     }
 
-    if (result.type === "not_sure") {
-      const recommended = result.value && options.includes(result.value) ? result.value : options[Math.floor(options.length / 2)];
-      if (tries === 3) {
-        // last turn available -- take the recommendation rather than loop
-        // past the cap with nothing decided
-        say("Dan", result.reply || `Let's go with ${recommended}, then.`);
-        setFact(c, slot, recommended);
-        return;
+    let settled = 0;
+    for (const [key, value] of Object.entries(result.answers)) {
+      if ((SLOT_ORDER as string[]).includes(key) && c.facts[key] === undefined && optionsFor(key as SlotKey, product).includes(value)) {
+        setFact(c, key as SlotKey, value);
+        settled++;
       }
-      say("Dan", result.reply || `No worries -- I'd go with ${recommended}. Sound alright, or did you want something else?`);
-      continue; // genuinely listen to whatever they say next, same as any other turn
     }
+    say("Dan", result.reply || "Got it.");
 
-    if (result.type === "question" || result.type === "unclear") {
-      say("Dan", result.reply || `Sorry, could you say that a different way? It's one of: ${options.join(", ")}.`);
-      continue;
+    // A weak free model can keep missing every open item for several
+    // turns in a row -- fall back to asking the single most pressing one
+    // plainly rather than loop on nothing settling, ever.
+    staleTurns = settled > 0 ? 0 : staleTurns + 1;
+    if (staleTurns >= 4) {
+      const slot = nextSlot(c.facts);
+      if (slot) setFact(c, slot, await menu(questionFor(slot, c.facts), optionsFor(slot, product)));
+      staleTurns = 0;
     }
-
-    say("Dan", `Could you pick one of: ${options.join(", ")}?`);
   }
-  setFact(c, slot, await menu(question, options)); // the model kept missing -- stop burning turns, just ask plainly
 }
 
 // The actual fix for "you don't even get asked if you had a particular
