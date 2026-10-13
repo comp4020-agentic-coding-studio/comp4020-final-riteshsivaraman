@@ -9,10 +9,12 @@
 // official SDK) -- see the commit that introduces this file.
 import { GoogleGenAI } from "@google/genai";
 
-// "gemini-flash-latest" was hitting 503s (model overloaded) in practice;
-// 2.5 flash is a stable, confirmed-free, confirmed-available model instead
-// (checked live against this account's own models.list(), not guessed).
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+// "gemini-flash-latest" was hitting 503s (model overloaded); 2.5-era
+// models then 404'd with "no longer available to new users" -- `list()`
+// still enumerates them, but this account's key can't actually call them.
+// Google's own error named the model to use instead; taking that at face
+// value rather than guessing further.
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const key = process.env.GEMINI_API_KEY;
 
 export function aiAvailable(): boolean {
