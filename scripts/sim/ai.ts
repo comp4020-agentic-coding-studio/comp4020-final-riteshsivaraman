@@ -1,41 +1,31 @@
 // Thin LLM bridge for the terminal sim's human-played side, following
-// SCOPE D8's already-decided shape for the real game: free-tier Gemini
-// key, read from the environment, with a scripted fallback whenever it's
+// SCOPE D8's already-decided shape for the real game: a free-tier key,
+// read from the environment, with a scripted fallback whenever it's
 // missing or fails. The model only ever classifies and narrates free
 // text -- it never decides state itself. setFact/handOff/stock stay in
 // the deterministic engine, the same boundary D8 draws for the shipped
 // app ("AI output is flavour only. It can never change slots... or any
-// persisted state"). Dependency added for this (`@google/genai`, the
-// official SDK) -- see the commit that introduces this file.
-import { GoogleGenAI } from "@google/genai";
-
-// "gemini-flash-latest" was hitting 503s (model overloaded); 2.5-era
-// models then 404'd with "no longer available to new users" -- `list()`
-// still enumerates them, but this account's key can't actually call them.
-// Google's own error named the model to use instead; taking that at face
-// value rather than guessing further.
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-const key = process.env.GEMINI_API_KEY;
+// persisted state").
+//
+// Switched from Gemini to OpenRouter (2026-10-14, SCOPE D43 follow-up):
+// Google's free tier turned out to be 5 requests/minute and model
+// availability shifted mid-session (2.5-era models 404'd as "no longer
+// available to new users"). OpenRouter's `:free`-suffixed models are
+// genuinely free with no billing link at all -- 20 req/min, 50/day with
+// no purchase, 1,000/day after a one-time $10 (a lifetime threshold, not
+// a balance that's spent) -- checked live against its own docs and
+// models endpoint, not guessed. Plain fetch; no SDK dependency needed.
+const MODEL = process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free";
+const key = process.env.OPENROUTER_API_KEY;
 
 export function aiAvailable(): boolean {
   return Boolean(key) && key !== "paste-your-key-here";
 }
 
-const ai = aiAvailable() ? new GoogleGenAI({ apiKey: key }) : null;
-
-// This account's free tier allows 5 requests per minute (checked live,
-// 2026-10-14) -- a single conversation can easily need more than 5 calls,
-// so calls are paced to stay under that rather than bursting and hitting
-// 429s mid-conversation. 13s gives a one-second margin over the 12s a
-// strict 5/min would allow.
-const MIN_INTERVAL_MS = 13_000;
+// 20 req/min on the free tier; 3.5s gives a half-second margin over the
+// strict 3s that would be.
+const MIN_INTERVAL_MS = 3_500;
 let lastCallAt = 0;
-
-async function paceCall(): Promise<void> {
-  const wait = lastCallAt + MIN_INTERVAL_MS - Date.now();
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastCallAt = Date.now();
-}
 
 // Dan's voice, anchored to the actual transcripts (docs/customer-journeys.md)
 // rather than described in the abstract: short sentences, a real trade-off
@@ -70,10 +60,13 @@ export async function interpret(args: {
   context: string;
   otherSlots?: Record<string, readonly string[]>;
 }): Promise<Interpretation | null> {
-  if (!ai) return null;
+  if (!aiAvailable()) return null;
+
   const wait = lastCallAt + MIN_INTERVAL_MS - Date.now();
-  if (wait > 1000) console.error(`[ai] pacing to stay under the free tier's 5/min limit -- waiting ${Math.ceil(wait / 1000)}s`);
-  await paceCall();
+  if (wait > 500) console.error(`[ai] pacing to stay under the free tier's rate limit -- waiting ${(wait / 1000).toFixed(1)}s`);
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastCallAt = Date.now();
+
   const otherSlotsBlock = args.otherSlots
     ? `\nOther things they might volunteer unprompted, each with its real options -- capture any of these only if they clearly said so, in "extra":\n${Object.entries(
         args.otherSlots,
@@ -97,17 +90,20 @@ Classify as exactly one of:
 Reply with ONLY compact JSON, no markdown fence:
 {"type": "...", "value": "<exact option text for this question, only if type is answer>", "reply": "<one short in-character Dan sentence, only if type is not_sure, question, or unclear>", "extra": {"<slot key>": "<its exact option text>", ...}}
 Omit "extra" entirely if nothing else was volunteered.`;
+
   try {
-    // A stalled connection (proxy, flaky network) must still fall back
-    // within a few seconds, not hang until someone Ctrl-Cs the game --
-    // the SDK's own timeout plus a manual backstop race, belt and braces.
-    // Google's API rejects anything under 10s outright (INVALID_ARGUMENT,
-    // found live: "Manually set deadline 8s is too short"), so 10s is the
-    // floor, not a choice.
-    const call = ai.models.generateContent({ model: MODEL, contents: prompt, config: { httpOptions: { timeout: 10_000 } } });
-    const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("ai timeout")), 11_000));
-    const res = await Promise.race([call, timeout]);
-    const text = (res.text ?? "").trim().replace(/^```json\s*|```$/g, "");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: MODEL, messages: [{ role: "user", content: prompt }] }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const text = (data.choices?.[0]?.message?.content ?? "").trim().replace(/^```json\s*|```$/g, "");
     const parsed = JSON.parse(text) as Interpretation;
     if (!["answer", "not_sure", "question", "unclear"].includes(parsed.type)) return null;
     return parsed;

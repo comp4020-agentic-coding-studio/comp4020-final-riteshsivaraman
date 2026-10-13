@@ -183,8 +183,10 @@ find every resource by reading this file, not by discovering it mid-task.
   (cheap and disposable, not the shipped engine — `src/server/cases.ts`
   below is the real one). Play as customer or employee; NPCs get seeded
   traits so their randomness is personality, not per-turn dice. The
-  customer POV takes free text via an optional Gemini bridge (`ai.ts`,
-  key in `mise.local.toml`, same fallback-when-unavailable shape as D8);
+  customer POV takes free text via an optional OpenRouter bridge (`ai.ts`,
+  key in `mise.local.toml` as `OPENROUTER_API_KEY`, same fallback-when-
+  unavailable shape as D8 — switched from Gemini after its free tier
+  turned out to be 5 req/min and model availability shifted mid-session);
   the employee POV's NPC-customer side is still menu-only. Read before
   deciding whether/how to port its validated design into the real engine.
 - `src/server/cases.ts` — the case/case_facts data layer ADR 4's addendum
