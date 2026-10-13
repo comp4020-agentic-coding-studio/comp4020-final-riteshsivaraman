@@ -9,6 +9,10 @@ import {
   Group,
   IcosahedronGeometry,
   Matrix4,
+  Mesh,
+  MeshBasicMaterial,
+  DoubleSide,
+  Raycaster,
   MeshStandardMaterial,
   Quaternion,
   NearestFilter,
@@ -95,11 +99,11 @@ export interface Mood {
 // of the mouth and the teeth show.
 export const EXPRESSIONS: Array<Mood & { name: string }> = [
   { name: "neutral", browY: 0.003, browTilt: 0, lid: -0.3, curve: 0.45, open: 0, width: 1.1 },
-  { name: "smile", browY: 0.006, browTilt: 0, lid: -0.1, curve: 0.95, open: 0.22, width: 1.4 },
-  { name: "curious", browY: 0.008, browTilt: 0.08, lid: -0.35, curve: 0.25, open: 0, width: 0.95 },
-  { name: "focused", browY: -0.002, browTilt: -0.25, lid: 0.15, curve: 0.1, open: 0, width: 0.9 },
-  { name: "surprised", browY: 0.012, browTilt: 0.05, lid: -0.6, curve: 0, open: 1, width: 0.7 },
-  { name: "worried", browY: 0.004, browTilt: 0.4, lid: -0.05, curve: -0.4, open: 0, width: 0.95 },
+  { name: "smile", browY: 0.012, browTilt: 0.12, lid: 0.0, curve: 1.6, open: 0.5, width: 1.7 },
+  { name: "curious", browY: 0.016, browTilt: 0.3, lid: -0.5, curve: 0.15, open: 0, width: 0.85 },
+  { name: "focused", browY: -0.006, browTilt: -0.5, lid: 0.3, curve: -0.1, open: 0, width: 0.8 },
+  { name: "surprised", browY: 0.024, browTilt: 0.15, lid: -0.9, curve: 0, open: 1.2, width: 0.6 },
+  { name: "worried", browY: 0.008, browTilt: 0.75, lid: 0.05, curve: -1.0, open: 0, width: 0.9 },
 ];
 
 export interface BoneSet {
@@ -454,6 +458,23 @@ export function buildCharacter(
     toy ? 3 : 4,
     toy,
   );
+  // Where the head's real, faceted surface is in front of (x, y), head-local.
+  // The toy face's marks sit on this instead of a guessed depth, so a facet
+  // can't poke through them. Over a mark's extent we take the most forward
+  // facet, then sit the mark a hair proud of it.
+  const probe = new Mesh(headGeo, new MeshBasicMaterial({ side: DoubleSide }));
+  const ray = new Raycaster();
+  const rayFrom = new Vector3();
+  const rayDir = new Vector3(0, 0, 1);
+  const surfaceZ = (x: number, y: number, hw = 0, hh = 0): number => {
+    let z = Infinity;
+    for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
+      ray.set(rayFrom.set(x + dx * hw, y + dy * hh, -1), rayDir);
+      const hit = ray.intersectObject(probe, false)[0];
+      if (hit) z = Math.min(z, hit.point.z);
+    }
+    return Number.isFinite(z) ? z : EYE.z;
+  };
   add(headGeo, head, null, hm());
   for (const s of SIDES) {
     add(new IcosahedronGeometry(0.026, 1), head, skin, hm(s * 0.081 * fw, -0.012 * Fy, 0.006, sc(0.4, 1, 0.75)));
@@ -515,12 +536,16 @@ export function buildCharacter(
       lashTube = 0.0012;
       oval(0.0072 * look.eyeSize, 0.0098 * look.eyeSize, ink);
       spot(0.0022, s * -0.0022, 0.0035, 0.0008);
-    } else if (eyeStyle === "toy") {
-      // plain black ovals: no whites, no highlight, nothing to stare back
-      oval(0.0082 * look.eyeSize, 0.0118 * look.eyeSize, ink);
-    } else if (eyeStyle === "peg") {
-      // two small round dots
-      oval(0.0066 * look.eyeSize, 0.0066 * look.eyeSize, ink);
+    } else if (toy) {
+      // plain black ovals, or small dots for peg: no whites, no highlight,
+      // nothing to stare back. They sit on the head surface and ride the lids
+      // bone, which scales them shut for a blink (see poseCharacter).
+      const w = (eyeStyle === "toy" ? 0.0082 : 0.0066) * look.eyeSize;
+      const h = (eyeStyle === "toy" ? 0.0118 : 0.0066) * look.eyeSize;
+      const g = new CircleGeometry(1, 14);
+      g.scale(w, h, 1);
+      g.rotateY(Math.PI);
+      add(g, lids, ink, hm(ex, eyeY, surfaceZ(ex, eyeY, w, h) - 0.0007));
     } else if (eyeStyle === "bean") {
       // tall dark ovals, a classic cartoon eye
       lashTube = 0.0012;
@@ -582,10 +607,9 @@ export function buildCharacter(
 
   // lids: a cap over each eye and a dark lash line along its rim
   const rim = 1.08 * (eyeStyle === "round" ? eyeR * 1.3 : eyeR);
-  for (const s of SIDES) {
+  for (const s of toy ? [] : SIDES) {
     const ex = s * eyeX;
     add(new SphereGeometry(rim, 12, 6, 0, Math.PI * 2, 0, 0.95), lids, skin, hm(ex, eyeY, eyeZ));
-    if (toy) continue;
     const lash = new TorusGeometry(rim * Math.sin(0.95), lashTube, 3, 12);
     lash.rotateX(Math.PI / 2);
     add(lash, lids, new Color("#1c1512"), hm(ex, eyeY + rim * Math.cos(0.95), eyeZ));
@@ -597,7 +621,7 @@ export function buildCharacter(
     const s = SIDES[i];
     if (toy) {
       // a straight dark dash, tilted and lifted by the brow bone like any other
-      add(new BoxGeometry(0.03 * look.eyeSize, 0.0052, 0.004), browBones[i], new Color("#241c19"), hm(s * eyeX, browY, browZ + 0.006));
+      add(new BoxGeometry(0.03 * look.eyeSize, 0.0052, 0.004), browBones[i], new Color("#241c19"), hm(s * eyeX, browY, surfaceZ(s * eyeX, browY, 0.015, 0.006) - 0.0022));
       continue;
     }
     add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, browY, browZ));
@@ -616,8 +640,11 @@ export function buildCharacter(
     const dash = new TorusGeometry(0.05, 0.0028, 3, 8, 0.7);
     dash.rotateZ(-Math.PI / 2 - 0.35);
     const ink = new Color("#241c19");
-    add(dash, mouth, ink, hm(0, mouthY + 0.05, mouthZ + 0.005));
-    add(new BoxGeometry(0.02, 0.006, 0.004), mouthOpen, ink, hm(0, mouthY - 0.002, mouthZ + 0.004));
+    // the dash bends by scaling about the mouth bone, so its ends can lift
+    // forward as it curves: sit it on the most forward facet along its width
+    const dashZ = surfaceZ(0, mouthY, 0.025, 0.006) - 0.0016;
+    add(dash, mouth, ink, hm(0, mouthY + 0.05, dashZ));
+    add(new BoxGeometry(0.02, 0.006, 0.004), mouthOpen, ink, hm(0, mouthY - 0.002, dashZ - 0.0004));
   } else {
     arc(0.024, 0.0032, "#a8514f", 0.0014);
     arc(0.026, 0.0046, "#c46a66", -0.0022);
@@ -906,7 +933,13 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   // face: lids (with a blink and the eye style's resting droop), brows (lift
   // and tilt, inner ends up is positive), mouth as an arc plus an opening;
   // a behaviour can add to the mood (a laugh opens the mouth and squints)
-  b.lids.rotation.x = -Math.min(1.35, m.lid + st.lid + c.lidBias + blink);
+  const lidAmount = m.lid + st.lid + c.lidBias + blink;
+  if (c.eyes === "toy" || c.eyes === "peg") {
+    // flat eyes shut by squashing: wide when surprised, a slit when squinting
+    b.lids.scale.y = Math.min(1.3, Math.max(0.08, 1 - (lidAmount + 0.3) * 0.9));
+  } else {
+    b.lids.rotation.x = -Math.min(1.35, lidAmount);
+  }
   for (let i = 0; i < 2; i++) {
     const side = i === 0 ? -1 : 1;
     const base = (b.brow[i].userData.y ??= b.brow[i].position.y) as number;

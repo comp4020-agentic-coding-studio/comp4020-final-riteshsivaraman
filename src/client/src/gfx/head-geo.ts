@@ -59,21 +59,30 @@ function hairMargin(nx: number, ny: number, nz: number, style: HairStyle): numbe
 // How far a point is inside the facial hair, positive inside, on the unit
 // sphere (face at -z). The mouth sits at about ny -0.58, the nose tip at -0.3.
 function beardMargin(nx: number, ny: number, nz: number, style: BeardStyle): number {
-  if (style === "none" || nz > 0.3) return -1;
+  if (style === "none") return -1;
+  // a beard grows on the face and jaw and stops at the ears (nz about 0.05):
+  // it never wraps round the back of the head
+  const ahead = (0.05 - nz) * 4;
+  if (ahead < 0) return -1;
   const ax = Math.abs(nx);
+  let m: number;
   switch (style) {
     case "moustache":
-      return Math.min(0.42 - ax, ny + 0.57, -0.4 - ny);
+      m = Math.min(0.42 - ax, ny + 0.57, -0.4 - ny);
+      break;
     case "goatee":
-      return Math.min(0.3 - ax, -0.64 - ny, 0.2 - nz > 0 ? 1 : -1);
+      m = Math.min(0.3 - ax, -0.64 - ny, 0.2 - nz > 0 ? 1 : -1);
+      break;
     case "full": {
       const jaw = -0.27 - ny;
       const sideburn = Math.min(ax - 0.8, 0.12 - ny);
-      return Math.max(jaw, sideburn);
+      m = Math.max(jaw, sideburn);
+      break;
     }
     default: // stubble: the lower face, the same area as a full beard
-      return Math.max(-0.27 - ny, Math.min(ax - 0.8, 0.12 - ny));
+      m = Math.max(-0.27 - ny, Math.min(ax - 0.8, 0.12 - ny));
   }
+  return Math.min(m, ahead);
 }
 
 function features(nx: number, ny: number, nz: number, s: HeadShape, plain: boolean): number {
