@@ -86,7 +86,11 @@ Omit "extra" entirely if nothing else was volunteered.`;
     const parsed = JSON.parse(text) as Interpretation;
     if (!["answer", "not_sure", "question", "unclear"].includes(parsed.type)) return null;
     return parsed;
-  } catch {
-    return null; // quota, network, timeout, or bad JSON -- caller falls back to the menu
+  } catch (err) {
+    // Printed to stderr, not the game's own output, and never the key
+    // itself -- just enough to tell quota/auth/model-name apart from an
+    // actual network stall, instead of swallowing every failure the same way.
+    console.error("[ai] call failed:", err instanceof Error ? err.message : err);
+    return null; // caller falls back to the menu
   }
 }
