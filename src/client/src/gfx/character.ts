@@ -645,9 +645,14 @@ export function buildCharacter(
     const ink = new Color("#241c19");
     // the dash bends by scaling about the mouth bone, so its ends can lift
     // forward as it curves: sit it on the most forward facet along its width
-    const dashZ = surfaceZ(0, mouthY, 0.025, 0.006) - 0.0016;
+    const dashZ = surfaceZ(0, mouthY, 0.025, 0.014) - 0.0016;
     add(dash, mouth, ink, hm(0, mouthY + 0.05, dashZ));
-    add(new BoxGeometry(0.02, 0.006, 0.004), mouthOpen, ink, hm(0, mouthY - 0.002, dashZ - 0.0004));
+    // the opening is an oval (a flat ellipse the mouthOpen bone stretches
+    // taller as it opens: a tall "O" when shocked)
+    const hole = new CircleGeometry(1, 16);
+    hole.scale(0.0053, 0.0044, 1);
+    hole.rotateY(Math.PI);
+    add(hole, mouthOpen, ink, hm(0, mouthY - 0.002, dashZ - 0.0004));
   } else {
     arc(0.024, 0.0032, "#a8514f", 0.0014);
     arc(0.026, 0.0046, "#c46a66", -0.0022);
@@ -953,6 +958,8 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   const open = Math.min(1.2, m.open + st.open);
   const bend = Math.abs(curve * 1.6) < 0.08 ? 0.08 : curve * 1.6;
   const mw = c.look.mouthWidth * m.width;
-  b.mouth.scale.set(mw * (1 - open * 0.5), bend * (1 - open * 0.6), 1);
+  // a toy mouth is one dash, which gives way to the oval as it opens wide
+  const dashFade = c.eyes === "toy" || c.eyes === "peg" ? 1 - Math.min(1, Math.max(0, (open - 0.5) * 2)) : 1;
+  b.mouth.scale.set(Math.max(0.0001, mw * (1 - open * 0.5) * dashFade), bend * (1 - open * 0.6), 1);
   b.mouthOpen.scale.set(0.5 + open * 1.0, 0.1 + open * 2.4, 1);
 }
