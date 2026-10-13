@@ -322,6 +322,9 @@ export function buildCharacter(
   const waistHalf = Math.min(shoulderHalf, hipHalf) * 0.86;
   const legX = hipHalf * 0.5;
   const shoulderX = shoulderHalf * 0.9;
+  // a thigh's outer edge must stay inside the pelvis (hipHalf * 1.02 at this
+  // height) or it pokes out through the trousers and under the shirt hem
+  const thighTop = Math.min(0.093, Math.max(0.055, hipHalf * 0.99 - legX));
   const upLen = 0.27 * style.limb * r;
   const foreLen = 0.235 * style.limb * r;
 
@@ -419,8 +422,8 @@ export function buildCharacter(
     add(
       loft(
         [
-          { y: Y(0.9), wx: 0.093, wz: 0.09 },
-          { y: Y(0.7), wx: 0.082, wz: 0.08 },
+          { y: Y(0.9), wx: thighTop, wz: 0.09 },
+          { y: Y(0.7), wx: Math.min(0.082, thighTop * 0.92), wz: 0.08 },
           { y: Y(0.49), wx: 0.058, wz: 0.057 },
         ],
         8,
