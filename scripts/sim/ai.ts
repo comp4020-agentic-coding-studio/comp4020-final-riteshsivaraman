@@ -49,8 +49,8 @@ Broad, hedged trade-off framing (e.g. "the higher tier usually gets the newer ca
 
 export interface Interpretation {
   type: "answer" | "not_sure" | "question" | "unclear";
-  value?: string; // one of the offered options, verbatim, only when type is "answer"
-  reply?: string; // a short in-character line, when type is "not_sure" | "question" | "unclear"
+  value?: string; // the option this answers, OR -- for "not_sure" -- Dan's own recommended option
+  reply?: string; // a short in-character line. Always include one, even for "answer" -- a real conversation acknowledges what was said instead of silently moving on
   extra?: Record<string, string>; // other, not-yet-asked facts volunteered unprompted (T7: stating everything upfront)
 }
 
@@ -88,13 +88,17 @@ Context -- facts already known to be true about this case; never invent beyond t
 The customer just said: "${args.utterance}"
 
 Classify as exactly one of:
-- "answer": they answered this question (match loosely -- "the cheaper one" means the lower-priced option)
-- "not_sure": they don't know, or want help deciding
-- "question": they're asking something back instead of answering
-- "unclear": none of the above fit
+- "answer": they answered this question. Match generously and by intent, not just keywords -- "set it up" for a now-vs-home question means "now, while I'm here"; "as much as possible" for storage means the largest option listed. Always fill "value" with the exact option text, and "reply" with a short acknowledgment of what they said before moving on (e.g. "Got it, the 2TB." or a one-line reason it's a good fit) -- never leave a correct answer silently unacknowledged.
+- "not_sure": they don't know, or want help deciding. Still fill "value" with the single option you'd actually recommend given the context, and "reply" with why, in one short sentence.
+- "question": they're asking something back instead of answering (e.g. "what do you have?" for colour means they want the option list, not a guess at one of them) -- "reply" answers it using only real options/context above, never a guess at which one they meant.
+- "unclear": genuinely none of the above fit -- "reply" asks them to restate it.
+
+Examples:
+- Question "Any colour you had in mind?", said "what do you have?" -> {"type":"question","reply":"Burgundy, Glacier, Silver, or Black -- which sounds good?"}
+- Question "Want me to set it up now, or at home?", said "set it up" -> {"type":"answer","value":"now, while I'm here","reply":"Sure, I'll get that going for you now."}
 
 Reply with ONLY compact JSON, no markdown fence:
-{"type": "...", "value": "<exact option text for this question, only if type is answer>", "reply": "<one short in-character Dan sentence, only if type is not_sure, question, or unclear>", "extra": {"<slot key>": "<its exact option text>", ...}}
+{"type": "...", "value": "<exact option text, for answer or not_sure>", "reply": "<one short in-character Dan sentence -- include this for every type>", "extra": {"<slot key>": "<its exact option text>", ...}}
 Omit "extra" entirely if nothing else was volunteered.`;
 
   try {

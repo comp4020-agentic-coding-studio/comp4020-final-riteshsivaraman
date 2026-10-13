@@ -114,7 +114,11 @@ async function askSlot(c: SimCase, slot: SlotKey, product: Product): Promise<voi
   }
 
   say("Dan", `${question} (type freely, or say you're not sure)`);
-  for (;;) {
+  // A bounded number of turns, not a one-shot follow-up: "not sure" and
+  // "question" both genuinely continue the same conversation -- a weak
+  // free model asking a confused "?" back shouldn't get silently defaulted
+  // past, but it also can't loop forever on a model that keeps missing.
+  for (let tries = 0; tries < 4; tries++) {
     const utterance = await ask("> ");
     const result = await interpret({ question, options, utterance, context: contextLine(c.facts), otherSlots: otherOpenSlots(c, product, slot) });
     if (!result) {
@@ -125,27 +129,32 @@ async function askSlot(c: SimCase, slot: SlotKey, product: Product): Promise<voi
     applyValidExtras(c, product, result.extra);
 
     if (result.type === "answer" && result.value && options.includes(result.value)) {
+      say("Dan", result.reply || `Got it, ${result.value}.`); // a real conversation acknowledges what you said
       setFact(c, slot, result.value);
       return;
     }
 
     if (result.type === "not_sure") {
-      const suggestion = options[Math.floor(options.length / 2)];
-      say("Dan", result.reply || `No worries -- most people go with ${suggestion}. Sound alright, or did you want something else?`);
-      const follow = await ask("> ");
-      const second = await interpret({ question, options, utterance: follow, context: contextLine(c.facts) });
-      applyValidExtras(c, product, second?.extra);
-      setFact(c, slot, second?.type === "answer" && second.value && options.includes(second.value) ? second.value : suggestion);
-      return;
+      const recommended = result.value && options.includes(result.value) ? result.value : options[Math.floor(options.length / 2)];
+      if (tries === 3) {
+        // last turn available -- take the recommendation rather than loop
+        // past the cap with nothing decided
+        say("Dan", result.reply || `Let's go with ${recommended}, then.`);
+        setFact(c, slot, recommended);
+        return;
+      }
+      say("Dan", result.reply || `No worries -- I'd go with ${recommended}. Sound alright, or did you want something else?`);
+      continue; // genuinely listen to whatever they say next, same as any other turn
     }
 
     if (result.type === "question" || result.type === "unclear") {
-      say("Dan", result.reply || "Sorry, could you say that a different way?");
-      continue; // same question stands; nothing's been answered yet
+      say("Dan", result.reply || `Sorry, could you say that a different way? It's one of: ${options.join(", ")}.`);
+      continue;
     }
 
-    say("Dan", `I don't think I've got that -- it's one of: ${options.join(", ")}.`);
+    say("Dan", `Could you pick one of: ${options.join(", ")}?`);
   }
+  setFact(c, slot, await menu(question, options)); // the model kept missing -- stop burning turns, just ask plainly
 }
 
 // The actual fix for "you don't even get asked if you had a particular
@@ -174,7 +183,7 @@ async function chooseProduct(c: SimCase): Promise<Product> {
     if (result.type === "answer" && result.value) {
       const match = SIM_PRODUCTS.find((p) => p.name === result.value);
       if (match) {
-        say("Dan", `Good choice, the ${match.name}.`);
+        say("Dan", result.reply || `Good choice, the ${match.name}.`);
         setFact(c, "use_case", "already decided"); // T7: already knowing what you want skips "what's it for"
         return match;
       }
@@ -188,7 +197,7 @@ async function chooseProduct(c: SimCase): Promise<Product> {
       setFact(c, "budget", budgetAnswer);
       const [a, b] = shortlistFor(budgetAnswer);
       say("Dan", `Two that'd suit: ${candidateLine(a)}, or ${candidateLine(b)}. ${compareLine(a, b)} Which sounds better -- or ask me anything first.`);
-      for (;;) {
+      for (let tries = 0; tries < 4; tries++) {
         const follow = await ask("> ");
         const pick = await interpret({ question: "which model", options: [a.name, b.name], utterance: follow, context: compareLine(a, b) });
         if (!pick) {
@@ -198,12 +207,14 @@ async function chooseProduct(c: SimCase): Promise<Product> {
         }
         if (pick.type === "answer" && pick.value === a.name) return a;
         if (pick.type === "answer" && pick.value === b.name) return b;
-        if (pick.type === "question" || pick.type === "unclear") {
+        if (pick.type === "question" || pick.type === "unclear" || pick.type === "not_sure") {
           say("Dan", pick.reply || compareLine(a, b));
           continue;
         }
         say("Dan", `Shall we go with the ${a.name}, or the ${b.name}?`);
       }
+      const choice = await menu(`Shall we go with the ${a.name}, or the ${b.name}?`, [a.name, b.name]);
+      return choice === a.name ? a : b;
     }
 
     if (result.type === "question" || result.type === "unclear") {
