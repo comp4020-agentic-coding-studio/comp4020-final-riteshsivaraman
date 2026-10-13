@@ -178,6 +178,12 @@ find every resource by reading this file, not by discovering it mid-task.
   Supersedes ADR 3's "character only talks if the visitor starts". **Option B
   confirmed and schema built 2026-10-13 (SCOPE D42)** — see the addendum.
   Reasoning `[TK]`.
+- `scripts/sim/` (`pnpm sim`, optional `--seed=N` to replay a run) — SCOPE
+  D43: a throwaway terminal prototype of the loop/case/slot design, option B
+  (cheap and disposable, not the shipped engine — `src/server/cases.ts`
+  below is the real one). Play as customer or employee; NPCs get seeded
+  traits so their randomness is personality, not per-turn dice. Read before
+  deciding whether/how to port its validated design into the real engine.
 - `src/server/cases.ts` — the case/case_facts data layer ADR 4's addendum
   describes: `openCase`, `handOffCase`, `setFact`, `factsOf`. Pure, like
   `stock.ts`; not yet wired into `service.ts`'s claim/handOn/open flow, and
@@ -276,6 +282,11 @@ cover more than was actually seen.
 - A weak assertion (bare substring match) can pass for the wrong reason when
   the same text also appears elsewhere on the page — assert on markup unique
   to the thing under test.
+- Node's `readline/promises` drops lines when driven by a bulk, non-TTY pipe
+  (printed/`yes`-fed input): a real terminal (and a pseudo-tty, e.g. Python's
+  `pty`) works fine. Don't trust a piped smoke test of an interactive CLI
+  (`scripts/sim/`) that hangs or shows a shifted answer — verify through a
+  real pty before concluding the tool itself is broken.
 
 ## Keep this file honest
 When a new rule is needed, integrate it into an existing section rather than

@@ -10,6 +10,7 @@
     "start": "tsx src/server/index.ts",
     "dev": "node scripts/dev.ts",
     "layout": "node scripts/layout-server.ts",
+    "sim": "tsx scripts/sim/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm typecheck && pnpm test",
     "check:evidence": "node scripts/check-evidence.ts",
