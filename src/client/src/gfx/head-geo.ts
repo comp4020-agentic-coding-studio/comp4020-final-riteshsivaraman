@@ -76,9 +76,17 @@ function beardMargin(nx: number, ny: number, nz: number, style: BeardStyle): num
   }
 }
 
-function features(nx: number, ny: number, nz: number, s: HeadShape): number {
+function features(nx: number, ny: number, nz: number, s: HeadShape, plain: boolean): number {
   const front = smooth(0.1, 0.6, -nz);
   if (front === 0) return 0;
+  if (plain) {
+    // toy face: no sockets, brow ridge or lips; just a pointed nose, a hint of
+    // cheek and chin, so the eyes and mouth read as marks on a clean surface
+    const nose = 0.03 * s.nose * g(nx, ny, 0, -0.26, 0.09, 0.11);
+    const cheeks = 0.005 * s.cheek * (g(nx, ny, -0.52, -0.22, 0.24, 0.22) + g(nx, ny, 0.52, -0.22, 0.24, 0.22));
+    const chin = 0.006 * s.chin * g(nx, ny, 0, -0.88, 0.2, 0.1);
+    return front * (nose + cheeks + chin);
+  }
   const brow = 0.008 * s.brow * g(nx, ny, 0, 0.18, 0.5, 0.08);
   const sockets = -0.006 * (g(nx, ny, -0.36, 0.0, 0.17, 0.12) + g(nx, ny, 0.36, 0.0, 0.17, 0.12));
   const bridge = 0.008 * s.nose * g(nx, ny, 0, -0.08, 0.07, 0.22);
@@ -97,6 +105,7 @@ export function buildHead(
   skinHex: string,
   beard: BeardStyle = "none",
   detail = 4,
+  plain = false,
 ): BufferGeometry {
   const geo = new IcosahedronGeometry(1, detail);
   geo.deleteAttribute("uv");
@@ -118,7 +127,7 @@ export function buildHead(
     const inside = smooth(-0.02, 0.1, hairMargin(nx, ny, nz, hair));
     const bump = hair === "curly" ? 0.006 * (0.5 + 0.5 * Math.sin(nx * 15 + 1) * Math.sin(ny * 13 + 2) * Math.sin(nz * 14 + 3)) : 0;
     const beardIn = beard === "none" || beard === "stubble" ? 0 : smooth(-0.04, 0.12, beardMargin(nx, ny, nz, beard));
-    const off = features(nx, ny, nz, shape) + inside * (0.007 + bump) + beardIn * 0.0055;
+    const off = features(nx, ny, nz, shape, plain) + inside * (0.007 + bump) + beardIn * 0.0055;
     // squareness pushes the sides and the jaw out towards a box, mostly low
     // down; forehead width scales the upper half
     const wq = shape.square * (0.3 + 0.7 * smooth(0.3, -0.6, ny));

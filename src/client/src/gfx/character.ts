@@ -39,12 +39,12 @@ import { buildHead, type HeadShape } from "./head-geo.ts";
 // Metres, y up, the figure faces -z. About 1.72 m tall whatever the style.
 
 export type BodyStyle = "friendly" | "natural" | "canon" | "sturdy" | "toon" | "chibi";
-export type EyeStyle = "dots" | "soft" | "glossy" | "lidded" | "almond" | "bean" | "round" | "sparkle" | "happy";
+export type EyeStyle = "dots" | "soft" | "glossy" | "lidded" | "almond" | "bean" | "round" | "sparkle" | "happy" | "toy" | "peg";
 export type FaceShape = "auto" | "oval" | "round" | "square" | "heart" | "long" | "diamond" | "pear";
 export type Shading = "flat" | "toon";
 
 export const BODY_STYLES: BodyStyle[] = ["friendly", "natural", "canon", "sturdy", "toon", "chibi"];
-export const EYE_STYLES: EyeStyle[] = ["dots", "soft", "glossy", "lidded", "almond", "bean", "round", "sparkle", "happy"];
+export const EYE_STYLES: EyeStyle[] = ["dots", "soft", "glossy", "lidded", "almond", "bean", "round", "sparkle", "happy", "toy", "peg"];
 export const FACE_SHAPES: FaceShape[] = ["auto", "oval", "round", "square", "heart", "long", "diamond", "pear"];
 export const SHADINGS: Shading[] = ["flat", "toon"];
 export type BeardChoice = "auto" | BeardStyle;
@@ -262,6 +262,9 @@ export function buildCharacter(
 ): Character {
   const bodyStyle = opts.body ?? "friendly";
   const eyeStyle = opts.eyes ?? "round";
+  // "toy" and "peg": marks on a clean, chunky head (plain black eyes, a dash
+  // for a mouth, a pointed nose), no sockets, lips, lashes, teeth or tongue
+  const toy = eyeStyle === "toy" || eyeStyle === "peg";
   // "auto" picks a shape from the person, so a crowd has all of them
   const faceKey: Exclude<FaceShape, "auto"> =
     !opts.face || opts.face === "auto" ? FACE_KEYS[Math.floor(look.jaw * 997 + look.cheek * 131) % FACE_KEYS.length] : opts.face;
@@ -448,6 +451,8 @@ export function buildCharacter(
     look.hairColour,
     look.skin,
     !opts.beard || opts.beard === "auto" ? look.beard : opts.beard,
+    toy ? 3 : 4,
+    toy,
   );
   add(headGeo, head, null, hm());
   for (const s of SIDES) {
@@ -510,6 +515,12 @@ export function buildCharacter(
       lashTube = 0.0012;
       oval(0.0072 * look.eyeSize, 0.0098 * look.eyeSize, ink);
       spot(0.0022, s * -0.0022, 0.0035, 0.0008);
+    } else if (eyeStyle === "toy") {
+      // plain black ovals: no whites, no highlight, nothing to stare back
+      oval(0.0082 * look.eyeSize, 0.0118 * look.eyeSize, ink);
+    } else if (eyeStyle === "peg") {
+      // two small round dots
+      oval(0.0066 * look.eyeSize, 0.0066 * look.eyeSize, ink);
     } else if (eyeStyle === "bean") {
       // tall dark ovals, a classic cartoon eye
       lashTube = 0.0012;
@@ -565,7 +576,7 @@ export function buildCharacter(
     }
   }
   // nostrils under the tip of the nose
-  for (const s of SIDES) {
+  for (const s of toy ? [] : SIDES) {
     add(new SphereGeometry(0.0034, 5, 4), head, dark(skin, 0.45), hm(s * 0.0072 * look.noseSize, -0.0425 * Fy, -0.1035 - 0.004 * shape.square, sc(1, 0.6, 1)));
   }
 
@@ -574,6 +585,7 @@ export function buildCharacter(
   for (const s of SIDES) {
     const ex = s * eyeX;
     add(new SphereGeometry(rim, 12, 6, 0, Math.PI * 2, 0, 0.95), lids, skin, hm(ex, eyeY, eyeZ));
+    if (toy) continue;
     const lash = new TorusGeometry(rim * Math.sin(0.95), lashTube, 3, 12);
     lash.rotateX(Math.PI / 2);
     add(lash, lids, new Color("#1c1512"), hm(ex, eyeY + rim * Math.cos(0.95), eyeZ));
@@ -581,8 +593,13 @@ export function buildCharacter(
 
   // brows, in the hair colour a little deeper
   const browColour = new Color(look.browColour).multiplyScalar(0.8);
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 2 && eyeStyle !== "peg"; i++) {
     const s = SIDES[i];
+    if (toy) {
+      // a straight dark dash, tilted and lifted by the brow bone like any other
+      add(new BoxGeometry(0.03 * look.eyeSize, 0.0052, 0.004), browBones[i], new Color("#241c19"), hm(s * eyeX, browY, browZ + 0.006));
+      continue;
+    }
     add(browGeo(-s, 0.036 * look.eyeSize, 0.0068 * (0.75 + look.brow * 0.45)), browBones[i], browColour, hm(s * eyeX, browY, browZ));
   }
 
@@ -593,10 +610,20 @@ export function buildCharacter(
     t.rotateZ(-Math.PI / 2 - 0.8);
     add(t, mouth, new Color(colour), hm(0, mouthY + radius + dy, mouthZ));
   };
-  arc(0.024, 0.0032, "#a8514f", 0.0014);
-  arc(0.026, 0.0046, "#c46a66", -0.0022);
-  add(new SphereGeometry(0.008, 8, 6), mouthOpen, new Color("#4a1c20"), hm(0, mouthY - 0.002, mouthZ + 0.0015, sc(2.4, 0.9, 1)));
-  add(new BoxGeometry(0.02, 0.005, 0.004), mouthOpen, new Color("#f4efe8").multiplyScalar(1.4), hm(0, mouthY + 0.0035, mouthZ - 0.0018));
+  if (toy) {
+    // one dark, nearly flat dash that still bends into a smile or a frown, and
+    // grows taller (not teeth, not a tongue) when it opens
+    const dash = new TorusGeometry(0.05, 0.0028, 3, 8, 0.7);
+    dash.rotateZ(-Math.PI / 2 - 0.35);
+    const ink = new Color("#241c19");
+    add(dash, mouth, ink, hm(0, mouthY + 0.05, mouthZ + 0.005));
+    add(new BoxGeometry(0.02, 0.006, 0.004), mouthOpen, ink, hm(0, mouthY - 0.002, mouthZ + 0.004));
+  } else {
+    arc(0.024, 0.0032, "#a8514f", 0.0014);
+    arc(0.026, 0.0046, "#c46a66", -0.0022);
+    add(new SphereGeometry(0.008, 8, 6), mouthOpen, new Color("#4a1c20"), hm(0, mouthY - 0.002, mouthZ + 0.0015, sc(2.4, 0.9, 1)));
+    add(new BoxGeometry(0.02, 0.005, 0.004), mouthOpen, new Color("#f4efe8").multiplyScalar(1.4), hm(0, mouthY + 0.0035, mouthZ - 0.0018));
+  }
 
   // ---- one mesh, one skeleton ----
   const merged = mergeGeometries(geos);
