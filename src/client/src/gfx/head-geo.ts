@@ -58,6 +58,12 @@ function hairMargin(nx: number, ny: number, nz: number, style: HairStyle): numbe
 
 // How far a point is inside the facial hair, positive inside, on the unit
 // sphere (face at -z). The mouth sits at about ny -0.58, the nose tip at -0.3.
+// The lower face: below a line across the cheeks, plus the sideburns up the
+// edge of the face. `lift` raises where it stops, on the cheeks and sides.
+function lowerFace(nx: number, ny: number, lift: number): number {
+  return Math.max(-0.27 + lift - ny, Math.min(Math.abs(nx) - 0.8, 0.12 + lift - ny));
+}
+
 function beardMargin(nx: number, ny: number, nz: number, style: BeardStyle): number {
   if (style === "none") return -1;
   // a beard grows on the face and jaw and stops at the ears (nz about 0.05):
@@ -73,18 +79,12 @@ function beardMargin(nx: number, ny: number, nz: number, style: BeardStyle): num
     case "goatee":
       m = Math.min(0.3 - ax, -0.64 - ny, 0.2 - nz > 0 ? 1 : -1);
       break;
-    case "full": {
-      // a band that follows the jaw: sideburns down the cheek edge (the inner
-      // edge slants in towards the chin) and the chin itself, leaving the
-      // cheeks and the mouth bare
-      const edge = 0.65 + 0.5 * ny;
-      const band = Math.min(ax - edge, 0.1 - ny);
-      const chin = -0.72 - ny;
-      m = Math.max(band, chin);
+    case "full":
+      // the stubble shape, with its upper edge a little higher up the face
+      m = lowerFace(nx, ny, 0.08);
       break;
-    }
-    default: // stubble: the lower face, the same area as a full beard
-      m = Math.max(-0.27 - ny, Math.min(ax - 0.8, 0.12 - ny));
+    default: // stubble: the lower face
+      m = lowerFace(nx, ny, 0);
   }
   return Math.min(m, ahead);
 }
