@@ -1,4 +1,9 @@
 # esbuild (used by Vitest) needs its postinstall to set up its native binary.
+# @google/genai and its protobufjs dependency (scripts/sim/ai.ts, SCOPE D43)
+# are the official Google SDK, from the public registry; their install
+# scripts are build steps, not anything unusual.
 allowBuilds:
+  '@google/genai': true
   better-sqlite3: true
   esbuild: true
+  protobufjs: true

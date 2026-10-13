@@ -2,6 +2,7 @@
 // + an ordering policy, not an authored node graph): this sim is the cheap
 // way to check that design feels right before it gets built for real.
 import type { Product } from "../../src/shared/catalogue.ts";
+import { BUDGET_OPTIONS } from "./product.ts";
 import { pick, roll, type Rng } from "./rng.ts";
 import type { Traits } from "./traits.ts";
 
@@ -45,7 +46,7 @@ export function optionsFor(slot: SlotKey, product: Product): string[] {
     case "use_case":
       return ["photos", "work", "games", "mostly calls and texts"];
     case "budget":
-      return ["under $700", "around $1,100", "around $1,600", "no real limit"];
+      return [...BUDGET_OPTIONS];
     case "storage":
       return product.storageOptions;
     case "colour":
