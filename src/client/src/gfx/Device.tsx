@@ -14,6 +14,7 @@ export function Device({
   colour,
   model,
   screenMode,
+  held,
 }: {
   kind: Kind;
   x: number;
@@ -23,9 +24,10 @@ export function Device({
   colour: string;
   model?: string;
   screenMode?: ScreenMode;
+  held?: boolean; // in a hand: no stand, centred on the origin, screen to +z
 }) {
   if (kind === "laptop" || kind === "tabletKb" || kind === "tablet") {
-    return <ComputerDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} screenMode={screenMode} />;
+    return <ComputerDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} screenMode={screenMode} held={held} />;
   }
-  return <PhoneDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} screenMode={screenMode} />;
+  return <PhoneDevice kind={kind} x={x} y={y} z={z} rotY={rotY} colour={colour} model={model} screenMode={screenMode} held={held} />;
 }

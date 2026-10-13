@@ -448,6 +448,7 @@ export function PhoneDevice({
   colour,
   model,
   screenMode = "home",
+  held = false,
 }: {
   kind: "phone" | "watch" | "earbuds" | "headphones" | "speaker" | "airtag";
   x: number;
@@ -457,6 +458,9 @@ export function PhoneDevice({
   colour: string;
   model?: string;
   screenMode?: ScreenMode;
+  // in someone's hand: no display stand and no table-top lean, the body
+  // centred on the origin with its screen facing +z
+  held?: boolean;
 }) {
   const spec = kind === "phone" && model ? PHONE_MODELS[model] : undefined;
   const watch = kind === "watch" && model ? WATCH_MODELS[model] : undefined;
@@ -480,12 +484,14 @@ export function PhoneDevice({
               against it (reference photo, Ritesh 2026-10-12) — a phone
               standing bolt upright meant looking at its screen face-on
               required crouching to table height */}
-          <mesh position={[0, 0.006, 0]}>
-            <cylinderGeometry args={[0.05, 0.05, 0.012, 20]} />
-            {std(STAND, 0.5, 0.4)}
-          </mesh>
-          <group position={[0, 0.012, 0]} rotation={[PHONE_LEAN, 0, 0]}>
-            <group position={[0, spec.length / 2, 0]}>
+          {!held && (
+            <mesh position={[0, 0.006, 0]}>
+              <cylinderGeometry args={[0.05, 0.05, 0.012, 20]} />
+              {std(STAND, 0.5, 0.4)}
+            </mesh>
+          )}
+          <group position={[0, held ? 0 : 0.012, 0]} rotation={[held ? 0 : PHONE_LEAN, 0, 0]}>
+            <group position={[0, held ? 0 : spec.length / 2, 0]}>
               <FinishMeshes parts={built} />
               <mesh position={[scr?.offsetX ?? 0, 0, spec.thickness / 2 + 0.0004]}>
                 <planeGeometry args={[screenW, screenH]} />

@@ -68,6 +68,7 @@ import {
   displayGeo,
   laptopGeo,
   tabletGeo,
+  tabletHeldGeo,
   tabletKbGeo,
   type DeviceGeo,
 } from "./computers-geo.ts";
@@ -207,6 +208,7 @@ export function ComputerDevice({
   colour,
   model,
   screenMode,
+  held = false,
 }: {
   kind: "laptop" | "tabletKb" | "tablet";
   x: number;
@@ -216,8 +218,9 @@ export function ComputerDevice({
   colour: string;
   model?: string;
   screenMode?: ScreenMode;
+  held?: boolean; // in a hand: no stand, centred, screen to +z
 }) {
-  const geo = modelGeo(kind, model);
+  const geo = modelGeo(kind, model, held);
   if (geo) {
     return (
       <group position={[x, y, z]} rotation={[0, rotY, 0]}>
@@ -285,7 +288,7 @@ export function ComputerDevice({
   );
 }
 
-function modelGeo(kind: "laptop" | "tabletKb" | "tablet", model: string | undefined): DeviceGeo | null {
+function modelGeo(kind: "laptop" | "tabletKb" | "tablet", model: string | undefined, held = false): DeviceGeo | null {
   if (!model) return null;
   if (kind === "laptop") {
     const spec = LAPTOP_MODELS[model];
@@ -293,6 +296,7 @@ function modelGeo(kind: "laptop" | "tabletKb" | "tablet", model: string | undefi
   }
   const spec = TABLET_MODELS[model];
   if (!spec) return null;
+  if (held && kind === "tablet") return tabletHeldGeo(spec);
   return kind === "tabletKb" ? tabletKbGeo(spec) : tabletGeo(spec);
 }
 

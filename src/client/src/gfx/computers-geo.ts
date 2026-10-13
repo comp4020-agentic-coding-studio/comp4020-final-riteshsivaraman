@@ -886,6 +886,14 @@ function tabletScreen(s: TabletSpec, M: Matrix4): BufferGeometry {
   return geo;
 }
 
+// A tablet held in the hand: no stand, centred on the origin, screen to +z.
+export function tabletHeldGeo(s: TabletSpec): DeviceGeo {
+  return cached(`tabletHeld:${s.id}`, () => {
+    const M = T(0, -s.H / 2, -s.t / 2);
+    return { body: mergeGeometries(tabletParts(s, M, true))!, screen: tabletScreen(s, M), format: "tablet" };
+  });
+}
+
 // A tablet leaning back 20 degrees on a small graphite display stand.
 export function tabletGeo(s: TabletSpec): DeviceGeo {
   return cached(`tablet:${s.id}`, () => {
