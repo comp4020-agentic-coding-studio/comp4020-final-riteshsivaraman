@@ -1,0 +1,91 @@
+{
+ "id": "r1b",
+ "source": "docs/conversation-model/transcripts/round-1/b.md",
+ "blocked": "Transcript S3 size_fit_check (and the later demo of the smaller 18 Pro, model switch) cannot be expressed: with the 18 Pro Max named, the pool holds only that model, so size_fit_check is not askable and the 18 Pro is not on the customer's demo menu. Replay truncated after known_model and finished on the Pro Max, not the transcript's 18 Pro 512GB Glacier.",
+ "steps": [
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "opening_intent"
+   },
+   "customer": {
+    "picks": [
+     "know"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 7
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "known_model"
+   },
+   "customer": {
+    "picks": [
+     "model:18-pro-max"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 1,
+    "top": "18-pro-max"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "storage_tier_for_model"
+   },
+   "customer": {
+    "picks": [
+     "storage:512GB"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "colour_pick"
+   },
+   "customer": {
+    "picks": [
+     "colour:Glacier"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1,
+    "rows": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "confirm"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly"
+  }
+ ],
+ "ends": {
+  "how": "bought",
+  "model": "18-pro-max",
+  "storage": "512GB",
+  "colour": "Glacier"
+ }
+}

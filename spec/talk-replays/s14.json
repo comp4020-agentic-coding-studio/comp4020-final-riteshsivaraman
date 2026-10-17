@@ -1,0 +1,142 @@
+{
+ "id": "s14",
+ "source": "docs/conversation-model/transcripts/round-2/s14.md",
+ "notes": [
+  "step 4: transcript offered only the 17e; engine offers all candidates (3) and a decline covers all of them.",
+  "step 5: transcript C5 answers colour (Lavender) AND asks to try the 17. A reply is either picks or an action, so the colour answer is lost and asked again at step 7. models=1 expectation after step 5 removed (engine has 3 there)."
+ ],
+ "steps": [
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "opening_intent"
+   },
+   "customer": {
+    "picks": [
+     "browse"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 7,
+    "top": "17e"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "budget_ceiling"
+   },
+   "customer": {
+    "picks": [
+     "ceiling:1600"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 3,
+    "top": "17e"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "hardware_features"
+   },
+   "customer": {
+    "picks": [
+     "notsure"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 3,
+    "top": "17e"
+   }
+  },
+  {
+   "staff": {
+    "t": "offer_demo"
+   },
+   "customer": {
+    "picks": [
+     "decline"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 3
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "colour_prefs"
+   },
+   "customer": {
+    "action": {
+     "t": "demo",
+     "model": "17"
+    }
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly"
+  },
+  {
+   "staff": {
+    "t": "demo",
+    "model": "17"
+   },
+   "customer": {
+    "picks": [
+     "happy"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1,
+    "top": "17"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "colour_pick"
+   },
+   "customer": {
+    "picks": [
+     "colour:Lavender"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1,
+    "rows": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "confirm"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly"
+  }
+ ],
+ "ends": {
+  "how": "bought",
+  "model": "17",
+  "storage": "256GB",
+  "colour": "Lavender"
+ }
+}

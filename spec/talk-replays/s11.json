@@ -1,0 +1,164 @@
+{
+ "id": "s11",
+ "source": "docs/conversation-model/transcripts/round-2/s11.md",
+ "skipped": [
+  "transcript S13/C14 size_fit_check on the lone 18 Pro Max: engine's size_fit_check needs a smaller model still in the pool, so it is not askable."
+ ],
+ "notes": [
+  "step 2 and 3: transcript ranking leader (Duo, 44h) not asserted; engine ranks 18 Pro Max, 18 Pro, Duo.",
+  "step 3: transcript throw-back was compare(18 Pro, 18 Pro Max); engine id follows ranking order: compare:18-pro-max:18-pro."
+ ],
+ "steps": [
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "known_model"
+   },
+   "customer": {
+    "picks": [
+     "gift"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 7
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "use_case"
+   },
+   "customer": {
+    "picks": [
+     "photos",
+     "video",
+     "streaming"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 7
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "battery_priority"
+   },
+   "customer": {
+    "picks": [
+     "min:40"
+    ],
+    "throwback": "compare:18-pro-max:18-pro"
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 2
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "budget_ceiling"
+   },
+   "customer": {
+    "picks": [
+     "ceiling:2700"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 1,
+    "top": "18-pro-max"
+   }
+  },
+  {
+   "staff": {
+    "t": "offer_demo"
+   },
+   "customer": {
+    "picks": [
+     "demo:18-pro-max"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "demo",
+    "model": "18-pro-max"
+   },
+   "customer": {
+    "picks": [
+     "happy"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "storage_tier_for_model"
+   },
+   "customer": {
+    "picks": [
+     "storage:256GB"
+    ],
+    "throwback": "haggle"
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "colour_pick"
+   },
+   "customer": {
+    "picks": [
+     "colour:Burgundy"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1,
+    "rows": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "confirm"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "friendly"
+  }
+ ],
+ "ends": {
+  "how": "bought",
+  "model": "18-pro-max",
+  "storage": "256GB",
+  "colour": "Burgundy"
+ }
+}

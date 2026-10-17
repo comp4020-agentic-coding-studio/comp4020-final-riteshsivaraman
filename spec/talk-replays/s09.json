@@ -1,0 +1,107 @@
+{
+ "id": "s09",
+ "source": "docs/conversation-model/transcripts/round-2/s09.md",
+ "notes": [
+  "step 4: transcript throw-back 'budget_is_firm' has no engine id; omitted.",
+  "step 5: nudge pick 'keep' (Keep both)."
+ ],
+ "steps": [
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "opening_intent"
+   },
+   "customer": {
+    "picks": [
+     "help"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 7,
+    "top": "17e"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "use_case"
+   },
+   "customer": {
+    "picks": [
+     "photos"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 7,
+    "top": "18-pro"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "telephoto_need"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 2,
+    "top": "18-pro"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "budget_ceiling"
+   },
+   "customer": {
+    "picks": [
+     "ceiling:1800"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 0
+   }
+  },
+  {
+   "staff": {
+    "t": "nudge"
+   },
+   "customer": {
+    "picks": [
+     "keep"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 0
+   }
+  },
+  {
+   "staff": {
+    "t": "rescue"
+   },
+   "customer": {
+    "picks": [
+     "think"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient"
+  }
+ ],
+ "ends": {
+  "how": "left"
+ }
+}

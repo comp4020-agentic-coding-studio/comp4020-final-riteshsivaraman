@@ -1,0 +1,247 @@
+{
+ "id": "r1a",
+ "source": "docs/conversation-model/transcripts/round-1/a.md",
+ "skipped": [
+  "S3/C4 current_storage_pressure: no such engine question.",
+  "S25/C26 colour_prefs shortlist (Mist Blue, Sage): colour_prefs is not askable once the model is fixed; the engine goes straight to colour_pick."
+ ],
+ "notes": [
+  "storage: S5 (unsure) + S7 (staff suggests 256GB) become storage_need then a reopen of storage_need.",
+  "step 6: reaction 'I want more camera' has no engine option; used 'unsure' with throw-back attr:tele.",
+  "step 7/10: staff lines that only answer a throw-back are {t:answer}; the customer then raises the budget by the standing 'change' action.",
+  "step 11: after 'too expensive' the 18 Pro is excluded; the customer picks the 17 by standing action."
+ ],
+ "steps": [
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "use_case"
+   },
+   "customer": {
+    "picks": [
+     "photos",
+     "video",
+     "social"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 7
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "storage_need"
+   },
+   "customer": {
+    "picks": [
+     "notsure"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "unsure",
+   "expect": {
+    "models": 7
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "storage_need",
+    "reopen": true
+   },
+   "customer": {
+    "picks": [
+     "min:256"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 6
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "budget_ceiling"
+   },
+   "customer": {
+    "picks": [
+     "ceiling:1600"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 2
+   }
+  },
+  {
+   "staff": {
+    "t": "offer_demo"
+   },
+   "customer": {
+    "picks": [
+     "demo:17"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 2
+   }
+  },
+  {
+   "staff": {
+    "t": "demo",
+    "model": "17"
+   },
+   "customer": {
+    "picks": [
+     "unsure"
+    ],
+    "throwback": "attr:tele"
+   },
+   "staffTone": "friendly",
+   "customerTone": "unsure",
+   "expect": {
+    "models": 2
+   }
+  },
+  {
+   "staff": {
+    "t": "answer"
+   },
+   "customer": {
+    "action": {
+     "t": "change",
+     "qid": "budget_ceiling"
+    }
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 2
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "budget_ceiling",
+    "reopen": true
+   },
+   "customer": {
+    "picks": [
+     "ceiling:2200"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 4
+   }
+  },
+  {
+   "staff": {
+    "t": "offer_demo"
+   },
+   "customer": {
+    "picks": [
+     "demo:18-pro"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 4
+   }
+  },
+  {
+   "staff": {
+    "t": "demo",
+    "model": "18-pro"
+   },
+   "customer": {
+    "picks": [
+     "expensive"
+    ],
+    "throwback": "attr:tele"
+   },
+   "staffTone": "friendly",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 3
+   }
+  },
+  {
+   "staff": {
+    "t": "answer"
+   },
+   "customer": {
+    "action": {
+     "t": "pick",
+     "model": "17"
+    }
+   },
+   "staffTone": "neutral",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "storage_tier_for_model"
+   },
+   "customer": {
+    "picks": [
+     "storage:256GB"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "colour_pick"
+   },
+   "customer": {
+    "picks": [
+     "colour:Sage"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1,
+    "rows": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "confirm"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly"
+  }
+ ],
+ "ends": {
+  "how": "bought",
+  "model": "17",
+  "storage": "256GB",
+  "colour": "Sage"
+ }
+}

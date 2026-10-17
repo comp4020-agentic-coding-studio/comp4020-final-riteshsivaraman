@@ -1,0 +1,163 @@
+{
+ "id": "s06",
+ "source": "docs/conversation-model/transcripts/round-2/s06.md",
+ "notes": [
+  "step 3: transcript throw-back was 'which has the longest zoom?'; no zoom-length throw-back exists, nearest is attr:tele."
+ ],
+ "steps": [
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "opening_intent"
+   },
+   "customer": {
+    "picks": [
+     "help"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 7,
+    "top": "17e"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "use_case"
+   },
+   "customer": {
+    "picks": [
+     "photos",
+     "video",
+     "travel"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 7,
+    "top": "18-pro-max"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "telephoto_need"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ],
+    "throwback": "attr:tele"
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 2,
+    "top": "18-pro-max"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "storage_need"
+   },
+   "customer": {
+    "picks": [
+     "min:1024"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 2,
+    "top": "18-pro-max"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "budget_ceiling"
+   },
+   "customer": {
+    "picks": [
+     "ceiling:3600"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 2,
+    "top": "18-pro-max"
+   }
+  },
+  {
+   "staff": {
+    "t": "offer_demo"
+   },
+   "customer": {
+    "picks": [
+     "demo:18-pro-max"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 2
+   }
+  },
+  {
+   "staff": {
+    "t": "demo",
+    "model": "18-pro-max"
+   },
+   "customer": {
+    "picks": [
+     "happy"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "colour_pick"
+   },
+   "customer": {
+    "picks": [
+     "colour:Burgundy"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly",
+   "expect": {
+    "models": 1,
+    "rows": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "confirm"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "friendly"
+  }
+ ],
+ "ends": {
+  "how": "bought",
+  "model": "18-pro-max",
+  "storage": "1TB",
+  "colour": "Burgundy"
+ }
+}

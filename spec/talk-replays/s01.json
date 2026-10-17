@@ -1,0 +1,78 @@
+{
+ "id": "s01",
+ "source": "docs/conversation-model/transcripts/round-2/s01.md",
+ "notes": [
+  "step 2: transcript S5 is answer_throwback + colour_pick in one turn; engine answers the owed throw-back inside the ask (as the task brief says)."
+ ],
+ "steps": [
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "known_model"
+   },
+   "customer": {
+    "picks": [
+     "model:18-pro"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 1,
+    "top": "18-pro"
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "storage_tier_for_model"
+   },
+   "customer": {
+    "picks": [
+     "storage:512GB"
+    ],
+    "throwback": "haggle"
+   },
+   "staffTone": "neutral",
+   "customerTone": "impatient",
+   "expect": {
+    "models": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "ask",
+    "qid": "colour_pick"
+   },
+   "customer": {
+    "picks": [
+     "colour:Glacier"
+    ]
+   },
+   "staffTone": "neutral",
+   "customerTone": "neutral",
+   "expect": {
+    "models": 1,
+    "rows": 1
+   }
+  },
+  {
+   "staff": {
+    "t": "confirm"
+   },
+   "customer": {
+    "picks": [
+     "yes"
+    ]
+   },
+   "staffTone": "friendly",
+   "customerTone": "neutral"
+  }
+ ],
+ "ends": {
+  "how": "bought",
+  "model": "18-pro",
+  "storage": "512GB",
+  "colour": "Glacier"
+ }
+}
