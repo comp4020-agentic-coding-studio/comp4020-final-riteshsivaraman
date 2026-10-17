@@ -1,243 +1,227 @@
 {
- "id": "s15",
- "source": "docs/conversation-model/transcripts/round-2/s15.md",
- "notes": [
-  "step 9: with the current engine, dropping the colour clears the Light Gold answer, so colour_pick is asked plainly as in the transcript (an earlier engine version needed reopen:true).",
-  "step 10: transcript throw-back compare_two_models at the confirm step; no throw-backs are offered at confirm, omitted. Engine's own answer happens in step 11's ask.",
-  "step 12: transcript S12 'which way are you leaning' has no engine move; modelled as offer_demo with the customer picking the Max by standing action. Engine's 'Change the model' also wiped the Glacier colour, so colour is asked again at step 13."
- ],
- "steps": [
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "opening_intent"
-   },
-   "customer": {
-    "picks": [
-     "line"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 7,
-    "top": "17e"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "model_family"
-   },
-   "customer": {
-    "picks": [
-     "line:18"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 2,
-    "top": "18-pro"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "storage_need"
-   },
-   "customer": {
-    "picks": [
-     "min:1024"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 2,
-    "top": "18-pro"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "budget_ceiling"
-   },
-   "customer": {
-    "picks": [
-     "ceiling:3300"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 1,
-    "top": "18-pro"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "colour_pick"
-   },
-   "customer": {
-    "picks": [
-     "colour:Light Gold"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 0
-   }
-  },
-  {
-   "staff": {
-    "t": "nudge"
-   },
-   "customer": {
-    "picks": [
-     "drop:colours"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "unsure",
-   "expect": {
-    "models": 1,
-    "top": "18-pro"
-   }
-  },
-  {
-   "staff": {
-    "t": "offer_demo"
-   },
-   "customer": {
-    "picks": [
-     "demo:18-pro"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "unsure",
-   "expect": {
-    "models": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "demo",
-    "model": "18-pro"
-   },
-   "customer": {
-    "picks": [
-     "happy"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "colour_pick"
-   },
-   "customer": {
-    "picks": [
-     "colour:Glacier"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "confirm"
-   },
-   "customer": {
-    "picks": [
-     "model"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "unsure",
-   "expect": {
-    "models": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "budget_ceiling",
-    "reopen": true
-   },
-   "customer": {
-    "picks": [
-     "ceiling:3500"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 2,
-    "top": "18-pro"
-   }
-  },
-  {
-   "staff": {
-    "t": "offer_demo"
-   },
-   "customer": {
-    "action": {
-     "t": "pick",
-     "model": "18-pro-max"
+  "id": "s15",
+  "source": "docs/conversation-model/transcripts/round-2/s15.md",
+  "notes": [
+    "step 9: with the current engine, dropping the colour clears the Light Gold answer, so colour_pick is asked plainly as in the transcript (an earlier engine version needed reopen:true).",
+    "step 10: transcript throw-back compare_two_models at the confirm step; no throw-backs are offered at confirm, omitted. Engine's own answer happens in step 11's ask.",
+    "step 12: transcript S12 'which way are you leaning' has no engine move; modelled as offer_demo with the customer picking the Max by standing action. 2026-10-17: the colour now carries across 'Change the model' (as the transcript did), so the old colour_pick step is gone and the pool is down to one row straight after the pick."
+  ],
+  "steps": [
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "opening_intent"
+      },
+      "customer": {
+        "picks": [
+          "line"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 7,
+        "top": "17e"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "model_family"
+      },
+      "customer": {
+        "picks": [
+          "line:18"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 2,
+        "top": "18-pro"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "storage_need"
+      },
+      "customer": {
+        "picks": [
+          "min:1024"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 2,
+        "top": "18-pro"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "budget_ceiling"
+      },
+      "customer": {
+        "picks": [
+          "ceiling:3300"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 1,
+        "top": "18-pro"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "colour_pick"
+      },
+      "customer": {
+        "picks": [
+          "colour:Light Gold"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 0
+      }
+    },
+    {
+      "staff": {
+        "t": "nudge"
+      },
+      "customer": {
+        "picks": [
+          "drop:colours"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 1,
+        "top": "18-pro"
+      }
+    },
+    {
+      "staff": {
+        "t": "offer_demo"
+      },
+      "customer": {
+        "picks": [
+          "demo:18-pro"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "demo",
+        "model": "18-pro"
+      },
+      "customer": {
+        "picks": [
+          "happy"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "colour_pick"
+      },
+      "customer": {
+        "picks": [
+          "colour:Glacier"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "confirm"
+      },
+      "customer": {
+        "picks": [
+          "model"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "budget_ceiling",
+        "reopen": true
+      },
+      "customer": {
+        "picks": [
+          "ceiling:3500"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 2,
+        "top": "18-pro"
+      }
+    },
+    {
+      "staff": {
+        "t": "offer_demo"
+      },
+      "customer": {
+        "action": {
+          "t": "pick",
+          "model": "18-pro-max"
+        }
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 1,
+        "top": "18-pro-max",
+        "rows": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "confirm"
+      },
+      "customer": {
+        "picks": [
+          "yes"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "friendly"
     }
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 1,
-    "top": "18-pro-max"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "colour_pick"
-   },
-   "customer": {
-    "picks": [
-     "colour:Glacier"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "friendly",
-   "expect": {
-    "models": 1,
-    "rows": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "confirm"
-   },
-   "customer": {
-    "picks": [
-     "yes"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "friendly"
+  ],
+  "ends": {
+    "how": "bought",
+    "model": "18-pro-max",
+    "storage": "1TB",
+    "colour": "Glacier"
   }
- ],
- "ends": {
-  "how": "bought",
-  "model": "18-pro-max",
-  "storage": "1TB",
-  "colour": "Glacier"
- }
 }

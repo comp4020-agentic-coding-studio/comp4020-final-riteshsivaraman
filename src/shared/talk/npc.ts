@@ -126,7 +126,9 @@ export function customerMove(sc: Scene, persona: Persona, rng: Rng, mem: Memory 
     const m = modelById(pend.model);
     const cheapest = Math.min(...m.tiers.map((x) => x.price));
     const pick = p.target ? (m.id === p.target.model ? "happy" : "notforme") : p.wants.maxPrice !== undefined && cheapest > p.wants.maxPrice ? "expensive" : fits(m.id, p) && chance(rng, 0.6) ? "happy" : "notforme";
-    reply = { picks: [pick], tone: t };
+    // Unhappy with it but with others on offer: look at one of them, or ask about something else.
+    const another = pick === "notforme" && menu.options.some((o) => o.id === "another") && chance(rng, 0.5) ? "another" : pick === "notforme" && chance(rng, 0.3) ? "others" : pick;
+    reply = { picks: [another], tone: t };
   } else if (pend.kind === "recommend") {
     const m = pend.model;
     const yes = p.target ? m === p.target.model : fits(m, p);

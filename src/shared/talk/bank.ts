@@ -40,6 +40,7 @@ export function newScene(): Scene {
     excluded: [],
     demoed: [],
     recommended: [],
+    wantsMore: false,
     declinedDemo: [],
     relaxDeclined: 0,
     gift: false,
@@ -67,6 +68,8 @@ const uniq = <T>(xs: T[]): T[] => [...new Set(xs)];
 const nameOf = (id: string): string => modelById(id).name;
 // A reopened question can come up after the model has been dropped again, so its wording can't assume one.
 const thePhone = (ctx: Ctx): string => (ctx.model ? nameOf(ctx.model) : "phone");
+// Once a phone has been named by either side, staff stop introducing it again and say "it".
+export const named = (ctx: Ctx, id: string | null): boolean => id !== null && ctx.sc.log.some((l) => l.text.includes(nameOf(id)));
 const valueOf = (picks: string[], prefix: string): string | undefined => picks.find((p) => p.startsWith(prefix))?.slice(prefix.length);
 const pickedIds = (picks: string[], prefix: string): string[] => picks.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length));
 const poolModels = (ctx: Ctx) => ctx.ranked;
@@ -324,7 +327,7 @@ export const BANK: QuestionDef[] = [
   {
     id: "storage_tier_for_model",
     kind: "resolve",
-    ask: (ctx) => `The ${thePhone(ctx)} comes in ${uniq(ctx.pool.map((r) => r.storage)).join(", ")}. Which one?`,
+    ask: (ctx) => `${named(ctx, ctx.model) ? "It" : `The ${thePhone(ctx)}`} comes in ${uniq(ctx.pool.map((r) => r.storage)).join(", ")}. Which would you like?`,
     pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.storage)).length > 1,
     options: (ctx) => [
       ...uniq(ctx.pool.map((r) => r.storage)).map((st) => ({ id: `storage:${st}`, label: `Storage: ${st} (${money(Math.min(...ctx.pool.filter((r) => r.storage === st).map((r) => r.price)))})` })),
@@ -338,7 +341,7 @@ export const BANK: QuestionDef[] = [
   {
     id: "colour_pick",
     kind: "resolve",
-    ask: (ctx, reopen) => (reopen ? "Which colour would you like instead?" : `Which colour for the ${thePhone(ctx)}?`),
+    ask: (ctx, reopen) => (reopen || named(ctx, ctx.model) ? `Which colour would you like${reopen ? " instead" : ""}?` : `Which colour for the ${thePhone(ctx)}?`),
     pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.colour)).length > 1,
     options: (ctx) => {
       const here = uniq(ctx.pool.map((r) => r.colour));

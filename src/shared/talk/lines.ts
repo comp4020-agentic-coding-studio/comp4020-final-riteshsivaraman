@@ -1,4 +1,4 @@
-import { describeConstraints, money, questionById } from "./bank.ts";
+import { describeConstraints, money, named, questionById } from "./bank.ts";
 import { modelById, type ModelRec } from "./data.ts";
 import { cheapest } from "./pool.ts";
 import type { Ctx, CustomerReply, Line, Option, Pending, StaffAct, Tone } from "./types.ts";
@@ -22,7 +22,7 @@ const NEGATIVE = new Set(["notsure", "unsure", "no", "notforme", "expensive", "k
 const staffLead = (tone: Tone, turn: number, prev: Line | undefined, badNews: boolean): string => {
   if (turn <= 1) return ""; // the first line is a plain hello, whatever the tone
   // They asked to change something: acknowledge it, don't just ask the next question.
-  if (prev?.who === "customer" && prev.picks?.some((p) => p === "colour" || p === "storage" || p === "model" || p === "another") && tone === "friendly") return "Of course. ";
+  if (prev?.who === "customer" && prev.picks?.some((p) => p === "colour" || p === "storage" || p === "model" || p === "another" || p === "others") && tone === "friendly") return "Of course. ";
   const downbeat = badNews || (prev?.who === "customer" && (prev.picks?.some((p) => NEGATIVE.has(p)) ?? false));
   const pool: Record<Tone, string[]> = {
     friendly: downbeat ? ["No problem. ", "That's fine. "] : ["", "Great. ", "Lovely. ", "Sure thing. "],
@@ -149,14 +149,15 @@ export function staffBase(act: StaffAct, ctx: Ctx, models: string[]): string {
     case "offer_demo": {
       if (models.length === 1) {
         const m = modelById(models[0]!).name;
-        // Told which phone, not narrowed down to one: acknowledge it, don't announce that "one phone fits".
-        return ctx.sc.answers["known_model"]?.picks.includes(`model:${models[0]}`) ? `Good choice. Would you like to have a look at the ${m}?` : `That leaves the ${m}. Would you like to have a look at it?`;
+        // Told which phone, not narrowed down to one: acknowledge it without saying its name back.
+        if (ctx.sc.answers["known_model"]?.picks.includes(`model:${models[0]}`)) return "Good choice. Would you like to have a look at it?";
+        return named(ctx, models[0]!) ? "Would you like to have a look at it?" : `That leaves the ${m}. Would you like to have a look at it?`;
       }
       return `${models.length} phones fit: ${names(models)}. Want to try any?`;
     }
     case "demo": {
       const m = modelById(act.model);
-      return `Here's the ${m.name}: ${highlights(m, ctx).join("; ")}. The demo unit might not be the colour we'd get you, and I'd have to check what's in stock. What do you think?`;
+      return `${named(ctx, m.id) ? "Here it is" : `Here's the ${m.name}`}: ${highlights(m, ctx).join("; ")}. The demo unit might not be the colour we'd get you, and I'd have to check what's in stock. What do you think?`;
     }
     case "recommend": {
       const m = modelById(act.model);
@@ -237,7 +238,8 @@ const SAID: Record<string, Said> = {
   "size_fit_check/fine": "Yes, that size suits me.",
   "offer_demo/decline": { neutral: "I'm fine without a demo for now, thanks.", impatient: "No demo, thanks." },
   "demo_reaction/happy": { friendly: "I really like this one, actually.", neutral: "This could be the one.", impatient: "This one will do.", unsure: "Maybe this is the one?" },
-  "demo_reaction/another": "Could I see another one?",
+  "demo_reaction/another": "Could I see another one of those?",
+  "demo_reaction/others": { neutral: "Actually, what else do you have?", friendly: "Do you have anything else I could look at?", impatient: "What else have you got?", unsure: "Is there anything else, maybe?" },
   "demo_reaction/expensive": "That's more than I wanted to spend.",
   "demo_reaction/notforme": "It's not really for me, sorry.",
   "recommend/yes": { friendly: "Yes, that sounds right to me.", neutral: "That sounds right.", impatient: "Fine, that one.", unsure: "I think that sounds right?" },

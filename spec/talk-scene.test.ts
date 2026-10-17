@@ -120,8 +120,8 @@ describe("demos", () => {
   it("acknowledges a phone they named instead of announcing that one phone fits", () => {
     let sc = ask(newScene(), "known_model", ["model:17e"]);
     sc = staff(sc, { t: "offer_demo" });
-    expect(sc.log.at(-1)!.text).toMatch(/Good choice\. Would you like to have a look at the iPhone 17e\?/);
-    expect(sc.log.at(-1)!.text).not.toMatch(/fits/);
+    // The customer named it, so staff say "it" and do not introduce it a second time.
+    expect(sc.log.at(-1)!.text).toBe("Good choice. Would you like to have a look at it?");
   });
 
   it("'show me another' makes staff offer another, and not ask something else", () => {
@@ -156,6 +156,65 @@ describe("demos", () => {
     sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
     sc = cust(staff(sc, { t: "demo", model: "18-pro" }), { picks: ["notforme"] });
     expect(derive(sc).ranked.map((m) => m.id)).toEqual(["18-pro-max"]);
+  });
+});
+
+describe("remembering what they wanted", () => {
+  it("a change of model keeps the colour and turns the exact storage into a floor", () => {
+    let sc = ask(newScene(), "known_model", ["model:17e"]);
+    sc = ask(sc, "storage_tier_for_model", ["storage:512GB"]);
+    sc = ask(sc, "colour_pick", ["colour:Black"]);
+    sc = cust(staff(sc, { t: "confirm" }), { picks: ["model"] });
+    expect(derive(sc).c).toMatchObject({ colours: ["Black"], minGB: 512 });
+    expect(derive(sc).c.storage).toBeUndefined();
+    expect(derive(sc).c.model).toBeUndefined();
+    // The next phone they pick starts from those wishes.
+    sc = cust(staff(sc, { t: "ask", qid: "use_case" }), { action: { t: "pick", model: "18-pro" } });
+    expect(derive(sc).pool.every((r) => r.model === "18-pro" && r.colour === "Black" && r.gb >= 512)).toBe(true);
+    expect(derive(sc).pool.length).toBeGreaterThan(0);
+  });
+
+  it("a wish the next phone cannot meet goes to the nudge, not silently away", () => {
+    let sc = ask(newScene(), "known_model", ["model:17"]);
+    sc = ask(sc, "storage_tier_for_model", ["storage:512GB"]);
+    sc = ask(sc, "colour_pick", ["colour:Sage"]);
+    sc = cust(staff(sc, { t: "confirm" }), { picks: ["model"] });
+    sc = ask(sc, "known_model", ["model:18-pro"]);
+    expect(derive(sc).pool).toHaveLength(0); // the 18 Pro has no Sage
+    expect(staffActs(sc).some((a) => a.act.t === "nudge")).toBe(true);
+  });
+});
+
+describe("after a demo they did not like", () => {
+  const afterDemo = (): Scene => {
+    let sc = ask(camera(), "telephoto_need", ["yes"]);
+    sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
+    return staff(sc, { t: "demo", model: "18-pro" });
+  };
+
+  it("offers both 'another one you offered' and 'ask about other phones'", () => {
+    const ids = customerMenu(afterDemo())!.options.map((o) => o.id);
+    expect(ids).toEqual(expect.arrayContaining(["happy", "another", "others", "expensive", "notforme"]));
+  });
+
+  it("hides 'another one you offered' when there is no other one left to show", () => {
+    let sc = ask(camera(), "telephoto_need", ["yes"]);
+    sc = ask(sc, "storage_need", ["min:1024"]);
+    sc = ask(sc, "budget_ceiling", ["ceiling:3300"]); // down to the 18 Pro alone
+    sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
+    sc = staff(sc, { t: "demo", model: "18-pro" });
+    expect(customerMenu(sc)!.options.map((o) => o.id)).not.toContain("another");
+  });
+
+  it("'ask about other phones' sends staff back to questions before any demo or recommendation", () => {
+    let sc = cust(afterDemo(), { picks: ["others"] });
+    const kinds = staffActs(sc).map((a) => a.act.t);
+    expect(kinds).toContain("ask");
+    expect(kinds).not.toContain("offer_demo");
+    expect(kinds).not.toContain("recommend");
+    expect(derive(sc).ranked.map((m) => m.id)).not.toContain("18-pro"); // they have seen it and moved on
+    sc = staff(sc, staffActs(sc).find((a) => a.act.t === "ask" && !a.act.reopen)!.act);
+    expect(sc.wantsMore).toBe(false); // having asked, staff may offer again
   });
 });
 

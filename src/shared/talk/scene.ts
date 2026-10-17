@@ -89,11 +89,13 @@ export function staffActs(sc: Scene): ActView[] {
       const g = gain(ctx, q);
       out.push(view({ t: "ask", qid: q.id }, `Ask: ${q.id.replace(/_/g, " ")}`, g, hintFor(ctx, q.id)));
     }
-    if (demoCandidates(ctx).length > 0 && (ctx.ranked.length <= 4 || open.length === 0)) out.push(view({ t: "offer_demo" }, "Offer a demo"));
+    // After "ask about other phones" staff go back to questions before offering anything.
+    const hold = sc.wantsMore && open.length > 0;
+    if (!hold && demoCandidates(ctx).length > 0 && (ctx.ranked.length <= 4 || open.length === 0)) out.push(view({ t: "offer_demo" }, "Offer a demo"));
     if (ctx.pool.length === 1) out.push(view({ t: "confirm" }, "Confirm the choice"));
     // Recommending something before learning anything about them would just be the cheapest phone.
     const informed = sc.order.some((q) => questionById(q).kind !== "route");
-    if (ctx.model === null && (informed || open.length === 0)) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
+    if (!hold && ctx.model === null && (informed || open.length === 0)) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
   }
   for (const q of reopenable(ctx)) out.push(view({ t: "ask", qid: q.id, reopen: true }, `Reopen: ${q.id.replace(/_/g, " ")}`));
   // Every conversation starts with a greeting and an introduction: before anything else
@@ -139,9 +141,12 @@ export interface CustomerMenu {
   actions: { action: CustomerAction; label: string }[];
 }
 
-const REACTIONS: Option[] = [
+// After a demo. "Another" is one of the phones staff already offered; "other
+// phones" is asking about anything else, which sends staff back to questions.
+const reactions = (ctx: Ctx, shown: string): Option[] => [
   { id: "happy", label: "Leaning towards this one" },
-  { id: "another", label: "Ask to see another" },
+  ...(demoCandidates(ctx).filter((m) => m !== shown).length > 0 ? [{ id: "another", label: "Ask to see another one you offered" }] : []),
+  { id: "others", label: "Ask about other phones" },
   { id: "expensive", label: "Say it's too expensive" },
   { id: "notforme", label: "Say it's not for me" },
   { id: "unsure", label: "Undecided", neutral: true },
@@ -160,7 +165,7 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
   } else if (p.kind === "offer_demo") {
     options = [...p.models.map((m) => ({ id: `demo:${m}`, label: `Ask to see the ${modelById(m).name}` })), { id: "decline", label: "No demo for now", neutral: true }];
   } else if (p.kind === "demo_reaction") {
-    options = REACTIONS;
+    options = reactions(ctx, p.model);
   } else if (p.kind === "recommend") {
     options = [{ id: "yes", label: "Agree with the suggestion" }, { id: "no", label: "Turn the suggestion down" }, { id: "unsure", label: "Undecided", neutral: true }];
   } else if (p.kind === "nudge") {
@@ -235,6 +240,7 @@ export function applyStaff(sc: Scene, act: StaffAct, tone: Tone): Scene | { erro
   const owed = sc.owed;
   next.owed = null;
   next.forced = null;
+  if (act.t === "ask" && !act.reopen) next.wantsMore = false;
   next.patience = Math.min(MAX_PATIENCE, next.patience + MOOD[tone] - (act.t === "ask" ? ASK_COST : 0));
 
   let models: string[] = [];
@@ -294,7 +300,7 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
     next.forced = null; // the action replaces whatever the answer forced
     if (a.t === "leave") next.ended = { how: "left", why: "the customer left" };
     else if (a.t === "demo") next.forced = { t: "demo", model: a.model };
-    else if (a.t === "pick") next.fixed = a.model;
+    else if (a.t === "pick") switchModel(next, a.model);
     else if (a.t === "change") next.forced = { t: "ask", qid: a.qid, reopen: true };
   }
   // Staff owe an answer to whatever was thrown back, before or alongside their next move.
@@ -313,6 +319,29 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
 }
 
 const same2 = (a: CustomerAction, b: CustomerAction): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+// The customer settles on a different phone from the one they had fixed: what they
+// said they wanted travels with them.
+function switchModel(sc: Scene, to: string): void {
+  if (sc.fixed && sc.fixed !== to) keepPreferences(sc);
+  sc.fixed = to;
+}
+
+// An exact storage tier belonged to one phone; as a preference it becomes a floor
+// ("512GB, so at least 512GB"), which the next phone can meet or not. Colours stay as they are.
+function keepPreferences(sc: Scene): void {
+  const tier = sc.answers["storage_tier_for_model"]?.picks.find((p) => p.startsWith("storage:"));
+  if (!tier) return;
+  const st = tier.slice("storage:".length);
+  const gb = st.endsWith("TB") ? parseInt(st, 10) * 1024 : parseInt(st, 10);
+  const had = sc.answers["storage_need"]?.picks.find((p) => p.startsWith("min:"));
+  if (!had || Number(had.slice(4)) < gb) {
+    sc.answers["storage_need"] = { picks: [`min:${gb}`], turn: sc.turn };
+    if (!sc.order.includes("storage_need")) sc.order.push("storage_need");
+  }
+  delete sc.answers["storage_tier_for_model"];
+  sc.order = sc.order.filter((q) => q !== "storage_tier_for_model");
+}
 
 // Giving up a requirement forgets the answers that set it, so those questions can be asked afresh.
 function forget(sc: Scene, key: keyof Constraints): void {
@@ -333,7 +362,7 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     const k: Contribution = q.apply(picks);
     sc.answers[q.id] = { picks, turn: sc.turn };
     if (!sc.order.includes(q.id)) sc.order.push(q.id);
-    if (k.fix) sc.fixed = k.fix;
+    if (k.fix) switchModel(sc, k.fix);
     if (k.wanted) {
       sc.wanted = k.wanted;
       sc.owed = `not_carried:${k.wanted}`;
@@ -347,12 +376,16 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     if (pick === "decline") sc.declinedDemo.push(...p.models);
     else sc.forced = { t: "demo", model: pick.slice(5) };
   } else if (p.kind === "demo_reaction") {
-    if (pick === "happy") sc.fixed = p.model;
+    if (pick === "happy") switchModel(sc, p.model);
     else if (pick === "expensive" || pick === "notforme") sc.excluded.push(p.model);
+    else if (pick === "others") {
+      sc.excluded.push(p.model);
+      sc.wantsMore = true;
+    }
     // "Show me another" is a request: the next thing staff do is offer one, if there is one left to show.
     else if (pick === "another" && demoCandidates(derive(sc)).length > 0) sc.forced = { t: "offer_demo" };
   } else if (p.kind === "recommend") {
-    if (pick === "yes") sc.fixed = p.model;
+    if (pick === "yes") switchModel(sc, p.model);
     else if (pick === "no") sc.excluded.push(p.model);
   } else if (p.kind === "nudge") {
     if (pick.startsWith("drop:")) forget(sc, pick.slice(5) as keyof Constraints);
@@ -376,9 +409,11 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
       sc.order = sc.order.filter((q) => q !== "storage_tier_for_model");
       sc.forced = { t: "ask", qid: "storage_tier_for_model", reopen: true };
     } else if (pick === "model") {
-      // Only the model-specific answers go; budget and the rest stay.
-      for (const q of ["known_model", "colour_pick", "colour_prefs", "storage_tier_for_model"]) delete sc.answers[q];
-      sc.order = sc.order.filter((q) => !["known_model", "colour_pick", "colour_prefs", "storage_tier_for_model"].includes(q));
+      // Changing their mind about the phone is not changing what they want from it:
+      // the colour stays, the storage becomes "at least this much", budget and the rest stay.
+      keepPreferences(sc);
+      delete sc.answers["known_model"];
+      sc.order = sc.order.filter((q) => q !== "known_model");
       sc.fixed = undefined;
     }
   }

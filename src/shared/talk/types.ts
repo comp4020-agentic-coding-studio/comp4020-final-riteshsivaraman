@@ -102,6 +102,7 @@ export interface Scene {
   excluded: string[];
   demoed: string[];
   recommended: string[];
+  wantsMore: boolean; // they asked about other phones: staff ask questions again before offering anything
   declinedDemo: string[];
   relaxDeclined: number;
   wanted?: string; // a model the customer asked for that we do not carry
