@@ -21,6 +21,16 @@ const OUT = arg("out", `.talk-runs/run-${Date.now()}`);
 
 const short = (s: string, n = 90): string => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
+// A long menu would drown the transcript: keep what was picked, then the first few others.
+function menuLine(labels: { label: string; picked: boolean }[], max = 8): string {
+  const picked = labels.filter((l) => l.picked);
+  const rest = labels.filter((l) => !l.picked);
+  const keep = rest.slice(0, Math.max(0, max - picked.length));
+  const shown = labels.filter((l) => l.picked || keep.includes(l));
+  const hidden = labels.length - shown.length;
+  return shown.map((l) => (l.picked ? `**[${l.label}]**` : l.label)).join(" | ") + (hidden > 0 ? ` | (+${hidden} more)` : "");
+}
+
 function trace(seed: number): { md: string; outcome: string; turns: number } {
   const rng: Rng = makeRng(seed);
   const persona: Persona = randomPersona(rng, `seed-${seed}`);
@@ -45,7 +55,7 @@ function trace(seed: number): { md: string; outcome: string; turns: number } {
     const chosen = legal.find((v) => JSON.stringify(v.act) === JSON.stringify(sm.act));
     const sl = afterStaff.log.at(-1)!;
     out.push(`## Turn ${sl.turn}: STAFF · tone ${sl.tone} · face ${sl.expression}`);
-    out.push(`Staff menu: ${legal.map((v) => (v === chosen ? `**[${v.label}]**` : v.label)).join(" | ")}`);
+    out.push(`Staff menu: ${menuLine(legal.map((v) => ({ label: v.label, picked: v === chosen })), 12)}`);
     out.push(`Said: "${sl.text}"`);
     out.push(`Pool after: ${sl.after.rows} options, ${sl.after.models.length} models${sl.after.models.length ? ` (${sl.after.models.slice(0, 4).map((i) => modelById(i).name.replace("iPhone ", "")).join(", ")})` : ""}`);
     out.push("");
@@ -58,8 +68,8 @@ function trace(seed: number): { md: string; outcome: string; turns: number } {
     const cl = afterCust.log.find((l) => l.who === "customer" && l.turn === afterStaff.turn + 1)!;
     const picked = new Set(reply.picks ?? []);
     out.push(`## Turn ${cl.turn}: CUSTOMER · tone ${cl.tone} · face ${cl.expression}`);
-    if (menu.options.length) out.push(`Menu (${menu.multi ? "pick any" : "pick one"}): ${menu.options.map((o) => (picked.has(o.id) || [...picked].some((p) => o.param && p.startsWith(o.param.prefix)) ? `**[${o.label}]**` : o.label)).join(" | ")}`);
-    if (menu.throwbacks.length) out.push(`Could also ask: ${menu.throwbacks.map((t) => (t.id === reply.throwback ? `**[${t.label}]**` : t.label)).join(" | ")}`);
+    if (menu.options.length) out.push(`Menu (${menu.multi ? "pick any" : "pick one"}): ${menuLine(menu.options.map((o) => ({ label: o.label, picked: picked.has(o.id) || [...picked].some((p) => !!o.param && p.startsWith(o.param.prefix)) })))}`);
+    if (reply.throwback) out.push(`Also asked (from a menu of ${menu.throwbacks.length}): **[${menu.throwbacks.find((t) => t.id === reply.throwback)?.label}]**`);
     const act = reply.action;
     out.push(`Standing actions available: ${menu.actions.length} (demo/go with any phone, change an earlier answer, leave${menu.pending.kind === "free" ? ", carry on" : ""})${act ? ` · TOOK: ${menu.actions.find((a) => JSON.stringify(a.action) === JSON.stringify(act))?.label ?? act.t}` : ""}`);
     out.push(`Said: "${cl.text}"`);
