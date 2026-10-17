@@ -36,6 +36,9 @@ source: Ritesh, this session (description, then answers 1 to 8 to the grilling q
 ## Later scope (keep in mind, not now)
 - Every conversation type between any two parties in the store will need its own model on this same engine (laptop, repair, billing, backroom, staff-staff, customer-customer, ...). Keep the engine generic: scene type = roles, goal, move bank with preconditions and effects, fact state.
 
+- Staff internal handoff (Ritesh, 2026-10-17): staff need a way to pass work to each other, e.g. "John will be with you in a moment", or handing a device to a technician and reporting back when done. This is a separate system from conversations: a quick one-way message that assigns a task (radio-style), not a back-and-forth. Separate task later.
+- Billing is a different scene, likely handled by another staff member, so the phone scene ends at model + storage + colour. Trade-in, accessories, care plans and payment belong to it.
+
 ## NPCs
 - NPCs loop on quasi-random but sensible choices: pick questions that genuinely narrow, offer demos with higher probability as the pool shrinks, reopen with low probability unless forced (contradiction or empty pool).
 - A customer NPC has a hidden goal (target device, must-haves, budget) and never gives conflicting answers.
