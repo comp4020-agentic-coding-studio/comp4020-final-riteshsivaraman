@@ -29,8 +29,10 @@ export interface ActView {
 
 // ---- demos ----
 
+// A phone the customer has already seen is not offered again (they can still
+// ask for it), and one they said no to is not offered either.
 export function demoCandidates(ctx: Ctx): string[] {
-  return ctx.ranked.filter((m) => !ctx.sc.declinedDemo.includes(m.id)).slice(0, 4).map((m) => m.id);
+  return ctx.ranked.filter((m) => !ctx.sc.declinedDemo.includes(m.id) && !ctx.sc.demoed.includes(m.id)).slice(0, 4).map((m) => m.id);
 }
 
 // ---- relaxing a requirement that left nothing ----
@@ -201,7 +203,7 @@ function nearestModels(ctx: Ctx): string[] {
     const c = { ...ctx.c };
     if (m.id.startsWith("drop:")) delete c[m.id.slice(5) as keyof Constraints];
     else c.maxPrice = Number(m.id.slice(6));
-    for (const r of poolOf(c)) if (!found.includes(r.model)) found.push(r.model);
+    for (const r of poolOf(c)) if (!found.includes(r.model) && !ctx.sc.demoed.includes(r.model)) found.push(r.model);
   }
   return found.slice(0, 2);
 }

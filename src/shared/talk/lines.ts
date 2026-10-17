@@ -172,7 +172,7 @@ export function staffLine(act: StaffAct, ctx: Ctx, tone: Tone, models: string[],
   const base = staffBase(act, ctx, models);
   const body = answer && base ? `${answer} ${base}` : answer || base;
   // No cheerful lead-in when the answer they are about to hear is bad news (no deals, not carried).
-  const badNews = owed === "haggle" || (owed?.startsWith("not_carried:") ?? false);
+  const badNews = owed === "haggle" || (owed?.startsWith("not_carried:") ?? false) || act.t === "nudge" || act.t === "rescue";
   const lead = staffLead(tone, turn, ctx.sc.log[ctx.sc.log.length - 1], badNews);
   if (lead === "" || body === "") return lead + body;
   // A lead that ends mid-sentence ("Um, ") runs on into a lower-case start.

@@ -68,7 +68,7 @@ describe("every line of 400 simulated conversations", () => {
         } else {
           const prev = log[i - 1];
           if (prev?.picks?.some((p) => NEGATIVE.has(p)) && /^(Great|Lovely|Sure thing)\./.test(t)) bad.push(`${at} cheers a downbeat answer`);
-          if (/^(Great|Lovely|Sure thing)\. (That's the listed price|We don't carry)/.test(t)) bad.push(`${at} cheers bad news`);
+          if (/^(Great|Lovely|Sure thing)\. (That's the listed price|We don't carry|Nothing fits|I can't promise)/.test(t)) bad.push(`${at} cheers bad news`);
         }
         if (/  | \.|\.\.\.\./.test(t.replace(/\.\.\./g, ""))) bad.push(`${at} has stray spacing or punctuation`);
       });

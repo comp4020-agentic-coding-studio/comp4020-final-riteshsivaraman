@@ -38,6 +38,30 @@ describe(`${RUNS} NPC-vs-NPC conversations`, () => {
     expect(bad.slice(0, 5)).toEqual([]);
   });
 
+  it("never show the same phone twice unless the customer asks to see it again", () => {
+    const repeats: string[] = [];
+    for (const r of results) {
+      const shown = r.scene.demoed;
+      const asked = r.scene.log.some((l) => l.who === "customer" && l.move.includes("action:demo"));
+      if (new Set(shown).size !== shown.length && !asked) repeats.push(`seed ${r.seed}: demoed ${shown.join(", ")}`);
+    }
+    expect(repeats.slice(0, 5)).toEqual([]);
+  });
+
+  it("never offer a demo of the phone the customer has already chosen and seen", () => {
+    const bad: string[] = [];
+    for (const r of results) {
+      const log = r.scene.log;
+      let fixedAndSeen = false;
+      log.forEach((l, i) => {
+        if (l.who === "customer" && l.picks?.includes("happy")) fixedAndSeen = true;
+        if (l.who === "staff" && l.move === "offer_demo" && fixedAndSeen && l.after.models.length === 1) bad.push(`seed ${r.seed} turn ${l.turn}`);
+        void i;
+      });
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  });
+
   it("never ask a question twice except as a reopen or a retry after 'Not sure'", () => {
     const repeats: string[] = [];
     for (const r of results) {
