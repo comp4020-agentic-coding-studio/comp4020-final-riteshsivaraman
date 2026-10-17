@@ -160,6 +160,21 @@ describe("demos", () => {
     expect(derive(sc).model).toBe("17");
   });
 
+  it("turning down the phone they named releases it, so the pool is the other phones and not empty", () => {
+    for (const reaction of ["others", "notforme", "expensive"]) {
+      let sc = ask(newScene(), "known_model", ["model:17"]);
+      sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:17"] });
+      sc = cust(staff(sc, { t: "demo", model: "17" }), { picks: [reaction] });
+      const ctx = derive(sc);
+      expect(ctx.pool.length, reaction).toBeGreaterThan(0);
+      expect(ctx.ranked.map((m) => m.id), reaction).not.toContain("17");
+      expect(sc.fixed, reaction).toBeUndefined();
+      expect(staffActs(sc).some((a) => a.act.t === "nudge"), reaction).toBe(false);
+      // They are not asked which phone they had in mind: they just said they have none now.
+      expect(staffActs(sc).some((a) => a.act.t === "ask" && a.act.qid === "known_model"), reaction).toBe(false);
+    }
+  });
+
   it("'not for me' removes the model from the pool", () => {
     let sc = ask(camera(), "telephoto_need", ["yes"]);
     sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });

@@ -325,6 +325,20 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
 
 const same2 = (a: CustomerAction, b: CustomerAction): boolean => JSON.stringify(a) === JSON.stringify(b);
 
+// The customer turns a phone down. If it was the one they had fixed (they named
+// it, or chose it), it stops being fixed, or the pool would be a phone that is
+// both wanted and refused. What they wanted from it travels with them, and the
+// "which phone" question counts as answered ("no model yet").
+function setAside(sc: Scene, model: string): void {
+  if (!sc.excluded.includes(model)) sc.excluded.push(model);
+  if (sc.fixed === model) {
+    keepPreferences(sc);
+    sc.fixed = undefined;
+    sc.answers["known_model"] = { picks: ["notyet"], turn: sc.turn };
+    if (!sc.order.includes("known_model")) sc.order.push("known_model");
+  }
+}
+
 // The customer settles on a different phone from the one they had fixed: what they
 // said they wanted travels with them.
 function switchModel(sc: Scene, to: string): void {
@@ -385,9 +399,9 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     else sc.forced = { t: "demo", model: pick.slice(5) };
   } else if (p.kind === "demo_reaction") {
     if (pick === "happy") switchModel(sc, p.model);
-    else if (pick === "expensive" || pick === "notforme") sc.excluded.push(p.model);
+    else if (pick === "expensive" || pick === "notforme") setAside(sc, p.model);
     else if (pick === "others") {
-      sc.excluded.push(p.model);
+      setAside(sc, p.model);
       sc.wantsMore = true;
     }
     // "Show me another" is a request: the next thing staff do is offer one, if there is one left to show.
@@ -407,7 +421,7 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     }
   } else if (p.kind === "recommend") {
     if (pick === "yes") switchModel(sc, p.model);
-    else if (pick === "no") sc.excluded.push(p.model);
+    else if (pick === "no") setAside(sc, p.model);
   } else if (p.kind === "nudge") {
     if (pick.startsWith("drop:")) forget(sc, pick.slice(5) as keyof Constraints);
     else if (pick.startsWith("raise:")) {

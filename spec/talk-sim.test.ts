@@ -38,6 +38,11 @@ describe(`${RUNS} NPC-vs-NPC conversations`, () => {
     expect(bad.slice(0, 5)).toEqual([]);
   });
 
+  it("never end up wanting and refusing the same phone", () => {
+    const both = results.filter((r) => r.scene.fixed && r.scene.excluded.includes(r.scene.fixed)).map((r) => `seed ${r.seed}`);
+    expect(both.slice(0, 5)).toEqual([]);
+  });
+
   it("never show the same phone twice unless the customer asks to see it again", () => {
     const repeats: string[] = [];
     for (const r of results) {
