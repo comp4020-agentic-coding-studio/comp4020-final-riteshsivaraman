@@ -1,6 +1,6 @@
 ---
 name: mutation-check
-description: Deliberately break a piece of Seen's code to confirm the test suite would actually catch it, then revert the break. Use when the user says "mutation check <file/function>", "would the suite catch this if it broke", or after writing code they didn't watch get written - especially the auto-send/self-destruct catch-up timers and draft-visibility rules, where CLAUDE.md's defect loop requires this check.
+description: Deliberately break a piece of the store's code to confirm the test suite would actually catch it, then revert the break. Use when the user says "mutation check <file/function>", "would the suite catch this if it broke", or after writing code they didn't watch get written - especially queue and slot booking, finite stock races, the occupancy cap and the staff-only back-room clamp, where CLAUDE.md's defect loop requires this check.
 ---
 
 # Mutation check
@@ -17,11 +17,11 @@ what proves the suite is watching that code at all.
    top of unrelated in-progress work.
 2. **Pick one realistic bug**, not a syntax error. It should be the kind of
    mistake a plausible-but-wrong implementation would actually make:
-   - Flip a comparison (`<` to `<=`, `>` to `>=`) on a timer/deadline boundary.
+   - Flip a comparison (`<` to `<=`, `>` to `>=`) on a deadline or capacity boundary (reservation expiry, the occupancy cap).
    - Skip or make conditional a write that should be unconditional (e.g. an
      `events` insert, a visibility flag flip).
-   - Off-by-one a catch-up window or retry count.
-   - Swap which side of a draft/visibility check a condition applies to.
+   - Off-by-one a catch-up window, a stock count or a slot count.
+   - Swap which side of an authorisation check a condition applies to (the staff-only back room, who may claim or hand on).
    Pick the single most realistic bug for the target code, not the easiest
    one to catch.
 3. **Apply the mutation directly in the file** (Edit tool, not a patch file).

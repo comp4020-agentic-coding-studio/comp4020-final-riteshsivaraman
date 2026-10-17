@@ -98,36 +98,33 @@ find every resource by reading this file, not by discovering it mid-task.
   people, npcs, pose, protocol). Graphics work draws on it, never moves it.
 - `references/` — photos, visitor accounts, the experience and reel notes,
   product notes. `references/README.md` says what each is.
-- `docs/design-handoff.md` — the visual design spec the real app is built
-  against: color/type tokens, layout, the two permitted signature "dread"
-  devices, copy voice, component inventory. Came from a standalone frontend
-  exploration outside this repo; read this doc, not that directory, going
-  forward.
+- `docs/design-handoff.md` — the visual design spec of the earlier app on
+  `main`, kept as marked history. It is **not** the store's design; the store's
+  look is `docs/graphics-brief.md`. `[TK]` whether to delete it.
 - `WORKLOG.md` — current state of the build, read this first for "where did
-  we leave off." Top section is the store project; Seen's log is kept below
+  we leave off." Top section is the store project; the earlier app's log is kept below
   it as history.
 - `LEARNINGS.md` — what Ritesh is learning about prompting/working with AI
   coding assistants, cited to commits (older entries predate this and are
   stack gotchas instead).
 - `CUTS.md` — what got cut under deadline pressure and why. Entries so far
-  are Seen's (attachments from C8, auto-send check advisory-only, company
-  name `[TK]`); none yet for the store project.
+  are the earlier app's (kept as marked history); none yet for the store project.
 - `.claude/agents/event-log-reviewer.md` — checks the event-log-write-
-  completeness invariant above; run it after a subsystem build. Its prompt
-  still lists Seen's actions (send, forward, self-destruct); update it to
-  the store's actions before relying on it.
+  completeness invariant above; run it after a subsystem build. Its action list was
+  written from `service.ts` and `presence.ts` on 2026-10-17, so re-check it
+  when a new kind of action is added.
 - `.claude/agents/fiction-integrity-reviewer.md` — see "Parody integrity";
-  Seen-era prompt, needs rewriting.
+  rewritten for the store on 2026-10-17.
 - `.claude/skills/mutation-check/` — the defect-loop mutation check below,
-  on demand for code built unwatched. Examples in its text are Seen's.
+  on demand for code built unwatched. Examples in its text were rewritten for the store on 2026-10-17.
 - `tools/layout/index.html` + `scripts/layout-server.ts` (`pnpm layout`, port 8124) —
   the floor-plan editor for tables, benches and stools; writes only
   `src/shared/layout.json`. After saving run `node scripts/blueprint.ts`.
 - `docs/graphics-brief.md` — the brief the four graphics specialists work to:
   fixed sizes, budget, ownership of `src/client/src/gfx/*`, how to check a look.
-- `README.md`, `PROCESS.md`, `reflections/crit-8.md` — currently describe
-  Seen. Ritesh's prose; they need his rewrite for the store project, and
-  nothing here should paper over that.
+- `README.md`, `PROCESS.md`, `reflections/crit-8.md` — Ritesh's prose.
+  `README.md` is a scaffold of facts and `[TK]` markers for him to write
+  into; `reflections/crit-8.md` is marked history of the earlier app.
 - `pnpm dev` (`scripts/dev.ts`) — server on 8080 plus the client on 5173 with
   hot reload; open http://localhost:5173.
 - `references/table-map.md` — my reading of what stands on each table in the

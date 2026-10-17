@@ -1,6 +1,6 @@
 ---
 status: active
-what: Running state of the Seen build, kept current so a fresh session can pick up without re-deriving context.
+what: Running state of the store build (the earlier app's history is kept at the bottom), kept current so a fresh session can pick up without re-deriving context.
 date: 2026-10-06
 ---
 
@@ -39,7 +39,7 @@ check before relying on it):
 - Genius Bar queue, slots, stock, budget, the device interaction and its
   persistent trace: SCOPE Tier 1 items 6, 10, 11 are not visibly built.
   `events` only logs join/leave/role.
-- Whether the Fly app is still serving Seen, or the store: not checked.
+- Whether the Fly app is serving the store or the earlier app: not checked.
 - `pnpm check` and `pnpm check:evidence` status on this branch: not run.
 
 **Still open** (from SCOPE.md): brand name `[TK]`, occupancy cap (D12),
@@ -363,10 +363,11 @@ near the greeter could auto-approach it before this test's own customer
 reached it. Fixed with `fileParallelism: false` in vitest.config.ts (whole
 suite: ~2s -> ~8s, worth it) — 5 consecutive clean runs after.
 
-**Docs that still describe Seen:** `README.md`, `PROCESS.md`,
-`reflections/crit-8.md`, ADRs 1 and 2, `CUTS.md` entries, and the prompts in
-`.claude/agents/` and `.claude/skills/mutation-check/`. Flagged in CLAUDE.md.
-README and PROCESS are Ritesh's prose.
+**Docs that still describe the earlier app:** `reflections/crit-8.md`, ADRs 1
+and 2 and `CUTS.md` entries, all kept as marked history. As of 2026-10-17 the
+`.claude/agents/` prompts and `.claude/skills/mutation-check/` are rewritten for
+the store, and `README.md` is rebuilt as a scaffold. README and PROCESS are
+Ritesh's prose.
 
 ---
 

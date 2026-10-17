@@ -116,8 +116,7 @@ textures or fonts (`docs/graphics-brief.md`). Never presented as official.
 Before shipping, a fresh subagent with no prior context reviews the live app
 for stray real names and for visible COMP4020/crit/marker language inside
 the app itself. The repo's own docs are expected to say it's a COMP4020
-project. **`.claude/agents/fiction-integrity-reviewer.md` needs rewriting for the
-store before use.**
+project. `.claude/agents/fiction-integrity-reviewer.md` runs this check.
 
 ## Keys never touch this repo
 Gemini key (D8, runtime AI with a fallback; boundary still open) and
