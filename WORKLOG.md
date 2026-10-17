@@ -10,6 +10,25 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## In progress: conversation model rebuild (started 2026-10-17)
+
+Replacing the slot engine (`scripts/sim/`, the phones script in
+`src/shared/conversation.ts`) with a menu-only, pool-and-ranking model for the
+phone-specialist scene. Settled design: `docs/conversation-model/decisions.md`.
+Data: `devices.json`. Examples and tests-to-be: `transcripts/` (11 files),
+`scenarios.md` (17 customer briefs). The old engine stays until Ritesh approves
+the POC; then remove it and write the ADR (supersedes ADR 6).
+
+Build plan, each step committed on its own:
+1. `src/shared/talk/` data + pool + ranking, with golden tests.
+2. Question bank + scene engine (pure TS, no DOM).
+3. Replay tests: the transcripts as menu-pick scripts the engine must accept.
+4. NPCs (hidden-goal customer, staff) + seeded NPC-vs-NPC invariants + coverage.
+5. `poc/talk/` HTML chat page: play either side against an NPC; `pnpm poc`.
+6. Two-tab human mode via BroadcastChannel (throwaway).
+
+Check `git log` for which steps have landed.
+
 ## Current state: store project (branch `new-idea`, as of 2026-10-11)
 
 Nothing from Seen is carried over (D1, `b61f6c7`). Scope and decisions D1 to
