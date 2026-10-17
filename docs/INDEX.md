@@ -33,6 +33,7 @@ find every resource by reading this file, not by discovering it mid-task.
   the database, menu conversations, employees online see customers' states. Facts
   filled in, reasoning `[TK]` for Ritesh. Read before touching `visitors`,
   `player_state`, `conversations`, `stock` or `src/shared/conversation.ts`.
+- `docs/adr/0003-conversations-and-player-state.md`, addendum 2026-10-18 — the table of what each action checks on the server, and the stdout log (`src/server/eventlog.ts`). Crit 10's "decision written down with why".
 - `docs/customer-journeys.md` — seven end-to-end customer transcripts (draft, for
   Ritesh's review) and what they imply; read before writing any conversation
   script. Prices and policies in it are `[TK]`/`[verify]`.

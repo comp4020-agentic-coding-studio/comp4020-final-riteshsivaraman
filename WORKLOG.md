@@ -10,6 +10,12 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## Crit 10 prep: stdout log and the authorisation note (2026-10-18)
+
+Crit 10 narrates "who did what" from `flyctl logs`; until now only "listening on" reached stdout. `a60962b`: `src/server/eventlog.ts` turns every events row into one line (`<iso time> [tag] type user=<id> k=v`), called beside both INSERTs (`service.ts` `log()`, `presence.ts` `logEvent()`). Conversation lines share a tag; tokens and typed notes are kept out. `spec/eventlog.test.ts` pins the format. D18's server clamp was already there (`clampToWalkable` in `presence.ts`, tested in `presence.test.ts`); added a `staff_area_refused` event for the first refusal per approach, and join now logs name, kind and role. ADR 3 has a new addendum (what each action checks, the self-chosen-role gap). `reflections/crit-10.md` is a skeleton only.
+
+Open: role is self-chosen (`DEV_ROLE_SWITCH`), decide before the crit whether to back it. Not yet run against the deployed app: do `flyctl logs --no-tail` after the next deploy. Throttled-connection check not done.
+
 ## Conversation model: phone scene built, documented (2026-10-18)
 
 All six steps below landed (`687bafb` to `2f3c2f2`), then play-testing and two automated review passes (`32878f7` to `417f949`). Everything is in `docs/conversation-model/README.md` (start there). Next: Ritesh approves the POC, then the ADR, then the next scenes (`conversation-types.md`).

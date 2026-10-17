@@ -358,3 +358,9 @@ checked): the reviewer is cheap and finds what the writer cannot see, but it
 is noisy, so every claim gets a spot-check and every fix gets re-reviewed on
 seeds it has not seen. The review reports and the specs that pin each
 finding are in the repo.
+
+## The events table recorded everything, and `flyctl logs` still showed nothing
+
+[`a60962b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a60962b)
+
+Every state change already wrote an `events` row, so the app looked well logged, but the only stdout line was "listening on". Crit 10 reads logs with `flyctl logs`, which shows stdout and never the SQLite file. Lesson (week 10 tl;dr: "logs help only when a command the agent can run prints them"): a record nobody can read with the command in hand is not yet a log. The fix put one line per event on stdout beside the existing insert, and the check was two real WebSocket clients plus a search of the output for every session token.
