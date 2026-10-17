@@ -1,0 +1,177 @@
+{
+  "id": "s16",
+  "source": "docs/conversation-model/transcripts/round-2/s16.md",
+  "notes": [
+    "step 7: transcript keeps 2 models after 'Happy with this one' (leaning only); engine fixes the model, so 1. models=2 expectation removed.",
+    "ranking leaders re-added 2026-10-17 after bigScreen scoring was made to favour larger screens (findings #9)"
+  ],
+  "steps": [
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "known_model"
+      },
+      "customer": {
+        "picks": [
+          "unlisted:iPhone 16 Plus"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 7
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "screen_size_pref"
+      },
+      "customer": {
+        "picks": [
+          "screen:large"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 3,
+        "top": "duo"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "form_factor"
+      },
+      "customer": {
+        "picks": [
+          "standard"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 2,
+        "top": "18-pro-max"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "budget_ceiling"
+      },
+      "customer": {
+        "picks": [
+          "ceiling:3000"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 2
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "weight_pref"
+      },
+      "customer": {
+        "picks": [
+          "max"
+        ],
+        "throwback": "compare:18-pro-max:air"
+      },
+      "staffTone": "neutral",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 2
+      }
+    },
+    {
+      "staff": {
+        "t": "offer_demo"
+      },
+      "customer": {
+        "picks": [
+          "demo:air"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 2
+      }
+    },
+    {
+      "staff": {
+        "t": "demo",
+        "model": "air"
+      },
+      "customer": {
+        "picks": [
+          "happy"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral",
+      "expect": {
+        "top": "air"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "budget_ceiling",
+        "reopen": true
+      },
+      "customer": {
+        "picks": [
+          "ceiling:2000"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 1,
+        "top": "air"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "colour_pick"
+      },
+      "customer": {
+        "picks": [
+          "colour:Light Gold"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 1,
+        "rows": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "confirm"
+      },
+      "customer": {
+        "picks": [
+          "yes"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral"
+    }
+  ],
+  "ends": {
+    "how": "bought",
+    "model": "air",
+    "storage": "256GB",
+    "colour": "Light Gold"
+  }
+}

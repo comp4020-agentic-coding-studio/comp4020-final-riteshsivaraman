@@ -112,7 +112,8 @@ export function score(m: ModelRec, s: Signals): number {
   if (s.video) n += (m.fourK120 ? 1 : 0) + (m.prores ? 1 : 0);
   if (s.battery) n += batteryPoints(m.batteryHours);
   for (const f of s.features ?? []) if (m[f] === true) n += 1;
-  if (s.bigScreen && screenBand(m.screenIn) === "large") n += 1;
+  // Among the large screens the bigger one leads: a flat point would tie them all.
+  if (s.bigScreen && screenBand(m.screenIn) === "large") n += 1 + (m.screenIn - 6.5) / 10;
   if (s.light) n += lightPoints(m.weightG);
   return n;
 }

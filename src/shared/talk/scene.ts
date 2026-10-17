@@ -1,5 +1,5 @@
 import { askable, derive, gain, money, newScene, optionsFor, questionById, reopenable, rowsIf, withoutAnswer, type Contribution } from "./bank.ts";
-import { modelById } from "./data.ts";
+import { MODELS, modelById } from "./data.ts";
 import { customerLine, staffLine, throwbacks } from "./lines.ts";
 import { ceil100, poolOf, type Constraints, type Sku } from "./pool.ts";
 import type { Ctx, CustomerAction, CustomerReply, Line, Option, Pending, Scene, StaffAct, Tone } from "./types.ts";
@@ -108,8 +108,12 @@ function hintFor(ctx: Ctx, qid: string): string {
   const opts = optionsFor(ctx, q).filter((o) => !o.neutral && !o.param);
   const models = opts.map((o) => modelCountIf(ctx, qid, o.id));
   // When the models don't change, the question is still narrowing storage or colour rows.
-  if (models.every((n) => n === ctx.ranked.length)) return `${ctx.pool.length} options → ${opts.map((o) => rowsIf(ctx, qid, [o.id])).join(" / ")}`;
-  return `${ctx.ranked.length} models → ${models.join(" / ")}`;
+  if (models.every((n) => n === ctx.ranked.length)) {
+    const rows = opts.map((o) => rowsIf(ctx, qid, [o.id]));
+    return `${ctx.pool.length} options → ${rows.length > 6 ? rows.slice(0, 6).join(" / ") + " …" : rows.join(" / ")}`;
+  }
+  const shown = models.length > 6 ? `${models.slice(0, 6).join(" / ")} …` : models.join(" / ");
+  return `${ctx.ranked.length} models → ${shown}`;
 }
 
 function modelCountIf(ctx: Ctx, qid: string, pick: string): number {
@@ -169,7 +173,9 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
   }
   const actions: CustomerMenu["actions"] = [];
   if (ctx.pool.length > 0 || p.kind === "nudge" || p.kind === "rescue") {
-    for (const m of ctx.ranked.slice(0, 7)) {
+    // Any phone we carry, not only the ones still in the pool: naming a model
+    // does not stop the customer wanting to see its neighbour.
+    for (const m of MODELS) {
       actions.push({ action: { t: "demo", model: m.id }, label: `Can I try the ${m.name}?` });
       actions.push({ action: { t: "pick", model: m.id }, label: `I'll go with the ${m.name}` });
     }
@@ -264,20 +270,25 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
   next.forced = null;
   let move = "answer";
 
-  if (reply.action) {
-    const a = reply.action;
-    if (!menu.actions.some((x) => same2(x.action, a))) return { error: "that is not an action on the menu" };
-    move = `action:${a.t}`;
-    if (a.t === "leave") next.ended = { how: "left", why: "the customer left" };
-    else if (a.t === "demo") next.forced = { t: "demo", model: a.model };
-    else if (a.t === "pick") next.fixed = a.model;
-    else if (a.t === "change") next.forced = { t: "ask", qid: a.qid, reopen: true };
-  } else {
-    const picks = reply.picks ?? [];
+  // A reply can answer the question and also do something ("Lavender, and can I try the 17?"):
+  // the answer is applied first.
+  const picks = reply.picks ?? [];
+  const answering = picks.length > 0 || !reply.action;
+  if (answering) {
     const bad = menu.pending.kind === "free" ? "pick an action" : validPicks(picks, menu.options, menu.multi);
     if (bad) return { error: bad };
     const err = answer(next, ctx, menu, picks);
     if (err) return { error: err };
+  }
+  if (reply.action && !next.ended) {
+    const a = reply.action;
+    if (!menu.actions.some((x) => same2(x.action, a))) return { error: "that is not an action on the menu" };
+    move = answering ? `answer+action:${a.t}` : `action:${a.t}`;
+    next.forced = null; // the action replaces whatever the answer forced
+    if (a.t === "leave") next.ended = { how: "left", why: "the customer left" };
+    else if (a.t === "demo") next.forced = { t: "demo", model: a.model };
+    else if (a.t === "pick") next.fixed = a.model;
+    else if (a.t === "change") next.forced = { t: "ask", qid: a.qid, reopen: true };
   }
   // Staff owe an answer to whatever was thrown back, before or alongside their next move.
   if (reply.throwback) next.owed = reply.throwback;
