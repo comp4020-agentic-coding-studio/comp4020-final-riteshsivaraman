@@ -28,6 +28,7 @@ find every resource by reading this file, not by discovering it mid-task.
   storage, or the data model. An accepted record is
   never edited; a changed decision gets a new, numbered record that
   supersedes it and says why.
+- `docs/adr/0007-stack.md` — ADR 7 (draft): the stack as it stands (R3F, Hono + ws, SQLite on a Fly volume). Facts filled in, reasoning `[TK]` for Ritesh. Read before changing stack, storage or the real-time transport.
 - `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
   the database, menu conversations, employees online see customers' states. Facts
   filled in, reasoning `[TK]` for Ritesh. Read before touching `visitors`,
