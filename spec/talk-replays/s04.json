@@ -1,140 +1,125 @@
 {
- "id": "s04",
- "source": "docs/conversation-model/transcripts/round-2/s04.md",
- "notes": [
-  "step 3: transcript throw-back was attribute_query(17e, Camera Control); no per-feature attribute throw-back exists, nearest is compare:17e:17 (whose answer covers Camera Control)."
- ],
- "steps": [
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "opening_intent"
-   },
-   "customer": {
-    "picks": [
-     "line"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 7,
-    "top": "17e"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "model_family"
-   },
-   "customer": {
-    "picks": [
-     "line:17"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 2,
-    "top": "17e"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "hardware_features"
-   },
-   "customer": {
-    "picks": [
-     "notsure"
-    ],
-    "throwback": "compare:17e:17"
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 2
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "budget_ceiling"
-   },
-   "customer": {
-    "picks": [
-     "ceiling:1100"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 0
-   }
-  },
-  {
-   "staff": {
-    "t": "nudge"
-   },
-   "customer": {
-    "picks": [
-     "raise:1200"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "impatient",
-   "expect": {
-    "models": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "offer_demo"
-   },
-   "customer": {
-    "picks": [
-     "decline"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "impatient",
-   "expect": {
-    "models": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "colour_pick"
-   },
-   "customer": {
-    "picks": [
-     "colour:White"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 1
-   }
-  },
-  {
-   "staff": {
-    "t": "confirm"
-   },
-   "customer": {
-    "picks": [
-     "yes"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "neutral"
+  "id": "s04",
+  "source": "docs/conversation-model/transcripts/round-2/s04.md",
+  "notes": [
+    "step 3: transcript throw-back was attribute_query(17e, Camera Control); no per-feature attribute throw-back exists, nearest is compare:17e:17 (whose answer covers Camera Control).",
+    "2026-10-17: the engine now asks feature questions only once use or budget is known (review L11), so the transcript's early hardware_features step is gone and its compare throw-back rides on the budget answer. The answer is about the two phones in play when it was asked (owedPool), even though the budget empties the pool."
+  ],
+  "steps": [
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "opening_intent"
+      },
+      "customer": {
+        "picks": [
+          "line"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 7,
+        "top": "17e"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "model_family"
+      },
+      "customer": {
+        "picks": [
+          "line:17"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 2,
+        "top": "17e"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "budget_ceiling"
+      },
+      "customer": {
+        "picks": [
+          "ceiling:1100"
+        ],
+        "throwback": "compare:17e:17"
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 0
+      }
+    },
+    {
+      "staff": {
+        "t": "nudge"
+      },
+      "customer": {
+        "picks": [
+          "raise:1200"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "impatient",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "offer_demo"
+      },
+      "customer": {
+        "picks": [
+          "decline"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "impatient",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "colour_pick"
+      },
+      "customer": {
+        "picks": [
+          "colour:White"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "confirm"
+      },
+      "customer": {
+        "picks": [
+          "yes"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral"
+    }
+  ],
+  "ends": {
+    "how": "bought",
+    "model": "17e",
+    "storage": "256GB",
+    "colour": "White"
   }
- ],
- "ends": {
-  "how": "bought",
-  "model": "17e",
-  "storage": "256GB",
-  "colour": "White"
- }
 }

@@ -22,6 +22,7 @@ export interface Constraints {
   maxScreenIn?: number; // "something smaller" than the one just shown
   separateTelephoto?: boolean;
   minBattery?: number; // video-playback hours
+  features?: ("cameraControl" | "dynamicIsland" | "promotion")[]; // things they said they need; a phone listed without one is out
 }
 
 export interface Signals {
@@ -54,6 +55,7 @@ function modelPasses(m: ModelRec, c: Constraints): boolean {
   if (c.screen && screenBand(m.screenIn) !== c.screen) return false;
   if (c.maxScreenIn !== undefined && m.screenIn > c.maxScreenIn) return false;
   if (c.separateTelephoto && !m.separateTelephoto) return false;
+  if (c.features?.some((f) => m[f] === false)) return false; // not stated is not "no"
   if (c.minBattery !== undefined && !keeps(m.batteryHours, (v) => (v as number) >= c.minBattery!)) return false;
   return true;
 }
@@ -87,6 +89,7 @@ export function mergeConstraints(a: Constraints, b: Constraints): Constraints {
   if (a.maxScreenIn !== undefined && b.maxScreenIn !== undefined) out.maxScreenIn = Math.min(a.maxScreenIn, b.maxScreenIn);
   if (a.lines && b.lines) out.lines = a.lines.filter((l) => b.lines!.includes(l));
   if (a.colours && b.colours) out.colours = a.colours.filter((x) => b.colours!.includes(x));
+  if (a.features || b.features) out.features = [...new Set([...(a.features ?? []), ...(b.features ?? [])])];
   if (a.excluded || b.excluded) out.excluded = [...new Set([...(a.excluded ?? []), ...(b.excluded ?? [])])];
   return out;
 }

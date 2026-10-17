@@ -336,3 +336,121 @@ describe("finishing", () => {
     expect(customerMenu(sc)!.options.some((o) => o.id === "notsure")).toBe(false);
   });
 });
+
+// Findings from the first automated review of 40 simulated conversations
+// (docs/conversation-model/review/review-1.md), each pinned by a spec.
+describe("review 1: honest answers", () => {
+  it("'of these' means the phones they were looking at when they asked, not the pool after their answer", () => {
+    // They say Lavender (leaving only the 17) and in the same breath ask which is lightest.
+    let sc = ask(camera(), "colour_prefs", ["colour:Lavender"], { throwback: "attr:weight" });
+    sc = staff(sc, { t: "answer" });
+    const t = sc.log.at(-1)!.text;
+    expect(t).toMatch(/lightest at 165g/); // the Air, out of everything they had been looking at
+    expect(t).toMatch(/Of the ones we've been looking at/);
+    expect(t).not.toMatch(/of these/);
+  });
+
+  it("a telephoto question is answered from the phones in play, never 'none of these' for a range that has them", () => {
+    let sc = ask(camera(), "telephoto_need", ["yes"], { throwback: "attr:tele" });
+    sc = staff(sc, { t: "answer" });
+    expect(sc.log.at(-1)!.text).toMatch(/only the iPhone 18 Pro( Max)? and iPhone 18 Pro( Max)? have a separate telephoto lens/);
+    expect(sc.log.at(-1)!.text).not.toMatch(/crop/i); // not in the data
+  });
+
+  it("says when what they told us has cut the list of storage sizes, instead of passing it off as the range", () => {
+    let sc = ask(opened(), "storage_need", ["min:512"]);
+    sc = cust(staff(sc, { t: "ask", qid: "use_case" }), { action: { t: "pick", model: "18-pro-max" } });
+    sc = staff(sc, { t: "ask", qid: "storage_tier_for_model" });
+    expect(sc.log.at(-1)!.text).toBe("With what you've told me, you could have it in 512GB, 1TB or 2TB. Which would you like?");
+    const plain = staff(ask(newScene(), "known_model", ["model:18-pro-max"]), { t: "ask", qid: "storage_tier_for_model" });
+    expect(plain.log.at(-1)!.text).toBe("It comes in 256GB, 512GB, 1TB or 2TB. Which would you like?");
+  });
+
+  it("describes the foldable's two screens and which screen its battery figure is for", () => {
+    let sc = cust(staff(ask(opened(), "use_case", ["travel"]), { t: "ask", qid: "form_factor" }), { action: { t: "demo", model: "duo" } });
+    sc = staff(sc, { t: "demo", model: "duo" });
+    expect(sc.log.at(-1)!.text).toMatch(/a 7\.6" screen inside and a 5\.4" screen outside/);
+    expect(sc.log.at(-1)!.text).toMatch(/up to 44 hours of video playback on the outer screen/);
+  });
+
+  it("a feature they say matters is a requirement: a phone listed without it is out, and one that does not say stays", () => {
+    const sc = ask(ask(opened(), "use_case", ["photos"]), "hardware_features", ["promotion"]);
+    const ids = derive(sc).ranked.map((m) => m.id);
+    expect(ids).not.toContain("17e"); // "No ProMotion technology"
+    expect(ids).toContain("16"); // the page is silent: not stated is not "no"
+  });
+
+  it("price talk is for the till and promises nothing", () => {
+    let sc = ask(camera(), "telephoto_need", ["yes"], { throwback: "haggle" });
+    sc = staff(sc, { t: "answer" });
+    expect(sc.log.at(-1)!.text).toBe("That's the listed price, I'm afraid. Anything beyond that is for the till to sort out.");
+    expect(sc.log.at(-1)!.text).not.toMatch(/deal/);
+  });
+});
+
+describe("review 1: answering what was said", () => {
+  it("'I know the range' gets 'which range' next, and 'I have a phone in mind' gets 'which one'", () => {
+    const line = cust(staff(newScene(), { t: "ask", qid: "opening_intent" }), { picks: ["line"] });
+    expect(staffActs(line).map((a) => a.act)).toEqual([{ t: "ask", qid: "model_family" }]);
+    const know = cust(staff(newScene(), { t: "ask", qid: "opening_intent" }), { picks: ["know"] });
+    expect(staffActs(know).map((a) => a.act)).toEqual([{ t: "ask", qid: "known_model" }]);
+  });
+
+  it("'what have you got?' gets an overview from the data before the next question", () => {
+    let sc = ask(newScene(), "known_model", ["notyet"]);
+    sc = staff(sc, { t: "ask", qid: "use_case" });
+    expect(sc.log.at(-1)!.text).toMatch(/^We've got 7 iPhones, starting from A\$1,149 for the iPhone 17e up to A\$3,499 for the iPhone Duo\. /);
+  });
+
+  it("does not recommend before it knows what the phone is for or what it should cost", () => {
+    const rec = (sc: Scene) => staffActs(sc).some((a) => a.act.t === "recommend");
+    expect(rec(ask(opened(), "form_factor", ["standard"]))).toBe(false);
+    expect(rec(ask(opened(), "budget_ceiling", ["ceiling:2300"]))).toBe(true);
+  });
+
+  it("asks about features and colours only after it knows the use or the budget", () => {
+    const asks = (sc: Scene) => staffActs(sc).flatMap((a) => (a.act.t === "ask" ? [a.act.qid] : []));
+    expect(asks(opened())).not.toContain("hardware_features");
+    expect(asks(opened())).not.toContain("colour_prefs");
+    expect(asks(ask(opened(), "use_case", ["photos"]))).toEqual(expect.arrayContaining(["hardware_features", "colour_prefs"]));
+  });
+
+  it("lists the phones still on offer as 'also', once some have been shown", () => {
+    let sc = ask(camera(), "telephoto_need", ["yes"]);
+    sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
+    sc = cust(staff(sc, { t: "demo", model: "18-pro" }), { picks: ["another"] });
+    sc = staff(sc, { t: "offer_demo" });
+    // Not "it": the phone they just saw was the 18 Pro, so "it" would be ambiguous.
+    expect(sc.log.at(-1)!.text).toBe("I could also show you the iPhone 18 Pro Max. Would you like to have a look at it?");
+  });
+});
+
+describe("review 1: how it sounds", () => {
+  it("a customer who leaves says only that, with no stock phrase after it", () => {
+    const sc = cust(staff(opened(), { t: "ask", qid: "use_case" }), { action: { t: "leave" }, tone: "impatient" });
+    expect(sc.log.at(-2)!.text).toBe("I'll leave it there, thanks.");
+  });
+
+  it("describes a phone in sentences, and says the demo-unit note once", () => {
+    let sc = cust(staff(opened(), { t: "ask", qid: "use_case" }), { action: { t: "demo", model: "17e" } });
+    sc = staff(sc, { t: "demo", model: "17e" });
+    const first = sc.log.at(-1)!.text;
+    // They asked to try it by name, so it is "it" and not named again.
+    expect(first).toMatch(/^Here it is\. It has .* and starts from A\$1,149\./);
+    expect(first).not.toMatch(/;/);
+    expect(first).toMatch(/The demo unit might not be the colour/);
+    // The note about the demo unit is said on the first demo only.
+    sc = cust(sc, { picks: ["unsure"] });
+    sc = cust(staff(sc, { t: "ask", qid: "use_case" }), { action: { t: "demo", model: "17" } });
+    const second = staff(sc, { t: "demo", model: "17" }).log.at(-1)!.text;
+    expect(second).not.toMatch(/The demo unit might not be the colour/);
+  });
+
+  it("apologises for bad news and puts no lead-in before it", () => {
+    for (const tone of ["friendly", "neutral", "impatient", "unsure"] as const) {
+      const sc = staff(ask(opened(), "form_factor", ["fold"]), { t: "ask", qid: "budget_ceiling" }, tone);
+      const nudge = staff(cust(sc, { picks: ["ceiling:2000"] }), { t: "nudge" }, tone).log.at(-1)!.text;
+      expect(nudge, tone).toMatch(/^(Um, )?[Ss]orry, nothing fits /);
+    }
+  });
+});

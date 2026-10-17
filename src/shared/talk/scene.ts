@@ -20,6 +20,26 @@ const MAX_PATIENCE = 8;
 const same = (a: StaffAct, b: StaffAct): boolean => JSON.stringify(a) === JSON.stringify(b);
 const clone = (sc: Scene): Scene => structuredClone(sc);
 
+// What each question means, for the staff menu (the spoken line is different).
+const ASK_LABEL: Record<string, string> = {
+  opening_intent: "Ask what brings them in",
+  known_model: "Ask if they have a phone in mind",
+  model_family: "Ask which range they mean",
+  use_case: "Ask what it is for",
+  form_factor: "Ask standard or foldable",
+  screen_size_pref: "Ask about screen size",
+  telephoto_need: "Ask if they want a telephoto lens",
+  battery_priority: "Ask how long the battery must last",
+  weight_pref: "Ask if weight matters",
+  hardware_features: "Ask which features matter",
+  storage_need: "Ask how much storage",
+  budget_ceiling: "Ask about budget",
+  colour_prefs: "Ask about colours",
+  size_fit_check: "Ask if the screen size suits them",
+  storage_tier_for_model: "Ask which storage",
+  colour_pick: "Ask which colour",
+};
+
 export interface ActView {
   act: StaffAct;
   label: string;
@@ -87,7 +107,7 @@ export function staffActs(sc: Scene): ActView[] {
     const open = askable(ctx);
     for (const q of open) {
       const g = gain(ctx, q);
-      out.push(view({ t: "ask", qid: q.id }, `Ask: ${q.id.replace(/_/g, " ")}`, g, hintFor(ctx, q.id)));
+      out.push(view({ t: "ask", qid: q.id }, ASK_LABEL[q.id] ?? `Ask: ${q.id.replace(/_/g, " ")}`, g, hintFor(ctx, q.id)));
     }
     // After "ask about other phones" staff go back to questions before offering anything.
     const hold = sc.wantsMore && open.length > 0;
@@ -96,7 +116,7 @@ export function staffActs(sc: Scene): ActView[] {
     // Wishes that came with them from a phone they moved away from are worth checking before building on them.
     if (sc.carried) out.push(view({ t: "reconfirm" }, "Check their earlier wishes still stand"));
     // Recommending something before learning anything about them would just be the cheapest phone.
-    const informed = sc.order.some((q) => questionById(q).kind !== "route");
+    const informed = !!(sc.answers["use_case"] || sc.answers["budget_ceiling"]);
     if (!hold && ctx.model === null && (informed || open.length === 0)) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
   }
   for (const q of reopenable(ctx)) out.push(view({ t: "ask", qid: q.id, reopen: true }, `Reopen: ${q.id.replace(/_/g, " ")}`));
@@ -243,6 +263,7 @@ export function applyStaff(sc: Scene, act: StaffAct, tone: Tone): Scene | { erro
   const ctx = derive(sc);
   const owed = sc.owed;
   next.owed = null;
+  next.owedPool = null;
   next.forced = null;
   if (act.t === "ask" && !act.reopen) next.wantsMore = false;
   next.patience = Math.min(MAX_PATIENCE, next.patience + MOOD[tone] - (act.t === "ask" ? ASK_COST : 0));
@@ -309,7 +330,10 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
     else if (a.t === "change") next.forced = { t: "ask", qid: a.qid, reopen: true };
   }
   // Staff owe an answer to whatever was thrown back, before or alongside their next move.
-  if (reply.throwback) next.owed = reply.throwback;
+  if (reply.throwback) {
+    next.owed = reply.throwback;
+    next.owedPool = ctx.ranked.map((m) => m.id); // "of these" will mean the phones in play now, not after their answer
+  }
 
   next.turn++;
   next.pending = null;
@@ -391,6 +415,10 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     }
     if (k.gift) sc.gift = true;
     if (k.end) sc.ended = { how: "left", why: "went to another desk" };
+    // Staff answer what was said: "I know the range" gets which range; "what have you got?" gets an overview.
+    if (q.id === "opening_intent" && picks[0] === "know") sc.forced = { t: "ask", qid: "known_model" };
+    if (q.id === "opening_intent" && picks[0] === "line") sc.forced = { t: "ask", qid: "model_family" };
+    if (q.id === "known_model" && picks.includes("notyet")) sc.owed = "overview";
     return null;
   }
   const pick = picks[0]!;

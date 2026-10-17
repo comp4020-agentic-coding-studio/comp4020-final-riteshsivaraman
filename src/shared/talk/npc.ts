@@ -3,7 +3,7 @@ import { MODELS, modelById } from "./data.ts";
 import { ceil100, poolOf, screenBand, type Constraints } from "./pool.ts";
 import { chance, pickOne, weighted, type Rng } from "./rng.ts";
 import { applyCustomer, applyStaff, customerMenu, staffActs, type CustomerMenu } from "./scene.ts";
-import { TONES, type CustomerReply, type Scene, type StaffAct, type Tone } from "./types.ts";
+import { type CustomerReply, type Scene, type StaffAct, type Tone } from "./types.ts";
 
 // NPCs. Neither is scripted: each turn they choose among the moves the engine
 // says are legal, with weights and a little noise, so conversations differ but
@@ -157,7 +157,14 @@ export function customerMove(sc: Scene, persona: Persona, rng: Rng, mem: Memory 
     const right = p.target ? r.model === p.target.model && r.storage === p.target.storage && r.colour === p.target.colour : poolOf(p.wants).some((x) => x.model === r.model && x.storage === r.storage && x.colour === r.colour);
     reply = { picks: [right ? "yes" : "leave"], tone: t };
   }
-  if (!reply.action && menu.throwbacks.length && chance(rng, p.throwbackRate)) reply.throwback = pickOne(rng, menu.throwbacks).id;
+  if (!reply.action && menu.throwbacks.length && chance(rng, p.throwbackRate)) {
+    // Not the same thing twice, and only about phones their own answer leaves in play.
+    const asked = new Set(sc.log.filter((l) => l.who === "customer" && l.throwback).map((l) => l.throwback));
+    const after = applyCustomer(sc, reply);
+    const left = "error" in after ? null : new Set(derive(after).ranked.map((m) => m.id));
+    const ok = menu.throwbacks.filter((t) => !asked.has(t.id) && (!left || (t.id.startsWith("compare:") ? t.id.split(":").slice(1).every((m) => left.has(m)) : t.id.startsWith("attr:") ? left.size >= 2 : true)));
+    if (ok.length) reply.throwback = pickOne(rng, ok).id;
+  }
   return reply;
 }
 
@@ -176,14 +183,16 @@ export function staffMove(sc: Scene, tr: StaffTraits, rng: Rng): { act: StaffAct
   const acts = staffActs(sc);
   const lastCustomerTone = [...sc.log].reverse().find((l) => l.who === "customer")?.tone;
   const impatient = lastCustomerTone === "impatient";
-  const t: Tone = impatient ? weighted(rng, [{ item: "friendly", w: 3 }, { item: "neutral", w: 2 }]) : pickOne(rng, tr.tones);
+  const picked: Tone = impatient ? weighted(rng, [{ item: "friendly", w: 3 }, { item: "neutral", w: 2 }]) : pickOne(rng, tr.tones);
+  // Nobody greets a customer impatiently or unsurely.
+  const t: Tone = sc.log.length === 0 && (picked === "impatient" || picked === "unsure") ? "neutral" : picked;
   const ctx = derive(sc);
   const models = ctx.ranked.length;
   const weights = acts.map((v) => {
     const a = v.act;
     let w = 0;
     if (acts.length === 1) w = 1;
-    else if (a.t === "ask" && a.reopen) w = ctx.pool.length === 0 ? 1 : 0.05;
+    else if (a.t === "ask" && a.reopen) w = ctx.pool.length === 0 ? 1 : 0; // never for no reason: only when nothing fits
     else if (a.t === "ask") {
       const q = questionById(a.qid);
       w = a.qid === "opening_intent" && sc.turn === 0 ? 6 : a.qid === "known_model" && sc.turn === 0 ? 2 : 0.2 + v.gain * 3;
@@ -201,7 +210,12 @@ export function staffMove(sc: Scene, tr: StaffTraits, rng: Rng): { act: StaffAct
   return { act: weighted(rng, weights), tone: t };
 }
 
-export const randomStaff = (rng: Rng): StaffTraits => ({ thorough: 0.6 + rng(), salesy: 0.6 + rng(), tones: TONES.filter((_, i) => i < 2 || chance(rng, 0.25)) });
+export const randomStaff = (rng: Rng): StaffTraits => ({
+  thorough: 0.6 + rng(),
+  salesy: 0.6 + rng(),
+  // Mostly warm; now and then unsure, rarely short.
+  tones: ["friendly", "neutral", ...(chance(rng, 0.25) ? (["unsure"] as Tone[]) : []), ...(chance(rng, 0.12) ? (["impatient"] as Tone[]) : [])],
+});
 
 // ---- personas ----
 

@@ -50,6 +50,7 @@ export function newScene(): Scene {
     toMove: "staff",
     pending: null,
     owed: null,
+    owedPool: null,
     forced: null,
     ended: null,
     log: [],
@@ -66,15 +67,40 @@ const givenCeiling = (ctx: Ctx): number | null => {
 };
 const NOTSURE: Option = { id: "notsure", label: "Not sure about this", neutral: true };
 const uniq = <T>(xs: T[]): T[] => [...new Set(xs)];
+const capitalise = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
 const nameOf = (id: string): string => modelById(id).name;
 // A reopened question can come up after the model has been dropped again, so its wording can't assume one.
 const thePhone = (ctx: Ctx): string => (ctx.model ? nameOf(ctx.model) : "phone");
 // Once a phone has been named by either side, staff stop introducing it again and say "it".
-export const named = (ctx: Ctx, id: string | null): boolean => id !== null && ctx.sc.log.some((l) => l.text.includes(nameOf(id)));
+// "It" is the phone talked about most recently, and only if that line talked about just that one:
+// after a list of phones, or after a different phone, "it" would be ambiguous.
+export function mentioned(text: string): string[] {
+  const found: string[] = [];
+  let rest = text;
+  // Longest names first, blanking each as it is found, so "iPhone 18 Pro" is not read inside "iPhone 18 Pro Max".
+  for (const m of [...MODELS].sort((a, b) => b.name.length - a.name.length)) {
+    if (rest.includes(m.name)) {
+      found.push(m.id);
+      rest = rest.split(m.name).join(" ");
+    }
+  }
+  return found;
+}
+export const named = (ctx: Ctx, id: string | null): boolean => {
+  if (id === null) return false;
+  for (let i = ctx.sc.log.length - 1; i >= 0; i--) {
+    const m = mentioned(ctx.sc.log[i]!.text);
+    if (m.length > 0) return m.length === 1 && m[0] === id;
+  }
+  return false;
+};
 const valueOf = (picks: string[], prefix: string): string | undefined => picks.find((p) => p.startsWith(prefix))?.slice(prefix.length);
 const pickedIds = (picks: string[], prefix: string): string[] => picks.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length));
 const poolModels = (ctx: Ctx) => ctx.ranked;
 const varies = (vals: unknown[]): boolean => new Set(vals).size > 1;
+const orList = (xs: string[]): string => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}`);
+// Cosmetic and technical questions wait until staff know what the phone is for or what it should cost.
+const knowsBasics = (ctx: Ctx): boolean => !!(ctx.sc.answers["use_case"] || ctx.sc.answers["budget_ceiling"]);
 
 export function describeConstraints(c: Constraints): string[] {
   const out: string[] = [];
@@ -85,6 +111,7 @@ export function describeConstraints(c: Constraints): string[] {
   if (c.screen) out.push(`a ${c.screen} screen`);
   if (c.maxScreenIn !== undefined) out.push("a smaller screen");
   if (c.separateTelephoto) out.push("a separate telephoto lens");
+  if (c.features?.length) out.push(c.features.map((f) => FEATURE_LABEL[f].toLowerCase()).join(" and "));
   if (c.minBattery !== undefined) out.push(`${c.minBattery}+ hours of video playback`);
   // An exact tier already says it; "at least 256GB, 512GB" would say it twice.
   if (c.minGB !== undefined && c.storage === undefined) out.push(`at least ${c.minGB >= 1024 ? c.minGB / 1024 + "TB" : c.minGB + "GB"}`);
@@ -207,7 +234,7 @@ export const BANK: QuestionDef[] = [
   {
     id: "telephoto_need",
     kind: "hard",
-    ask: () => "Most of our phones get their 2x zoom by cropping the main camera, which Apple calls optical-quality 2x. Only some have a separate telephoto lens as well. Do you want a separate telephoto lens?",
+    ask: () => "The main camera on each of our phones also gives a 2x zoom, but only some have a separate telephoto lens as well. Do you want a separate telephoto lens?",
     // A technical question: only once they have said they care about the camera.
     pre: (ctx) => (ctx.s.photos === true || ctx.s.video === true) && varies(poolModels(ctx).map((m) => m.separateTelephoto)),
     options: () => [
@@ -249,16 +276,20 @@ export const BANK: QuestionDef[] = [
   },
   {
     id: "hardware_features",
-    kind: "soft",
+    // A feature they say matters is a requirement: a phone listed without it is out.
+    kind: "hard",
     multi: true,
-    ask: () => "Do any of these matter to you?",
-    pre: (ctx) => featuresThatVary(ctx).length > 0,
+    ask: (ctx) => `Do any of these matter to you: ${orList(featuresThatVary(ctx).map((f) => FEATURE_LABEL[f]))}?`,
+    pre: (ctx) => knowsBasics(ctx) && featuresThatVary(ctx).length > 0,
     options: (ctx) => [
       ...featuresThatVary(ctx).map((f) => ({ id: f, label: FEATURE_LABEL[f] })),
       { id: "none", label: "None of these matter", neutral: true },
       NOTSURE,
     ],
-    apply: (picks) => ({ s: { features: picks.filter((p): p is "cameraControl" | "dynamicIsland" | "promotion" => p in FEATURE_LABEL) } }),
+    apply: (picks) => {
+      const features = picks.filter((p): p is "cameraControl" | "dynamicIsland" | "promotion" => p in FEATURE_LABEL);
+      return features.length ? { c: { features }, s: { features } } : {};
+    },
   },
   {
     id: "storage_need",
@@ -279,7 +310,8 @@ export const BANK: QuestionDef[] = [
       const n = givenCeiling(ctx);
       return reopen && n !== null ? `You said up to ${money(n)}. Still right?` : "What's the most you'd like to spend?";
     },
-    pre: (ctx) => priceBands(ctx.pool).length > 0,
+    // Not once they have chosen the phone: the storage question does the work then. Down to one phone by elimination, a ceiling can still matter (it may leave nothing).
+    pre: (ctx) => !ctx.sc.fixed && priceBands(ctx.pool).length > 0,
     options: (ctx) => {
       const n = givenCeiling(ctx);
       const bands = priceBands(ctx.pool);
@@ -301,7 +333,7 @@ export const BANK: QuestionDef[] = [
     kind: "hard",
     multi: true,
     ask: () => "Is there a colour that catches your eye?",
-    pre: (ctx) => !ctx.model && uniq(ctx.pool.map((r) => r.colour)).length > 1,
+    pre: (ctx) => knowsBasics(ctx) && !ctx.model && uniq(ctx.pool.map((r) => r.colour)).length > 1,
     options: (ctx) => [...uniq(ctx.pool.map((r) => r.colour)).sort().map((col) => ({ id: `colour:${col}`, label: `Colour: ${col}` })), NOTSURE],
     apply: (picks) => {
       const cols = pickedIds(picks, "colour:");
@@ -329,7 +361,13 @@ export const BANK: QuestionDef[] = [
   {
     id: "storage_tier_for_model",
     kind: "resolve",
-    ask: (ctx) => `${named(ctx, ctx.model) ? "It" : `The ${thePhone(ctx)}`} comes in ${uniq(ctx.pool.map((r) => r.storage)).join(", ")}. Which would you like?`,
+    ask: (ctx) => {
+      // Say what it comes in; if what they have said has cut the list, say that, rather than pass the cut list off as the range.
+      const shown = uniq(ctx.pool.map((r) => r.storage));
+      const full = ctx.model ? modelById(ctx.model).tiers.length : shown.length;
+      const who = named(ctx, ctx.model) ? "it" : `the ${thePhone(ctx)}`;
+      return shown.length === full ? `${capitalise(who)} comes in ${orList(shown)}. Which would you like?` : `With what you've told me, you could have ${who} in ${orList(shown)}. Which would you like?`;
+    },
     pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.storage)).length > 1,
     options: (ctx) => [
       ...uniq(ctx.pool.map((r) => r.storage)).map((st) => ({ id: `storage:${st}`, label: `Storage: ${st} (${money(Math.min(...ctx.pool.filter((r) => r.storage === st).map((r) => r.price)))})` })),

@@ -115,6 +115,7 @@ export interface Scene {
   toMove: Role;
   pending: Pending | null;
   owed: string | null; // a throw-back the staff must answer next
+  owedPool: string[] | null; // the phones the customer was looking at when they asked it: "of these" means these
   forced: StaffAct | null; // the only thing staff may do next
   ended: Ended | null;
   log: Line[];

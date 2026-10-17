@@ -81,6 +81,38 @@ describe(`${RUNS} NPC-vs-NPC conversations`, () => {
     expect(early.slice(0, 5)).toEqual([]);
   });
 
+  it("open warmly: the first staff line is never impatient or unsure", () => {
+    const bad = results.filter((r) => !["friendly", "neutral"].includes(r.scene.log[0]!.tone)).map((r) => `seed ${r.seed}: ${r.scene.log[0]!.tone}`);
+    expect(bad.slice(0, 5)).toEqual([]);
+  });
+
+  it("never reopen an answered question for no reason", () => {
+    const bad: string[] = [];
+    for (const r of results) {
+      const log = r.scene.log;
+      log.forEach((l, i) => {
+        if (l.who !== "staff" || !l.move.includes("reopen")) return;
+        const prev = log[i - 1];
+        const asked = prev?.move.startsWith("action:change") || prev?.move.includes("action:change") || prev?.picks?.some((p) => p === "colour" || p === "storage") || prev?.after.rows === 0;
+        if (!asked) bad.push(`seed ${r.seed} turn ${l.turn}: reopened ${l.qid}`);
+      });
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  });
+
+  it("never throw back the same question twice in one conversation", () => {
+    const bad: string[] = [];
+    for (const r of results) {
+      const seen = new Set<string>();
+      for (const l of r.scene.log) {
+        if (l.who !== "customer" || !l.throwback) continue;
+        if (seen.has(l.throwback)) bad.push(`seed ${r.seed}: ${l.throwback} twice`);
+        seen.add(l.throwback);
+      }
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  });
+
   it("never ask a question twice except as a reopen or a retry after 'Not sure'", () => {
     const repeats: string[] = [];
     for (const r of results) {

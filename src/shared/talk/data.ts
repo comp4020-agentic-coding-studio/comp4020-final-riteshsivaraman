@@ -20,11 +20,13 @@ export interface ModelRec {
   line: "18" | "17" | "air" | "16" | "duo"; // derived from the name; the scrape has no family field
   foldable: boolean;
   screenIn: number; // largest screen (the Duo's inner display)
+  outerIn: number | null; // the foldable's outer display
   weightG: number | null;
   lenses: number; // rear camera lines listed
   separateTelephoto: boolean; // a lens line named "Telephoto" of its own, not the 2x crop most models advertise
   maxZoomX: number | null; // furthest optical(-quality) zoom in; null when no range line
-  batteryHours: number | null; // first "Up to N hours" video-playback figure (the Duo's is its outer display)
+  batteryHours: number | null; // first "Up to N hours" video-playback figure
+  batteryOuter: boolean; // that figure is for the outer display (the Duo's)
   promotion: Tri;
   dynamicIsland: Tri;
   cameraControl: Tri;
@@ -75,11 +77,13 @@ function normalise(m: RawModel): ModelRec {
     line: /Pro|18/.test(name) ? "18" : /Air/.test(name) ? "air" : /Duo/.test(name) ? "duo" : /17/.test(name) ? "17" : "16",
     foldable: typeof dims === "object" && dims !== null && !Array.isArray(dims),
     screenIn: parseFloat(/(\d+(?:\.\d+)?)-inch/.exec(inner)?.[1] ?? "NaN"),
+    outerIn: typeof screen === "object" && screen !== null ? Number(/(\d+(?:\.\d+)?)-inch/.exec((screen as { outer: string }).outer)?.[1] ?? NaN) || null : null,
     weightG: Number(/(\d+) grams/.exec(text(m, "weight_g") ?? "")?.[1] ?? NaN) || null,
     lenses: rear.length,
     separateTelephoto: rear.some((l) => /Fusion Telephoto/.test(l)),
     maxZoomX: Number(/(\d+)x optical(?:-quality)? zoom in/.exec(zoom ?? "")?.[1] ?? NaN) || null,
     batteryHours: Number(/Up to (\d+) hours/.exec(text(m, "battery_video_playback") ?? "")?.[1] ?? NaN) || null,
+    batteryOuter: /outer display/.test(text(m, "battery_video_playback") ?? ""),
     promotion: feature(text(m, "refresh_rate_promotion"), /ProMotion/, /No ProMotion/),
     dynamicIsland: feature(text(m, "dynamic_island"), /Dynamic Island/, /No Dynamic Island/),
     cameraControl: feature(text(m, "camera_control"), /Camera Control/, /No Camera Control/),

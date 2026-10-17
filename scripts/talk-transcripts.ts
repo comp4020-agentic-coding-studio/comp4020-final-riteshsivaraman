@@ -21,6 +21,9 @@ const OUT = arg("out", `.talk-runs/run-${Date.now()}`);
 
 const short = (s: string, n = 90): string => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
+const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
+const poolText = (rows: number, models: string[]): string => `${plural(rows, "option")}, ${plural(models.length, "model")}${models.length ? ` (${models.slice(0, 4).map((i) => modelById(i).name.replace("iPhone ", "")).join(", ")}${models.length > 4 ? `, +${models.length - 4} more` : ""})` : ""}`;
+
 // A long menu would drown the transcript: keep what was picked, then the first few others.
 function menuLine(labels: { label: string; picked: boolean }[], max = 8): string {
   const picked = labels.filter((l) => l.picked);
@@ -57,7 +60,7 @@ function trace(seed: number): { md: string; outcome: string; turns: number } {
     out.push(`## Turn ${sl.turn}: STAFF · tone ${sl.tone} · face ${sl.expression}`);
     out.push(`Staff menu: ${menuLine(legal.map((v) => ({ label: v.label, picked: v === chosen })), 12)}`);
     out.push(`Said: "${sl.text}"`);
-    out.push(`Pool after: ${sl.after.rows} options, ${sl.after.models.length} models${sl.after.models.length ? ` (${sl.after.models.slice(0, 4).map((i) => modelById(i).name.replace("iPhone ", "")).join(", ")})` : ""}`);
+    out.push(`Pool after: ${poolText(sl.after.rows, sl.after.models)}`);
     out.push("");
     // ---- customer ----
     const menu = customerMenu(afterStaff);
@@ -74,7 +77,7 @@ function trace(seed: number): { md: string; outcome: string; turns: number } {
     out.push(`Standing actions available: ${menu.actions.length} (demo/go with any phone, change an earlier answer, leave${menu.pending.kind === "free" ? ", carry on" : ""})${act ? ` · TOOK: ${menu.actions.find((a) => JSON.stringify(a.action) === JSON.stringify(act))?.label ?? act.t}` : ""}`);
     out.push(`Said: "${cl.text}"`);
     const c = derive(afterCust);
-    out.push(`Pool after: ${c.pool.length} options, ${c.ranked.length} models${c.ranked.length ? ` (${c.ranked.slice(0, 4).map((m) => m.name.replace("iPhone ", "")).join(", ")})` : ""}`);
+    out.push(`Pool after: ${poolText(c.pool.length, c.ranked.map((m) => m.id))}`);
     out.push("");
     sc = afterCust;
     if (sc.ended) {

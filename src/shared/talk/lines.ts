@@ -1,6 +1,5 @@
 import { describeConstraints, money, named, questionById } from "./bank.ts";
-import { modelById, type ModelRec } from "./data.ts";
-import { cheapest } from "./pool.ts";
+import { MODELS, modelById, type ModelRec } from "./data.ts";
 import type { Ctx, CustomerReply, Line, Option, Pending, StaffAct, Tone } from "./types.ts";
 
 // Wording. Every line is built from the scene's state and the sourced data, so
@@ -19,22 +18,29 @@ import type { Ctx, CustomerReply, Line, Option, Pending, StaffAct, Tone } from "
 // What a customer's answer sounded like, so staff do not say "Great." to "Not sure."
 const NEGATIVE = new Set(["notsure", "unsure", "no", "notforme", "expensive", "keep", "decline", "think", "avg", "notyet"]);
 
+// The ways a customer can turn something down, as against merely not being sure.
+const REJECT = new Set(["notforme", "expensive", "no", "others", "keep", "decline", "think"]);
+
 const staffLead = (tone: Tone, turn: number, prev: Line | undefined, badNews: boolean): string => {
   if (turn <= 1) return ""; // the first line is a plain hello, whatever the tone
+  // Bad news carries its own apology; nothing goes in front of it.
+  if (badNews) return tone === "unsure" ? "Um, " : "";
+  const picks = prev?.who === "customer" ? (prev.picks ?? []) : [];
   // They asked to change something: acknowledge it, don't just ask the next question.
-  if (prev?.who === "customer" && prev.picks?.some((p) => p === "colour" || p === "storage" || p === "model" || p === "another" || p === "others") && tone === "friendly") return "Of course. ";
-  const downbeat = badNews || (prev?.who === "customer" && (prev.picks?.some((p) => NEGATIVE.has(p)) ?? false));
+  if (picks.some((p) => p === "colour" || p === "storage" || p === "model" || p === "another" || p === "others") && tone === "friendly") return "Of course. ";
+  const rejected = picks.some((p) => REJECT.has(p));
+  const hesitant = !rejected && picks.some((p) => NEGATIVE.has(p));
   const pool: Record<Tone, string[]> = {
-    friendly: downbeat ? ["No problem. ", "That's fine. "] : ["", "Great. ", "Lovely. ", "Sure thing. "],
+    friendly: rejected ? ["Understood. ", "No problem. "] : hesitant ? ["That's fine. ", "No problem. "] : ["", "Great. ", "Lovely. ", "Sure thing. "],
     neutral: [""],
-    impatient: ["Right. ", "OK. "],
-    unsure: ["Um, ", "Let me see... "],
+    impatient: rejected || hesitant ? ["Right. "] : ["Right. ", "OK. "],
+    unsure: ["Um, ", "Hmm, "],
   };
-  const lead = pool[tone][turn % pool[tone].length]!;
-  return lead;
+  return pool[tone][turn % pool[tone].length]!;
 };
 
-const lcFirst = (t: string): string => t.charAt(0).toLowerCase() + t.slice(1);
+// Lower-case the first letter when a lead-in runs on, except for "I", "I'd" and the like.
+const lcFirst = (t: string): string => (/^I(\b|')/.test(t) || /^iPhone/.test(t) ? t : t.charAt(0).toLowerCase() + t.slice(1));
 const capFirst = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
 const stop = (t: string): string => (/[.?!]$/.test(t) ? t : t + ".");
 const names = (ids: string[]): string => ids.map((i) => modelById(i).name).join(", ");
@@ -50,19 +56,25 @@ const list = (xs: string[], word = "and"): string => (xs.length <= 1 ? (xs[0] ??
 
 // ---- facts a staff member may read out about a model ----
 
+// The Duo's figures depend on which screen: say so.
+const screenPhrase = (m: ModelRec): string => (m.foldable && m.outerIn ? `a ${m.screenIn}" screen inside and a ${m.outerIn}" screen outside` : `a ${m.screenIn}" screen`);
+const startingPrice = (m: ModelRec): number => Math.min(...m.tiers.map((t) => t.price));
+
+// What to say about a phone, as noun phrases that read after "It has", chosen by what the customer cares about.
 export function highlights(m: ModelRec, ctx: Ctx): string[] {
   const out: string[] = [];
   const noSignals = !ctx.s.photos && !ctx.s.video && !ctx.s.battery && !ctx.s.light;
   if (ctx.s.photos || noSignals) out.push(`${m.lenses} rear camera ${m.lenses === 1 ? "line" : "lines"}${m.separateTelephoto ? ", including a separate telephoto lens" : ""}`);
   if (ctx.s.video && m.fourK120) out.push("4K Dolby Vision video at up to 120 fps");
   if (ctx.s.video && m.prores) out.push("ProRes recording");
-  if (ctx.s.battery && m.batteryHours) out.push(`up to ${m.batteryHours} hours of video playback`);
-  if (ctx.s.light && m.weightG) out.push(`${m.weightG}g`);
-  out.push(`a ${m.screenIn}" screen`);
+  if (ctx.s.battery && m.batteryHours) out.push(`up to ${m.batteryHours} hours of video playback${m.batteryOuter ? " on the outer screen" : ""}`);
+  if (ctx.s.light && m.weightG) out.push(`a weight of ${m.weightG}g`);
+  out.push(screenPhrase(m));
   if (m.frame) out.push(`${/^[aeiou]/.test(m.frame) ? "an" : "a"} ${m.frame} frame`);
-  out.push(`from ${money(Math.min(...m.tiers.map((t) => t.price)))}`);
   return out.slice(0, 4);
 }
+
+const describe = (m: ModelRec, ctx: Ctx): string => `It has ${list(highlights(m, ctx))} and starts from ${money(startingPrice(m))}.`;
 
 // ---- the answers to the things a customer can throw back ----
 
@@ -96,41 +108,48 @@ const best = (ms: ModelRec[], by: (m: ModelRec) => number | null, dir: 1 | -1): 
   return known.filter((m) => by(m) === top);
 };
 
-export function answerThrowback(id: string, ctx: Ctx): string {
-  const ms = ctx.ranked;
+// "Of these" means the phones they were looking at when they asked, even if the
+// answer they gave in the same breath has since narrowed the pool.
+const SCOPE = "of the ones we've been looking at";
+
+export function answerThrowback(id: string, ctx: Ctx, scope: string[] | null = null): string {
+  const ms = scope ? scope.map(modelById) : ctx.ranked;
+  if (id === "overview") {
+    const byStart = [...MODELS].sort((a, b) => startingPrice(a) - startingPrice(b));
+    return `We've got ${MODELS.length} iPhones, starting from ${money(startingPrice(byStart[0]!))} for the ${byStart[0]!.name} up to ${money(startingPrice(byStart[byStart.length - 1]!))} for the ${byStart[byStart.length - 1]!.name}.`;
+  }
   if (id.startsWith("compare:")) {
     const [, a, b] = id.split(":");
     const [x, y] = [modelById(a!), modelById(b!)];
-    const px = Math.min(...x.tiers.map((t) => t.price));
-    const py = Math.min(...y.tiers.map((t) => t.price));
-    const bits = [`The ${x.name} has a ${x.screenIn}" screen from ${money(px)}; the ${y.name} has a ${y.screenIn}" screen from ${money(py)}.`];
-    if (x.separateTelephoto !== y.separateTelephoto) bits.push(`Only the ${x.separateTelephoto ? x.name : y.name} has a separate telephoto lens.`);
-    if (x.batteryHours && y.batteryHours && x.batteryHours !== y.batteryHours) bits.push(`Video playback is up to ${x.batteryHours} hours on the ${x.name} and ${y.batteryHours} on the ${y.name}.`);
+    const bits = [`The ${x.name} has ${screenPhrase(x)} and starts from ${money(startingPrice(x))}; the ${y.name} has ${screenPhrase(y)} and starts from ${money(startingPrice(y))}.`];
+    if (x.separateTelephoto !== y.separateTelephoto) bits.push(`Only the ${x.separateTelephoto ? x.name : y.name} of the two has a separate telephoto lens.`);
+    if (x.batteryHours && y.batteryHours && x.batteryHours !== y.batteryHours) bits.push(`Video playback is up to ${x.batteryHours} hours on the ${x.name}${x.batteryOuter ? " (outer screen)" : ""} and ${y.batteryHours} on the ${y.name}${y.batteryOuter ? " (outer screen)" : ""}.`);
     return bits.join(" ");
   }
-  // The answer they gave in the same turn can have emptied the pool.
-  if (id.startsWith("attr:") && ms.length === 0) return "Right now nothing fits what you've told me, so there's nothing to compare.";
   if (id === "attr:tele") {
     const withLens = ms.filter((m) => m.separateTelephoto);
-    return withLens.length === 0 ? "None of these has a separate telephoto lens; they get 2x by cropping the main camera." : `Only the ${names(withLens.map((m) => m.id))} ${withLens.length === 1 ? "has" : "have"} a separate telephoto lens; the rest get 2x by cropping the main camera.`;
+    return withLens.length === 0
+      ? `None ${SCOPE} has a separate telephoto lens; their main cameras give a 2x zoom.`
+      : `Of the ones we've been looking at, only the ${list(withLens.map((m) => m.name), "and")} ${withLens.length === 1 ? "has" : "have"} a separate telephoto lens; the others' main cameras give a 2x zoom.`;
   }
   if (id === "attr:battery") {
     const b = best(ms, (m) => m.batteryHours, 1);
-    return b.length ? `The ${names(b.map((m) => m.id))} ${b.length === 1 ? "has" : "have"} the longest video playback of these, up to ${b[0]!.batteryHours} hours.` : "I'd have to check the battery figures.";
+    return b.length ? `${capFirst(SCOPE)}, the ${names(b.map((m) => m.id))} ${b.length === 1 ? "has" : "have"} the longest video playback, up to ${b[0]!.batteryHours} hours${b[0]!.batteryOuter ? " on the outer screen" : ""}.` : "I'd have to check the battery figures.";
   }
   if (id === "attr:weight") {
     const b = best(ms, (m) => m.weightG, -1);
-    return b.length ? `The ${names(b.map((m) => m.id))} ${b.length === 1 ? "is" : "are"} the lightest of these at ${b[0]!.weightG}g.` : "I'd have to check the weights.";
+    return b.length ? `${capFirst(SCOPE)}, the ${names(b.map((m) => m.id))} ${b.length === 1 ? "is" : "are"} the lightest at ${b[0]!.weightG}g.` : "I'd have to check the weights.";
   }
   if (id === "attr:screen") {
     const b = best(ms, (m) => m.screenIn, 1);
-    return `The ${names(b.map((m) => m.id))} ${b.length === 1 ? "has" : "have"} the biggest screen of these at ${b[0]!.screenIn}".`;
+    return `${capFirst(SCOPE)}, the ${names(b.map((m) => m.id))} ${b.length === 1 ? "has" : "have"} the biggest screen at ${b[0]!.screenIn}"${b[0]!.foldable ? " when open" : ""}.`;
   }
   if (id === "attr:price") {
-    const b = best(ms, (m) => cheapest(ctx.pool, m.id), -1);
-    return `The ${names(b.map((m) => m.id))} ${b.length === 1 ? "is" : "are"} the cheapest of these, from ${money(cheapest(ctx.pool, b[0]!.id))}.`;
+    const b = best(ms, (m) => startingPrice(m), -1);
+    return `${capFirst(SCOPE)}, the ${names(b.map((m) => m.id))} ${b.length === 1 ? "is" : "are"} the cheapest, from ${money(startingPrice(b[0]!))}.`;
   }
-  if (id === "haggle") return "That's the listed price, I'm afraid. I'd have to check on any deals, and I can't promise one.";
+  // Price talk is for the till, and nothing is promised.
+  if (id === "haggle") return "That's the listed price, I'm afraid. Anything beyond that is for the till to sort out.";
   // We have no data on a phone we don't sell, so nothing is claimed about how close anything else is to it.
   if (id.startsWith("not_carried:")) return `Sorry, we don't carry the ${id.slice("not_carried:".length)}. I can show you what we do have.`;
   return "";
@@ -149,17 +168,24 @@ export function staffBase(act: StaffAct, ctx: Ctx, models: string[]): string {
         const m = modelById(models[0]!).name;
         // Told which phone, not narrowed down to one: acknowledge it without saying its name back.
         if (ctx.sc.answers["known_model"]?.picks.includes(`model:${models[0]}`)) return "Good choice. Would you like to have a look at it?";
-        return named(ctx, models[0]!) ? "Would you like to have a look at it?" : `That leaves the ${m}. Would you like to have a look at it?`;
+        if (named(ctx, models[0]!)) return "Would you like to have a look at it?";
+        // After showing others, the last one is "also", not what is "left".
+        if (ctx.sc.demoed.length > 0 || ctx.sc.declinedDemo.length > 0) return `I could also show you the ${m}. Would you like to have a look at it?`;
+        return `That leaves the ${m}. Would you like to have a look at it?`;
       }
+      // Some have been shown already: the others are "also", not "the ones that fit".
+      if (ctx.sc.demoed.length > 0 || ctx.sc.declinedDemo.length > 0) return `I could also show you the ${list(models.map((id) => modelById(id).name), "or")}. Want to try one?`;
       return `${models.length} phones fit: ${names(models)}. Want to try any?`;
     }
     case "demo": {
       const m = modelById(act.model);
-      return `${named(ctx, m.id) ? "Here it is" : `Here's the ${m.name}`}: ${highlights(m, ctx).join("; ")}. The demo unit might not be the colour we'd get you, and I'd have to check what's in stock. What do you think?`;
+      // The note about the demo unit's colour is said once, not on every demo.
+      const note = ctx.sc.demoed.length === 0 ? " The demo unit might not be the colour we'd get you, and I'd have to check what's in stock." : "";
+      return `${named(ctx, m.id) ? "Here it is." : `Here's the ${m.name}.`} ${describe(m, ctx)}${note} What do you think?`;
     }
     case "recommend": {
       const m = modelById(act.model);
-      return `I'd suggest the ${m.name}: ${highlights(m, ctx).join("; ")}. Does that sound right?`;
+      return `I'd suggest the ${m.name}. ${describe(m, ctx)} Does that sound right?`;
     }
     case "reconfirm": {
       const c = ctx.sc.carried ?? {};
@@ -180,7 +206,7 @@ export function staffBase(act: StaffAct, ctx: Ctx, models: string[]): string {
 }
 
 export function staffLine(act: StaffAct, ctx: Ctx, tone: Tone, models: string[], owed: string | null, turn: number): string {
-  const answer = owed ? answerThrowback(owed, ctx) : "";
+  const answer = owed ? answerThrowback(owed, ctx, ctx.sc.owedPool) : "";
   const base = staffBase(act, ctx, models);
   const body = answer && base ? `${answer} ${base}` : answer || base;
   // No cheerful lead-in when the answer they are about to hear is bad news (no deals, not carried).
@@ -335,11 +361,11 @@ export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, tur
     const sentences = qid === "use_case" || qid === "colour_prefs" || qid === "colour_pick" || qid === "hardware_features" ? [say(reply.picks[0]!, reply.picks, optionLabel(opts, reply.picks[0]!), qid, pending.kind, reply.tone, lab, onlyOne)] : reply.picks.map((p) => say(p, reply.picks!, optionLabel(opts, p), qid, pending.kind, reply.tone, lab, onlyOne));
     body = body ? `${sentences.join(" ")} ${body}` : sentences.join(" ");
   }
-  // A little tone on the end of a statement: always grammatical, never a clash.
-  const sureAnswer = reply.picks?.every((p) => !NEGATIVE.has(p)) ?? false;
-  if (body && /\.$/.test(body) && !reply.throwback) {
+  // A little tone on the end of a plain answer: always grammatical, never after an action (a leave) or a refusal.
+  const sureAnswer = reply.picks?.every((p) => !NEGATIVE.has(p) && !REJECT.has(p)) ?? false;
+  if (body && /\.$/.test(body) && !reply.throwback && !reply.action && reply.picks?.length) {
     if (reply.tone === "friendly" && sureAnswer && turn % 3 === 0) body += " Thanks!";
-    if (reply.tone === "impatient" && turn % 3 === 0) body += " Can we keep going?";
+    if (reply.tone === "impatient" && sureAnswer && turn % 3 === 0) body += turn % 2 === 0 ? " What's next?" : " Can we move on?";
   }
   if (reply.throwback) body = `${body ? stop(body) + " " : ""}${throwbackSaid(reply.throwback, ctx)}`;
   // Their first words back are a hello.
