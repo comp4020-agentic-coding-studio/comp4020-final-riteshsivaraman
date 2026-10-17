@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm typecheck && pnpm test",
     "check:evidence": "node scripts/check-evidence.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:talk": "vitest run --config vitest.talk.config.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",
