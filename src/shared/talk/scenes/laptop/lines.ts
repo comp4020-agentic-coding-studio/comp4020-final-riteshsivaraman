@@ -40,11 +40,14 @@ export function closingLine(ended: { how: "bought" } | { how: "left"; why: strin
 const list = (xs: string[], word = "and"): string => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} ${word} ${xs[xs.length - 1]}`);
 
 const startingPrice = (m: ModelRec): number => Math.min(...m.tiers.map((t) => t.price));
+// Chip names are read as letters ("M-five"), not words, so "M5" and "A19"
+// take "an" the way "an MRI" does, not the "a" a written M would suggest.
+const anChip = (chip: string): string => (/^[MA]\d/.test(chip) ? "an" : "a");
 
 export function highlights(m: ModelRec, ctx: Ctx): string[] {
   const out: string[] = [];
   const noSignals = !ctx.s.portability && !ctx.s.performance && !ctx.s.battery && !ctx.s.screen;
-  if (ctx.s.performance || noSignals) out.push(`a ${m.chip} chip (${m.cpuCores}-core CPU, ${m.gpuCores}-core GPU)`);
+  if (ctx.s.performance || noSignals) out.push(`${anChip(m.chip)} ${m.chip} chip (${m.cpuCores}-core CPU, ${m.gpuCores}-core GPU)`);
   if (ctx.s.portability) out.push(`a weight of ${(m.weightG / 1000).toFixed(2)}kg`);
   if (ctx.s.battery) out.push(`up to ${m.batteryHours} hours of video playback`);
   out.push(`a ${m.screenIn}" display`);
@@ -108,13 +111,13 @@ export function answerThrowback(id: string, ctx: Ctx, scope: string[] | null = n
   if (id.startsWith("compare:")) {
     const [, a, b] = id.split(":");
     const [x, y] = [modelById(a!), modelById(b!)];
-    const bits = [`The ${x.name} has a ${x.chip} chip and starts from ${money(startingPrice(x))}; the ${y.name} has a ${y.chip} chip and starts from ${money(startingPrice(y))}.`];
+    const bits = [`The ${x.name} has ${anChip(x.chip)} ${x.chip} chip and starts from ${money(startingPrice(x))}; the ${y.name} has ${anChip(y.chip)} ${y.chip} chip and starts from ${money(startingPrice(y))}.`];
     if (x.batteryHours !== y.batteryHours) bits.push(`Battery is up to ${x.batteryHours} hours on the ${x.name} and ${y.batteryHours} on the ${y.name}.`);
     return bits.join(" ");
   }
   if (id === "attr:performance") {
     const b = best(ms, (m) => m.cpuCores, 1);
-    return b.length ? `${basis}, ${whoHas(b, "has", "have")} the most processing power, a ${b[0]!.chip} chip.` : "I'd have to check the chip specs.";
+    return b.length ? `${basis}, ${whoHas(b, "has", "have")} the most processing power, ${anChip(b[0]!.chip)} ${b[0]!.chip} chip.` : "I'd have to check the chip specs.";
   }
   if (id === "attr:battery") {
     const b = best(ms, (m) => m.batteryHours, 1);
