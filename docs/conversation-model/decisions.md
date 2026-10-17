@@ -49,6 +49,9 @@ source: Ritesh, this session (description, then answers 1 to 8 to the grilling q
 - After a demo they did not like there are two distinct options: **another one you offered** (a demo of one of the other offered phones; hidden when none is left) and **ask about other phones** (the shown phone is set aside and staff go back to asking questions before offering a demo or a recommendation).
 - Once a phone has been named by either side, staff do not introduce it again: they say "it" (the final summary still names it).
 
+- A phone the customer turned down is never offered again by staff, but the customer can always ask about it ("ask about the X again" gets the facts) or ask to see it or go with it, which brings it back (Ritesh, 2026-10-17).
+- Foldable: it is never suggested to someone who has not said whether they are open to one, and is introduced as a folding phone when shown.
+
 ## NPCs
 - NPCs loop on quasi-random but sensible choices: pick questions that genuinely narrow, offer demos with higher probability as the pool shrinks, reopen with low probability unless forced (contradiction or empty pool).
 - A customer NPC has a hidden goal (target device, must-haves, budget) and never gives conflicting answers.

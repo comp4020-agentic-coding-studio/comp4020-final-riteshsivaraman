@@ -340,8 +340,13 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
     move = answering ? `answer+action:${a.t}` : `action:${a.t}`;
     next.forced = null; // the action replaces whatever the answer forced
     if (a.t === "leave") next.ended = { how: "left", why: "the customer left" };
-    else if (a.t === "demo") next.forced = { t: "demo", model: a.model };
-    else if (a.t === "pick") switchModel(next, a.model);
+    else if (a.t === "demo") {
+      reconsider(next, a.model);
+      next.forced = { t: "demo", model: a.model };
+    } else if (a.t === "pick") {
+      reconsider(next, a.model);
+      switchModel(next, a.model);
+    }
     else if (a.t === "change") next.forced = { t: "ask", qid: a.qid, reopen: true };
   }
   // Staff owe an answer to whatever was thrown back, before or alongside their next move.
@@ -363,6 +368,11 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
 }
 
 const same2 = (a: CustomerAction, b: CustomerAction): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+// Asking for a phone they had turned down brings it back: they can always come round.
+function reconsider(sc: Scene, model: string): void {
+  sc.excluded = sc.excluded.filter((m) => m !== model);
+}
 
 // The customer turns a phone down. If it was the one they had fixed (they named
 // it, or chose it), it stops being fixed, or the pool would be a phone that is

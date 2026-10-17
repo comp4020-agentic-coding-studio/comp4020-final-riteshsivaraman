@@ -63,7 +63,7 @@ describe("every line of 400 simulated conversations", () => {
         if (/(^|[^.][.?!] )(?!iPhone)[a-z]/.test(t)) bad.push(`${at} has a sentence starting in lower case`);
         if (l.who === "customer") {
           // Asked "would you like a look at it?", nobody answers by saying the phone's name back.
-          if (log[i - 1]?.text.endsWith("have a look at it?") && /iPhone/.test(t)) bad.push(`${at} names the phone again`);
+          if (log[i - 1]?.text.endsWith("have a look at it?") && l.picks?.some((p) => p.startsWith("demo:")) && /iPhone/.test(t)) bad.push(`${at} names the phone again`);
           if (/Not sure/.test(t)) bad.push(`${at} has a bare menu label`);
           if (/\b(Sure\.|I guess|Happy to say|Quick answer|Just:|Look,)/.test(t)) bad.push(`${at} has a retired lead-in`);
           if (!/[.?!]$/.test(t)) bad.push(`${at} does not end like a sentence`);

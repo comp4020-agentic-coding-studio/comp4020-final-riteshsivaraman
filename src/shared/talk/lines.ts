@@ -99,6 +99,11 @@ export function throwbacks(ctx: Ctx): ThrowbackDef[] {
     out.push({ id: "attr:screen", label: "Ask which has the biggest screen", said: "Which one has the biggest screen?" });
     out.push({ id: "attr:price", label: "Ask which is the cheapest", said: "Which is the cheapest?" });
   }
+  // Staff never offer a phone they turned down again, but they can always ask about it.
+  for (const id of ctx.sc.excluded.slice(-2)) {
+    const name = modelById(id).name;
+    out.push({ id: `about:${id}`, label: `Ask about the ${name} again`, said: `Could you tell me about the ${name} again?` });
+  }
   if (ctx.pool.length > 0) out.push({ id: "haggle", label: "Ask whether there is room on the price", said: "Is there any room on the price?" });
   return out;
 }
@@ -124,6 +129,10 @@ export function answerThrowback(id: string, ctx: Ctx, scope: string[] | null = n
     const lo = byStart[0]!;
     const hi = byStart[byStart.length - 1]!;
     return `We've got ${MODELS.length} iPhones. Prices start at ${money(startingPrice(lo))} for the ${lo.name}, and the ${hi.name}${hi.foldable ? ", our foldable," : ""} starts at ${money(startingPrice(hi))}.`;
+  }
+  if (id.startsWith("about:")) {
+    const m = modelById(id.slice("about:".length));
+    return `Here's the ${m.name} again. ${describe(m, ctx)}`;
   }
   if (id.startsWith("compare:")) {
     const [, a, b] = id.split(":");

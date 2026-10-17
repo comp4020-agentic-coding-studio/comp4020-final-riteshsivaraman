@@ -282,6 +282,46 @@ describe("after a demo they did not like", () => {
   });
 });
 
+describe("coming back to a phone they turned down", () => {
+  const turnedDown = (): Scene => {
+    let sc = ask(camera(), "telephoto_need", ["yes"]);
+    sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
+    return cust(staff(sc, { t: "demo", model: "18-pro" }), { picks: ["notforme"] });
+  };
+
+  it("staff never offer it again, even though they could", () => {
+    const sc = turnedDown();
+    expect(derive(sc).ranked.map((m) => m.id)).not.toContain("18-pro");
+    const offered = staffActs(sc).flatMap((a) => (a.act.t === "recommend" ? [a.act.model] : []));
+    expect(offered).not.toContain("18-pro");
+  });
+
+  it("the customer can still ask about it, see it, or go with it", () => {
+    const menu = customerMenu(staff(turnedDown(), { t: "recommend", model: "18-pro-max" }))!;
+    expect(menu.throwbacks.map((t) => t.id)).toContain("about:18-pro");
+    expect(menu.actions.map((a) => JSON.stringify(a.action))).toEqual(expect.arrayContaining([JSON.stringify({ t: "demo", model: "18-pro" }), JSON.stringify({ t: "pick", model: "18-pro" })]));
+  });
+
+  it("asking about it gets the facts again and does not bring it back", () => {
+    let sc = cust(staff(turnedDown(), { t: "recommend", model: "18-pro-max" }), { picks: ["unsure"], throwback: "about:18-pro" });
+    sc = staff(sc, { t: "answer" });
+    expect(sc.log.at(-1)!.text).toMatch(/^Here's the iPhone 18 Pro again\. It has .* and starts from A\$2,099\./);
+    expect(derive(sc).ranked.map((m) => m.id)).not.toContain("18-pro");
+  });
+
+  it("asking to see it, or going with it, brings it back instead of leaving it both wanted and refused", () => {
+    let sc = cust(staff(turnedDown(), { t: "recommend", model: "18-pro-max" }), { action: { t: "demo", model: "18-pro" } });
+    expect(sc.excluded).not.toContain("18-pro");
+    sc = cust(staff(sc, { t: "demo", model: "18-pro" }), { picks: ["happy"] });
+    expect(sc.fixed).toBe("18-pro");
+    expect(derive(sc).pool.length).toBeGreaterThan(0);
+    const go = cust(staff(turnedDown(), { t: "recommend", model: "18-pro-max" }), { action: { t: "pick", model: "18-pro" } });
+    expect(go.fixed).toBe("18-pro");
+    expect(go.excluded).not.toContain("18-pro");
+    expect(derive(go).pool.length).toBeGreaterThan(0);
+  });
+});
+
 describe("an empty pool", () => {
   const empty = (): Scene => ask(ask(opened(), "form_factor", ["fold"]), "budget_ceiling", ["ceiling:2000"]);
 
