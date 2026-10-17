@@ -17,5 +17,5 @@
     "jsx": "react-jsx",
     "resolveJsonModule": true
   },
-  "include": ["*.ts", "spec", "scripts", "src"]
+  "include": ["*.ts", "spec", "scripts", "src", "poc"]
 }
