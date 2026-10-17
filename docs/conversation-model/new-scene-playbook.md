@@ -2,7 +2,7 @@
 status: draft
 what: Recipe for building the next conversation scene on this system, what is phone-specific versus generic today, and the pitfalls already paid for. Compact first version.
 date: 2026-10-18
-source: the phone-scene build (see how-we-built-it.md). The generalisation section is a proposal, not built.
+source: the phone-scene build (see how-we-built-it.md), updated after porting the laptop scene the same night (Claude, overnight run under Ritesh's standing authorization; see decisions.md). The generalisation section was a proposal; porting laptop tested it and found it did not land as planned -- see below.
 ---
 
 # Playbook: building the next scene
@@ -19,10 +19,34 @@ source: the phone-scene build (see how-we-built-it.md). The generalisation secti
 9. **Replays** of the transcripts (prompt D), **seeded simulation** with the invariants in `spec/talk-sim.test.ts`, **wording specs** like `spec/talk-lines.test.ts`.
 10. **Play it, paste transcripts, fix with a spec each.** Then the **review loop** (`scripts/talk-transcripts.ts` plus prompt E on fresh seeds, spot-check before acting).
 
-## Generic today vs phone-specific
-- **Generic:** turn protocol and legality checks, scene as plain data, state as a fold over answers, obligations, mandatory open and close, tone and face, NPC loop shape and seeded RNG, the replay runner, the simulation harness, the trace tool, the review loop.
-- **Phone-specific:** `data.ts`, the attributes in `pool.ts`, every question in `bank.ts`, the facts in `lines.ts`, the personas in `npc.ts`, demo/recommend moves (the "present a candidate" idea is generic, the wording is not).
-- **Proposed refactor (not built):** a scene definition object (`items`, `constraints`, `signals`, `bank`, `moves`, `outcomes`, `wording`) with the engine generic over it, so `scenes/phone.ts` and `scenes/<next>.ts` share `core/`. Do it while porting the second scene, not before: two examples show what is truly shared.
+## Generic today vs phone-specific (updated after porting laptop)
+
+The plan below was to do the scene-definition refactor *while* porting laptop, on the theory
+that porting first and extracting what the two scenes actually share would avoid designing a
+generic core from imagination. Laptop was ported (`src/shared/talk/scenes/laptop/`); **the
+extraction did not happen** -- what's below is what's actually true of the code today, not the
+plan that was supposed to produce it.
+
+- **Actually extracted into `core/` and reused by both scenes:** only `core/rng.ts` (the seeded
+  generator and its helpers) and `core/types.ts` (`Tone`, `Role`, `Option`, `Answer`, the
+  tone-to-expression map). That's it.
+- **Still fully duplicated, not shared:** the turn protocol (`scene.ts`'s `staffActs`/
+  `applyStaff`/`customerMenu`/`applyCustomer`), `derive()`-as-a-fold and its helpers (`askable`,
+  `reopenable`, `gain`, `withoutAnswer`, `rowsIf`, `optionsFor`), the NPC loop shape
+  (`npc.ts`'s `customerMove`/`staffMove`/`runConversation`), obligations (`forced`/`owed`). Every
+  one of these exists twice, nearly line-for-line, once under `src/shared/talk/` for phones and
+  once under `src/shared/talk/scenes/laptop/` for laptops. Porting laptop *by copying* did confirm
+  these shapes are identical across two real scenes (the files really do read as the same logic
+  with phone nouns swapped for laptop ones) -- that's useful evidence for the next attempt -- but
+  confirming an abstraction is possible is not the same as having built it.
+- **Genuinely scene-specific, as expected:** `data.ts` (the sourced catalogue and its schema),
+  the attributes in `pool.ts`, every question in `bank.ts`, the facts and phrasing in `lines.ts`,
+  the personas in `npc.ts`.
+- **Still a proposed refactor, not built:** the scene-definition object (`items`, `constraints`,
+  `signals`, `bank`, `moves`, `outcomes`, `wording`) with the engine generic over it, so
+  `scenes/phone/` and `scenes/laptop/` share a real `core/engine.ts`. Doing this *now*, against
+  two real scenes instead of one, is lower-risk than the original plan to do it blind -- but it
+  is still a from-scratch extraction pass, not a cleanup of something half-done.
 
 ## Pitfalls already paid for (details: how-we-built-it.md section 7)
 - Two correct rules interacting (test pairs of features, not each alone).

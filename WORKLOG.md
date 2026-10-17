@@ -10,6 +10,36 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## Conversation model: laptop scene built overnight (2026-10-18)
+
+Ritesh asked for an overnight run to build out more conversation types, after first checking the
+framework for staleness. Three decisions authorized via AskUserQuestion (quoted in full in
+`docs/conversation-model/decisions.md`'s 2026-10-18 entry): extract the generic engine core while
+porting a second scene; invent clearly-labelled parody policy where a scene needs one; build
+laptop purchase (G3) next.
+
+Built: `src/shared/talk/scenes/laptop/` (data, pool, types, bank, scene, lines, npc), sourced
+Apple AU MacBook data (`docs/conversation-model/laptops.json`, `laptops-v2-notes.md`, preconfigured
+SKUs only), `spec/talk-laptop-{data,pool,sim,lines}.test.ts` (34 specs), and
+`scripts/talk-laptop-transcripts.ts`. 140 talk specs total (`pnpm test:talk`), 0-stuck at both the
+400-seed in-suite simulation and an ad hoc 2000-seed spot check. Found and fixed three real engine
+bugs and one wording bug by applying the phone scene's own invariants and spot-checking generated
+transcripts (see decisions.md for the list) -- the kind of defect loop CLAUDE.md asks for.
+
+**The generic-core half of the authorization did not fully land.** Only `src/shared/talk/core/{rng,types}.ts`
+were actually extracted and shared between the two scenes; the turn protocol, `derive()` and its
+helpers, and the NPC loop shape are duplicated, not shared, between phone and laptop. Porting
+laptop by direct duplication confirmed the shapes genuinely match across two real scenes, but that
+confirmation isn't the extraction itself. Recorded honestly (not glossed over) in
+`docs/conversation-model/new-scene-playbook.md`'s updated "Generic today vs phone-specific" and in
+`README.md`'s status table.
+
+Not done, by the playbook's own "Definition of done for a scene": an automated reviewer pass on
+fresh seeds (only hand spot-checks were done), Ritesh playing either side, his review of the
+wording, and the real core extraction. Commits: `1a14475` (core extraction, partial),
+`a7ce856` (laptop scene), `6d368a8` (specs + 2 engine bugs fixed), `a219bd6` (lines.ts rewrite +
+wording specs), `112de3a` (transcript generator), `6422af6` (an/a grammar fix).
+
 ## Crit 10 prep: stdout log and the authorisation note (2026-10-18)
 
 Crit 10 narrates "who did what" from `flyctl logs`; until now only "listening on" reached stdout. `a60962b`: `src/server/eventlog.ts` turns every events row into one line (`<iso time> [tag] type user=<id> k=v`), called beside both INSERTs (`service.ts` `log()`, `presence.ts` `logEvent()`). Conversation lines share a tag; tokens and typed notes are kept out. `spec/eventlog.test.ts` pins the format. D18's server clamp was already there (`clampToWalkable` in `presence.ts`, tested in `presence.test.ts`); added a `staff_area_refused` event for the first refusal per approach, and join now logs name, kind and role. ADR 3 has a new addendum (what each action checks, the self-chosen-role gap). `reflections/crit-10.md` is a skeleton only.

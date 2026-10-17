@@ -120,7 +120,20 @@ outcomes each allows), (c) the class-specific questions (a laptop asks about liq
 data matters; a watch asks about the strap and pairing; earbuds ask which side), (d) any class-specific
 mandatory line. The class decides the *bank*, not the *engine*.
 
-## G3. Purchase of another family (laptop first)
+## G3. Purchase of another family (laptop first) -- BUILT 2026-10-18
+
+Built the same night as this document's G-section sketches, by Claude under Ritesh's standing
+authorization (an overnight run; see decisions.md's 2026-10-18 entry). `src/shared/talk/scenes/laptop/`,
+140 talk specs total (34 laptop), 0-stuck simulation at 400 and 2000 seeds. **What's real vs
+still needed:** the engine, sourced data (`laptops.json`, preconfigured SKUs only -- build-to-order
+memory/storage combinations are out of scope, see `laptops-v2-notes.md`) and specs are built and
+green; an automated reviewer pass on fresh seeds, Ritesh playing either side, and his review of the
+wording are **not done** (see README.md's status table and new-scene-playbook.md's "Definition of
+done for a scene"). The "prove the engine is generic" goal below was only half met: porting laptop
+confirmed the turn protocol and NPC loop really are the same shape across two scenes, but no shared
+`core/` engine was actually extracted -- see new-scene-playbook.md's "Generic today vs phone-specific".
+
+Original sketch, kept for the record:
 - **Pool:** model x memory x storage x colour (and keyboard layout or chip variant if the data has them).
   Same shape as phones, so this is the best second scene to prove the engine is generic.
 - **New questions:** what do you use it for (office, creative, study, gaming), portability (screen size,

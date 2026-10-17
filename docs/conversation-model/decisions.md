@@ -62,3 +62,51 @@ source: Ritesh, this session (description, then answers 1 to 8 to the grilling q
 
 ## Success test
 - Coverage: for every reachable pool, at least one askable question still narrows it. Report fact combinations that leave no device.
+
+## Overnight run: laptop scene (Claude, 2026-10-18, under Ritesh's standing authorization)
+
+Ritesh asked Claude to check the conversation-model framework for consistency, then (via
+AskUserQuestion, since the framework's own rules required pausing on several open design
+questions before building) gave three answers that authorized this run:
+
+1. **Scope:** "Extract generic core + port one scene" -- extract the engine's scene-definition
+   abstraction *while* porting a real second scene (laptop), per conversation-types.md's own
+   build-order recommendation and new-scene-playbook.md's "Proposed refactor" section, rather than
+   designing a generic core speculatively or building a second scene without attempting the
+   extraction at all.
+2. **Policy data:** "Invent clearly-labelled parody policy" where a scene genuinely needs an
+   invented fact (trade-in, care plan, return window, etc.), rather than leaving such scenes
+   blocked on real-world sourcing, since this is a fictional store (D6).
+3. **Next scene:** "Laptop purchase (G3)" -- conversation-types.md's own recommendation, since it
+   shares the phone scene's pool shape (model x memory x storage x colour) and was expected to be
+   the clearest test of whether the engine generalises.
+
+**What actually happened, plainly:** the laptop scene (point 3) was built and tested --
+`src/shared/talk/scenes/laptop/`, sourced data (`laptops.json`, preconfigured SKUs only),
+140 talk specs total (up from 106), a 400-seed simulation in the test suite plus an ad hoc
+2000-seed spot check, both clean. Parody policy (point 2) never actually came up: like the phone
+scene, the laptop purchase scene ends at model/memory/storage/colour and never touches
+checkout, trade-in or care plans, so nothing needed inventing.
+
+**Point 1 -- the generic-core extraction -- did not fully land.** Only `core/rng.ts` and
+`core/types.ts` were actually pulled into a shared location; the turn protocol, `derive()` and its
+helpers, and the NPC loop shape are duplicated between the phone and laptop scene files, not
+extracted into a shared `core/engine.ts`. Porting laptop by direct duplication did confirm these
+shapes are identical across two real scenes (useful evidence that the abstraction is sound), but
+that confirmation is not the extraction itself. This is recorded honestly in
+new-scene-playbook.md's updated "Generic today vs phone-specific" section and in README.md's
+status table, rather than claimed as done. The real extraction, a scene-definition object with the
+engine generic over it, remains a decision for Ritesh: whether to do it now (against two real
+scenes instead of one, lower-risk than before) or after a third scene.
+
+Also found and fixed in the process (the kind of thing CLAUDE.md's defect loop exists to catch):
+two engine bugs where a model's preconfigured tiers varied on an axis no bank question could
+resolve (a missing `memory_tier_for_model` question for the 16-inch M5 Max's two memory tiers,
+fixed; the nano-texture display finish, scoped out rather than given its own question), one
+precondition bug (`performance_pref` asked before the customer had shown they cared, unlike the
+phone scene's matching telephoto/battery questions), and one wording bug ("a M5 chip" instead of
+"an M5 chip", found by hand-spot-checking generated transcripts).
+
+**Not done, by the playbook's own "Definition of done for a scene":** an automated reviewer pass
+on fresh seeds (only hand spot-checks were done), Ritesh playing either side, his review of the
+wording, and the real core extraction above. These are named, not silently skipped.

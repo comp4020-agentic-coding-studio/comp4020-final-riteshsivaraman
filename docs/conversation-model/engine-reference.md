@@ -1,50 +1,57 @@
 ---
 status: working
-what: How the conversation engine in src/shared/talk works: layers, modules, the state, the turn protocol, how options and legal moves are computed, the rules the engine enforces, the NPCs, the wording system, the tests that guard it, and where to extend it.
+what: How the conversation engine in src/shared/talk works: layers, modules, the state, the turn protocol, how options and legal moves are computed, the rules the engine enforces, the NPCs, the wording system, the tests that guard it, and where to extend it. Covers both the phone scene and the laptop scene added 2026-10-18, and says plainly which parts are actually shared between them and which are duplicated.
 date: 2026-10-18
-source: read from src/shared/talk/*.ts and spec/talk-*.test.ts at commit 417f949. Claude's account; the code is the source of truth.
+source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/talk/scenes/laptop/*.ts and spec/talk-*.test.ts, updated the night the laptop scene was added (Claude, overnight run under Ritesh's standing authorization; see decisions.md). Claude's account; the code is the source of truth.
 ---
 
 # Engine reference
 
 ## 1. Layers
 
+There are now two scenes on this engine, phone (`src/shared/talk/`) and laptop
+(`src/shared/talk/scenes/laptop/`). **Only `core/rng.ts` and `core/types.ts` are actually shared
+between them** -- everything else below exists once per scene, duplicated, not imported from a
+common place. This was meant to be a real shared core (new-scene-playbook.md's "Proposed
+refactor"); porting laptop confirmed the shapes match but did not extract them. Read
+new-scene-playbook.md's "Generic today vs phone-specific" for the full account.
+
 ```
-devices.json  ──>  data.ts   (typed, normalised records; null = not stated)
-                      │
-                      v
-                   pool.ts   (constraints, signals, the pool of SKUs, ranking, price bands)
-                      │
-                      v
-                   bank.ts   (questions: preconditions, options, effects; derive(); helpers)
-                      │
-        ┌─────────────┴─────────────┐
-        v                           v
-     scene.ts                    lines.ts
- (turn engine: legal moves,    (every spoken line, built from
-  menus, applying a move)       state + data; tone; the SAID table)
-        │                           │
-        └─────────────┬─────────────┘
-                      v
-                   npc.ts    (customer persona + staff weights + runConversation)
-                      │
-         ┌────────────┼──────────────────┐
-         v            v                  v
-   spec/talk-*    scripts/talk-      poc/talk/
-    (tests)       transcripts.ts     (HTML page)
+                 core/rng.ts    core/types.ts
+                 (seeded RNG)   (Tone, Role, Option, Answer,
+                      │          tone→expression)
+                      │                │
+        ┌─────────────┴────────────────┴─────────────┐
+        v                                             v
+  PHONE SCENE (src/shared/talk/)             LAPTOP SCENE (src/shared/talk/scenes/laptop/)
+  devices.json ─> data.ts ─> pool.ts         laptops.json ─> data.ts ─> pool.ts
+                     │                                          │
+                   bank.ts                                    bank.ts
+                     │                                          │
+          ┌──────────┴──────────┐                    ┌──────────┴──────────┐
+          v                     v                     v                     v
+       scene.ts              lines.ts              scene.ts              lines.ts
+          │                     │                     │                     │
+          └──────────┬──────────┘                     └──────────┬──────────┘
+                      v                                           v
+                   npc.ts                                      npc.ts
+          (customer persona + staff weights + runConversation, same shape both scenes)
 ```
 
-`types.ts` is the shared vocabulary; `rng.ts` is a seeded generator. Everything is pure: state in,
-state out, no DOM, clock or network. The scene is plain JSON (cloneable, serialisable), so the two
-tabs of the page pass it around and a spec can build any state by hand.
+Within one scene, `types.ts` holds the scene's own vocabulary (re-exporting `core/types.ts`'s
+pieces alongside `Scene`, `Pending`, `StaffAct`, which do depend on that scene's pool shape).
+Everything is pure: state in, state out, no DOM, clock or network. The scene is plain JSON
+(cloneable, serialisable), so the two tabs of the phone page pass it around and a spec can build
+any state by hand. The laptop scene has no page (`poc/talk/` is phone-only).
 
-Import order matters: `bank.ts` owns `derive()` and the question definitions; `scene.ts` imports it;
-`lines.ts` imports `bank.ts` (for `describeConstraints`, `named`, `questionById`); nothing imports
-`scene.ts` except `npc.ts`, the specs and the page. That is how a circular import is avoided.
+Import order matters within a scene: `bank.ts` owns `derive()` and the question definitions;
+`scene.ts` imports it; `lines.ts` imports `bank.ts` (for `describeConstraints`, `named`,
+`questionById`); nothing imports `scene.ts` except `npc.ts`, the specs and (phone only) the page.
+That is how a circular import is avoided, in both scenes' module graphs independently.
 
 Node runs the `.ts` files directly (erasable syntax only: no enums, no parameter properties) and
-`data.ts` imports `docs/conversation-model/devices.json` with an import attribute; vite and vitest
-handle both.
+each scene's `data.ts` imports its own JSON (`docs/conversation-model/devices.json` or
+`laptops.json`) with an import attribute; vite and vitest handle both.
 
 ## 2. The state: `Scene` (`types.ts`)
 
@@ -196,6 +203,13 @@ Every line is built from state and data; nothing is free text. Pieces:
 `vitest.talk.config.ts` runs just these (`pnpm test:talk`, about a second, no app). `pnpm check` runs them
 too through the main config (which needs the app up for the older specs).
 
+**Laptop scene:** `spec/talk-laptop-{data,pool,sim,lines}.test.ts` make the same four promises
+(golden data values, pool/ranking/bands, 400-run simulation invariants, English wording) against
+`src/shared/talk/scenes/laptop/`. There is no `talk-laptop-scene.test.ts` or replay suite --
+laptop was never given hand-written sample transcripts to convert into replays, so that half of
+the phone scene's test coverage (direct scene-mechanics specs and transcript replays) has no
+laptop equivalent yet. 140 specs total.
+
 ## 9. The page (`poc/talk/`)
 
 `pnpm poc` (port 5180). Setup screen or a hash. Play either side against an NPC or open the shown link in a
@@ -206,10 +220,15 @@ persisted or logged.
 
 ## 10. Known limits
 
-- One scene's questions and facts are hard-wired (see the playbook for what is generic).
-- `devices.json` is imported from `docs/`; a deployed build would need it copied.
+- One scene's questions and facts are hard-wired (see the playbook for what is generic -- as of
+  2026-10-18, almost nothing: see section 1 above).
+- `devices.json`/`laptops.json` are imported from `docs/`; a deployed build would need them copied.
 - No persistence and no `events` rows (the CLAUDE.md invariant applies the moment this is wired).
 - Customers sometimes give a looser first budget than their limit (intended: it exercises the reopen).
 - Ranking is a starting rule, not a considered one.
-- The customer's menu offers every phone we carry as a demo or pick (14 actions): fine for the page, long for a
-  real UI (group it).
+- The customer's menu offers every phone/laptop we carry as a demo or pick (14 phone actions, 14 laptop
+  actions): fine for the page, long for a real UI (group it). The laptop scene has no page at all yet.
+- Laptop's catalogue only models Apple's preconfigured SKUs, not the full build-to-order
+  memory/storage space (see `laptops-v2-notes.md`), and excludes the nano-texture display finish
+  (no bank question distinguishes a finish; including it left two rows the engine could never
+  resolve between -- see the laptop `data.ts` comment on `skusStandard`).
