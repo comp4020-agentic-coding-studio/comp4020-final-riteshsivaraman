@@ -39,6 +39,10 @@ source: Ritesh, this session (description, then answers 1 to 8 to the grilling q
 - Staff internal handoff (Ritesh, 2026-10-17): staff need a way to pass work to each other, e.g. "John will be with you in a moment", or handing a device to a technician and reporting back when done. This is a separate system from conversations: a quick one-way message that assigns a task (radio-style), not a back-and-forth. Separate task later.
 - Billing is a different scene, likely handled by another staff member, so the phone scene ends at model + storage + colour. Trade-in, accessories, care plans and payment belong to it.
 
+## Tone is a facial expression (Ritesh, 2026-10-17)
+- In the real store each tone shows on the speaker's face. The engine stamps every line with an `expression` from the character's own set: friendly = smile, neutral = neutral, impatient = focused, unsure = worried (`TONE_EXPRESSION`, `src/shared/talk/types.ts`). There is no "annoyed" face yet; adding one is graphics' call.
+- The customer's menu says the move; the character says the line (never the menu text), same as the staff side.
+
 ## NPCs
 - NPCs loop on quasi-random but sensible choices: pick questions that genuinely narrow, offer demos with higher probability as the pool shrinks, reopen with low probability unless forced (contradiction or empty pool).
 - A customer NPC has a hidden goal (target device, must-haves, budget) and never gives conflicting answers.

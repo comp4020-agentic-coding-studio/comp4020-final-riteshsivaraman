@@ -4,7 +4,7 @@ import { customerLine } from "../src/shared/talk/lines.ts";
 import { customerMove, randomPersona, randomStaff, runConversation, staffMove, type Memory } from "../src/shared/talk/npc.ts";
 import { makeRng } from "../src/shared/talk/rng.ts";
 import { applyCustomer, applyStaff, customerMenu } from "../src/shared/talk/scene.ts";
-import { TONES, type Scene, type Tone } from "../src/shared/talk/types.ts";
+import { TONE_EXPRESSION, TONES, type Scene, type Tone } from "../src/shared/talk/types.ts";
 
 // Promise: what the characters say reads as English. Tone is carried by
 // phrasing, so it never produces "Sure. Not sure." or "I guess Not sure.",
@@ -120,5 +120,23 @@ describe("the customer's menu is not the customer's speech", () => {
       }
     }
     expect([...new Set(same)].slice(0, 12)).toEqual([]);
+  });
+});
+
+// In the store a tone is a face. The mapping lives in the engine, and every
+// name in it has to be one the character can actually make.
+describe("tones and faces", () => {
+  it("maps every tone to an expression the 3D character has", async () => {
+    const { EXPRESSIONS } = await import("../src/client/src/gfx/character.ts");
+    const have = EXPRESSIONS.map((e: { name: string }) => e.name);
+    for (const tone of TONES) expect(have, tone).toContain(TONE_EXPRESSION[tone]);
+    expect(new Set(TONES.map((t) => TONE_EXPRESSION[t])).size).toBe(TONES.length); // four tones, four faces
+  });
+
+  it("stamps each line with the face for its tone", () => {
+    const sc = ok(applyStaff(newScene(), { t: "ask", qid: "opening_intent" }, "unsure"));
+    expect(sc.log[0]).toMatchObject({ tone: "unsure", expression: "worried" });
+    const c = ok(applyCustomer(sc, { picks: ["help"], tone: "impatient" }));
+    expect(c.log[1]).toMatchObject({ tone: "impatient", expression: "focused" });
   });
 });

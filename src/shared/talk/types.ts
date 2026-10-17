@@ -9,6 +9,18 @@ import type { Signals, Sku, Constraints } from "./pool.ts";
 export type Tone = "friendly" | "neutral" | "impatient" | "unsure";
 export const TONES: Tone[] = ["friendly", "neutral", "impatient", "unsure"];
 
+// In the store the tone shows on the speaker's face. These are names from the
+// character's own expression set (EXPRESSIONS in src/client/src/gfx/character.ts),
+// so the shop reads them off the line without a lookup of its own. There is no
+// "annoyed" face yet: focused (brows pulled down, mouth flat) is the nearest to
+// impatient, and a proper one would be graphics' to add.
+export const TONE_EXPRESSION: Record<Tone, "smile" | "neutral" | "focused" | "worried"> = {
+  friendly: "smile",
+  neutral: "neutral",
+  impatient: "focused",
+  unsure: "worried",
+};
+
 export type Role = "staff" | "customer";
 
 // A menu item. Most are fixed; `param` makes one take a number the picker
@@ -72,6 +84,7 @@ export interface Line {
   turn: number;
   who: Role;
   tone: Tone;
+  expression: string; // the face that goes with the tone, for the 3D character
   move: string; // ask, reopen, offer_demo, demo_highlight, nudge_relax, rescue, confirm, answer_throwback; or answer, throwback, action
   qid?: string;
   picks?: string[];

@@ -2,7 +2,7 @@ import { askable, derive, gain, money, newScene, optionsFor, questionById, reope
 import { MODELS, modelById } from "./data.ts";
 import { closingLine, customerLine, staffLine, throwbacks } from "./lines.ts";
 import { ceil100, poolOf, type Constraints, type Sku } from "./pool.ts";
-import type { Ctx, CustomerAction, CustomerReply, Line, Option, Pending, Scene, StaffAct, Tone } from "./types.ts";
+import { TONE_EXPRESSION, type Ctx, type CustomerAction, type CustomerReply, type Line, type Option, type Pending, type Scene, type StaffAct, type Tone } from "./types.ts";
 
 // The turn engine. A scene alternates: staff make one move, then the customer
 // replies from a menu. Both menus are computed here, so a human at a keyboard
@@ -259,9 +259,9 @@ export function applyStaff(sc: Scene, act: StaffAct, tone: Tone): Scene | { erro
   return next;
 }
 
-function log(sc: Scene, l: Omit<Line, "turn" | "after">): void {
+function log(sc: Scene, l: Omit<Line, "turn" | "after" | "expression">): void {
   const ctx = derive(sc);
-  sc.log.push({ ...l, turn: sc.turn, after: { rows: ctx.pool.length, models: ctx.ranked.map((m) => m.id) } });
+  sc.log.push({ ...l, expression: TONE_EXPRESSION[l.tone], turn: sc.turn, after: { rows: ctx.pool.length, models: ctx.ranked.map((m) => m.id) } });
 }
 
 // ---- customer reply ----

@@ -136,7 +136,7 @@ function start(role: Role, mode: "npc" | "tab", roomId: string, seedN: number): 
       .map((l) => {
         const mine = l.who === role;
         const snap = role === "staff" ? `<span class="snap">${l.after.rows} options · ${l.after.models.length} models${l.after.models.length ? ": " + l.after.models.slice(0, 3).map((i) => modelById(i).name.replace("iPhone ", "")).join(", ") : ""}</span>` : "";
-        return `<div class="msg ${mine ? "mine" : "theirs"}"><span class="meta">${l.who === "staff" ? "Specialist" : "Customer"} · ${l.tone}</span>${esc(l.text)}${snap}</div>`;
+        return `<div class="msg ${mine ? "mine" : "theirs"}"><span class="meta">${l.who === "staff" ? "Specialist" : "Customer"} · ${l.tone} · face: ${l.expression}</span>${esc(l.text)}${snap}</div>`;
       })
       .join("");
   }
