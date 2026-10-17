@@ -130,3 +130,4 @@ find every resource by reading this file, not by discovering it mid-task.
 - `references/table-map.md` — my reading of what stands on each table in the
   Canberra photo, for Ritesh to correct.
 - *(add further ADRs here as they're created — don't let this list go stale.)*
+- `docs/conversation-model/mockup-v0.html` — static mockup of the proposed phone-specialist conversation model (v0, for correction before any code).

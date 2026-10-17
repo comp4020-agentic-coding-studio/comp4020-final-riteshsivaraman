@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conversation model mockup v0</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c1c1a;--mute:#8a8a84;--line:#e1dfd8;--acc:#2f5fd0;--ok:#2e7d4f;--warn:#b5651d}
+@media(prefers-color-scheme:dark){:root{--bg:#161614;--card:#1f1f1c;--ink:#ecebe6;--mute:#8b8a83;--line:#33322d;--acc:#7fa2ff;--ok:#6fcf97;--warn:#e8a15c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif;padding:16px}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:0 0 10px}
+.note{color:var(--mute);margin:0 0 16px;max-width:80ch}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.log .m{margin:6px 0;padding:8px 10px;border-radius:8px;max-width:88%}
+.m.staff{background:color-mix(in srgb,var(--acc) 14%,transparent)}.m.cust{background:color-mix(in srgb,var(--mute) 18%,transparent);margin-left:auto}
+.tone{font-size:11px;color:var(--mute);display:block}
+.q{display:flex;justify-content:space-between;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;margin:5px 0;cursor:pointer}
+.q.done{opacity:.5}.q small{color:var(--mute)}.q .badge{color:var(--ok);font-size:12px;white-space:nowrap}
+.q.blocked{opacity:.35;cursor:not-allowed}.q.blocked .badge{color:var(--warn)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.chip{border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:13px;cursor:pointer;background:none;color:inherit}
+.chip.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.pool{display:flex;align-items:center;gap:10px;margin-bottom:10px}.bar{flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;width:30%;background:var(--acc)}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;margin-right:4px;color:var(--mute)}
+.opt{display:flex;gap:8px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;margin:5px 0}
+.cta{display:block;width:100%;text-align:left;padding:9px;border:1px dashed var(--acc);border-radius:8px;background:none;color:var(--acc);margin:8px 0;cursor:pointer;font:inherit}
+pre{background:color-mix(in srgb,var(--mute) 12%,transparent);padding:10px;border-radius:8px;overflow:auto;font-size:12px;margin:8px 0 0}
+</style></head><body>
+<h1>Phone-specialist conversation: mockup v0</h1>
+<p class="note">Static picture of my reading of the model, for you to correct before any code. Device names are placeholders <b>[TK]</b>, to come from the sourced catalogue. Click around: tones, chips and options toggle, nothing is wired.</p>
+
+<div class="grid">
+
+<section class="card"><h2>A. Staff view (you are the specialist)</h2>
+ <div class="pool"><b>6 of 23</b> devices still fit<div class="bar"><i></i></div></div>
+ <div><span class="tag">budget 1200-1500</span><span class="tag">screen: large</span><span class="tag">storage: 256+</span></div>
+ <h2 style="margin-top:14px">Questions you can ask</h2>
+ <div class="q done"><span>What budget are you thinking?<br><small>answered: 1200-1500</small></span><span class="badge">asked · reopen ↺</span></div>
+ <div class="q"><span>What do you mainly use it for?<br><small>would split 6 → 3 / 3</small></span><span class="badge">+2 narrowing</span></div>
+ <div class="q"><span>Big screen or easy to carry?<br><small>would split 6 → 4 / 2</small></span></div>
+ <div class="q blocked"><span>Which colour?<br><small>needs a model first (precondition: ≤ 4 devices)</small></span><span class="badge">locked</span></div>
+ <div class="q"><span>Anything you already have in mind?</span><span class="badge">always ok</span></div>
+ <h2 style="margin-top:14px">Delivery tone</h2>
+ <div class="chips"><button class="chip on">friendly</button><button class="chip">neutral</button><button class="chip">apathetic</button><button class="chip">annoyed</button><button class="chip">enthusiastic</button></div>
+ <button class="cta">At ≤ 4 devices this appears: "I've narrowed it to these 4. Want to see one?" →</button>
+ <button class="cta">If 0 fit: nudge "That's tight. Could we flex on budget or size?" →</button>
+</section>
+
+<section class="card"><h2>B. Customer view (you are the shopper)</h2>
+ <div class="log">
+  <div class="m staff"><span class="tone">friendly</span>Hi! Had a phone in mind, or want help narrowing down?</div>
+  <div class="m cust">Help me narrow it down.</div>
+  <div class="m staff"><span class="tone">friendly</span>Great. Roughly what budget?</div>
+  <div class="m cust">1200–1500.</div>
+  <div class="m staff"><span class="tone">curious</span>Mainly use it for what? Pick any that apply.</div>
+ </div>
+ <div class="opt"><input type="checkbox" checked> Photos and video</div>
+ <div class="opt"><input type="checkbox" checked> Social media</div>
+ <div class="opt"><input type="checkbox"> Gaming</div>
+ <div class="opt"><input type="checkbox"> Work</div>
+ <div class="opt"><input type="checkbox"> Just calls and texts</div>
+ <div class="opt"><input type="checkbox"> Not sure</div>
+ <h2 style="margin-top:12px">…and/or throw one back</h2>
+ <div class="chips"><button class="chip">"Is the normal one too small? I'd want a Max."</button><button class="chip">"What's the difference between these two?"</button><button class="chip">"Can I just see one?"</button><button class="chip">"Actually, can I change my budget?"</button></div>
+ <div class="chips"><button class="chip on">answer + question</button><button class="chip">answer only</button></div>
+ <div class="chips"><button class="chip on">friendly</button><button class="chip">impatient</button><button class="chip">unsure</button></div>
+</section>
+
+<section class="card"><h2>C. Reopening a question</h2>
+ <div class="log">
+  <div class="m staff"><span class="tone">neutral</span>You told me about 1200–1500. Still right?</div>
+ </div>
+ <div class="opt"><input type="radio" name="r" checked> Yes, still right</div>
+ <div class="opt"><input type="radio" name="r"> Change it: <select><option>1500–2000</option><option>under 1200</option></select></div>
+ <p class="note">Changing it widens the pool again (6 → 9). Greyed questions stay available to reopen.</p>
+
+ <h2 style="margin-top:14px">D. Demo phase (≤ 4 left)</h2>
+ <div class="opt">① Phone A · large · 256GB <span class="tag">from $1,2xx [TK]</span><button class="chip">Demo</button><button class="chip">This one</button></div>
+ <div class="opt">② Phone B · large · 512GB <button class="chip">Demo</button><button class="chip">This one</button></div>
+ <div class="log"><div class="m staff"><span class="tone">enthusiastic</span>Try the camera. Note the zoom and the screen brightness in daylight. <small>(staff picks features to highlight from this device's list)</small></div></div>
+ <div class="chips"><button class="chip">Take this one → hand off to billing (new conversation)</button><button class="chip">Demo another</button><button class="chip">Reopen questions</button></div>
+</section>
+
+<section class="card"><h2>E. How a question is stored (preconditions and effects)</h2>
+<pre>{
+ id: "budget",
+ pre:  [ ],                          // always askable
+ gain: pool is split by price band,  // computed, not authored
+ ask:  { text, tones[], options[] (multi: false) },
+ answer "1200-1500" →
+   fact budget = [1200,1500]
+   effect: pool = pool.filter(price in range)
+ reopen: text = "You said {budget}. Still right?"
+}
+
+{
+ id: "colour",
+ pre:  [ pool.size <= 4 ],           // pointless earlier
+ ...
+}</pre>
+ <p class="note">Coverage check (the "do we need more questions?" report): for every reachable pool, is there ≥ 1 askable question that splits it? If not, that pool is a hole in the bank. Also: any fact combination that empties the pool is flagged, so staff get a "nudge to flex" move there.</p>
+</section>
+
+<section class="card"><h2>F. NPC loop (one decision per turn)</h2>
+<pre>staff NPC:
+  legal = askable questions + [offer_demo if pool≤4]
+          + [reopen] + [nudge_flex if pool=0]
+  weight = info_gain(q)          // splits the pool
+         × (1 + trait noise)
+  demo prob ↑ as pool shrinks; reopen prob low
+          unless contradiction / empty pool
+
+customer NPC (has a hidden goal):
+  goal = a target device + must-haves + a budget
+  answers are always consistent with goal,
+  sometimes "not sure", sometimes asks back,
+  sometimes changes mind (trait-driven)</pre>
+</section>
+
+</div></body></html>
