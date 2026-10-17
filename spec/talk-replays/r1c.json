@@ -1,157 +1,173 @@
 {
- "id": "r1c",
- "source": "docs/conversation-model/transcripts/round-1/c.md",
- "skipped": [
-  "S11/C12 camera_setup (cameras on the back): no engine question; telephoto_need is not askable because none of the 4 remaining models has a separate telephoto."
- ],
- "notes": [
-  "step 9: transcript S19 (rescue_offer, move=recommend) is expressed as the new recommend move on the Air plus the throw-back answer; rescue itself is only legal after an empty pool. The transcript also offered the Duo, which the pool had dropped, and the customer's I'll-think-about-it is the leave action (recommend only offers yes/no/unsure).",
-  "step 1: opening form_factor question put as the first ask (no opening_intent in round 1).",
-  "step 3: throw-back 'can you do a better price' not allowed at a nudge (no throw-back menu there); omitted."
- ],
- "steps": [
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "form_factor"
-   },
-   "customer": {
-    "picks": [
-     "fold"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "friendly",
-   "expect": {
-    "models": 1,
-    "top": "duo"
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "budget_ceiling"
-   },
-   "customer": {
-    "picks": [
-     "ceiling:2000"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "friendly",
-   "expect": {
-    "models": 0
-   }
-  },
-  {
-   "staff": {
-    "t": "nudge"
-   },
-   "customer": {
-    "picks": [
-     "keep"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "impatient",
-   "expect": {
-    "models": 0
-   }
-  },
-  {
-   "staff": {
-    "t": "nudge"
-   },
-   "customer": {
-    "picks": [
-     "drop:foldable"
-    ]
-   },
-   "staffTone": "neutral",
-   "customerTone": "impatient",
-   "expect": {
-    "models": 4
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "screen_size_pref"
-   },
-   "customer": {
-    "picks": [
-     "notsure"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "unsure",
-   "expect": {
-    "models": 4
-   }
-  },
-  {
-   "staff": {
-    "t": "ask",
-    "qid": "storage_need"
-   },
-   "customer": {
-    "picks": [
-     "min:256"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "neutral",
-   "expect": {
-    "models": 3
-   }
-  },
-  {
-   "staff": {
-    "t": "offer_demo"
-   },
-   "customer": {
-    "picks": [
-     "demo:17"
-    ]
-   },
-   "staffTone": "friendly",
-   "customerTone": "friendly",
-   "expect": {
-    "models": 3
-   }
-  },
-  {
-   "staff": {
-    "t": "demo",
-    "model": "17"
-   },
-   "customer": {
-    "picks": [
-     "notforme"
-    ],
-    "throwback": "compare:17:air"
-   },
-   "staffTone": "friendly",
-   "customerTone": "impatient",
-   "expect": {
-    "models": 2
-   }
-  },
-  {
-   "staff": {
-    "t": "recommend",
-    "model": "air"
-   },
-   "customer": {
-    "action": {
-     "t": "leave"
+  "id": "r1c",
+  "source": "docs/conversation-model/transcripts/round-1/c.md",
+  "skipped": [
+    "S11/C12 camera_setup (cameras on the back): no engine question; telephoto_need is not askable because none of the 4 remaining models has a separate telephoto."
+  ],
+  "notes": [
+    "step 9: transcript S19 (rescue_offer, move=recommend) is expressed as the new recommend move on the Air plus the throw-back answer; rescue itself is only legal after an empty pool. The transcript also offered the Duo, which the pool had dropped, and the customer's I'll-think-about-it is the leave action (recommend only offers yes/no/unsure).",
+    "step 1: opening form_factor question put as the first ask (no opening_intent in round 1).",
+    "step 3: throw-back 'can you do a better price' not allowed at a nudge (no throw-back menu there); omitted.",
+    "2026-10-17: a conversation must open with the greeting (opening_intent), so this step was added in front of the transcript's first question"
+  ],
+  "steps": [
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "opening_intent"
+      },
+      "staffTone": "friendly",
+      "customer": {
+        "picks": [
+          "help"
+        ]
+      },
+      "expect": {
+        "models": 7
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "form_factor"
+      },
+      "customer": {
+        "picks": [
+          "fold"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "friendly",
+      "expect": {
+        "models": 1,
+        "top": "duo"
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "budget_ceiling"
+      },
+      "customer": {
+        "picks": [
+          "ceiling:2000"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "friendly",
+      "expect": {
+        "models": 0
+      }
+    },
+    {
+      "staff": {
+        "t": "nudge"
+      },
+      "customer": {
+        "picks": [
+          "keep"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "impatient",
+      "expect": {
+        "models": 0
+      }
+    },
+    {
+      "staff": {
+        "t": "nudge"
+      },
+      "customer": {
+        "picks": [
+          "drop:foldable"
+        ]
+      },
+      "staffTone": "neutral",
+      "customerTone": "impatient",
+      "expect": {
+        "models": 4
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "screen_size_pref"
+      },
+      "customer": {
+        "picks": [
+          "notsure"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "unsure",
+      "expect": {
+        "models": 4
+      }
+    },
+    {
+      "staff": {
+        "t": "ask",
+        "qid": "storage_need"
+      },
+      "customer": {
+        "picks": [
+          "min:256"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "neutral",
+      "expect": {
+        "models": 3
+      }
+    },
+    {
+      "staff": {
+        "t": "offer_demo"
+      },
+      "customer": {
+        "picks": [
+          "demo:17"
+        ]
+      },
+      "staffTone": "friendly",
+      "customerTone": "friendly",
+      "expect": {
+        "models": 3
+      }
+    },
+    {
+      "staff": {
+        "t": "demo",
+        "model": "17"
+      },
+      "customer": {
+        "picks": [
+          "notforme"
+        ],
+        "throwback": "compare:17:air"
+      },
+      "staffTone": "friendly",
+      "customerTone": "impatient",
+      "expect": {
+        "models": 2
+      }
+    },
+    {
+      "staff": {
+        "t": "recommend",
+        "model": "air"
+      },
+      "customer": {
+        "action": {
+          "t": "leave"
+        }
+      },
+      "staffTone": "friendly",
+      "customerTone": "impatient"
     }
-   },
-   "staffTone": "friendly",
-   "customerTone": "impatient"
+  ],
+  "ends": {
+    "how": "left"
   }
- ],
- "ends": {
-  "how": "left"
- }
 }

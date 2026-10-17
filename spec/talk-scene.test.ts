@@ -13,7 +13,38 @@ const ok = (r: Scene | { error: string }): Scene => {
 };
 const staff = (sc: Scene, act: StaffAct, tone: Tone = "neutral"): Scene => ok(applyStaff(sc, act, tone));
 const cust = (sc: Scene, r: Omit<CustomerReply, "tone"> & { tone?: Tone }): Scene => ok(applyCustomer(sc, { tone: "neutral", ...r }));
+// Every conversation opens with the greeting question; most specs start after it.
+const opened = (): Scene => cust(staff(newScene(), { t: "ask", qid: "opening_intent" }), { picks: ["help"] });
 const ask = (sc: Scene, qid: string, picks: string[], extra: Partial<CustomerReply> = {}): Scene => cust(staff(sc, { t: "ask", qid }), { picks, ...extra });
+
+describe("the opening and the sign-off", () => {
+  it("starts with a greeting: only the two opening questions are legal first", () => {
+    const first = staffActs(newScene()).map((a) => a.act);
+    expect(first).toEqual([
+      { t: "ask", qid: "known_model" },
+      { t: "ask", qid: "opening_intent" },
+    ].sort((a, b) => first.findIndex((x) => JSON.stringify(x) === JSON.stringify(a)) - first.findIndex((x) => JSON.stringify(x) === JSON.stringify(b))));
+    expect(applyStaff(newScene(), { t: "ask", qid: "storage_need" }, "neutral")).toHaveProperty("error");
+    expect(applyStaff(newScene(), { t: "ask", qid: "budget_ceiling" }, "neutral")).toHaveProperty("error");
+  });
+
+  it("introduces the staff member in the first line, and the customer says hello back", () => {
+    const sc = cust(staff(newScene(), { t: "ask", qid: "opening_intent" }), { picks: ["help"] });
+    expect(sc.log[0]!.text).toMatch(/^Hi, welcome in\. I'm on the phones table/);
+    expect(sc.log[1]!.text).toMatch(/^Hi\. /);
+  });
+
+  it("ends with a staff sign-off, whichever way it ends", () => {
+    let sc = ask(newScene(), "known_model", ["model:17"]);
+    sc = ask(sc, "storage_tier_for_model", ["storage:256GB"]);
+    sc = ask(sc, "colour_pick", ["colour:Sage"]);
+    const sold = cust(staff(sc, { t: "confirm" }), { picks: ["yes"] });
+    expect(sold.log.at(-1)).toMatchObject({ who: "staff", move: "close" });
+    expect(sold.log.at(-1)!.text).toMatch(/till/);
+    const left = cust(staff(opened(), { t: "ask", qid: "use_case" }), { action: { t: "leave" } });
+    expect(left.log.at(-1)).toMatchObject({ who: "staff", move: "close" });
+  });
+});
 
 describe("refusals", () => {
   it("refuses a staff move that is not on the menu", () => {
@@ -30,7 +61,7 @@ describe("refusals", () => {
   });
 
   it("refuses a custom ceiling that is not in A$100 steps", () => {
-    const sc = staff(newScene(), { t: "ask", qid: "budget_ceiling" });
+    const sc = staff(opened(), { t: "ask", qid: "budget_ceiling" });
     expect(applyCustomer(sc, { picks: ["ceiling:3650"], tone: "neutral" })).toHaveProperty("error");
     expect(applyCustomer(sc, { picks: ["ceiling:3600"], tone: "neutral" })).not.toHaveProperty("error");
   });
@@ -44,7 +75,7 @@ describe("refusals", () => {
 
 describe("answers are recomputed, not stacked", () => {
   it("reopening the budget replaces it and widens the pool again", () => {
-    let sc = ask(newScene(), "budget_ceiling", ["ceiling:1200"]);
+    let sc = ask(opened(), "budget_ceiling", ["ceiling:1200"]);
     const tight = derive(sc).pool.length;
     sc = cust(staff(sc, { t: "ask", qid: "budget_ceiling", reopen: true }), { picks: ["ceiling:2300"] });
     expect(derive(sc).pool.length).toBeGreaterThan(tight);
@@ -52,7 +83,7 @@ describe("answers are recomputed, not stacked", () => {
   });
 
   it("only offers a hard question while some answer narrows the pool", () => {
-    let sc = ask(newScene(), "telephoto_need", ["yes"]);
+    let sc = ask(opened(), "telephoto_need", ["yes"]);
     // Everything left has the lens, so asking again would be a question worth nothing.
     expect(staffActs(sc).some((a) => a.act.t === "ask" && a.act.qid === "telephoto_need" && !a.act.reopen)).toBe(false);
     sc = ask(ask(sc, "storage_need", ["min:1024"]), "budget_ceiling", ["ceiling:3300"]);
@@ -61,14 +92,14 @@ describe("answers are recomputed, not stacked", () => {
 
   it("never eliminates on 'Not sure'", () => {
     const before = derive(newScene()).pool.length;
-    const sc = ask(newScene(), "budget_ceiling", ["notsure"]);
+    const sc = ask(opened(), "budget_ceiling", ["notsure"]);
     expect(derive(sc).pool.length).toBe(before);
   });
 });
 
 describe("throw-backs", () => {
   it("are answered in staff's next line, from the data", () => {
-    let sc = ask(newScene(), "telephoto_need", ["yes"], { throwback: "attr:battery" });
+    let sc = ask(opened(), "telephoto_need", ["yes"], { throwback: "attr:battery" });
     sc = staff(sc, { t: "answer" });
     expect(sc.log.at(-1)!.text).toMatch(/longest video playback/);
     expect(sc.pending).toEqual({ kind: "free" });
@@ -95,7 +126,7 @@ describe("demos", () => {
   });
 
   it("'not for me' removes the model from the pool", () => {
-    let sc = ask(newScene(), "telephoto_need", ["yes"]);
+    let sc = ask(opened(), "telephoto_need", ["yes"]);
     sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
     sc = cust(staff(sc, { t: "demo", model: "18-pro" }), { picks: ["notforme"] });
     expect(derive(sc).ranked.map((m) => m.id)).toEqual(["18-pro-max"]);
@@ -103,7 +134,7 @@ describe("demos", () => {
 });
 
 describe("an empty pool", () => {
-  const empty = (): Scene => ask(ask(newScene(), "form_factor", ["fold"]), "budget_ceiling", ["ceiling:2000"]);
+  const empty = (): Scene => ask(ask(opened(), "form_factor", ["fold"]), "budget_ceiling", ["ceiling:2000"]);
 
   it("always has a nudge, and every relax move makes the pool non-empty", () => {
     const sc = empty();

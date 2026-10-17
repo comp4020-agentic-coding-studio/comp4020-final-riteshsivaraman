@@ -1,6 +1,6 @@
 import { askable, derive, gain, money, newScene, optionsFor, questionById, reopenable, rowsIf, withoutAnswer, type Contribution } from "./bank.ts";
 import { MODELS, modelById } from "./data.ts";
-import { customerLine, staffLine, throwbacks } from "./lines.ts";
+import { closingLine, customerLine, staffLine, throwbacks } from "./lines.ts";
 import { ceil100, poolOf, type Constraints, type Sku } from "./pool.ts";
 import type { Ctx, CustomerAction, CustomerReply, Line, Option, Pending, Scene, StaffAct, Tone } from "./types.ts";
 
@@ -89,9 +89,14 @@ export function staffActs(sc: Scene): ActView[] {
     }
     if (demoCandidates(ctx).length > 0 && (ctx.ranked.length <= 4 || open.length === 0)) out.push(view({ t: "offer_demo" }, "Offer a demo"));
     if (ctx.pool.length === 1) out.push(view({ t: "confirm" }, "Confirm the choice"));
-    if (ctx.model === null) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
+    // Recommending something before learning anything about them would just be the cheapest phone.
+    const informed = sc.order.some((q) => questionById(q).kind !== "route");
+    if (ctx.model === null && (informed || open.length === 0)) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
   }
   for (const q of reopenable(ctx)) out.push(view({ t: "ask", qid: q.id, reopen: true }, `Reopen: ${q.id.replace(/_/g, " ")}`));
+  // Every conversation starts with a greeting and an introduction: before anything else
+  // is said, the only moves are the two that open the visit.
+  if (sc.log.length === 0) return out.filter((v) => v.act.t === "ask" && (v.act.qid === "opening_intent" || v.act.qid === "known_model"));
   if (sc.owed) out.push(view({ t: "answer" }, "Answer their question and leave it with them"));
   return out;
 }
@@ -297,6 +302,11 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
   next.pending = null;
   next.toMove = "staff";
   log(next, { who: "customer", tone: reply.tone, move, picks: reply.picks, throwback: reply.throwback, text: customerLine(reply, menu.options, ctx, next.turn) });
+  // No scene ends in silence: staff sign off.
+  if (next.ended) {
+    next.turn++;
+    log(next, { who: "staff", tone: "friendly", move: "close", text: closingLine(next.ended) });
+  }
   return next;
 }
 

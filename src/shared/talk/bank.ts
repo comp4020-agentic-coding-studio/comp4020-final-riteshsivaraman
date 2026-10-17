@@ -98,7 +98,7 @@ export const BANK: QuestionDef[] = [
   {
     id: "opening_intent",
     kind: "route",
-    ask: () => "Hi, what brings you in today?",
+    ask: () => "Hi, welcome in. I'm on the phones table. What brings you in today?",
     pre: (ctx) => ctx.sc.turn === 0 && !ctx.sc.fixed,
     options: () => [
       { id: "know", label: "I know which phone I want" },
@@ -112,7 +112,7 @@ export const BANK: QuestionDef[] = [
   {
     id: "known_model",
     kind: "route",
-    ask: (ctx) => (ctx.sc.log.length === 0 ? "Hi! Did you already have a phone in mind?" : "Which one did you have in mind?"),
+    ask: (ctx) => (ctx.sc.log.length === 0 ? "Hi, welcome in. I'm on the phones table. Did you already have a phone in mind?" : "Which one did you have in mind?"),
     pre: (ctx) => !ctx.sc.fixed && ctx.pool.length > 0 && [undefined, "know"].includes(ctx.sc.answers["opening_intent"]?.picks[0]),
     options: () => [
       ...MODELS.map((m) => ({ id: `model:${m.id}`, label: m.name })),

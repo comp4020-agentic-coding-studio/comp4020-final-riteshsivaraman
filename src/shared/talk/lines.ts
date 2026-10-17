@@ -29,6 +29,14 @@ const wrap = (table: Record<Tone, string[]>, tone: Tone, turn: number, text: str
   return /(,|\.\.\.) $/.test(lead) ? lead + text.charAt(0).toLowerCase() + text.slice(1) : lead + text;
 };
 
+// The sign-off staff give when a scene ends. Payment is a different scene (and
+// likely a different person), so a sale hands over to the till.
+export function closingLine(ended: { how: "bought" } | { how: "left"; why: string }): string {
+  if (ended.how === "bought") return "Great choice. I'll take you across to the till so someone there can sort the payment.";
+  if (ended.why.includes("another desk")) return "No problem, the team on that desk will look after you.";
+  return "No worries at all. I'm here if you want another look.";
+}
+
 const names = (ids: string[]): string => ids.map((i) => modelById(i).name).join(", ");
 
 // ---- facts a staff member may read out about a model ----
@@ -89,6 +97,8 @@ export function answerThrowback(id: string, ctx: Ctx): string {
     if (x.batteryHours && y.batteryHours && x.batteryHours !== y.batteryHours) bits.push(`Video playback is up to ${x.batteryHours} hours on the ${x.name} and ${y.batteryHours} on the ${y.name}.`);
     return bits.join(" ");
   }
+  // The answer they gave in the same turn can have emptied the pool.
+  if (id.startsWith("attr:") && ms.length === 0) return "Right now nothing fits what you've told me, so there's nothing to compare.";
   if (id === "attr:tele") {
     const withLens = ms.filter((m) => m.separateTelephoto);
     return withLens.length === 0 ? "None of these has a separate telephoto lens; they get 2x by cropping the main camera." : `Only the ${names(withLens.map((m) => m.id))} ${withLens.length === 1 ? "has" : "have"} a separate telephoto lens; the rest get 2x by cropping the main camera.`;
@@ -179,5 +189,7 @@ export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, tur
     body = reply.picks.map((p) => labelOf(opts, p)).join("; ");
   }
   if (reply.throwback) body = `${body ? body.replace(/[.?!]$/, "") + ". " : ""}${throwbackLabel(reply.throwback, ctx)}`;
+  // Their first words back are a hello.
+  if (turn === 2 && body) return `Hi. ${body}`;
   return wrap(CUSTOMER_TONE, reply.tone, turn, body);
 }

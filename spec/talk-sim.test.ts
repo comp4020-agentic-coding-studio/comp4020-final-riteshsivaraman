@@ -28,6 +28,16 @@ describe(`${RUNS} NPC-vs-NPC conversations`, () => {
     expect(bad).toEqual([]);
   });
 
+  it("open with the greeting and end with a staff sign-off", () => {
+    const bad: string[] = [];
+    for (const r of results) {
+      const log = r.scene.log;
+      if (!(log[0]?.who === "staff" && (log[0].qid === "opening_intent" || log[0].qid === "known_model") && /^Hi, welcome in/.test(log[0].text))) bad.push(`seed ${r.seed}: opened with ${log[0]?.qid}`);
+      if (r.scene.ended && !(log.at(-1)?.who === "staff" && log.at(-1)?.move === "close")) bad.push(`seed ${r.seed}: ended without a sign-off`);
+    }
+    expect(bad.slice(0, 5)).toEqual([]);
+  });
+
   it("never ask a question twice except as a reopen or a retry after 'Not sure'", () => {
     const repeats: string[] = [];
     for (const r of results) {
