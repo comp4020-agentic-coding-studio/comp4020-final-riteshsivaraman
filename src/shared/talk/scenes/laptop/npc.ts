@@ -38,6 +38,7 @@ const compatible = (c: Constraints, p: Persona): boolean => {
   if (c.maxWeightG !== undefined && ((w.maxWeightG !== undefined && c.maxWeightG < w.maxWeightG) || (tm && c.maxWeightG < tm.weightG))) return false;
   if (c.colours && ((w.colours && !c.colours.some((x) => w.colours!.includes(x))) || (p.target && !c.colours.includes(p.target.colour)))) return false;
   if (c.model !== undefined && ((p.target && c.model !== p.target.model) || (w.model && c.model !== w.model))) return false;
+  if (c.memory !== undefined && p.target && c.memory !== p.target.memoryGb) return false;
   if (c.storage !== undefined && p.target && c.storage !== p.target.storageGb) return false;
   if (c.minScreenIn !== undefined && tm && c.minScreenIn > tm.screenIn) return false;
   if (c.maxScreenIn !== undefined && tm && c.maxScreenIn < tm.screenIn) return false;
@@ -52,7 +53,7 @@ function consistent(sc: Scene, p: Persona, qid: string, picks: string[]): boolea
   if (p.target && qid !== "opening_intent") {
     const trial: Scene = { ...sc, answers: { ...sc.answers, [qid]: { picks, turn: sc.turn } }, order: sc.order.includes(qid) ? sc.order : [...sc.order, qid], fixed: k.fix ?? sc.fixed };
     const pool = derive(trial).pool;
-    if (!pool.some((r) => r.model === p.target!.model && r.storageGb === p.target!.storageGb && r.colour === p.target!.colour)) return false;
+    if (!pool.some((r) => r.model === p.target!.model && r.memoryGb === p.target!.memoryGb && r.storageGb === p.target!.storageGb && r.colour === p.target!.colour)) return false;
   }
   return true;
 }
@@ -146,7 +147,7 @@ export function customerMove(sc: Scene, persona: Persona, rng: Rng, mem: Memory 
     reply = { picks: [see?.id ?? "think"], tone: t };
   } else {
     const r = derive(sc).pool[0]!;
-    const right = p.target ? r.model === p.target.model && r.storageGb === p.target.storageGb && r.colour === p.target.colour : poolOf(p.wants).some((x) => x.model === r.model && x.storageGb === r.storageGb && x.colour === r.colour);
+    const right = p.target ? r.model === p.target.model && r.memoryGb === p.target.memoryGb && r.storageGb === p.target.storageGb && r.colour === p.target.colour : poolOf(p.wants).some((x) => x.model === r.model && x.storageGb === r.storageGb && x.colour === r.colour);
     reply = { picks: [right ? "yes" : "leave"], tone: t };
   }
   if (!reply.action && menu.throwbacks.length && chance(rng, p.throwbackRate)) {

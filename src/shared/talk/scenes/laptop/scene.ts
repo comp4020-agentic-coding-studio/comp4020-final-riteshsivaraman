@@ -38,6 +38,7 @@ const ASK_LABEL: Record<string, string> = {
   storage_need: "Ask how much storage",
   budget_ceiling: "Ask about budget",
   colour_prefs: "Ask about colours",
+  memory_tier_for_model: "Ask which memory",
   storage_tier_for_model: "Ask which storage",
   colour_pick: "Ask which colour",
 };
@@ -192,10 +193,13 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
     options = [...near.map((m) => ({ id: `demo:${m}`, label: `Look at the ${modelById(m).name}` })), { id: "think", label: "Go away and think about it", neutral: true }];
   } else if (p.kind === "confirm") {
     const m = modelById(ctx.pool[0]!.model);
+    const memoryVaries = new Set(m.tiers.map((t) => t.memoryGb)).size > 1;
+    const storageVaries = new Set(m.tiers.map((t) => t.storageGb)).size > 1;
     options = [
       { id: "yes", label: "Confirm this laptop" },
       ...(m.colours.length > 1 ? [{ id: "colour", label: "Change the colour" }] : []),
-      ...(m.tiers.length > 1 ? [{ id: "storage", label: "Change the storage" }] : []),
+      ...(memoryVaries ? [{ id: "memory", label: "Change the memory" }] : []),
+      ...(storageVaries ? [{ id: "storage", label: "Change the storage" }] : []),
       { id: "model", label: "Change the model" },
       { id: "leave", label: "Leave without a laptop" },
     ];
@@ -446,6 +450,10 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
       delete sc.answers["colour_prefs"];
       sc.order = sc.order.filter((q) => q !== "colour_pick" && q !== "colour_prefs");
       sc.forced = { t: "ask", qid: "colour_pick", reopen: true };
+    } else if (pick === "memory") {
+      delete sc.answers["memory_tier_for_model"];
+      sc.order = sc.order.filter((q) => q !== "memory_tier_for_model");
+      sc.forced = { t: "ask", qid: "memory_tier_for_model", reopen: true };
     } else if (pick === "storage") {
       delete sc.answers["storage_tier_for_model"];
       sc.order = sc.order.filter((q) => q !== "storage_tier_for_model");

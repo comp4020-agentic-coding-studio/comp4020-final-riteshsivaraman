@@ -139,6 +139,7 @@ const SAID: Record<string, Record<Tone, string>> = {
   no: { friendly: "Not quite, thanks.", neutral: "No.", impatient: "No.", unsure: "I don't think so." },
   leave: { friendly: "Thanks, but I'll leave it for now.", neutral: "I'll leave it for now.", impatient: "I'll leave it.", unsure: "I'll just leave it, I think." },
   colour: { friendly: "Could I change the colour?", neutral: "I'd like to change the colour.", impatient: "Change the colour.", unsure: "Could I maybe change the colour?" },
+  memory: { friendly: "Could I change the memory?", neutral: "I'd like to change the memory.", impatient: "Change the memory.", unsure: "Could I change the memory maybe?" },
   storage: { friendly: "Could I change the storage?", neutral: "I'd like to change the storage.", impatient: "Change the storage.", unsure: "Could I change the storage maybe?" },
   model: { friendly: "Actually, could we look at a different model?", neutral: "I'd like a different model.", impatient: "A different model.", unsure: "Maybe a different model?" },
   decline: { friendly: "No demo for now, thanks.", neutral: "No demo for now.", impatient: "No demo.", unsure: "Maybe not right now." },
@@ -178,6 +179,7 @@ export function customerLine(reply: CustomerReply, options: Option[], ctx: Ctx, 
     return Number.isFinite(n) ? `Up to ${money(n)}, I think.` : picks[0];
   }
   if (picks[0]?.startsWith("colour:")) return `${picks.map((p) => p.slice(7)).join(" or ")} would be nice.`;
+  if (picks[0]?.startsWith("memory:")) return `I'll take ${picks[0].slice(7)}GB of memory.`;
   if (picks[0]?.startsWith("storage:")) return `I'll take ${picks[0].slice(8)}GB.`;
   if (picks[0]?.startsWith("min:")) return `At least ${picks[0].slice(4)}.`;
   if (picks[0]?.startsWith("family:")) return `${picks[0].slice(7) === "air" ? "MacBook Air" : "MacBook Pro"}, please.`;

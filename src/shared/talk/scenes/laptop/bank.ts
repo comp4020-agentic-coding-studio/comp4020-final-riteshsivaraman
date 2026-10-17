@@ -214,7 +214,8 @@ export const BANK: QuestionDef[] = [
     id: "performance_pref",
     kind: "soft",
     ask: () => "Do you need serious processing power (heavy editing, 3D, big builds), or is everyday performance enough?",
-    pre: (ctx) => knowsBasics(ctx) && varies(poolModels(ctx).map((m) => m.cpuCores)),
+    // A technical question: only once the customer has shown (via use_case) that performance matters.
+    pre: (ctx) => ctx.s.performance === true && varies(poolModels(ctx).map((m) => m.cpuCores)),
     options: () => [
       { id: "max", label: "Want the most power available" },
       { id: "some", label: "A bit more than everyday" },
@@ -307,6 +308,28 @@ export const BANK: QuestionDef[] = [
     apply: (picks) => {
       const cols = pickedIds(picks, "colour:");
       return cols.length ? { c: { colours: cols } } : {};
+    },
+  },
+  {
+    // Only needed when a model's preconfigured tiers vary in memory at the
+    // same storage (e.g. the 16-inch M5 Max's 36GB and 48GB tiers): most
+    // models have one memory figure across their tiers, so `pre` is false
+    // there and this question never appears for them.
+    id: "memory_tier_for_model",
+    kind: "resolve",
+    ask: (ctx) => {
+      const shown = uniq(ctx.pool.map((r) => r.memoryGb));
+      const who = named(ctx, ctx.model) ? "it" : `the ${theLaptop(ctx)}`;
+      return `${capitalise(who)} comes with ${orList(shown.map(gbText))} of memory. Which would you like?`;
+    },
+    pre: (ctx) => ctx.model !== null && ctx.sc.fixed !== undefined && uniq(ctx.pool.map((r) => r.memoryGb)).length > 1,
+    options: (ctx) => [
+      ...uniq(ctx.pool.map((r) => r.memoryGb)).map((gb) => ({ id: `memory:${gb}`, label: `Memory: ${gbText(gb)} (${money(Math.min(...ctx.pool.filter((r) => r.memoryGb === gb).map((r) => r.price)))})` })),
+      ...(ctx.sc.answers["memory_tier_for_model"]?.picks.includes("notsure") ? [] : [NOTSURE]),
+    ],
+    apply: (picks) => {
+      const gb = valueOf(picks, "memory:");
+      return gb ? { c: { memory: Number(gb) } } : {};
     },
   },
   {

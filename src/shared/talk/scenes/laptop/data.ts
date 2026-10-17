@@ -18,7 +18,6 @@ export interface Tier {
   memoryGb: number;
   storageGb: number;
   price: number; // AUD
-  nanoTexture?: boolean; // the Pro's optional anti-glare finish, priced as its own SKU
 }
 
 export interface ModelRec {
@@ -64,25 +63,59 @@ interface RawModel {
 }
 
 const screenInOf = (m: RawModel): number => parseFloat(/(\d+(?:\.\d+)?)-inch/.exec(m.screen_inches.value)?.[1] ?? "NaN");
-const thunderboltGen = (m: RawModel): 4 | 5 => (/Thunderbolt 5/.test(m.ports.value) ? 5 : 4);
 
 // The Pro's ports/wifi/weight/battery text covers several chip tiers in one
-// sentence ("M5: X; M5 Pro: Y; M5 Max: Z"); pick the figure named for this tier.
+// sentence ("M5: X; M5 Pro: Y; M5 Max: Z", or "M5 Pro/Max: Y" covering two at
+// once); pick the clause that names this chip, falling back to a clause that
+// names it alongside another tier ("M5 Pro/Max"), and only then to a sentence
+// with no per-tier breakdown at all (every tier the same).
+function clauseFor(text: string, chip: string): string | null {
+  for (const clause of text.split(";")) {
+    const label = clause.split(":")[0]?.trim() ?? "";
+    const tiers = label.split("/").map((t) => t.trim());
+    // "M5 Pro/Max" splits to ["M5 Pro", "Max"]; expand "Max" back to "M5 Max".
+    const expanded = tiers.map((t, i) => (i > 0 && !/^M\d/.test(t) ? `${tiers[0]!.split(" ")[0]} ${t}` : t));
+    if (expanded.includes(chip)) return clause;
+  }
+  return text.includes(":") ? null : text; // no per-tier breakdown: the whole text applies to every tier
+}
 function perTier(text: string, chip: string): number | null {
-  const re = new RegExp(`${chip.replace(/\s+/g, "\\s+")}[^;]*?(\\d+(?:\\.\\d+)?)`, "i");
-  const m = re.exec(text);
+  const clause = clauseFor(text, chip);
+  if (clause === null) return null;
+  // Skip past "M5 Pro:" etc. before looking for the figure, so the "5" in the
+  // chip's own name is never mistaken for the number that follows the colon.
+  const afterLabel = clause.includes(":") ? clause.slice(clause.indexOf(":") + 1) : clause;
+  const m = /(\d+(?:\.\d+)?)/.exec(afterLabel);
   return m ? Number(m[1]) : null;
 }
+const thunderboltGen = (m: RawModel, chip: string): 4 | 5 => {
+  const clause = clauseFor(m.ports.value, chip) ?? m.ports.value;
+  return /Thunderbolt 5/.test(clause) ? 5 : 4;
+};
+const hasWifi7 = (m: RawModel, chip: string): boolean => {
+  const clause = clauseFor(m.wifi.value, chip) ?? m.wifi.value;
+  return /Wi-Fi 7/.test(clause);
+};
 
 function buildModel(m: RawModel, chip: string, cpuCores: number, gpuCores: number, skus: RawSku[]): ModelRec {
   const screenIn = screenInOf(m);
   const size = screenIn < 14 ? "13" : screenIn < 15 ? "14" : screenIn < 16 ? "15" : "16";
   const weightG = perTier(m.weight_g.value, chip) ?? Number(/(\d+)\s*g/.exec(m.weight_g.value)?.[1] ?? NaN);
   const batteryHours = perTier(m.battery_video_playback.value, chip) ?? Number(/Up to (\d+) hours/.exec(m.battery_video_playback.value)?.[1] ?? NaN);
-  const colours = [...new Set(skus.map((s) => s.colour))];
-  const tiers: Tier[] = skus
-    .map((s) => ({ memoryGb: s.memory_gb, storageGb: s.storage_gb, price: s.priceAUD, nanoTexture: s.finish === "nano-texture" || undefined }))
-    .filter((t, i, arr) => arr.findIndex((x) => x.memoryGb === t.memoryGb && x.storageGb === t.storageGb && x.price === t.price && !!x.nanoTexture === !!t.nanoTexture) === i)
+  // The nano-texture (anti-glare) finish is a separate SKU at the same
+  // memory/storage as the standard finish: no bank question distinguishes a
+  // display finish, so including both would give two rows the engine could
+  // never resolve between (no legal move narrows them, and neither "confirm"
+  // nor a reopen can single one out) -- the scene would get stuck forever
+  // offering "which colour" on a pool of one colour and two indistinguishable
+  // rows. Out of scope tonight, same spirit as build-to-order memory/storage
+  // (see laptops-v2-notes.md "What is modelled"): only the standard finish is
+  // priced into this catalogue.
+  const skusStandard = skus.filter((s) => s.finish !== "nano-texture");
+  const colours = [...new Set(skusStandard.map((s) => s.colour))];
+  const tiers: Tier[] = skusStandard
+    .map((s) => ({ memoryGb: s.memory_gb, storageGb: s.storage_gb, price: s.priceAUD }))
+    .filter((t, i, arr) => arr.findIndex((x) => x.memoryGb === t.memoryGb && x.storageGb === t.storageGb && x.price === t.price) === i)
     .sort((a, b) => a.price - b.price);
   const family: Family = /Air/.test(m.model) ? "air" : "pro";
   const id = `${family}-${size}${chip === "M5" && family === "pro" ? "" : chip !== "M5" ? `-${chip.toLowerCase().replace(/\s+/g, "-")}` : ""}`;
@@ -97,8 +130,8 @@ function buildModel(m: RawModel, chip: string, cpuCores: number, gpuCores: numbe
     gpuCores,
     weightG,
     batteryHours,
-    thunderboltGen: thunderboltGen(m),
-    wifi7: /Wi-Fi 7/.test(m.wifi.value),
+    thunderboltGen: thunderboltGen(m, chip),
+    wifi7: hasWifi7(m, chip),
     colours,
     tiers,
   };

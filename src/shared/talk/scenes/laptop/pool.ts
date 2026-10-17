@@ -12,6 +12,7 @@ export interface Constraints {
   maxPrice?: number; // AUD ceiling, applied to the tier price
   minMemoryGb?: number;
   minStorageGb?: number;
+  memory?: number; // exact tier memory chosen (GB)
   storage?: number; // exact tier storage chosen (GB)
   colours?: string[];
   maxWeightG?: number; // "something I can carry around"
@@ -35,7 +36,6 @@ export interface Sku {
   storageGb: number;
   colour: string;
   price: number;
-  nanoTexture?: boolean;
 }
 
 const keeps = (stated: number | null, ok: (v: number) => boolean): boolean => stated === null || ok(stated);
@@ -60,10 +60,11 @@ export function poolOf(c: Constraints): Sku[] {
       if (c.maxPrice !== undefined && t.price > c.maxPrice) continue;
       if (c.minMemoryGb !== undefined && t.memoryGb < c.minMemoryGb) continue;
       if (c.minStorageGb !== undefined && t.storageGb < c.minStorageGb) continue;
+      if (c.memory !== undefined && t.memoryGb !== c.memory) continue;
       if (c.storage !== undefined && t.storageGb !== c.storage) continue;
       for (const colour of m.colours) {
         if (c.colours && !c.colours.includes(colour)) continue;
-        rows.push({ model: m.id, memoryGb: t.memoryGb, storageGb: t.storageGb, colour, price: t.price, nanoTexture: t.nanoTexture });
+        rows.push({ model: m.id, memoryGb: t.memoryGb, storageGb: t.storageGb, colour, price: t.price });
       }
     }
   }
