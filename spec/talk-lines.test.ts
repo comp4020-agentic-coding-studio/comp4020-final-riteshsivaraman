@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { newScene } from "../src/shared/talk/bank.ts";
-import { randomPersona, randomStaff, runConversation } from "../src/shared/talk/npc.ts";
+import { derive, newScene } from "../src/shared/talk/bank.ts";
+import { customerLine } from "../src/shared/talk/lines.ts";
+import { customerMove, randomPersona, randomStaff, runConversation, staffMove, type Memory } from "../src/shared/talk/npc.ts";
 import { makeRng } from "../src/shared/talk/rng.ts";
-import { applyCustomer, applyStaff } from "../src/shared/talk/scene.ts";
+import { applyCustomer, applyStaff, customerMenu } from "../src/shared/talk/scene.ts";
 import { TONES, type Scene, type Tone } from "../src/shared/talk/types.ts";
 
 // Promise: what the characters say reads as English. Tone is carried by
@@ -31,7 +32,7 @@ describe("customer wording", () => {
 
   it("says a budget, a colour and a model as sentences in every tone", () => {
     for (const tone of TONES) {
-      expect(said("budget_ceiling", ["ceiling:1200"], tone), tone).toMatch(/^(Up to|Maybe up to) A\$1,200/);
+      expect(said("budget_ceiling", ["ceiling:1200"], tone), tone).toMatch(/^(My budget is around A\$1,200\.|No more than A\$1,200\.|A\$1,200 at the most\.|Maybe around A\$1,200\?)$/);
     }
     let sc = ok(applyStaff(newScene(), { t: "ask", qid: "known_model" }, "neutral"));
     sc = ok(applyCustomer(sc, { picks: ["model:17"], tone: "friendly" }));
@@ -73,5 +74,51 @@ describe("every line of 400 simulated conversations", () => {
       });
     }
     expect(bad.slice(0, 8)).toEqual([]);
+  });
+});
+
+// The staff side already works this way: the menu says the move ("Ask: colour
+// prefs") and the character says it in words. The customer's menu has to as
+// well: what you pick is the intent, never the line itself.
+describe("the customer's menu is not the customer's speech", () => {
+  const norm = (t: string): string => t.toLowerCase().replace(/[^a-z0-9$ ]/g, " ").replace(/\s+/g, " ").trim();
+
+  it("says every option, throw-back and action differently from how the menu labels it, in every tone", () => {
+    const same: string[] = [];
+    const seen = new Set<string>();
+    for (let seed = 1; seed <= 120; seed++) {
+      const rng = makeRng(seed);
+      const persona = randomPersona(rng, "x");
+      const staff = randomStaff(rng);
+      const mem: Memory = { wants: persona.wants, conceded: new Set() };
+      let sc = newScene();
+      while (!sc.ended && sc.turn < 60) {
+        const sm = staffMove(sc, staff, rng);
+        const a = applyStaff(sc, sm.act, sm.tone);
+        if ("error" in a) break;
+        const menu = customerMenu(a);
+        if (!menu) break;
+        const ctx = derive(a);
+        for (const tone of TONES) {
+          for (const o of menu.options) {
+            const pick = o.param ? `${o.param.prefix}${o.param.min + 10 * o.param.step}` : o.id;
+            const spoken = customerLine({ picks: [pick], tone }, menu.options, ctx, 4, menu.pending);
+            const label = o.param ? "" : o.label;
+            const k = `${menu.pending.kind}/${o.id}/${tone}`;
+            if (label && !seen.has(k) && norm(spoken) === norm(label)) same.push(`${k}: "${label}" -> "${spoken}"`);
+            seen.add(k);
+          }
+          for (const act of menu.actions) {
+            const spoken = customerLine({ action: act.action, tone }, menu.options, ctx, 4, menu.pending);
+            if (norm(spoken) === norm(act.label)) same.push(`action ${act.label}: "${spoken}"`);
+          }
+        }
+        for (const tb of menu.throwbacks as { id: string; label: string; said: string }[]) if (norm(tb.said) === norm(tb.label)) same.push(`throw-back ${tb.id}`);
+        const c = applyCustomer(a, customerMove(a, persona, rng, mem));
+        if ("error" in c) break;
+        sc = c;
+      }
+    }
+    expect([...new Set(same)].slice(0, 12)).toEqual([]);
   });
 });

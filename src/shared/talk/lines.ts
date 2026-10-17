@@ -66,7 +66,8 @@ export function highlights(m: ModelRec, ctx: Ctx): string[] {
 
 export interface ThrowbackDef {
   id: string;
-  label: string;
+  label: string; // what the menu says: the move
+  said: string; // what the customer says out loud
 }
 
 export function throwbacks(ctx: Ctx): ThrowbackDef[] {
@@ -74,14 +75,15 @@ export function throwbacks(ctx: Ctx): ThrowbackDef[] {
   const out: ThrowbackDef[] = [];
   if (top.length >= 2) {
     for (let i = 0; i < top.length; i++)
-      for (let j = i + 1; j < top.length; j++) out.push({ id: `compare:${top[i]!.id}:${top[j]!.id}`, label: `How do the ${top[i]!.name} and the ${top[j]!.name} compare?` });
-    out.push({ id: "attr:tele", label: "Do any of them have a separate telephoto lens?" });
-    out.push({ id: "attr:battery", label: "Which has the longest battery?" });
-    out.push({ id: "attr:weight", label: "Which is the lightest?" });
-    out.push({ id: "attr:screen", label: "Which has the biggest screen?" });
-    out.push({ id: "attr:price", label: "Which is the cheapest?" });
+      for (let j = i + 1; j < top.length; j++)
+        out.push({ id: `compare:${top[i]!.id}:${top[j]!.id}`, label: `Ask how the ${top[i]!.name} and the ${top[j]!.name} compare`, said: `How do the ${top[i]!.name} and the ${top[j]!.name} compare?` });
+    out.push({ id: "attr:tele", label: "Ask which have a separate telephoto lens", said: "Do any of these have a proper telephoto lens?" });
+    out.push({ id: "attr:battery", label: "Ask which has the longest battery", said: "Which one lasts longest on a charge?" });
+    out.push({ id: "attr:weight", label: "Ask which is the lightest", said: "Which of these is the lightest?" });
+    out.push({ id: "attr:screen", label: "Ask which has the biggest screen", said: "Which one has the biggest screen?" });
+    out.push({ id: "attr:price", label: "Ask which is the cheapest", said: "Which is the cheapest?" });
   }
-  if (ctx.pool.length > 0) out.push({ id: "haggle", label: "Is there any room on the price?" });
+  if (ctx.pool.length > 0) out.push({ id: "haggle", label: "Ask whether there is room on the price", said: "Is there any room on the price?" });
   return out;
 }
 
@@ -134,7 +136,7 @@ export function answerThrowback(id: string, ctx: Ctx): string {
   return "";
 }
 
-export const throwbackLabel = (id: string, ctx: Ctx): string => throwbacks(ctx).find((t) => t.id === id)?.label ?? id;
+export const throwbackSaid = (id: string, ctx: Ctx): string => throwbacks(ctx).find((t) => t.id === id)?.said ?? id;
 
 // ---- staff lines ----
 
@@ -191,40 +193,108 @@ const optionLabel = (opts: Option[], pick: string): string => {
   const o = opts.find((x) => x.id === pick);
   if (o) return o.label;
   const p = opts.find((x) => x.param && pick.startsWith(x.param.prefix));
-  if (p?.param) return `Up to ${money(Number(pick.slice(p.param.prefix.length)))}`;
+  if (p?.param) return `Budget: up to ${money(Number(pick.slice(p.param.prefix.length)))}`;
   return pick;
 };
 
 const noParen = (t: string): string => t.replace(/\s*\(.*\)$/, "");
 
-// The pick as a customer would say it, as a full sentence. Picks whose label is
-// already a sentence ("Yes, a separate telephoto lens") are said as is.
+// What a customer says for the picks whose option is the same wherever it turns up.
+// The menu says the move ("Say it's too expensive"); this is the line, which is
+// never the menu text. A string is the same in every tone.
+type Said = string | Partial<Record<Tone, string>>;
+const SAID: Record<string, Said> = {
+  "opening_intent/know": { friendly: "I've actually got a phone in mind already.", neutral: "I've got a phone in mind already.", impatient: "I know which one I want.", unsure: "I think I know which one I want?" },
+  "opening_intent/line": { neutral: "I know roughly which range I want.", unsure: "I know the range, I think, but not the exact model." },
+  "opening_intent/help": { friendly: "I'm after a new phone and could do with some help.", neutral: "I need a new phone but I don't know which.", impatient: "I need a phone. Help me pick one.", unsure: "I'm not really sure what I need, to be honest." },
+  "opening_intent/browse": { neutral: "I'm just having a look, really.", impatient: "Just looking, thanks.", unsure: "I'm only looking, I think." },
+  "opening_intent/other": "Actually, I'm here about something else.",
+  "known_model/gift": "It's actually a gift for someone.",
+  "known_model/notyet": { neutral: "Not yet, no. What have you got?", impatient: "No, not yet. What's available?", unsure: "No, not really. What do you have?" },
+  "form_factor/standard": { friendly: "A normal phone is fine, nothing folding.", neutral: "A standard phone.", impatient: "Standard. No foldable.", unsure: "A normal one, I think?" },
+  "form_factor/fold": { friendly: "I'd love a foldable, if you've got one.", neutral: "I want a foldable.", impatient: "A foldable.", unsure: "I'd like a foldable, I think?" },
+  "form_factor/open": "I'd be open to a foldable.",
+  "screen_size_pref/screen:compact": { friendly: "Something compact, I think.", neutral: "I'd like it compact.", impatient: "Compact.", unsure: "Maybe something compact?" },
+  "screen_size_pref/screen:medium": { friendly: "A middling size is fine for me.", neutral: "A medium size.", impatient: "Medium.", unsure: "Maybe a medium size?" },
+  "screen_size_pref/screen:large": { friendly: "I'd love a big screen.", neutral: "I want a big screen.", impatient: "Big screen.", unsure: "A big screen, maybe?" },
+  "telephoto_need/yes": { friendly: "I do want a proper telephoto lens, not just a crop.", neutral: "I want a separate telephoto lens.", impatient: "A real telephoto lens.", unsure: "A proper telephoto lens would be good, I think?" },
+  "telephoto_need/no": "The zoom from the main camera is enough for me.",
+  "battery_priority/min:40": { neutral: "As long as you can get.", friendly: "The longest battery you've got, please.", impatient: "Longest battery.", unsure: "A long battery, maybe?" },
+  "battery_priority/min:30": { neutral: "A long battery matters to me.", unsure: "A fairly long battery, I think?" },
+  "battery_priority/avg": "An average battery is fine.",
+  "weight_pref/max": { friendly: "I'd like it as light as it gets.", neutral: "As light as possible.", impatient: "Lightest you've got.", unsure: "As light as possible, maybe?" },
+  "weight_pref/some": "A bit lighter would be nice.",
+  "weight_pref/no": "Weight doesn't bother me.",
+  "budget_ceiling/nolimit": { neutral: "I don't really have a limit.", impatient: "No limit.", unsure: "I don't think I have a limit?" },
+  "size_fit_check/fine": "Yes, that size suits me.",
+  "offer_demo/decline": { neutral: "I'm fine without a demo for now, thanks.", impatient: "No demo, thanks." },
+  "demo_reaction/happy": { friendly: "I really like this one, actually.", neutral: "This could be the one.", impatient: "This one will do.", unsure: "Maybe this is the one?" },
+  "demo_reaction/another": "Could I see another one?",
+  "demo_reaction/expensive": "That's more than I wanted to spend.",
+  "demo_reaction/notforme": "It's not really for me, sorry.",
+  "recommend/yes": { friendly: "Yes, that sounds right to me.", neutral: "That sounds right.", impatient: "Fine, that one.", unsure: "I think that sounds right?" },
+  "recommend/no": "Not that one, I think.",
+  "nudge/keep": { neutral: "I'd rather keep it as it is.", impatient: "No, I want what I asked for.", unsure: "I'd rather not change it, I think." },
+  "rescue/think": "I'll go away and think about it, thanks.",
+  "confirm/yes": { friendly: "Yes, that's the one!", neutral: "Yes, that's the one.", impatient: "Yes, that's it.", unsure: "Yes, I think that's right." },
+  "confirm/colour": "Actually, can I change the colour?",
+  "confirm/storage": "Can I change the storage?",
+  "confirm/model": "Actually, I'd like to look at a different model.",
+  "confirm/leave": "I think I'll leave it, thanks.",
+};
+const saidFor = (key: string, tone: Tone): string | undefined => {
+  const e = SAID[key];
+  if (e === undefined) return undefined;
+  return typeof e === "string" ? e : (e[tone] ?? e.neutral ?? Object.values(e)[0]);
+};
+
+const GB = (n: number): string => (n >= 1024 ? `${n / 1024}TB` : `${n}GB`);
+
+// The pick as a customer would say it: a sentence of their own, never the menu text.
 function say(pick: string, picks: string[], label: string, qid: string | undefined, kind: string, tone: Tone, lab: (p: string) => string): string {
   if (pick === "notsure" || (kind !== "question" && pick === "unsure")) return NOT_SURE[tone];
   const t = (v: Record<Tone, string>): string => v[tone];
+  const scope = qid ?? kind;
+  const key = pick.startsWith("smaller:") ? `${scope}/smaller` : `${scope}/${pick}`;
+  const fixed = saidFor(key, tone);
+  if (fixed) return fixed;
+  if (key === "size_fit_check/smaller") return "That's too big for me. Have you got anything smaller?";
   if (kind === "offer_demo" && pick.startsWith("demo:")) return t({ friendly: `Yes please, I'd love to see the ${modelById(pick.slice(5)).name}.`, neutral: `Let's see the ${modelById(pick.slice(5)).name}.`, impatient: `The ${modelById(pick.slice(5)).name}.`, unsure: `Maybe the ${modelById(pick.slice(5)).name}?` });
-  if (kind === "rescue" && pick.startsWith("demo:")) return `Let me see the ${modelById(pick.slice(5)).name}.`;
-  if (kind === "nudge" && pick.startsWith("drop:")) return `Let's drop ${label.replace(/^Drop /, "")}.`;
+  if (kind === "rescue" && pick.startsWith("demo:")) return `Alright, let me see the ${modelById(pick.slice(5)).name}.`;
+  if (kind === "nudge" && pick.startsWith("drop:")) return `OK, I can do without ${label.replace(/^Give up /, "")}.`;
+  if (kind === "nudge" && pick.startsWith("raise:")) return `I could stretch to ${money(Number(pick.slice(6)))}.`;
   if (kind !== "question") return stop(label);
-  if (qid === "known_model" && pick.startsWith("model:")) return t({ friendly: `The ${label}, please.`, neutral: `The ${label}.`, impatient: `The ${label}.`, unsure: `I think the ${label}?` });
+  if (qid === "known_model" && pick.startsWith("model:")) return t({ friendly: `The ${modelById(pick.slice(6)).name}, please.`, neutral: `The ${modelById(pick.slice(6)).name}.`, impatient: `The ${modelById(pick.slice(6)).name}.`, unsure: `I think the ${modelById(pick.slice(6)).name}?` });
   if (qid === "known_model" && pick.startsWith("unlisted:")) return `I was after the ${pick.slice(9)}.`;
-  if (qid === "model_family") return t({ friendly: `I was thinking of the ${noParen(label)}.`, neutral: `The ${noParen(label)}.`, impatient: `The ${noParen(label)}.`, unsure: `Maybe the ${noParen(label)}?` });
+  if (qid === "model_family") {
+    const line = noParen(label).replace(/^Pick the /, "");
+    return t({ friendly: `I was thinking of the ${line}.`, neutral: `The ${line}.`, impatient: `The ${line}.`, unsure: `Maybe the ${line}?` });
+  }
   if (qid === "colour_prefs" || qid === "colour_pick") {
     const cols = picks.filter((p) => p.startsWith("colour:")).map((p) => p.slice(7));
     return t({ friendly: `I'd love ${list(cols, "or")}.`, neutral: `${capFirst(list(cols, "or"))}, please.`, impatient: `${capFirst(list(cols, "or"))}.`, unsure: `Maybe ${list(cols, "or")}?` });
   }
-  if (qid === "storage_tier_for_model") return t({ friendly: `The ${noParen(label)}, please.`, neutral: `The ${noParen(label)}.`, impatient: `${noParen(label)}.`, unsure: `Maybe the ${noParen(label)}?` });
-  if (qid === "storage_need") return t({ friendly: `At least ${label}, I think.`, neutral: `At least ${label}.`, impatient: `${label} at least.`, unsure: `Maybe ${label} at least?` });
-  if (qid === "budget_ceiling" && (pick.startsWith("ceiling:") || label.startsWith("Up to"))) return t({ friendly: `${label.replace(/^Yes, /, "")}.`.replace(/^up/, "Up"), neutral: `${label}.`, impatient: `${label}, that's it.`, unsure: `Maybe ${lcFirst(label)}?` });
+  if (qid === "storage_tier_for_model") {
+    const st = pick.slice("storage:".length);
+    return t({ friendly: `The ${st}, please.`, neutral: `The ${st}.`, impatient: `${st}.`, unsure: `Maybe the ${st}?` });
+  }
+  if (qid === "storage_need") {
+    const gb = GB(Number(pick.slice(4)));
+    return t({ friendly: `I'd want ${gb} or more, I think.`, neutral: `${gb} or more.`, impatient: `${gb} at least.`, unsure: `Maybe ${gb} or more?` });
+  }
+  if (qid === "budget_ceiling" && label.startsWith("Keep my budget")) return "Yes, that's still right.";
+  if (qid === "budget_ceiling" && pick.startsWith("ceiling:")) {
+    const n = money(Number(pick.slice(8)));
+    return t({ friendly: `My budget is around ${n}.`, neutral: `No more than ${n}.`, impatient: `${n} at the most.`, unsure: `Maybe around ${n}?` });
+  }
   if (qid === "use_case") {
     const uses = picks.filter((p) => p !== "notsure").map((p) => lcFirst(noParen(lab(p))));
-    return t({ friendly: `Mostly ${list(uses)}.`, neutral: `${capFirst(list(uses))}.`, impatient: `${capFirst(list(uses))}, that's all.`, unsure: `Probably ${list(uses)}, I think.` });
+    return t({ friendly: `Mostly ${list(uses)}.`, neutral: `Mainly ${list(uses)}.`, impatient: `${capFirst(list(uses))}, that's all.`, unsure: `Probably ${list(uses)}, I think.` });
   }
   if (qid === "hardware_features") {
     const fs = picks.filter((p) => p !== "notsure" && p !== "none").map((p) => lcFirst(noParen(lab(p))));
-    return fs.length ? t({ friendly: `${capFirst(list(fs))} would be nice.`, neutral: `${capFirst(list(fs))}.`, impatient: `${capFirst(list(fs))}.`, unsure: `Maybe ${list(fs)}?` }) : "None of those matter to me.";
+    return fs.length ? t({ friendly: `${capFirst(list(fs))} would be nice.`, neutral: `${capFirst(list(fs))}, please.`, impatient: `${capFirst(list(fs))}, that's all I care about.`, unsure: `Maybe ${list(fs)}?` }) : "None of those really matter to me.";
   }
-  if (qid === "screen_size_pref") return t({ friendly: `${noParen(label)}, I think.`, neutral: `${noParen(label)}.`, impatient: `${noParen(label)}.`, unsure: `Maybe ${lcFirst(noParen(label))}?` });
   return stop(label);
 }
 
@@ -251,7 +321,7 @@ export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, tur
     if (reply.tone === "friendly" && sureAnswer && turn % 3 === 0) body += " Thanks!";
     if (reply.tone === "impatient" && turn % 3 === 0) body += " Can we keep going?";
   }
-  if (reply.throwback) body = `${body ? stop(body) + " " : ""}${throwbackLabel(reply.throwback, ctx)}`;
+  if (reply.throwback) body = `${body ? stop(body) + " " : ""}${throwbackSaid(reply.throwback, ctx)}`;
   // Their first words back are a hello.
   if (turn === 2 && body) return `Hi. ${body}`;
   return body;

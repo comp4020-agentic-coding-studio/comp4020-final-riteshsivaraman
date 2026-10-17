@@ -62,7 +62,7 @@ const givenCeiling = (ctx: Ctx): number | null => {
   const had = ctx.sc.answers["budget_ceiling"]?.picks[0];
   return had?.startsWith("ceiling:") ? Number(had.slice("ceiling:".length)) : null;
 };
-const NOTSURE: Option = { id: "notsure", label: "Not sure", neutral: true };
+const NOTSURE: Option = { id: "notsure", label: "Not sure about this", neutral: true };
 const uniq = <T>(xs: T[]): T[] => [...new Set(xs)];
 const nameOf = (id: string): string => modelById(id).name;
 // A reopened question can come up after the model has been dropped again, so its wording can't assume one.
@@ -101,11 +101,11 @@ export const BANK: QuestionDef[] = [
     ask: () => "Hi, welcome in. I'm on the phones table. What brings you in today?",
     pre: (ctx) => ctx.sc.turn === 0 && !ctx.sc.fixed,
     options: () => [
-      { id: "know", label: "I know which phone I want" },
-      { id: "line", label: "I have a model line in mind" },
-      { id: "help", label: "I want help choosing" },
-      { id: "browse", label: "I'm just looking" },
-      { id: "other", label: "Something else (repair, accessory)" },
+      { id: "know", label: "I already have a phone in mind" },
+      { id: "line", label: "I know the range, not the model" },
+      { id: "help", label: "I need help choosing" },
+      { id: "browse", label: "Just browsing" },
+      { id: "other", label: "I'm here about something else (repair, accessory)" },
     ],
     apply: (picks) => (picks[0] === "other" ? { route: "other", end: "other" } : { route: picks[0] }),
   },
@@ -115,11 +115,11 @@ export const BANK: QuestionDef[] = [
     ask: (ctx) => (ctx.sc.log.length === 0 ? "Hi, welcome in. I'm on the phones table. Did you already have a phone in mind?" : "Which one did you have in mind?"),
     pre: (ctx) => !ctx.sc.fixed && ctx.pool.length > 0 && [undefined, "know"].includes(ctx.sc.answers["opening_intent"]?.picks[0]),
     options: () => [
-      ...MODELS.map((m) => ({ id: `model:${m.id}`, label: m.name })),
-      { id: "unlisted:iPhone 16 Plus", label: "iPhone 16 Plus (not on this list)" },
-      { id: "unlisted:iPhone 17 Pro", label: "iPhone 17 Pro (not on this list)" },
-      { id: "gift", label: "It's a gift for someone else", neutral: true },
-      { id: "notyet", label: "Not yet, show me options", neutral: true },
+      ...MODELS.map((m) => ({ id: `model:${m.id}`, label: `Name the ${m.name}` })),
+      { id: "unlisted:iPhone 16 Plus", label: "Ask about the iPhone 16 Plus" },
+      { id: "unlisted:iPhone 17 Pro", label: "Ask about the iPhone 17 Pro" },
+      { id: "gift", label: "Say it's a gift", neutral: true },
+      { id: "notyet", label: "No model in mind yet", neutral: true },
       NOTSURE,
     ],
     apply: (picks) => {
@@ -136,7 +136,7 @@ export const BANK: QuestionDef[] = [
     options: (ctx) => [
       ...uniq(ctx.ranked.map((m) => m.line)).map((l) => ({
         id: `line:${l}`,
-        label: `${LINE_NAMES[l]} (${lineLabel(ctx.ranked.filter((m) => m.line === l).map((m) => m.id))})`,
+        label: `Pick the ${LINE_NAMES[l]} (${lineLabel(ctx.ranked.filter((m) => m.line === l).map((m) => m.id))})`,
       })),
       NOTSURE,
     ],
@@ -177,8 +177,8 @@ export const BANK: QuestionDef[] = [
     ask: () => "Standard phone, or are you open to a foldable?",
     pre: (ctx) => varies(poolModels(ctx).map((m) => m.foldable)),
     options: () => [
-      { id: "standard", label: "A standard phone" },
-      { id: "fold", label: "I want a foldable" },
+      { id: "standard", label: "A standard phone, not a foldable" },
+      { id: "fold", label: "Want a foldable" },
       { id: "open", label: "Open to a foldable", neutral: true },
       NOTSURE,
     ],
@@ -191,7 +191,7 @@ export const BANK: QuestionDef[] = [
     pre: (ctx) => uniq(poolModels(ctx).map((m) => screenBand(m.screenIn))).length > 1,
     options: (ctx) => {
       const present = uniq(poolModels(ctx).map((m) => screenBand(m.screenIn)));
-      const label: Record<ScreenBand, string> = { compact: 'Compact (about 6.1")', medium: 'Medium (about 6.3")', large: 'Large (6.5" or bigger)' };
+      const label: Record<ScreenBand, string> = { compact: 'Prefer a compact screen (about 6.1")', medium: 'Prefer a medium screen (about 6.3")', large: 'Prefer a large screen (6.5" or bigger)' };
       return [...(["compact", "medium", "large"] as ScreenBand[]).filter((b) => present.includes(b)).map((b) => ({ id: `screen:${b}`, label: label[b] })), NOTSURE];
     },
     apply: (picks) => {
@@ -205,8 +205,8 @@ export const BANK: QuestionDef[] = [
     ask: () => "Most of our phones get their 2x zoom by cropping the main camera, which Apple calls optical-quality 2x. Only some have a separate telephoto lens as well. Do you want a separate telephoto lens?",
     pre: (ctx) => varies(poolModels(ctx).map((m) => m.separateTelephoto)),
     options: () => [
-      { id: "yes", label: "Yes, a separate telephoto lens" },
-      { id: "no", label: "No, the 2x from the main camera is enough", neutral: true },
+      { id: "yes", label: "Want a separate telephoto lens" },
+      { id: "no", label: "The 2x from the main camera is enough", neutral: true },
       NOTSURE,
     ],
     apply: (picks) => (picks[0] === "yes" ? { c: { separateTelephoto: true } } : {}),
@@ -217,9 +217,9 @@ export const BANK: QuestionDef[] = [
     ask: () => "How long does the battery need to last?",
     pre: (ctx) => poolModels(ctx).some((m) => m.batteryHours !== null) && varies(poolModels(ctx).map((m) => m.batteryHours === null || m.batteryHours >= 40)),
     options: () => [
-      { id: "min:40", label: "As long as possible (40+ hours of video)" },
-      { id: "min:30", label: "Long (30+ hours of video)" },
-      { id: "avg", label: "Average is fine", neutral: true },
+      { id: "min:40", label: "Battery: as long as possible (40+ hours of video)" },
+      { id: "min:30", label: "Battery: long (30+ hours of video)" },
+      { id: "avg", label: "Battery: average is fine", neutral: true },
       NOTSURE,
     ],
     apply: (picks) => {
@@ -233,9 +233,9 @@ export const BANK: QuestionDef[] = [
     ask: () => "Does a light, slim phone matter to you?",
     pre: (ctx) => varies(poolModels(ctx).map((m) => m.weightG)),
     options: () => [
-      { id: "max", label: "Yes, as light as possible" },
-      { id: "some", label: "A bit" },
-      { id: "no", label: "Doesn't matter", neutral: true },
+      { id: "max", label: "Want it as light as possible" },
+      { id: "some", label: "Lightness matters a bit" },
+      { id: "no", label: "Weight doesn't matter", neutral: true },
       NOTSURE,
     ],
     apply: (picks) => (picks[0] === "max" || picks[0] === "some" ? { s: { light: true } } : {}),
@@ -259,7 +259,7 @@ export const BANK: QuestionDef[] = [
     ask: () => "What's the least storage you'd want?",
     // Once the model is down to one, the tier question below does this job.
     pre: (ctx) => ctx.model === null && ctx.c.storage === undefined && uniq(ctx.pool.map((r) => r.gb)).length > 1,
-    options: (ctx) => [...uniq(ctx.pool.map((r) => r.gb)).sort((a, b) => a - b).map((gb) => ({ id: `min:${gb}`, label: gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB` })), NOTSURE],
+    options: (ctx) => [...uniq(ctx.pool.map((r) => r.gb)).sort((a, b) => a - b).map((gb) => ({ id: `min:${gb}`, label: `Storage: at least ${gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`}` })), NOTSURE],
     apply: (picks) => {
       const n = valueOf(picks, "min:");
       return n ? { c: { minGB: Number(n) } } : {};
@@ -277,10 +277,10 @@ export const BANK: QuestionDef[] = [
       const n = givenCeiling(ctx);
       const bands = priceBands(ctx.pool);
       return [
-        ...(n !== null ? [{ id: `ceiling:${n}`, label: `Yes, up to ${money(n)} stays` }] : []),
-        ...bands.filter((b) => b !== n).map((b) => ({ id: `ceiling:${b}`, label: `Up to ${money(b)}` })),
-        { id: "nolimit", label: "No real limit", neutral: true },
-        { id: "ceiling:own", label: "Set my own ceiling (A$100 steps)", param: { prefix: "ceiling:", min: 100, max: 6000, step: 100 } },
+        ...(n !== null ? [{ id: `ceiling:${n}`, label: `Keep my budget at ${money(n)}` }] : []),
+        ...bands.filter((b) => b !== n).map((b) => ({ id: `ceiling:${b}`, label: `Budget: up to ${money(b)}` })),
+        { id: "nolimit", label: "No budget limit", neutral: true },
+        { id: "ceiling:own", label: "Set my own budget (A$100 steps)", param: { prefix: "ceiling:", min: 100, max: 6000, step: 100 } },
         NOTSURE,
       ];
     },
@@ -295,7 +295,7 @@ export const BANK: QuestionDef[] = [
     multi: true,
     ask: () => "Is there a colour that catches your eye?",
     pre: (ctx) => !ctx.model && uniq(ctx.pool.map((r) => r.colour)).length > 1,
-    options: (ctx) => [...uniq(ctx.pool.map((r) => r.colour)).sort().map((col) => ({ id: `colour:${col}`, label: col })), NOTSURE],
+    options: (ctx) => [...uniq(ctx.pool.map((r) => r.colour)).sort().map((col) => ({ id: `colour:${col}`, label: `Colour: ${col}` })), NOTSURE],
     apply: (picks) => {
       const cols = pickedIds(picks, "colour:");
       return cols.length ? { c: { colours: cols } } : {};
@@ -310,8 +310,8 @@ export const BANK: QuestionDef[] = [
     },
     pre: (ctx) => ctx.ranked.length > 0 && ctx.ranked[0]!.screenIn >= 6.5 && ctx.ranked.some((m) => m.screenIn < ctx.ranked[0]!.screenIn),
     options: (ctx) => [
-      { id: "fine", label: "Yes, that size is fine", neutral: true },
-      ...(ctx.ranked[0] ? [{ id: `smaller:${ctx.ranked[0].screenIn}`, label: "Too big, show me something smaller" }] : []),
+      { id: "fine", label: "That size is fine for me", neutral: true },
+      ...(ctx.ranked[0] ? [{ id: `smaller:${ctx.ranked[0].screenIn}`, label: "That's too big, show me smaller" }] : []),
       NOTSURE,
     ],
     apply: (picks) => {
@@ -325,7 +325,7 @@ export const BANK: QuestionDef[] = [
     ask: (ctx) => `The ${thePhone(ctx)} comes in ${uniq(ctx.pool.map((r) => r.storage)).join(", ")}. Which one?`,
     pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.storage)).length > 1,
     options: (ctx) => [
-      ...uniq(ctx.pool.map((r) => r.storage)).map((st) => ({ id: `storage:${st}`, label: `${st} (${money(Math.min(...ctx.pool.filter((r) => r.storage === st).map((r) => r.price)))})` })),
+      ...uniq(ctx.pool.map((r) => r.storage)).map((st) => ({ id: `storage:${st}`, label: `Storage: ${st} (${money(Math.min(...ctx.pool.filter((r) => r.storage === st).map((r) => r.price)))})` })),
       ...(ctx.sc.answers["storage_tier_for_model"]?.picks.includes("notsure") ? [] : [NOTSURE]),
     ],
     apply: (picks) => {
@@ -342,8 +342,8 @@ export const BANK: QuestionDef[] = [
       const here = uniq(ctx.pool.map((r) => r.colour));
       const others = uniq(MODELS.flatMap((m) => m.colours)).filter((col) => !here.includes(col)).sort();
       return [
-        ...here.map((col) => ({ id: `colour:${col}`, label: col })),
-        ...others.map((col) => ({ id: `colour:${col}`, label: `Another colour: ${col}`, group: "other colours" })),
+        ...here.map((col) => ({ id: `colour:${col}`, label: `Colour: ${col}` })),
+        ...others.map((col) => ({ id: `colour:${col}`, label: `Ask for ${col} (not in this model)`, group: "other colours" })),
         ...(ctx.sc.answers["colour_pick"]?.picks.includes("notsure") ? [] : [NOTSURE]),
       ];
     },

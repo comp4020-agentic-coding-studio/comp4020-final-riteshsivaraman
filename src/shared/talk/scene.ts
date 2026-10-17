@@ -58,7 +58,7 @@ export function relaxMoves(ctx: Ctx): RelaxMove[] {
     if (ctx.c[key] === undefined) continue;
     const without = { ...ctx.c };
     delete without[key];
-    if (poolOf(without).length > 0) moves.push({ id: `drop:${key}`, label: `Drop ${KEY_TEXT[key]}` });
+    if (poolOf(without).length > 0) moves.push({ id: `drop:${key}`, label: `Give up ${KEY_TEXT[key]}` });
   }
   if (ctx.c.maxPrice !== undefined) {
     const looser = { ...ctx.c };
@@ -138,11 +138,11 @@ export interface CustomerMenu {
 }
 
 const REACTIONS: Option[] = [
-  { id: "happy", label: "This could be the one" },
-  { id: "another", label: "Show me another" },
-  { id: "expensive", label: "Too expensive for me" },
-  { id: "notforme", label: "Not for me" },
-  { id: "unsure", label: "Not sure yet", neutral: true },
+  { id: "happy", label: "Leaning towards this one" },
+  { id: "another", label: "Ask to see another" },
+  { id: "expensive", label: "Say it's too expensive" },
+  { id: "notforme", label: "Say it's not for me" },
+  { id: "unsure", label: "Undecided", neutral: true },
 ];
 
 export function customerMenu(sc: Scene): CustomerMenu | null {
@@ -156,20 +156,20 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
     options = optionsFor(p.reopen ? withoutAnswer(ctx, q.id) : ctx, q);
     multi = q.multi === true;
   } else if (p.kind === "offer_demo") {
-    options = [...p.models.map((m) => ({ id: `demo:${m}`, label: `Demo the ${modelById(m).name}` })), { id: "decline", label: "No demo, keep going", neutral: true }];
+    options = [...p.models.map((m) => ({ id: `demo:${m}`, label: `Ask to see the ${modelById(m).name}` })), { id: "decline", label: "No demo for now", neutral: true }];
   } else if (p.kind === "demo_reaction") {
     options = REACTIONS;
   } else if (p.kind === "recommend") {
-    options = [{ id: "yes", label: "That sounds right" }, { id: "no", label: "Not that one" }, { id: "unsure", label: "Not sure yet", neutral: true }];
+    options = [{ id: "yes", label: "Agree with the suggestion" }, { id: "no", label: "Turn the suggestion down" }, { id: "unsure", label: "Undecided", neutral: true }];
   } else if (p.kind === "nudge") {
-    options = [...relaxMoves(ctx).map((m) => ({ id: m.id, label: m.label })), { id: "keep", label: "Keep it as it is", neutral: true }, { id: "unsure", label: "Not sure", neutral: true }];
+    options = [...relaxMoves(ctx).map((m) => ({ id: m.id, label: m.label })), { id: "keep", label: "Hold firm", neutral: true }, { id: "unsure", label: "Undecided", neutral: true }];
   } else if (p.kind === "rescue") {
     const near = nearestModels(ctx);
-    options = [...near.map((m) => ({ id: `demo:${m}`, label: `See the ${modelById(m).name}` })), { id: "think", label: "I'll think about it", neutral: true }];
+    options = [...near.map((m) => ({ id: `demo:${m}`, label: `Look at the ${modelById(m).name}` })), { id: "think", label: "Go away and think about it", neutral: true }];
   } else if (p.kind === "confirm") {
     const m = modelById(ctx.pool[0]!.model);
     options = [
-      { id: "yes", label: "Yes, that one" },
+      { id: "yes", label: "Confirm this phone" },
       ...(m.colours.length > 1 ? [{ id: "colour", label: "Change the colour" }] : []),
       ...(m.tiers.length > 1 ? [{ id: "storage", label: "Change the storage" }] : []),
       { id: "model", label: "Change the model" },
@@ -181,13 +181,13 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
     // Any phone we carry, not only the ones still in the pool: naming a model
     // does not stop the customer wanting to see its neighbour.
     for (const m of MODELS) {
-      actions.push({ action: { t: "demo", model: m.id }, label: `Can I try the ${m.name}?` });
-      actions.push({ action: { t: "pick", model: m.id }, label: `I'll go with the ${m.name}` });
+      actions.push({ action: { t: "demo", model: m.id }, label: `Ask for a demo of the ${m.name}` });
+      actions.push({ action: { t: "pick", model: m.id }, label: `Go with the ${m.name}` });
     }
   }
-  for (const q of reopenable(ctx)) actions.push({ action: { t: "change", qid: q.id }, label: `Change my answer: ${q.id.replace(/_/g, " ")}` });
+  for (const q of reopenable(ctx)) actions.push({ action: { t: "change", qid: q.id }, label: `Change an earlier answer: ${q.id.replace(/_/g, " ")}` });
   actions.push({ action: { t: "leave" }, label: "Leave" });
-  if (p.kind === "free") actions.push({ action: { t: "ok" }, label: "Go on" });
+  if (p.kind === "free") actions.push({ action: { t: "ok" }, label: "Carry on" });
   const prompt = sc.log[sc.log.length - 1]?.text ?? "";
   const tb = p.kind === "confirm" || p.kind === "nudge" || p.kind === "rescue" ? [] : throwbacks(ctx);
   return { pending: p, prompt, options, multi, throwbacks: tb, actions };
