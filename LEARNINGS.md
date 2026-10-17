@@ -263,3 +263,22 @@ the mouth was seated against the nose tip. Lesson: for "X pokes through Y"
 ask for the opposite failure too (X floats off Y) and for a render the agent
 actually looked at, not a green number; a metric for only one direction of a
 defect passes the other.
+
+## Dictating the model first and getting a mockup plus numbered defaults back caught two wrong assumptions before any code
+
+[`236e47e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/236e47e),
+[`d389a76`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/d389a76)
+
+Redesigning the conversation model, I described it in one long unstructured
+message and told the assistant to listen and clarify only at the end. It
+answered with a static HTML mockup and eight numbered questions, each with a
+default. Two of its defaults were wrong: it proposed free text between two
+human players (I ruled out free text entirely, since it can't be tied to
+preconditions and effects), and it treated "device" as the model alone (the
+answer is both: questions narrow to model + storage + colour, while demos are
+by model only). Both would have been built into the POC had the assistant
+picked a reading and proceeded. Lesson (week 2, argue with the brief before
+it builds, and say what was assumed): a picture plus a default per question
+is cheaper to correct than code, and answering "defaults" to the ones that are
+right takes seconds. The settled list went into
+`docs/conversation-model/decisions.md` so the next session loads it.
