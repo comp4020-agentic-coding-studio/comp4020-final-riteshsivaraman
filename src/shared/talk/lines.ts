@@ -42,7 +42,7 @@ export function highlights(m: ModelRec, ctx: Ctx): string[] {
   if (ctx.s.battery && m.batteryHours) out.push(`up to ${m.batteryHours} hours of video playback`);
   if (ctx.s.light && m.weightG) out.push(`${m.weightG}g`);
   out.push(`a ${m.screenIn}" screen`);
-  if (m.frame) out.push(`a ${m.frame} frame`);
+  if (m.frame) out.push(`${/^[aeiou]/.test(m.frame) ? "an" : "a"} ${m.frame} frame`);
   out.push(`from ${money(Math.min(...m.tiers.map((t) => t.price)))}`);
   return out.slice(0, 4);
 }
