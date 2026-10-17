@@ -76,3 +76,119 @@ Rare, mostly ambient (D9: NPC-NPC talk is only speech bubbles). Candidates: aski
 - Is the radio task protocol one message, one acknowledgement, one completion?
 - Do pairs of customers shopping together count as one party?
 - Which policies (window, plans, trade-in) are we sourcing, and which are invented parody?
+
+---
+
+# G. Scene sketches (the next candidates, in the engine's terms)
+
+Each sketch answers the questions the playbook asks first: the **pool**, the **hard constraints** (answers
+that eliminate), the **soft signals** (answers that only re-rank), the **mandatory lines**, the
+**outcomes**, and the **hand-offs**. All questions and policies are proposals for Ritesh to cut; anything about
+what a real store allows is `[verify]` and must be sourced before it is said (D37).
+
+## G1. Device service, phone: intake and diagnosis
+- **Parties:** customer, technician or Genius (S8, T4). **Goal:** reach an outcome the customer accepts.
+- **Pool:** candidate faults and repair options for that model (for example screen replacement, battery
+  service, water-damage assessment, software reset, nothing wrong). Not products: the *ranking* is "most likely
+  cause given the symptoms", and the staff-side hint is how much each question separates the causes.
+- **Hard constraints:** the model (and its age, for eligibility `[verify]`); a symptom the customer confirms
+  ("it won't turn on", "the screen is cracked"); water exposure yes/no; whether it was ever opened or repaired
+  elsewhere `[verify]`.
+- **Soft signals:** when it started, what happened just before, charging habits, what they use it for
+  (it changes how urgent a battery issue is, not what the fault is).
+- **Questions (bank sketch):** what is wrong (a menu of symptoms by class); when did it start; has it been
+  dropped or wet; does it charge; does it turn on; what have you tried (restart, other charger); is there data
+  you cannot lose; do you have a backup; are you signed in to the account (activation lock, `[verify]`).
+- **Staff moves beyond questions:** *run a check* (a test result is a fact that enters the state, from data
+  not chance: the NPC technician reads it off a fault table), *explain the options*, *give a quote*
+  `[verify]`, *offer a loaner* `[verify]`, *warn about data* (mandatory before any repair that can lose it).
+- **Customer throw-backs:** how long will it take, how much will it cost, will I lose my data, can you fix it
+  today. These are parameterised menu items answered from the outcome table.
+- **Mandatory lines:** greeting, data warning before authorising, sign-off with what happens next.
+- **Outcomes:** fixed now; repaired in store (booked); sent away (a case with a due date, S8); replace the
+  device (hands to a purchase scene with the *preferences carried over*, as the phone scene already does for a
+  change of model); cannot fix; customer declines the quote and leaves.
+- **Hands off to:** technician (radio task), booking and queue (S2 and the Genius Bar slots), checkout (payment
+  for a repair), purchase (replacement), manager (dispute).
+- **What is new for the engine:** the pool holds *explanations*, not products, and some facts arrive from the
+  world (test results), not from the customer. The turn protocol, the obligations and the NPC shape are unchanged.
+
+## G2. Device service, one bank per class
+The same scene, a different bank. Build the phone first; for each further class write only:
+(a) the symptom menu for that class, (b) the fault table (symptom combinations to candidate faults and the
+outcomes each allows), (c) the class-specific questions (a laptop asks about liquid, storage and whether the
+data matters; a watch asks about the strap and pairing; earbuds ask which side), (d) any class-specific
+mandatory line. The class decides the *bank*, not the *engine*.
+
+## G3. Purchase of another family (laptop first)
+- **Pool:** model x memory x storage x colour (and keyboard layout or chip variant if the data has them).
+  Same shape as phones, so this is the best second scene to prove the engine is generic.
+- **New questions:** what do you use it for (office, creative, study, gaming), portability (screen size,
+  weight), how many years it must last, ports you need, whether they have a screen already, whether they
+  need to run particular software (hard filter only if the data says it matters).
+- **New wrinkle:** configure-to-order axes (memory and storage are chosen, not stocked), so the *price*
+  depends on choices and "this exact configuration is in stock" becomes a hard fact late in the scene.
+- **Reuses unchanged:** the whole turn protocol, demos, recommend, nudge, reconfirm, carried preferences.
+
+## G4. Greeter and check-in
+- **Pool:** destinations (specialist for a family, Genius Bar queue or booking, pickup, self-serve, leave).
+- **Questions:** what brings you in; do you have a booking; which product; do you want someone to help now or
+  to look around first.
+- **Outcomes:** routed (with a *case* started that carries the answers to the next scene), told to wait with a
+  rough time `[verify]`, "help yourself".
+- **Hands off to:** every other scene. This is where the carried facts begin.
+- **Note:** this replaces the two opening questions in the phone scene with a proper greeter scene; the
+  phone scene then starts from "you were sent to me for a phone".
+
+## G5. Checkout and billing
+- **Pool:** ways to finish: pay now, add trade-in, add a care plan, split, gift receipt, invoice, decline.
+- **Hard facts from the previous scene:** the confirmed phone, storage, colour and price (carried).
+- **Questions:** trade in an old device; add a care plan `[verify]`; protection items (case, charger); how to pay.
+- **Outcomes:** paid and bagged; payment failed (S7: limbo and escalation); customer leaves; sent back to the
+  specialist (changed their mind).
+- **Mandatory lines:** read-back of what is being paid; receipt and bag; sign-off.
+
+## G6. Staff: fetch request (stock runner)
+The simplest staff-staff scene and a good test of the engine with *no customer*.
+- **Parties:** specialist asks, runner answers. **Pool:** locations and items matching a request.
+- **Moves:** *request* (item, size or storage, colour, how many), *clarify* (which one exactly), *report*
+  (found: bringing it; not found: alternatives or none), *acknowledge*.
+- **Outcomes:** item brought; none in stock (feeds the customer's "out of stock" branch, S4); substituted.
+- **Realism:** the runner's answer is a stock lookup, never a dice roll, so the customer scene and the staff
+  scene agree.
+
+## G7. Staff: the one-way radio task (not a conversation)
+Ritesh's note: a quick message that assigns a task, not a back-and-forth. Proposed protocol, to settle with him:
+`assign(to, task, from, details)` then `acknowledge` then `done(result)`; three message types, no menus of
+questions, no turn-taking. Examples: "John will be with you in a moment" (customer handoff), "device in the
+back for diagnosis" (technician), "table 3 needs restocking". The task becomes a stored row with a state
+(`assigned`, `accepted`, `done`), so the customer scene can read it ("John is on his way"). The
+conversation engine is not involved; the event log row per state change is.
+
+## G8. Pickup and returns
+- **Pickup (S9):** pool is the customer's open orders (from the case). Questions: name or order number,
+  identity check `[verify]`. Outcomes: handed over; not ready (explain, offer a time); wrong item (escalate).
+- **Returns:** pool is return outcomes (refund, exchange, store credit `[verify]`). Hard facts: when bought,
+  condition, reason. Outcomes branch to purchase (exchange) or checkout (refund).
+
+## G9. Escalation (manager)
+- **Pool:** remedies the manager is allowed to offer `[verify]`. Questions: what happened, what would
+  make this right. Outcomes: apology, small goodwill, "not much we can do" (the satire beat in S7), referral.
+- **Mandatory:** the customer can always leave; the manager always signs off.
+
+## H. Build order, with reasoning
+1. **Extract the generic core while porting G3 (laptop).** Same pool shape, so the diff isolates what is
+   truly phone-specific.
+2. **G1 then G2 (service).** A new kind of pool (explanations) and facts that come from the world; proves
+   the engine is not only for products.
+3. **G4 (greeter) then G5 (checkout).** Closes the purchase journey end to end and starts the *case* that
+   carries facts across scenes.
+4. **G6 and G7.** Staff-to-staff, including the radio-task protocol.
+5. **G8 and G9, then ambient talk.**
+
+## I. Shared work these scenes force (do once, early)
+- A **case** object that survives hand-offs (reuse the idea in ADR 4 and `src/server/cases.ts`).
+- A **world facts** source for things that are not the customer's answers: stock, test results, queue state.
+- A **scene definition** interface so a new scene is data plus a bank, not a copy of the engine.
+- **Handoff messages** (G7) as stored tasks with a state.
+- The **event log row** per state change, the moment any scene is wired to the server.
