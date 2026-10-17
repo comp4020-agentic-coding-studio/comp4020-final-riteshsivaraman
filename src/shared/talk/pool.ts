@@ -19,6 +19,7 @@ export interface Constraints {
   colours?: string[]; // any of these
   foldable?: boolean;
   screen?: ScreenBand;
+  maxScreenIn?: number; // "something smaller" than the one just shown
   separateTelephoto?: boolean;
   minBattery?: number; // video-playback hours
 }
@@ -51,6 +52,7 @@ function modelPasses(m: ModelRec, c: Constraints): boolean {
   if (c.excluded?.includes(m.id)) return false;
   if (c.foldable !== undefined && m.foldable !== c.foldable) return false;
   if (c.screen && screenBand(m.screenIn) !== c.screen) return false;
+  if (c.maxScreenIn !== undefined && m.screenIn > c.maxScreenIn) return false;
   if (c.separateTelephoto && !m.separateTelephoto) return false;
   if (c.minBattery !== undefined && !keeps(m.batteryHours, (v) => (v as number) >= c.minBattery!)) return false;
   return true;
@@ -82,6 +84,7 @@ export function mergeConstraints(a: Constraints, b: Constraints): Constraints {
   if (a.maxPrice !== undefined && b.maxPrice !== undefined) out.maxPrice = Math.min(a.maxPrice, b.maxPrice);
   if (a.minGB !== undefined && b.minGB !== undefined) out.minGB = Math.max(a.minGB, b.minGB);
   if (a.minBattery !== undefined && b.minBattery !== undefined) out.minBattery = Math.max(a.minBattery, b.minBattery);
+  if (a.maxScreenIn !== undefined && b.maxScreenIn !== undefined) out.maxScreenIn = Math.min(a.maxScreenIn, b.maxScreenIn);
   if (a.lines && b.lines) out.lines = a.lines.filter((l) => b.lines!.includes(l));
   if (a.colours && b.colours) out.colours = a.colours.filter((x) => b.colours!.includes(x));
   if (a.excluded || b.excluded) out.excluded = [...new Set([...(a.excluded ?? []), ...(b.excluded ?? [])])];
