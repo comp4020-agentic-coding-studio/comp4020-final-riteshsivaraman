@@ -6,11 +6,6 @@ Fiber client, Hono + ws + SQLite server). Real visitors and CPU players share
 one room, and the Genius Bar queue is the shared state. Brand name is `[TK]`.
 Scope, decisions D1 to D24, tiers and open items: `SCOPE.md`.
 
-**`main` is a different app** (Seen, the cursed email client, deployed
-earlier). `new-idea` replaced it wholesale in `b61f6c7`; nothing is carried
-over (D1). Anything below that says "Seen" is history on `main`, and the
-Seen-only agents and ADRs are flagged where they appear.
-
 ## Don't invent, don't guess through ambiguity
 No made-up copy, stats, sources, or feature details. If a decision isn't
 pinned (see `SCOPE.md`'s `[TK]` items and open decisions), mark it `[TK]` and ask rather than
@@ -78,7 +73,7 @@ someone is connected.
   check in `spec/` over the real protocol. Each either has a matching
   `spec/*.test.ts`, or an explicit note in PROCESS.md saying why it's
   advisory-only — don't let one quietly fall off the list under deadline
-  pressure. (Adapted from the Seen rule; confirm this is how you want it.)
+  pressure.
 - **Cut the feature, never cut the harness.** When behind schedule, the
   answer is smaller scope, not a skipped feel-check or a merged red test.
   The verification discipline above is the thing that doesn't flex.
@@ -121,8 +116,8 @@ textures or fonts (`docs/graphics-brief.md`). Never presented as official.
 Before shipping, a fresh subagent with no prior context reviews the live app
 for stray real names and for visible COMP4020/crit/marker language inside
 the app itself. The repo's own docs are expected to say it's a COMP4020
-project. **`.claude/agents/fiction-integrity-reviewer.md` is still written
-for Seen's "boring email client" cover and needs rewriting before use here.**
+project. **`.claude/agents/fiction-integrity-reviewer.md` needs rewriting for the
+store before use.**
 
 ## Keys never touch this repo
 Gemini key (D8, runtime AI with a fallback; boundary still open) and
@@ -141,135 +136,14 @@ rather than reconstructing them from memory later — a cut made under
 deadline pressure is real process evidence, not just a loose end.
 
 ## Where things live
-This file is the index. Any time a new document gets created that records a
-decision or working state — an ADR, `WORKLOG.md`, `LEARNINGS.md`, `CUTS.md`,
-anything in `spec/`, `PROCESS.md` — add a one-line pointer to it here, in
-this section, when it's created. A fresh agent session should be able to
-find every resource by reading this file, not by discovering it mid-task.
-- `PROCESS.md` — the account of how this was built, Ritesh's prose, cites
-  commits by hash. Candidate citations as they happen: ADR 1 (stack choice),
-  the feel-vs-function verification split and why, the timer/catch-up design
-  forced by Fly's auto-stop machine, a defect-loop instance that actually
-  caught something, the subsystem-delegation structure and the
-  fiction-integrity sweep (evidence of taking "satirise, don't harm"
-  seriously).
-- `reflections/crit-{8,9,10}.md` — the two standing crit prompts, one file
-  per crit, Ritesh's prose.
-- `spec/README.md` — what's fixed (the two invariants) vs what's Seen's own.
-- `SCOPE.md` — the store project's scope: the one idea, decisions D1 to
-  D24, tiers, staff roles, scenarios, open items. The nearest thing to a
-  spec; read it before building anything.
-- `docs/adr/0001-stack.md`, `docs/adr/0002-live-preview-transport.md` —
-  **both are Seen's** (Preact SPA, SSE draft preview), kept as history. The
-  `new-idea` stack (React Three Fiber, Hono + ws, SQLite via better-sqlite3)
-  has **no ADR yet**, nor does D8's reversal of "no runtime AI". Write one
-  before changing stack, storage, or the data model. An accepted record is
-  never edited; a changed decision gets a new, numbered record that
-  supersedes it and says why.
-- `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
-  the database, menu conversations, employees online see customers' states. Facts
-  filled in, reasoning `[TK]` for Ritesh. Read before touching `visitors`,
-  `player_state`, `conversations`, `stock` or `src/shared/conversation.ts`.
-- `docs/customer-journeys.md` — seven end-to-end customer transcripts (draft, for
-  Ritesh's review) and what they imply; read before writing any conversation
-  script. Prices and policies in it are `[TK]`/`[verify]`.
-- `docs/adr/0004-cases-and-moves.md` — ADR 4 (draft): a durable case per customer
-  goal and conversations as moves with preconditions; either party can start.
-  Supersedes ADR 3's "character only talks if the visitor starts". **Option B
-  confirmed and schema built 2026-10-13 (SCOPE D42)** — see the addendum.
-  Reasoning `[TK]`.
-- `scripts/sim/` (`pnpm sim`, optional `--seed=N` to replay a run) — SCOPE
-  D43: a throwaway terminal prototype of the loop/case/slot design, option B
-  (cheap and disposable, not the shipped engine — `src/server/cases.ts`
-  below is the real one). Play as customer or employee; NPCs get seeded
-  traits so their randomness is personality, not per-turn dice. The
-  customer POV takes free text via an optional OpenRouter bridge (`ai.ts`,
-  key in `mise.local.toml` as `OPENROUTER_API_KEY`, same fallback-when-
-  unavailable shape as D8 — switched from Gemini after its free tier
-  turned out to be 5 req/min and model availability shifted mid-session).
-  Slot-filling is a genuinely non-linear turn (`interpretTurn`, every open
-  slot on the table each turn, any order, several at once or none), not a
-  for-loop over a fixed question list — `SLOT_ORDER` is only the engine's
-  own fallback shape now. Needs a large free model (120B tested); a small
-  one narrated answers it never actually recorded. The employee POV's
-  NPC-customer side is still menu-only. Read before deciding whether/how
-  to port its validated design into the real engine.
-- `src/server/cases.ts` — the case/case_facts data layer ADR 4's addendum
-  describes: `openCase`, `handOffCase`, `setFact`, `factsOf`. Pure, like
-  `stock.ts`; not yet wired into `service.ts`'s claim/handOn/open flow, and
-  writes no `events` row itself — that belongs at the call site once wired.
-  Migration 6 (`src/server/migrate.ts`) adds its tables. Read before touching
-  `cases`, `case_facts`, or `conversations.case_id`.
-- `docs/adr/0006-behaviour-loop-and-conversation-engine.md` — ADR 6 (draft,
-  from a grilling session): resolves D32's open timetable-vs-reactive
-  behaviour decision as "timetable + interruptible", one generic
-  idle/converse/leave loop shared by every customer purpose and staff role
-  (repair and pickup excepted), and concretises ADR 4's "moves with
-  preconditions" as slot-filling with a per-script ordering policy instead of
-  an authored node graph. D40's NPC-auto-claim wiring question and build
-  sequencing remain open. Reasoning `[TK]`. See SCOPE.md D41.
-- `docs/data-overview.html` — diagram of where every kind of data lives today.
-- `src/shared/assignments.ts` — maps every table id+side, wall desktop/
-  monitor/headphone slot, and bay ledge to a specific real model id (pure
-  data, doesn't touch `layout.json`/`world.ts`/`plan.ts`). A proposal, not
-  final — read `references/table-map.md` alongside it.
-- `src/shared/slots.ts` — every product-table device's stable id (D28:
-  "table and position"), one source of truth the 3D render and the
-  server's inspect range-check (D39) both read. Read before touching how
-  or where a device actually sits on a table.
-- `docs/prompts/product-line-session.md` — the prompt for the session that designs
-  every device as a real, named, distinct model (SCOPE D37). Hand it to a fresh session.
-- `references/product-line.md` — Step 1 of the above: every family Apple AU
-  currently sells, sourced live (phones, iPad, Mac laptops/desktops, displays,
-  Watch, AirPods, HomePod, AirTag, a representative accessories slice), with
-  physical-layout claims flagged text-only/unverified. Read before cataloguing
-  or modelling anything outside phones.
-- `src/shared/catalogue.ts` — the real sourced catalogue (phones only so far;
-  other families wait on a conversation script to sell them). `docs/adr/0005-storage-sku-key.md`
-  is the ADR for its storage axis; read both before touching `stock`,
-  `reservations`, `catalogue.ts` or `src/server/stock.ts`.
-- `docs/blueprint/` — the floor plan, four wall elevations, ceiling and mall
-  drawings (D20: the drawings are the specification), drawn from
-  `src/shared/plan.ts`, `world.ts` and `mall.ts`.
-- `src/shared/` — the model every layer reads (layout, plan, world, mall,
-  people, npcs, pose, protocol). Graphics work draws on it, never moves it.
-- `references/` — photos, visitor accounts, the experience and reel notes,
-  product notes. `references/README.md` says what each is.
-- `docs/design-handoff.md` — the visual design spec the real app is built
-  against: color/type tokens, layout, the two permitted signature "dread"
-  devices, copy voice, component inventory. Came from a standalone frontend
-  exploration outside this repo; read this doc, not that directory, going
-  forward.
-- `WORKLOG.md` — current state of the build, read this first for "where did
-  we leave off." Top section is the store project; Seen's log is kept below
-  it as history.
-- `LEARNINGS.md` — what Ritesh is learning about prompting/working with AI
-  coding assistants, cited to commits (older entries predate this and are
-  stack gotchas instead).
-- `CUTS.md` — what got cut under deadline pressure and why. Entries so far
-  are Seen's (attachments from C8, auto-send check advisory-only, company
-  name `[TK]`); none yet for the store project.
-- `.claude/agents/event-log-reviewer.md` — checks the event-log-write-
-  completeness invariant above; run it after a subsystem build. Its prompt
-  still lists Seen's actions (send, forward, self-destruct); update it to
-  the store's actions before relying on it.
-- `.claude/agents/fiction-integrity-reviewer.md` — see "Parody integrity";
-  Seen-era prompt, needs rewriting.
-- `.claude/skills/mutation-check/` — the defect-loop mutation check below,
-  on demand for code built unwatched. Examples in its text are Seen's.
-- `tools/layout/index.html` + `scripts/layout-server.ts` (`pnpm layout`, port 8124) —
-  the floor-plan editor for tables, benches and stools; writes only
-  `src/shared/layout.json`. After saving run `node scripts/blueprint.ts`.
-- `docs/graphics-brief.md` — the brief the four graphics specialists work to:
-  fixed sizes, budget, ownership of `src/client/src/gfx/*`, how to check a look.
-- `README.md`, `PROCESS.md`, `reflections/crit-8.md` — currently describe
-  Seen. Ritesh's prose; they need his rewrite for the store project, and
-  nothing here should paper over that.
-- `pnpm dev` (`scripts/dev.ts`) — server on 8080 plus the client on 5173 with
-  hot reload; open http://localhost:5173.
-- `references/table-map.md` — my reading of what stands on each table in the
-  Canberra photo, for Ritesh to correct.
-- *(add further ADRs here as they're created — don't let this list go stale.)*
+Full index: `docs/INDEX.md`. Read it when you need to find a decision or a
+document; it is not loaded every turn. When you create a new ADR, worklog,
+spec file or other record, add its one-line pointer there, not here. The
+ones to know by heart:
+- `SCOPE.md` — the scope, decisions D1 onwards, tiers, scenarios. Read before building anything.
+- `WORKLOG.md` — where we left off. Read first in a fresh session.
+- `docs/adr/` — numbered decision records. Read before changing stack, storage or the data model.
+- `LEARNINGS.md`, `CUTS.md`, `PROCESS.md`, `reflections/` — the process evidence; cite commits by hash.
 
 ## How we work
 Build one subsystem at a time, with a fresh context per subsystem rather
