@@ -163,6 +163,11 @@ export function staffBase(act: StaffAct, ctx: Ctx, models: string[]): string {
       const m = modelById(act.model);
       return `I'd suggest the ${m.name}: ${highlights(m, ctx).join("; ")}. Does that sound right?`;
     }
+    case "reconfirm": {
+      const c = ctx.sc.carried ?? {};
+      const parts = [...(c.colours?.length ? [list(c.colours, "or")] : []), ...(c.minGB ? [`at least ${GB(c.minGB)}`] : [])];
+      return `Earlier you mentioned ${list(parts)}. Is that still what you want?`;
+    }
     case "nudge":
       return `Nothing fits ${describeConstraints(ctx.c).join(", ") || "that"}. How do you want to go?`;
     case "rescue":
@@ -242,6 +247,9 @@ const SAID: Record<string, Said> = {
   "demo_reaction/others": { neutral: "Actually, what else do you have?", friendly: "Do you have anything else I could look at?", impatient: "What else have you got?", unsure: "Is there anything else, maybe?" },
   "demo_reaction/expensive": "That's more than I wanted to spend.",
   "demo_reaction/notforme": "It's not really for me, sorry.",
+  "reconfirm/keep": { friendly: "Yes, that's still what I want.", neutral: "Yes, that still stands.", impatient: "Yes, same as before.", unsure: "I think so, yes." },
+  "reconfirm/colour": "Actually, I'd like a different colour.",
+  "reconfirm/storage": "Actually, I'd like a different amount of storage.",
   "recommend/yes": { friendly: "Yes, that sounds right to me.", neutral: "That sounds right.", impatient: "Fine, that one.", unsure: "I think that sounds right?" },
   "recommend/no": "Not that one, I think.",
   "nudge/keep": { neutral: "I'd rather keep it as it is.", impatient: "No, I want what I asked for.", unsure: "I'd rather not change it, I think." },

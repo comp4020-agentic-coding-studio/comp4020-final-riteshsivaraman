@@ -93,6 +93,8 @@ export function staffActs(sc: Scene): ActView[] {
     const hold = sc.wantsMore && open.length > 0;
     if (!hold && demoCandidates(ctx).length > 0 && (ctx.ranked.length <= 4 || open.length === 0)) out.push(view({ t: "offer_demo" }, "Offer a demo"));
     if (ctx.pool.length === 1) out.push(view({ t: "confirm" }, "Confirm the choice"));
+    // Wishes that came with them from a phone they moved away from are worth checking before building on them.
+    if (sc.carried) out.push(view({ t: "reconfirm" }, "Check their earlier wishes still stand"));
     // Recommending something before learning anything about them would just be the cheapest phone.
     const informed = sc.order.some((q) => questionById(q).kind !== "route");
     if (!hold && ctx.model === null && (informed || open.length === 0)) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
@@ -166,6 +168,8 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
     options = [...p.models.map((m) => ({ id: `demo:${m}`, label: `Ask to see the ${modelById(m).name}` })), { id: "decline", label: "No demo for now", neutral: true }];
   } else if (p.kind === "demo_reaction") {
     options = reactions(ctx, p.model);
+  } else if (p.kind === "reconfirm") {
+    options = [{ id: "keep", label: "Yes, keep what I said" }, ...(sc.carried?.colours ? [{ id: "colour", label: "Change the colour" }] : []), ...(sc.carried?.minGB ? [{ id: "storage", label: "Change the storage" }] : []), { id: "unsure", label: "Undecided", neutral: true }];
   } else if (p.kind === "recommend") {
     options = [{ id: "yes", label: "Agree with the suggestion" }, { id: "no", label: "Turn the suggestion down" }, { id: "unsure", label: "Undecided", neutral: true }];
   } else if (p.kind === "nudge") {
@@ -250,7 +254,8 @@ export function applyStaff(sc: Scene, act: StaffAct, tone: Tone): Scene | { erro
   else if (act.t === "demo") {
     next.demoed.push(act.model);
     next.pending = { kind: "demo_reaction", model: act.model };
-  } else if (act.t === "recommend") {
+  } else if (act.t === "reconfirm") next.pending = { kind: "reconfirm" };
+  else if (act.t === "recommend") {
     next.recommended.push(act.model);
     next.pending = { kind: "recommend", model: act.model };
   } else if (act.t === "nudge") next.pending = { kind: "nudge" };
@@ -330,6 +335,8 @@ function switchModel(sc: Scene, to: string): void {
 // An exact storage tier belonged to one phone; as a preference it becomes a floor
 // ("512GB, so at least 512GB"), which the next phone can meet or not. Colours stay as they are.
 function keepPreferences(sc: Scene): void {
+  const colours = ["colour_pick", "colour_prefs"].flatMap((q) => sc.answers[q]?.picks.filter((p) => p.startsWith("colour:")).map((p) => p.slice(7)) ?? []);
+  if (colours.length) sc.carried = { ...sc.carried, colours: [...new Set([...(sc.carried?.colours ?? []), ...colours])] };
   const tier = sc.answers["storage_tier_for_model"]?.picks.find((p) => p.startsWith("storage:"));
   if (!tier) return;
   const st = tier.slice("storage:".length);
@@ -338,6 +345,7 @@ function keepPreferences(sc: Scene): void {
   if (!had || Number(had.slice(4)) < gb) {
     sc.answers["storage_need"] = { picks: [`min:${gb}`], turn: sc.turn };
     if (!sc.order.includes("storage_need")) sc.order.push("storage_need");
+    sc.carried = { ...sc.carried, minGB: gb };
   }
   delete sc.answers["storage_tier_for_model"];
   sc.order = sc.order.filter((q) => q !== "storage_tier_for_model");
@@ -384,6 +392,19 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     }
     // "Show me another" is a request: the next thing staff do is offer one, if there is one left to show.
     else if (pick === "another" && demoCandidates(derive(sc)).length > 0) sc.forced = { t: "offer_demo" };
+  } else if (p.kind === "reconfirm") {
+    const had = sc.carried;
+    sc.carried = null;
+    // A change means asking that question afresh, so the answer goes first.
+    if (pick === "colour") {
+      for (const q of ["colour_pick", "colour_prefs"]) delete sc.answers[q];
+      sc.order = sc.order.filter((q) => q !== "colour_pick" && q !== "colour_prefs");
+      sc.forced = { t: "ask", qid: derive(sc).model ? "colour_pick" : "colour_prefs" };
+    } else if (pick === "storage" && had?.minGB) {
+      delete sc.answers["storage_need"];
+      sc.order = sc.order.filter((q) => q !== "storage_need");
+      sc.forced = { t: "ask", qid: derive(sc).model ? "storage_tier_for_model" : "storage_need" };
+    }
   } else if (p.kind === "recommend") {
     if (pick === "yes") switchModel(sc, p.model);
     else if (pick === "no") sc.excluded.push(p.model);

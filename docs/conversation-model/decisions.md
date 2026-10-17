@@ -45,6 +45,7 @@ source: Ritesh, this session (description, then answers 1 to 8 to the grilling q
 
 ## Preferences, demos and naming (Ritesh, 2026-10-17)
 - A preference survives a change of model. Colour stays; an exact storage tier becomes a floor ("512GB" so "at least 512GB"). A wish the next phone cannot meet goes through the empty-pool nudge, not silently away.
+- Carried wishes are reconfirmed: after a change of model, staff can check them ("Earlier you mentioned Black and at least 512GB. Is that still what you want?"); the customer keeps them, or changes the colour or the storage (which is then asked afresh). It is a staff move with a high NPC weight, not forced, so a human specialist can skip it.
 - After a demo they did not like there are two distinct options: **another one you offered** (a demo of one of the other offered phones; hidden when none is left) and **ask about other phones** (the shown phone is set aside and staff go back to asking questions before offering a demo or a recommendation).
 - Once a phone has been named by either side, staff do not introduce it again: they say "it" (the final summary still names it).
 

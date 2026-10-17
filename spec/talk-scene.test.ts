@@ -174,6 +174,44 @@ describe("remembering what they wanted", () => {
     expect(derive(sc).pool.length).toBeGreaterThan(0);
   });
 
+  const movedOn = (): Scene => {
+    let sc = ask(newScene(), "known_model", ["model:17e"]);
+    sc = ask(sc, "storage_tier_for_model", ["storage:512GB"]);
+    sc = ask(sc, "colour_pick", ["colour:Black"]);
+    sc = cust(staff(sc, { t: "confirm" }), { picks: ["model"] });
+    return cust(staff(sc, { t: "ask", qid: "use_case" }), { action: { t: "pick", model: "18-pro" } });
+  };
+
+  it("staff can check the carried wishes still stand, saying what they were", () => {
+    let sc = movedOn();
+    expect(staffActs(sc).some((a) => a.act.t === "reconfirm")).toBe(true);
+    sc = staff(sc, { t: "reconfirm" });
+    expect(sc.log.at(-1)!.text).toBe("Earlier you mentioned Black and at least 512GB. Is that still what you want?");
+    expect(customerMenu(sc)!.options.map((o) => o.id)).toEqual(["keep", "colour", "storage", "unsure"]);
+  });
+
+  it("'keep' stands them, and staff do not ask again", () => {
+    let sc = cust(staff(movedOn(), { t: "reconfirm" }), { picks: ["keep"] });
+    expect(sc.carried).toBeNull();
+    expect(derive(sc).c).toMatchObject({ colours: ["Black"], minGB: 512 });
+    expect(staffActs(sc).some((a) => a.act.t === "reconfirm")).toBe(false);
+    expect(sc.log.at(-1)!.text).toBe("Yes, that still stands.");
+  });
+
+  it("changing the colour or the storage asks that question afresh", () => {
+    let sc = cust(staff(movedOn(), { t: "reconfirm" }), { picks: ["colour"] });
+    expect(staffActs(sc).map((a) => a.act)).toEqual([{ t: "ask", qid: "colour_pick" }]);
+    expect(derive(sc).c.colours).toBeUndefined();
+    sc = cust(staff(movedOn(), { t: "reconfirm" }), { picks: ["storage"] });
+    expect(staffActs(sc).map((a) => a.act)).toEqual([{ t: "ask", qid: "storage_tier_for_model" }]);
+    expect(derive(sc).c.minGB).toBeUndefined();
+  });
+
+  it("is not offered when nothing was carried", () => {
+    const sc = ask(newScene(), "known_model", ["model:17e"]);
+    expect(staffActs(sc).some((a) => a.act.t === "reconfirm")).toBe(false);
+  });
+
   it("a wish the next phone cannot meet goes to the nudge, not silently away", () => {
     let sc = ask(newScene(), "known_model", ["model:17"]);
     sc = ask(sc, "storage_tier_for_model", ["storage:512GB"]);

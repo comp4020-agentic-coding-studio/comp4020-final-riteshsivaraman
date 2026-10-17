@@ -40,6 +40,7 @@ export function newScene(): Scene {
     excluded: [],
     demoed: [],
     recommended: [],
+    carried: null,
     wantsMore: false,
     declinedDemo: [],
     relaxDeclined: 0,

@@ -129,6 +129,8 @@ export function customerMove(sc: Scene, persona: Persona, rng: Rng, mem: Memory 
     // Unhappy with it but with others on offer: look at one of them, or ask about something else.
     const another = pick === "notforme" && menu.options.some((o) => o.id === "another") && chance(rng, 0.5) ? "another" : pick === "notforme" && chance(rng, 0.3) ? "others" : pick;
     reply = { picks: [another], tone: t };
+  } else if (pend.kind === "reconfirm") {
+    reply = { picks: ["keep"], tone: t }; // what they carried over is what they said, so it stands
   } else if (pend.kind === "recommend") {
     const m = pend.model;
     const yes = p.target ? m === p.target.model : fits(m, p);
@@ -188,6 +190,7 @@ export function staffMove(sc: Scene, tr: StaffTraits, rng: Rng): { act: StaffAct
       if (q.kind === "resolve") w = 3;
       w *= tr.thorough * (impatient ? 0.5 : 1);
     } else if (a.t === "offer_demo") w = (models <= 4 ? 1 + (5 - models) * 0.8 : 0.3) * tr.salesy * (impatient ? 2 : 1);
+    else if (a.t === "reconfirm") w = 9; // they moved to a new phone: check their wishes still stand
     else if (a.t === "recommend") w = (acts.some((x) => x.act.t === "ask" && !x.act.reopen) ? 0.3 : 6) * tr.salesy;
     else if (a.t === "confirm") w = 12;
     else if (a.t === "nudge") w = 10;

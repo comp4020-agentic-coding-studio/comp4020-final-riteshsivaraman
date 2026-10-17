@@ -45,6 +45,7 @@ export type Pending =
   | { kind: "offer_demo"; models: string[] }
   | { kind: "demo_reaction"; model: string }
   | { kind: "recommend"; model: string }
+  | { kind: "reconfirm" } // do their earlier wishes still stand?
   | { kind: "nudge" }
   | { kind: "rescue" }
   | { kind: "confirm" }
@@ -55,6 +56,7 @@ export type StaffAct =
   | { t: "offer_demo" }
   | { t: "demo"; model: string }
   | { t: "recommend"; model: string } // staff suggest one; the way forward when questions and demos run out
+  | { t: "reconfirm" } // check the wishes carried over from the phone they moved away from
   | { t: "nudge" }
   | { t: "rescue" }
   | { t: "confirm" }
@@ -102,6 +104,7 @@ export interface Scene {
   excluded: string[];
   demoed: string[];
   recommended: string[];
+  carried: { colours?: string[]; minGB?: number } | null; // wishes that travelled with them to a new phone, not yet checked
   wantsMore: boolean; // they asked about other phones: staff ask questions again before offering anything
   declinedDemo: string[];
   relaxDeclined: number;
