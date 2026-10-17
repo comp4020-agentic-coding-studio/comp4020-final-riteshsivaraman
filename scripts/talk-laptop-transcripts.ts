@@ -1,0 +1,102 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { derive, newScene } from "../src/shared/talk/scenes/laptop/bank.ts";
+import { modelById } from "../src/shared/talk/scenes/laptop/data.ts";
+import { customerMove, randomPersona, randomStaff, staffMove, type Memory, type Persona, type StaffTraits } from "../src/shared/talk/scenes/laptop/npc.ts";
+import { makeRng, type Rng } from "../src/shared/talk/core/rng.ts";
+import { applyCustomer, applyStaff, customerMenu, staffActs } from "../src/shared/talk/scenes/laptop/scene.ts";
+import type { Scene } from "../src/shared/talk/scenes/laptop/types.ts";
+
+// Generates NPC-vs-NPC laptop-scene conversations as readable transcripts, the
+// same shape scripts/talk-transcripts.ts produces for phones, for the review
+// loop (prompts.md prompt E) to read.
+//
+//   node scripts/talk-laptop-transcripts.ts --n=40 --seed=1000 --out=.talk-runs/laptop-run1
+
+const arg = (name: string, d: string): string => process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1] ?? d;
+const N = Number(arg("n", "40"));
+const SEED0 = Number(arg("seed", "1000"));
+const OUT = arg("out", `.talk-runs/laptop-run-${Date.now()}`);
+
+const short = (s: string, n = 90): string => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+const plural = (n: number, w: string): string => `${n} ${w}${n === 1 ? "" : "s"}`;
+const poolText = (rows: number, models: string[]): string => `${plural(rows, "option")}, ${plural(models.length, "model")}${models.length ? ` (${models.slice(0, 4).map((i) => modelById(i).name.replace("MacBook ", "")).join(", ")}${models.length > 4 ? `, +${models.length - 4} more` : ""})` : ""}`;
+
+function menuLine(labels: { label: string; picked: boolean }[], max = 8): string {
+  const picked = labels.filter((l) => l.picked);
+  const rest = labels.filter((l) => !l.picked);
+  const keep = rest.slice(0, Math.max(0, max - picked.length));
+  const shown = labels.filter((l) => l.picked || keep.includes(l));
+  const hidden = labels.length - shown.length;
+  return shown.map((l) => (l.picked ? `**[${l.label}]**` : l.label)).join(" | ") + (hidden > 0 ? ` | (+${hidden} more)` : "");
+}
+
+function trace(seed: number): { md: string; outcome: string; turns: number } {
+  const rng: Rng = makeRng(seed);
+  const persona: Persona = randomPersona(rng, `seed-${seed}`);
+  const staff: StaffTraits = randomStaff(rng);
+  const mem: Memory = { wants: persona.wants, conceded: new Set() };
+  let sc: Scene = newScene();
+  const out: string[] = [];
+  out.push(`# Conversation, seed ${seed}`);
+  out.push("");
+  out.push("Hidden from the characters: the customer's goal and the staff member's habits.");
+  out.push(`- Customer goal: ${persona.target ? `buy ${modelById(persona.target.model).name}, ${persona.target.memoryGb}GB/${persona.target.storageGb}GB, ${persona.target.colour}` : "no laptop fully satisfies them"}; hard wants ${JSON.stringify(persona.wants)}; opening: ${persona.opening}; would give up: ${persona.relax ? JSON.stringify(persona.relax) : "nothing"}; ticks: ${persona.signals.join(", ")}`);
+  out.push(`- Staff habits: thorough ${staff.thorough.toFixed(2)}, salesy ${staff.salesy.toFixed(2)}, tones ${staff.tones.join("/")}`);
+  out.push("");
+  let stuck = "";
+  while (!sc.ended && sc.turn < 80) {
+    const legal = staffActs(sc);
+    if (legal.length === 0) { stuck = "no legal staff move"; break; }
+    const sm = staffMove(sc, staff, rng);
+    const afterStaff = applyStaff(sc, sm.act, sm.tone);
+    if ("error" in afterStaff) { stuck = `staff error: ${afterStaff.error}`; break; }
+    const chosen = legal.find((v) => JSON.stringify(v.act) === JSON.stringify(sm.act));
+    const sl = afterStaff.log.at(-1)!;
+    out.push(`## Turn ${sl.turn}: STAFF · tone ${sl.tone} · face ${sl.expression}`);
+    out.push(`Staff menu: ${menuLine(legal.map((v) => ({ label: v.label, picked: v === chosen })), 12)}`);
+    out.push(`Said: "${sl.text}"`);
+    out.push(`Pool after: ${poolText(sl.after.rows, sl.after.models)}`);
+    out.push("");
+    const menu = customerMenu(afterStaff);
+    if (!menu) { stuck = "no customer menu"; sc = afterStaff; break; }
+    const reply = customerMove(afterStaff, persona, rng, mem);
+    const afterCust = applyCustomer(afterStaff, reply);
+    if ("error" in afterCust) { stuck = `customer error: ${afterCust.error}`; sc = afterStaff; break; }
+    const cl = afterCust.log.find((l) => l.who === "customer" && l.turn === afterStaff.turn + 1)!;
+    const picked = new Set(reply.picks ?? []);
+    out.push(`## Turn ${cl.turn}: CUSTOMER · tone ${cl.tone} · face ${cl.expression}`);
+    if (menu.options.length) out.push(`Menu (${menu.multi ? "pick any" : "pick one"}): ${menuLine(menu.options.map((o) => ({ label: o.label, picked: picked.has(o.id) || [...picked].some((p) => !!o.param && p.startsWith(o.param.prefix)) })))}`);
+    if (reply.throwback) out.push(`Also asked (from a menu of ${menu.throwbacks.length}): **[${menu.throwbacks.find((t) => t.id === reply.throwback)?.label}]**`);
+    const act = reply.action;
+    out.push(`Standing actions available: ${menu.actions.length} (demo/go with any laptop, change an earlier answer, leave${menu.pending.kind === "free" ? ", carry on" : ""})${act ? ` · TOOK: ${menu.actions.find((a) => JSON.stringify(a.action) === JSON.stringify(act))?.label ?? act.t}` : ""}`);
+    out.push(`Said: "${cl.text}"`);
+    const c = derive(afterCust);
+    out.push(`Pool after: ${poolText(c.pool.length, c.ranked.map((m) => m.id))}`);
+    out.push("");
+    sc = afterCust;
+    if (sc.ended) {
+      const last = sc.log.at(-1)!;
+      out.push(`## Turn ${last.turn}: STAFF · tone ${last.tone} · face ${last.expression} (sign-off)`);
+      out.push(`Said: "${last.text}"`);
+      out.push("");
+    }
+  }
+  const e = sc.ended;
+  const outcome = stuck ? `STUCK: ${stuck}` : e?.how === "bought" ? `SOLD ${modelById(e.sku.model).name}, ${e.sku.memoryGb}GB/${e.sku.storageGb}GB, ${e.sku.colour}, A$${e.sku.price}` : e ? `LEFT: ${e.why}` : "UNFINISHED";
+  out.push(`**Outcome: ${outcome}**`);
+  return { md: out.join("\n"), outcome, turns: sc.turn };
+}
+
+mkdirSync(OUT, { recursive: true });
+const index: string[] = [`# Run ${OUT}`, "", `${N} conversations, seeds ${SEED0} to ${SEED0 + N - 1}`, "", "| seed | turns | outcome |", "|---|---|---|"];
+let sold = 0;
+for (let i = 0; i < N; i++) {
+  const seed = SEED0 + i;
+  const r = trace(seed);
+  if (r.outcome.startsWith("SOLD")) sold++;
+  writeFileSync(`${OUT}/${String(i + 1).padStart(3, "0")}-seed${seed}.md`, r.md + "\n");
+  index.push(`| ${seed} | ${r.turns} | ${short(r.outcome, 70)} |`);
+}
+index.push("", `Sold: ${sold} of ${N}`);
+writeFileSync(`${OUT}/INDEX.md`, index.join("\n") + "\n");
+console.log(`wrote ${N} transcripts to ${OUT} (sold ${sold})`);
