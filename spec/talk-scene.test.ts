@@ -109,10 +109,12 @@ describe("throw-backs", () => {
     expect(staffActs(sc).length).toBeGreaterThan(0);
   });
 
-  it("a model we do not carry is said so, naming the closest we have", () => {
+  it("a model we do not carry is said so, with an apology and no invented comparison", () => {
     let sc = ask(newScene(), "known_model", ["unlisted:iPhone 16 Plus"]);
     sc = staff(sc, { t: "ask", qid: "use_case" });
-    expect(sc.log.at(-1)!.text).toMatch(/We don't carry the iPhone 16 Plus/);
+    expect(sc.log.at(-1)!.text).toMatch(/^Sorry, we don't carry the iPhone 16 Plus\. I can show you what we do have\./);
+    // We have no data on the 16 Plus, so nothing is claimed to be "closest" to it.
+    expect(sc.log.at(-1)!.text).not.toMatch(/closest/i);
   });
 });
 

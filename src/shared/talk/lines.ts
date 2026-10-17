@@ -131,10 +131,8 @@ export function answerThrowback(id: string, ctx: Ctx): string {
     return `The ${names(b.map((m) => m.id))} ${b.length === 1 ? "is" : "are"} the cheapest of these, from ${money(cheapest(ctx.pool, b[0]!.id))}.`;
   }
   if (id === "haggle") return "That's the listed price, I'm afraid. I'd have to check on any deals, and I can't promise one.";
-  if (id.startsWith("not_carried:")) {
-    const lead = ms[0] ?? ctx.ranked[0];
-    return `We don't carry the ${id.slice("not_carried:".length)}.${lead ? ` The closest we have is the ${lead.name}.` : ""}`;
-  }
+  // We have no data on a phone we don't sell, so nothing is claimed about how close anything else is to it.
+  if (id.startsWith("not_carried:")) return `Sorry, we don't carry the ${id.slice("not_carried:".length)}. I can show you what we do have.`;
   return "";
 }
 
@@ -169,9 +167,9 @@ export function staffBase(act: StaffAct, ctx: Ctx, models: string[]): string {
       return `Earlier you mentioned ${list(parts)}. Is that still what you want?`;
     }
     case "nudge":
-      return `Nothing fits ${describeConstraints(ctx.c).join(", ") || "that"}. How do you want to go?`;
+      return `Sorry, nothing fits ${describeConstraints(ctx.c).join(", ") || "that"}. How do you want to go?`;
     case "rescue":
-      return "I can't promise a perfect match. Is there something close you'd like to see?";
+      return "Sorry, I can't promise a perfect match. Is there something close you'd like to see?";
     case "confirm": {
       const r = ctx.pool[0]!;
       return `So that's the ${modelById(r.model).name}, ${r.storage}, ${r.colour}, ${money(r.price)}. I'll check we have it in stock. Is that right?`;
@@ -187,8 +185,8 @@ export function staffLine(act: StaffAct, ctx: Ctx, tone: Tone, models: string[],
   const body = answer && base ? `${answer} ${base}` : answer || base;
   // No cheerful lead-in when the answer they are about to hear is bad news (no deals, not carried).
   const badNews = owed === "haggle" || (owed?.startsWith("not_carried:") ?? false) || act.t === "nudge" || act.t === "rescue";
-  // A line that opens with its own acknowledgement ("Good choice.") needs no second one in front.
-  const lead = /^(Good choice|Great choice)/.test(body) ? "" : staffLead(tone, turn, ctx.sc.log[ctx.sc.log.length - 1], badNews);
+  // A line that opens with its own acknowledgement ("Good choice.") or its own apology needs no lead-in in front.
+  const lead = /^(Good choice|Great choice|Sorry,)/.test(body) || owed === "haggle" ? "" : staffLead(tone, turn, ctx.sc.log[ctx.sc.log.length - 1], badNews);
   if (lead === "" || body === "") return lead + body;
   // A lead that ends mid-sentence ("Um, ") runs on into a lower-case start.
   return /(,|\.\.\.) $/.test(lead) ? lead + lcFirst(body) : lead + body;

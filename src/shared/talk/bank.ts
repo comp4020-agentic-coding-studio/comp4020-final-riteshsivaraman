@@ -86,7 +86,8 @@ export function describeConstraints(c: Constraints): string[] {
   if (c.maxScreenIn !== undefined) out.push("a smaller screen");
   if (c.separateTelephoto) out.push("a separate telephoto lens");
   if (c.minBattery !== undefined) out.push(`${c.minBattery}+ hours of video playback`);
-  if (c.minGB !== undefined) out.push(`at least ${c.minGB >= 1024 ? c.minGB / 1024 + "TB" : c.minGB + "GB"}`);
+  // An exact tier already says it; "at least 256GB, 512GB" would say it twice.
+  if (c.minGB !== undefined && c.storage === undefined) out.push(`at least ${c.minGB >= 1024 ? c.minGB / 1024 + "TB" : c.minGB + "GB"}`);
   if (c.storage) out.push(c.storage);
   if (c.colours) out.push(c.colours.join(" or "));
   if (c.maxPrice !== undefined) out.push(`up to ${money(c.maxPrice)}`);
