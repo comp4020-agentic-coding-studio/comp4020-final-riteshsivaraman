@@ -319,3 +319,21 @@ approach, and a sensor must be fast, automatic and trustworthy): the cheap
 seeded simulation was the sensor that paid, and the invariants it checks (no
 side without a legal move, every conversation ends, no sale to someone who
 cannot be satisfied) were worth writing before the NPCs were any good.
+
+## A human reading one played transcript found a loop that 400 green simulated runs had not
+
+[`97da377`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/97da377)
+
+Ritesh pasted a conversation from the proof of concept and asked whether I
+could see what was wrong. Staff had shown the same phone (the Duo) three times
+in a row after the customer said they liked it, and had said "Sure thing."
+before "Nothing fits...". My simulation specs passed because they checked
+structure (nobody stranded, every conversation ends, no repeated question) and
+never said "do not show the same phone twice"; the engine remembered demos the
+customer declined but not ones it had given. Lesson (week 5, agentic manual
+testing: drive the running thing yourself, then turn each finding into a
+permanent failing-first test): the seeded sim is only as good as the
+invariants somebody thought to write, and reading real transcripts is how the
+missing ones turn up. Two new specs now reproduce it (they go red on seeds 8
+and 9 with the old rule restored), and the habit going forward is to add the
+spec before the fix.
