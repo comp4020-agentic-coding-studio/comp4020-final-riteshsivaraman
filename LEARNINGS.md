@@ -298,3 +298,24 @@ a subagent sees only the delegation message, so restate every rule you want
 followed): the required assumptions section is what made the gap visible to
 me at review, rather than buried in plausible prose. The gap list ("NEEDS
 DATA") now drives what the Apple scrape has to cover.
+
+## A seeded NPC-vs-NPC simulation found four engine gaps that unit tests and hand-written replays had not
+
+[`739eb14`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/739eb14),
+[`30cdf64`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/30cdf64)
+
+I wrote the turn engine and 17 unit tests against it, all green. The first
+400-run NPC-vs-NPC simulation then failed in four distinct ways: a crash
+when a question was reopened with no model fixed, staff with no way forward
+once questions and demos ran out (the engine had no "recommend" move, though
+the transcripts did), a relaxed requirement leaving its question marked as
+answered so staff could not ask it again, and reopens offering menus of dead
+ends on an empty pool. None of these were visible from my own cases, because
+I only wrote the paths I had imagined. The replays of the 11 transcripts, run
+by a separate agent, found a different set (a named model hiding its sibling
+models; throw-backs not offered at the confirm step). Lesson (week 3,
+backpressure: one well-aimed failing test reorganises the agent's whole
+approach, and a sensor must be fast, automatic and trustworthy): the cheap
+seeded simulation was the sensor that paid, and the invariants it checks (no
+side without a legal move, every conversation ends, no sale to someone who
+cannot be satisfied) were worth writing before the NPCs were any good.
