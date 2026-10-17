@@ -16,7 +16,8 @@
     "check:evidence": "node scripts/check-evidence.ts",
     "test": "vitest run",
     "test:talk": "vitest run --config vitest.talk.config.ts",
-    "poc": "vite --config poc/talk/vite.config.ts"
+    "poc": "vite --config poc/talk/vite.config.ts",
+    "talk:runs": "node scripts/talk-transcripts.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.5",

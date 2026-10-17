@@ -29,3 +29,6 @@ mise.local.toml
 references/*.png
 references/*.jpg
 references/*.jpeg
+
+# generated NPC conversation transcripts (scripts/talk-transcripts.ts)
+.talk-runs/
