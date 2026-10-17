@@ -1,0 +1,144 @@
+[
+  {
+    "model": "MacBook Air 13-inch",
+    "specs_page": "https://www.apple.com/au/macbook-air/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-mac/macbook-air",
+    "chip": {
+      "value": "Apple M5 chip; 10-core CPU with 4 super cores and 6 efficiency cores; 8-core GPU standard, configurable to 10-core GPU",
+      "source": "https://www.apple.com/au/macbook-air/specs/",
+      "fetched": "2026-10-18"
+    },
+    "screen_inches": { "value": "13.6-inch (diagonal) LED-backlit display with IPS technology; 2560-by-1664 native resolution at 224 ppi", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "brightness": { "value": "500 nits", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "weight_g": { "value": "1230 grams (1.23 kg / 2.7 pounds)", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "dimensions_mm": { "value": "Height 11.3 mm, Width 304.1 mm, Depth 215.0 mm", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "battery_video_playback": { "value": "Up to 18 hours video streaming; up to 15 hours wireless web; 53.8-watt-hour battery", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "ports": { "value": "MagSafe 3, 3.5mm headphone jack, two Thunderbolt 4 (USB-C) ports up to 40Gbps", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "wifi": { "value": "Wi-Fi 7 (802.11be), Bluetooth 6, Thread (Apple N1 chip)", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "camera": { "value": "12MP Center Stage camera with Desk View, 1080p recording", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "speakers": { "value": "Four-speaker sound system", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "colours": { "value": ["Sky Blue", "Silver", "Starlight", "Midnight"], "source": "https://www.apple.com/au/shop/buy-mac/macbook-air", "fetched": "2026-10-18" },
+    "base_memory_gb": { "value": 16, "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "configurable_memory_gb": { "value": [24, 32], "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "base_storage_gb": { "value": 512, "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "configurable_storage_gb": { "value": [1024, 2048, 4096], "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "preconfigured_skus": [
+      { "part_number": "MDH74X/A", "colour": "Silver", "gpu_cores": 8, "memory_gb": 16, "storage_gb": 512, "priceAUD": 2099, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" },
+      { "part_number": "MDHH4X/A", "colour": "Sky Blue", "gpu_cores": 8, "memory_gb": 16, "storage_gb": 512, "priceAUD": 2099, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" },
+      { "part_number": "MDHA4X/A", "colour": "Starlight", "gpu_cores": 8, "memory_gb": 16, "storage_gb": 512, "priceAUD": 2099, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" },
+      { "part_number": "MDHE4X/A", "colour": "Midnight", "gpu_cores": 8, "memory_gb": 16, "storage_gb": 512, "priceAUD": 2099, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" }
+    ],
+    "trade_in": null,
+    "applecare": null
+  },
+  {
+    "model": "MacBook Air 15-inch",
+    "specs_page": "https://www.apple.com/au/macbook-air/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-mac/macbook-air",
+    "chip": {
+      "value": "Apple M5 chip; 10-core CPU with 4 super cores and 6 efficiency cores; 10-core GPU (only configuration offered at this size)",
+      "source": "https://www.apple.com/au/macbook-air/specs/",
+      "fetched": "2026-10-18"
+    },
+    "screen_inches": { "value": "15.3-inch (diagonal) LED-backlit display with IPS technology; 2880-by-1864 native resolution at 224 ppi", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "brightness": { "value": "500 nits", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "weight_g": { "value": "1510 grams (1.51 kg / 3.3 pounds)", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "dimensions_mm": { "value": "Height 11.5 mm, Width 340.4 mm, Depth 237.6 mm", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "battery_video_playback": { "value": "Up to 18 hours video streaming; up to 15 hours wireless web; 66.5-watt-hour battery", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "ports": { "value": "MagSafe 3, 3.5mm headphone jack, two Thunderbolt 4 (USB-C) ports up to 40Gbps", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "wifi": { "value": "Wi-Fi 7 (802.11be), Bluetooth 6, Thread (Apple N1 chip)", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "camera": { "value": "12MP Center Stage camera with Desk View, 1080p recording", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "speakers": { "value": "Six-speaker sound system with force-cancelling woofers", "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "colours": { "value": ["Sky Blue", "Silver", "Starlight", "Midnight"], "source": "https://www.apple.com/au/shop/buy-mac/macbook-air", "fetched": "2026-10-18" },
+    "base_memory_gb": { "value": 16, "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "configurable_memory_gb": { "value": [24, 32], "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "base_storage_gb": { "value": 512, "source": "verified against buy-page preconfigured sku URL slug (16gb-memory-512gb-storage)", "fetched": "2026-10-18" },
+    "configurable_storage_gb": { "value": [1024, 2048, 4096], "source": "https://www.apple.com/au/macbook-air/specs/", "fetched": "2026-10-18" },
+    "preconfigured_skus": [
+      { "part_number": "MDV94X/A", "colour": "Silver", "gpu_cores": 10, "memory_gb": 16, "storage_gb": 1024, "priceAUD": 2499, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" },
+      { "part_number": "MDVQ4X/A", "colour": "Sky Blue", "gpu_cores": 10, "memory_gb": 16, "storage_gb": 1024, "priceAUD": 2499, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" },
+      { "part_number": "MDVD4X/A", "colour": "Starlight", "gpu_cores": 10, "memory_gb": 16, "storage_gb": 1024, "priceAUD": 2499, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" },
+      { "part_number": "MDVH4X/A", "colour": "Midnight", "gpu_cores": 10, "memory_gb": 16, "storage_gb": 1024, "priceAUD": 2499, "source": "https://www.apple.com/au/shop/buy-mac/macbook-air" }
+    ],
+    "trade_in": null,
+    "applecare": null
+  },
+  {
+    "model": "MacBook Pro 14-inch",
+    "specs_page": "https://www.apple.com/au/macbook-pro/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-mac/macbook-pro",
+    "chip": {
+      "value": "Three chip tiers: M5 (10-core CPU, 10-core GPU, 16-core Neural Engine, 153GB/s bandwidth); M5 Pro (15-core CPU/16-core GPU base, configurable to 18-core CPU/20-core GPU, 307GB/s); M5 Max (18-core CPU, configurable to 32-core GPU/460GB/s or 40-core GPU/614GB/s)",
+      "source": "https://www.apple.com/au/macbook-pro/specs/",
+      "fetched": "2026-10-18"
+    },
+    "screen_inches": { "value": "14.2-inch (diagonal) Liquid Retina XDR display; 3024-by-1964 native resolution at 254 ppi; ProMotion up to 120Hz", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "brightness": { "value": "1,000 nits sustained full-screen, 1,600 nits peak (HDR)", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "weight_g": { "value": "M5: 1550g; M5 Pro: 1600g; M5 Max: 1620g", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "dimensions_mm": { "value": "Height 15.5 mm, Width 312.6 mm, Depth 221.2 mm", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "battery_video_playback": { "value": "M5: up to 24 hours; M5 Pro: up to 22 hours; M5 Max: up to 20 hours; 72.4-watt-hour battery", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "ports": { "value": "M5: three Thunderbolt 4 (up to 40Gbps); M5 Pro/Max: three Thunderbolt 5 (up to 120Gbps); plus MagSafe 3, HDMI, SDXC, headphone jack", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "wifi": { "value": "M5: Wi-Fi 6E; M5 Pro/Max: Wi-Fi 7 (Apple N1 chip); Bluetooth 5.3 or 6", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "camera": { "value": "12MP Center Stage camera with Desk View, 1080p recording", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "speakers": { "value": "High-fidelity six-speaker sound system with force-cancelling woofers", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "colours": { "value": ["Space Black", "Silver"], "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "chip_tiers": {
+      "value": [
+        { "chip": "M5", "cpu_cores": 10, "gpu_cores": 10, "base_memory_gb": 16, "configurable_memory_gb": [24, 32], "base_storage_gb": 1024, "configurable_storage_gb": [2048, 4096] },
+        { "chip": "M5 Pro", "cpu_cores": 15, "gpu_cores": 16, "base_memory_gb": 24, "configurable_memory_gb": [48, 64, 128], "base_storage_gb": 1024, "configurable_storage_gb": [2048, 4096] },
+        { "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 32, "base_memory_gb": 36, "configurable_memory_gb": [64, 128], "base_storage_gb": 2048, "configurable_storage_gb": [4096] }
+      ],
+      "source": "https://www.apple.com/au/macbook-pro/specs/, cross-checked against preconfigured-SKU buy-page URL slugs",
+      "fetched": "2026-10-18"
+    },
+    "preconfigured_skus": [
+      { "part_number": "MDE54X/A", "colour": "Silver", "chip": "M5", "cpu_cores": 10, "gpu_cores": 10, "memory_gb": 16, "storage_gb": 1024, "priceAUD": 3199, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MDE14X/A", "colour": "Space Black", "chip": "M5", "cpu_cores": 10, "gpu_cores": 10, "memory_gb": 16, "storage_gb": 1024, "priceAUD": 3199, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MEQJ4X/A", "colour": "Space Black", "finish": "nano-texture", "chip": "M5", "cpu_cores": 10, "gpu_cores": 10, "memory_gb": 16, "storage_gb": 1024, "priceAUD": 3424, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGDN4X/A", "colour": "Silver", "chip": "M5 Pro", "cpu_cores": 15, "gpu_cores": 16, "memory_gb": 24, "storage_gb": 1024, "priceAUD": 3999, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGDR4X/A", "colour": "Space Black", "chip": "M5 Pro", "cpu_cores": 15, "gpu_cores": 16, "memory_gb": 24, "storage_gb": 1024, "priceAUD": 3999, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGDQ4X/A", "colour": "Silver", "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 32, "memory_gb": 36, "storage_gb": 2048, "priceAUD": 6399, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGDU4X/A", "colour": "Space Black", "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 32, "memory_gb": 36, "storage_gb": 2048, "priceAUD": 6399, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" }
+    ],
+    "trade_in": null,
+    "applecare": null
+  },
+  {
+    "model": "MacBook Pro 16-inch",
+    "specs_page": "https://www.apple.com/au/macbook-pro/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-mac/macbook-pro",
+    "chip": {
+      "value": "Two chip tiers: M5 Pro (18-core CPU, 20-core GPU base, configurable to Max GPU options, 307GB/s); M5 Max (32-core GPU base, 460GB/s, configurable to 40-core GPU, 614GB/s)",
+      "source": "https://www.apple.com/au/macbook-pro/specs/",
+      "fetched": "2026-10-18"
+    },
+    "screen_inches": { "value": "16.2-inch (diagonal) Liquid Retina XDR display; 3456-by-2234 native resolution at 254 ppi; ProMotion up to 120Hz", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "brightness": { "value": "1,000 nits sustained full-screen, 1,600 nits peak (HDR)", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "weight_g": { "value": "M5 Pro: 2140g; M5 Max: 2150g", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "dimensions_mm": { "value": "Height 16.8 mm, Width 355.7 mm, Depth 248.1 mm", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "battery_video_playback": { "value": "M5 Pro: up to 24 hours; M5 Max: up to 22 hours; 99.6-watt-hour battery (listed as 100Wh)", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "ports": { "value": "Three Thunderbolt 5 (USB-C) ports up to 120Gbps on every configuration; plus MagSafe 3, HDMI, SDXC, headphone jack", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "wifi": { "value": "Wi-Fi 7 (Apple N1 chip); Bluetooth 6", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "camera": { "value": "12MP Center Stage camera with Desk View, 1080p recording", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "speakers": { "value": "High-fidelity six-speaker sound system with force-cancelling woofers", "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "colours": { "value": ["Space Black", "Silver"], "source": "https://www.apple.com/au/macbook-pro/specs/", "fetched": "2026-10-18" },
+    "chip_tiers": {
+      "value": [
+        { "chip": "M5 Pro", "cpu_cores": 18, "gpu_cores": 20, "base_memory_gb": 24, "configurable_memory_gb": [48, 64, 128], "base_storage_gb": 1024, "configurable_storage_gb": [2048, 4096] },
+        { "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 32, "base_memory_gb": 36, "configurable_memory_gb": [64, 128], "base_storage_gb": 2048, "configurable_storage_gb": [4096, 8192] }
+      ],
+      "source": "https://www.apple.com/au/macbook-pro/specs/, cross-checked against preconfigured-SKU buy-page URL slugs",
+      "fetched": "2026-10-18"
+    },
+    "preconfigured_skus": [
+      { "part_number": "MGE44X/A", "colour": "Silver", "chip": "M5 Pro", "cpu_cores": 18, "gpu_cores": 20, "memory_gb": 24, "storage_gb": 1024, "priceAUD": 4799, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGEA4X/A", "colour": "Space Black", "chip": "M5 Pro", "cpu_cores": 18, "gpu_cores": 20, "memory_gb": 24, "storage_gb": 1024, "priceAUD": 4799, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGE74X/A", "colour": "Silver", "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 32, "memory_gb": 36, "storage_gb": 2048, "priceAUD": 6999, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGED4X/A", "colour": "Space Black", "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 32, "memory_gb": 36, "storage_gb": 2048, "priceAUD": 6999, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGE94X/A", "colour": "Silver", "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 40, "memory_gb": 48, "storage_gb": 2048, "priceAUD": 7999, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" },
+      { "part_number": "MGEE4X/A", "colour": "Space Black", "chip": "M5 Max", "cpu_cores": 18, "gpu_cores": 40, "memory_gb": 48, "storage_gb": 2048, "priceAUD": 7999, "source": "https://www.apple.com/au/shop/buy-mac/macbook-pro" }
+    ],
+    "trade_in": null,
+    "applecare": null
+  }
+]
