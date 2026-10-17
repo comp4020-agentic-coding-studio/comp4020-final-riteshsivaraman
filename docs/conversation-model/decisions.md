@@ -27,6 +27,15 @@ source: Ritesh, this session (description, then answers 1 to 8 to the grilling q
 - Each question has **preconditions** and **effects** on a shared fact state and the candidate pool. This is how the bank is kept consistent and how devs find gaps. Staff see the live pool size and how much each question would narrow it.
 - Bank is built by a loop of subagents generating sample conversations (3 per round) over real, sourced device data, until a round adds no new question type.
 
+## Ranking and soft signals (added 2026-10-17)
+- Hard filters define the feasible set; soft signals (e.g. use case) score it into a **ranking**. The ranking drives recommendation order, demo feature highlights and the near-miss list when nothing fits. The customer never sees the ranking; staff only.
+- Attribute data has three states: yes, no, not stated. A filter never eliminates on "not stated".
+- Tones: four. Wordings per tone are generated offline, reviewed and stored, never produced at runtime. Any line must derive from state and data.
+- Throw-backs are parameterised menu items (compare, attribute query) resolved by the system.
+
+## Later scope (keep in mind, not now)
+- Every conversation type between any two parties in the store will need its own model on this same engine (laptop, repair, billing, backroom, staff-staff, customer-customer, ...). Keep the engine generic: scene type = roles, goal, move bank with preconditions and effects, fact state.
+
 ## NPCs
 - NPCs loop on quasi-random but sensible choices: pick questions that genuinely narrow, offer demos with higher probability as the pool shrinks, reopen with low probability unless forced (contradiction or empty pool).
 - A customer NPC has a hidden goal (target device, must-haves, budget) and never gives conflicting answers.
