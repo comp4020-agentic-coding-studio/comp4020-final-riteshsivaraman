@@ -62,6 +62,20 @@ describe(`${RUNS} NPC-vs-NPC conversations`, () => {
     expect(bad.slice(0, 5)).toEqual([]);
   });
 
+  it("only ask about the telephoto lens or the battery after the customer has said it matters", () => {
+    const early: string[] = [];
+    for (const r of results) {
+      const log = r.scene.log;
+      log.forEach((l, i) => {
+        if (l.who !== "staff" || (l.qid !== "telephoto_need" && l.qid !== "battery_priority") || l.move.includes("reopen")) return;
+        const said = log.slice(0, i).filter((x) => x.who === "customer").flatMap((x) => x.picks ?? []);
+        const interested = l.qid === "telephoto_need" ? said.some((p) => p === "photos" || p === "video") : said.some((p) => p === "travel" || p === "streaming");
+        if (!interested) early.push(`seed ${r.seed}: ${l.qid} at turn ${l.turn}`);
+      });
+    }
+    expect(early.slice(0, 5)).toEqual([]);
+  });
+
   it("never ask a question twice except as a reopen or a retry after 'Not sure'", () => {
     const repeats: string[] = [];
     for (const r of results) {

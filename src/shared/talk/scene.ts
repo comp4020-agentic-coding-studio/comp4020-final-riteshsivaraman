@@ -349,6 +349,8 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
   } else if (p.kind === "demo_reaction") {
     if (pick === "happy") sc.fixed = p.model;
     else if (pick === "expensive" || pick === "notforme") sc.excluded.push(p.model);
+    // "Show me another" is a request: the next thing staff do is offer one, if there is one left to show.
+    else if (pick === "another" && demoCandidates(derive(sc)).length > 0) sc.forced = { t: "offer_demo" };
   } else if (p.kind === "recommend") {
     if (pick === "yes") sc.fixed = p.model;
     else if (pick === "no") sc.excluded.push(p.model);

@@ -17,10 +17,12 @@ import type { Ctx, CustomerReply, Line, Option, Pending, StaffAct, Tone } from "
 // four tones are fixed.
 
 // What a customer's answer sounded like, so staff do not say "Great." to "Not sure."
-const NEGATIVE = new Set(["notsure", "unsure", "no", "notforme", "expensive", "keep", "decline", "think", "another", "avg", "notyet"]);
+const NEGATIVE = new Set(["notsure", "unsure", "no", "notforme", "expensive", "keep", "decline", "think", "avg", "notyet"]);
 
 const staffLead = (tone: Tone, turn: number, prev: Line | undefined, badNews: boolean): string => {
   if (turn <= 1) return ""; // the first line is a plain hello, whatever the tone
+  // They asked to change something: acknowledge it, don't just ask the next question.
+  if (prev?.who === "customer" && prev.picks?.some((p) => p === "colour" || p === "storage" || p === "model" || p === "another") && tone === "friendly") return "Of course. ";
   const downbeat = badNews || (prev?.who === "customer" && (prev.picks?.some((p) => NEGATIVE.has(p)) ?? false));
   const pool: Record<Tone, string[]> = {
     friendly: downbeat ? ["No problem. ", "That's fine. "] : ["", "Great. ", "Lovely. ", "Sure thing. "],
@@ -144,8 +146,14 @@ export function staffBase(act: StaffAct, ctx: Ctx, models: string[]): string {
   switch (act.t) {
     case "ask":
       return questionById(act.qid).ask(ctx, act.reopen === true);
-    case "offer_demo":
-      return `${models.length === 1 ? "One phone fits" : `${models.length} phones fit`}: ${names(models)}. Want to try ${models.length === 1 ? "it" : "any"}?`;
+    case "offer_demo": {
+      if (models.length === 1) {
+        const m = modelById(models[0]!).name;
+        // Told which phone, not narrowed down to one: acknowledge it, don't announce that "one phone fits".
+        return ctx.sc.answers["known_model"]?.picks.includes(`model:${models[0]}`) ? `Good choice. Would you like to have a look at the ${m}?` : `That leaves the ${m}. Would you like to have a look at it?`;
+      }
+      return `${models.length} phones fit: ${names(models)}. Want to try any?`;
+    }
     case "demo": {
       const m = modelById(act.model);
       return `Here's the ${m.name}: ${highlights(m, ctx).join("; ")}. The demo unit might not be the colour we'd get you, and I'd have to check what's in stock. What do you think?`;

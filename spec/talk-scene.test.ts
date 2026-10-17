@@ -15,6 +15,8 @@ const staff = (sc: Scene, act: StaffAct, tone: Tone = "neutral"): Scene => ok(ap
 const cust = (sc: Scene, r: Omit<CustomerReply, "tone"> & { tone?: Tone }): Scene => ok(applyCustomer(sc, { tone: "neutral", ...r }));
 // Every conversation opens with the greeting question; most specs start after it.
 const opened = (): Scene => cust(staff(newScene(), { t: "ask", qid: "opening_intent" }), { picks: ["help"] });
+// Someone who has said they care about the camera, which is what makes a telephoto question worth asking.
+const camera = (): Scene => cust(staff(opened(), { t: "ask", qid: "use_case" }), { picks: ["photos"] });
 const ask = (sc: Scene, qid: string, picks: string[], extra: Partial<CustomerReply> = {}): Scene => cust(staff(sc, { t: "ask", qid }), { picks, ...extra });
 
 describe("the opening and the sign-off", () => {
@@ -83,7 +85,7 @@ describe("answers are recomputed, not stacked", () => {
   });
 
   it("only offers a hard question while some answer narrows the pool", () => {
-    let sc = ask(opened(), "telephoto_need", ["yes"]);
+    let sc = ask(camera(), "telephoto_need", ["yes"]);
     // Everything left has the lens, so asking again would be a question worth nothing.
     expect(staffActs(sc).some((a) => a.act.t === "ask" && a.act.qid === "telephoto_need" && !a.act.reopen)).toBe(false);
     sc = ask(ask(sc, "storage_need", ["min:1024"]), "budget_ceiling", ["ceiling:3300"]);
@@ -99,7 +101,7 @@ describe("answers are recomputed, not stacked", () => {
 
 describe("throw-backs", () => {
   it("are answered in staff's next line, from the data", () => {
-    let sc = ask(opened(), "telephoto_need", ["yes"], { throwback: "attr:battery" });
+    let sc = ask(camera(), "telephoto_need", ["yes"], { throwback: "attr:battery" });
     sc = staff(sc, { t: "answer" });
     expect(sc.log.at(-1)!.text).toMatch(/longest video playback/);
     expect(sc.pending).toEqual({ kind: "free" });
@@ -115,6 +117,30 @@ describe("throw-backs", () => {
 });
 
 describe("demos", () => {
+  it("acknowledges a phone they named instead of announcing that one phone fits", () => {
+    let sc = ask(newScene(), "known_model", ["model:17e"]);
+    sc = staff(sc, { t: "offer_demo" });
+    expect(sc.log.at(-1)!.text).toMatch(/Good choice\. Would you like to have a look at the iPhone 17e\?/);
+    expect(sc.log.at(-1)!.text).not.toMatch(/fits/);
+  });
+
+  it("'show me another' makes staff offer another, and not ask something else", () => {
+    let sc = ask(camera(), "telephoto_need", ["yes"]);
+    sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
+    sc = cust(staff(sc, { t: "demo", model: "18-pro" }), { picks: ["another"] });
+    expect(staffActs(sc).map((a) => a.act)).toEqual([{ t: "offer_demo" }]);
+    sc = staff(sc, { t: "offer_demo" });
+    expect(sc.pending).toEqual({ kind: "offer_demo", models: ["18-pro-max"] });
+  });
+
+  it("does not ask the technical questions before the customer has shown they care", () => {
+    const acts = (sc: Scene) => staffActs(sc).map((a) => a.act).filter((a) => a.t === "ask").map((a) => (a as { qid: string }).qid);
+    expect(acts(opened())).not.toContain("telephoto_need");
+    expect(acts(opened())).not.toContain("battery_priority");
+    expect(acts(camera())).toContain("telephoto_need");
+    expect(acts(cust(staff(opened(), { t: "ask", qid: "use_case" }), { picks: ["travel"] }))).toContain("battery_priority");
+  });
+
   it("a customer's request forces the demo, and 'this could be the one' fixes the model", () => {
     let sc = cust(staff(newScene(), { t: "ask", qid: "opening_intent" }), { picks: ["help"] });
     sc = cust(staff(sc, { t: "ask", qid: "use_case" }), { action: { t: "demo", model: "17" } });
@@ -126,7 +152,7 @@ describe("demos", () => {
   });
 
   it("'not for me' removes the model from the pool", () => {
-    let sc = ask(opened(), "telephoto_need", ["yes"]);
+    let sc = ask(camera(), "telephoto_need", ["yes"]);
     sc = cust(staff(sc, { t: "offer_demo" }), { picks: ["demo:18-pro"] });
     sc = cust(staff(sc, { t: "demo", model: "18-pro" }), { picks: ["notforme"] });
     expect(derive(sc).ranked.map((m) => m.id)).toEqual(["18-pro-max"]);

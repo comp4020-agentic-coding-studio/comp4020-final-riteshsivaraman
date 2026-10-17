@@ -203,7 +203,8 @@ export const BANK: QuestionDef[] = [
     id: "telephoto_need",
     kind: "hard",
     ask: () => "Most of our phones get their 2x zoom by cropping the main camera, which Apple calls optical-quality 2x. Only some have a separate telephoto lens as well. Do you want a separate telephoto lens?",
-    pre: (ctx) => varies(poolModels(ctx).map((m) => m.separateTelephoto)),
+    // A technical question: only once they have said they care about the camera.
+    pre: (ctx) => (ctx.s.photos === true || ctx.s.video === true) && varies(poolModels(ctx).map((m) => m.separateTelephoto)),
     options: () => [
       { id: "yes", label: "Want a separate telephoto lens" },
       { id: "no", label: "The 2x from the main camera is enough", neutral: true },
@@ -215,7 +216,8 @@ export const BANK: QuestionDef[] = [
     id: "battery_priority",
     kind: "hard",
     ask: () => "How long does the battery need to last?",
-    pre: (ctx) => poolModels(ctx).some((m) => m.batteryHours !== null) && varies(poolModels(ctx).map((m) => m.batteryHours === null || m.batteryHours >= 40)),
+    // Only once battery has come up (travel, streaming): otherwise it is a question out of nowhere.
+    pre: (ctx) => ctx.s.battery === true && poolModels(ctx).some((m) => m.batteryHours !== null) && varies(poolModels(ctx).map((m) => m.batteryHours === null || m.batteryHours >= 40)),
     options: () => [
       { id: "min:40", label: "Battery: as long as possible (40+ hours of video)" },
       { id: "min:30", label: "Battery: long (30+ hours of video)" },
