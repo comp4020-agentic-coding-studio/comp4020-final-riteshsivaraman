@@ -5,39 +5,14 @@ import type { Signals, Sku, Constraints } from "./pool.ts";
 // turns, every line a pick from a menu. Nothing here knows about a screen or a
 // network; the same scene runs in a spec, in an NPC-vs-NPC simulation and in
 // the proof-of-concept page.
+//
+// Tone, Role, Option and Answer are the part of this vocabulary that does not
+// depend on the phone pool shape; they live in core/types.ts and every other
+// scene (see scenes/laptop/types.ts) reuses them unchanged. Re-exported here
+// so every existing import of "./types.ts" keeps working.
 
-export type Tone = "friendly" | "neutral" | "impatient" | "unsure";
-export const TONES: Tone[] = ["friendly", "neutral", "impatient", "unsure"];
-
-// In the store the tone shows on the speaker's face. These are names from the
-// character's own expression set (EXPRESSIONS in src/client/src/gfx/character.ts),
-// so the shop reads them off the line without a lookup of its own. There is no
-// "annoyed" face yet: focused (brows pulled down, mouth flat) is the nearest to
-// impatient, and a proper one would be graphics' to add.
-export const TONE_EXPRESSION: Record<Tone, "smile" | "neutral" | "focused" | "worried"> = {
-  friendly: "smile",
-  neutral: "neutral",
-  impatient: "focused",
-  unsure: "worried",
-};
-
-export type Role = "staff" | "customer";
-
-// A menu item. Most are fixed; `param` makes one take a number the picker
-// types in (the "set my own ceiling" option), in which case a pick is
-// `prefix + value`.
-export interface Option {
-  id: string;
-  label: string;
-  group?: string; // the UI may fold a long group away ("other colours")
-  neutral?: boolean; // "Not sure", "none of these": a pick that changes nothing
-  param?: { prefix: string; min: number; max: number; step: number };
-}
-
-export interface Answer {
-  picks: string[];
-  turn: number;
-}
+export { TONES, TONE_EXPRESSION, type Tone, type Role, type Option, type Answer } from "./core/types.ts";
+import type { Tone, Role, Option, Answer } from "./core/types.ts";
 
 // What the customer is being asked right now.
 export type Pending =
