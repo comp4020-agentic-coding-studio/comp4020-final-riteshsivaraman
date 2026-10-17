@@ -131,3 +131,4 @@ find every resource by reading this file, not by discovering it mid-task.
   Canberra photo, for Ritesh to correct.
 - *(add further ADRs here as they're created — don't let this list go stale.)*
 - `docs/conversation-model/mockup-v0.html` — static mockup of the proposed phone-specialist conversation model (v0, for correction before any code).
+- `docs/conversation-model/` — conversation-model design: `decisions.md` (settled so far), `devices.json` + `devices-v2-notes.md` (sourced attributes, 2026-10-17), `transcripts/round-1/`.
