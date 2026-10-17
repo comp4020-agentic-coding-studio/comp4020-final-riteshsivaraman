@@ -345,9 +345,8 @@ describe("review 1: honest answers", () => {
     let sc = ask(camera(), "colour_prefs", ["colour:Lavender"], { throwback: "attr:weight" });
     sc = staff(sc, { t: "answer" });
     const t = sc.log.at(-1)!.text;
-    expect(t).toMatch(/lightest at 165g/); // the Air, out of everything they had been looking at
-    expect(t).toMatch(/Of the ones we've been looking at/);
-    expect(t).not.toMatch(/of these/);
+    expect(t).toMatch(/Of our iPhones, the iPhone Air is the lightest at 165g/); // out of everything they had been looking at, and said so
+    expect(t).not.toMatch(/of these|looking at/);
   });
 
   it("a telephoto question is answered from the phones in play, never 'none of these' for a range that has them", () => {
@@ -361,7 +360,7 @@ describe("review 1: honest answers", () => {
     let sc = ask(opened(), "storage_need", ["min:512"]);
     sc = cust(staff(sc, { t: "ask", qid: "use_case" }), { action: { t: "pick", model: "18-pro-max" } });
     sc = staff(sc, { t: "ask", qid: "storage_tier_for_model" });
-    expect(sc.log.at(-1)!.text).toBe("With what you've told me, you could have it in 512GB, 1TB or 2TB. Which would you like?");
+    expect(sc.log.at(-1)!.text).toBe("Since you wanted at least 512GB, you could have it in 512GB, 1TB or 2TB. Which would you like?");
     const plain = staff(ask(newScene(), "known_model", ["model:18-pro-max"]), { t: "ask", qid: "storage_tier_for_model" });
     expect(plain.log.at(-1)!.text).toBe("It comes in 256GB, 512GB, 1TB or 2TB. Which would you like?");
   });
@@ -383,8 +382,12 @@ describe("review 1: honest answers", () => {
   it("price talk is for the till and promises nothing", () => {
     let sc = ask(camera(), "telephoto_need", ["yes"], { throwback: "haggle" });
     sc = staff(sc, { t: "answer" });
-    expect(sc.log.at(-1)!.text).toBe("That's the listed price, I'm afraid. Anything beyond that is for the till to sort out.");
-    expect(sc.log.at(-1)!.text).not.toMatch(/deal/);
+    // With no phone chosen yet, "the listed price" would be of what?
+    expect(sc.log.at(-1)!.text).toBe("That depends on the phone, but our prices start at A$2,099.");
+    let one = ask(newScene(), "known_model", ["model:17"], { throwback: "haggle" });
+    one = staff(one, { t: "answer" });
+    expect(one.log.at(-1)!.text).toBe("That's the listed price, I'm afraid.");
+    expect(one.log.at(-1)!.text).not.toMatch(/deal|till/);
   });
 });
 
@@ -399,7 +402,7 @@ describe("review 1: answering what was said", () => {
   it("'what have you got?' gets an overview from the data before the next question", () => {
     let sc = ask(newScene(), "known_model", ["notyet"]);
     sc = staff(sc, { t: "ask", qid: "use_case" });
-    expect(sc.log.at(-1)!.text).toMatch(/^We've got 7 iPhones, starting from A\$1,149 for the iPhone 17e up to A\$3,499 for the iPhone Duo\. /);
+    expect(sc.log.at(-1)!.text).toMatch(/^We've got 7 iPhones\. Prices start at A\$1,149 for the iPhone 17e, and the iPhone Duo, our foldable, starts at A\$3,499\. /);
   });
 
   it("does not recommend before it knows what the phone is for or what it should cost", () => {
@@ -452,5 +455,69 @@ describe("review 1: how it sounds", () => {
       const nudge = staff(cust(sc, { picks: ["ceiling:2000"] }), { t: "nudge" }, tone).log.at(-1)!.text;
       expect(nudge, tone).toMatch(/^(Um, )?[Ss]orry, nothing fits /);
     }
+  });
+});
+
+describe("review 2: not building on a phone nobody accepted, and answering everything asked", () => {
+  // Down to the 17e by their own budget, but nobody has said they want it.
+  const narrowed = (): Scene => ask(ask(newScene(), "known_model", ["notyet"]), "budget_ceiling", ["ceiling:1200"]);
+
+  it("a phone left over by elimination is suggested, not confirmed: colour, storage and confirm wait for a yes", () => {
+    const sc = narrowed();
+    const moves = staffActs(sc).map((a) => a.act);
+    expect(derive(sc).ranked.map((m) => m.id)).toEqual(["17e"]);
+    expect(moves.some((a) => a.t === "ask" && (a.qid === "colour_pick" || a.qid === "storage_tier_for_model"))).toBe(false);
+    expect(moves.some((a) => a.t === "confirm")).toBe(false);
+    expect(moves).toContainEqual({ t: "recommend", model: "17e" });
+    const yes = cust(staff(sc, { t: "recommend", model: "17e" }), { picks: ["yes"] });
+    expect(staffActs(yes).some((a) => a.act.t === "ask" && a.act.qid === "colour_pick")).toBe(true);
+  });
+
+  it("when the budget decided the storage size, the confirmation says so", () => {
+    let sc = cust(staff(narrowed(), { t: "recommend", model: "17e" }), { picks: ["yes"] });
+    sc = ask(sc, "colour_pick", ["colour:White"]);
+    const t = staff(sc, { t: "confirm" }).log.at(-1)!.text;
+    expect(t).toBe("With your A$1,200 budget, 256GB is the only size that fits. So that's the iPhone 17e, 256GB, White, A$1,149. I'll check we have it in stock. Is that right?");
+  });
+
+  it("answers every question asked in one go, in order (what have you got, and is there room on the price)", () => {
+    let sc = ask(newScene(), "known_model", ["notyet"], { throwback: "haggle" });
+    expect(sc.owed).toBe("overview|haggle");
+    sc = staff(sc, { t: "ask", qid: "use_case" });
+    const t = sc.log.at(-1)!.text;
+    expect(t).toMatch(/^We've got 7 iPhones\. .* That depends on the phone, but our prices start at A\$1,149\. /);
+  });
+
+  it("a foldable is not suggested to someone who has not said they are open to one, and is introduced as one when it is", () => {
+    const sc = ask(opened(), "budget_ceiling", ["nolimit"]);
+    const recs = staffActs(sc).flatMap((a) => (a.act.t === "recommend" ? [a.act.model] : []));
+    expect(recs).not.toContain("duo");
+    const duo = staff(cust(staff(sc, { t: "ask", qid: "use_case" }), { action: { t: "demo", model: "duo" } }), { t: "demo", model: "duo" });
+    expect(duo.log.at(-1)!.text).toMatch(/It has a folding design/);
+  });
+
+  it("when nothing fits, says where the colour they want does exist, and does not read the same line twice", () => {
+    let sc = ask(ask(newScene(), "known_model", ["model:18-pro"]), "colour_pick", ["colour:Light Gold"]);
+    expect(derive(sc).pool).toHaveLength(0);
+    const first = staff(sc, { t: "nudge" }).log.at(-1)!.text;
+    expect(first).toMatch(/Light Gold is only on the iPhone Air\. How do you want to go\?$/);
+    sc = cust(staff(sc, { t: "nudge" }), { picks: ["keep"] });
+    const second = staff(sc, { t: "nudge" }).log.at(-1)!.text;
+    expect(second).toBe("Sorry, nothing fits yet. Is there anything you'd be willing to change?");
+  });
+
+  it("when no single concession brings anything back, offers the smallest pair, never just 'hold firm'", () => {
+    // A telephoto lens, Light Gold and under A$1,200: no one of the three can be dropped alone and leave a phone.
+    const sc = opened();
+    sc.answers["telephoto_need"] = { picks: ["yes"], turn: 1 };
+    sc.answers["colour_prefs"] = { picks: ["colour:Light Gold"], turn: 1 };
+    sc.answers["budget_ceiling"] = { picks: ["ceiling:1200"], turn: 1 };
+    sc.order.push("telephoto_need", "colour_prefs", "budget_ceiling");
+    expect(derive(sc).pool).toHaveLength(0);
+    const ids = customerMenu(staff(sc, { t: "nudge" }))!.options.map((o) => o.id);
+    expect(ids).toContain("drop:separateTelephoto+colours");
+    // Taking it forgets both, and something fits again.
+    const after = cust(staff(sc, { t: "nudge" }), { picks: ["drop:separateTelephoto+colours"] });
+    expect(derive(after).pool.length).toBeGreaterThan(0);
   });
 });

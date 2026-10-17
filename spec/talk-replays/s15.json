@@ -4,7 +4,8 @@
   "notes": [
     "step 9: with the current engine, dropping the colour clears the Light Gold answer, so colour_pick is asked plainly as in the transcript (an earlier engine version needed reopen:true).",
     "step 10: transcript throw-back compare_two_models at the confirm step; no throw-backs are offered at confirm, omitted. Engine's own answer happens in step 11's ask.",
-    "step 12: transcript S12 'which way are you leaning' has no engine move; modelled as offer_demo with the customer picking the Max by standing action. 2026-10-17: the colour now carries across 'Change the model' (as the transcript did), so the old colour_pick step is gone and the pool is down to one row straight after the pick."
+    "step 12: transcript S12 'which way are you leaning' has no engine move; modelled as offer_demo with the customer picking the Max by standing action. 2026-10-17: the colour now carries across 'Change the model' (as the transcript did), so the old colour_pick step is gone and the pool is down to one row straight after the pick.",
+    "2026-10-17: a phone left over by elimination must be accepted (here by a suggestion) before colour and storage are asked (review 2, D3); the recommend step was added."
   ],
   "steps": [
     {
@@ -73,6 +74,20 @@
       "expect": {
         "models": 1,
         "top": "18-pro"
+      }
+    },
+    {
+      "staff": {
+        "t": "recommend",
+        "model": "18-pro"
+      },
+      "customer": {
+        "picks": [
+          "yes"
+        ]
+      },
+      "expect": {
+        "models": 1
       }
     },
     {

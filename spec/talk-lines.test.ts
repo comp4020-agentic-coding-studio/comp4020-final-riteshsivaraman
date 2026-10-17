@@ -72,7 +72,7 @@ describe("every line of 400 simulated conversations", () => {
           if (prev?.picks?.some((p) => NEGATIVE.has(p)) && /^(Great|Lovely|Sure thing)\./.test(t)) bad.push(`${at} cheers a downbeat answer`);
           if (/^(Great|Lovely|Sure thing|That's fine|No problem|OK|Right)\. (That's the listed price|We don't carry|Sorry|Nothing fits|I can't promise)/.test(t)) bad.push(`${at} cheers or shrugs at bad news`);
           if (/\bcrop/i.test(t)) bad.push(`${at} says "crop", which the data does not`);
-          if (/ of these\b/.test(t) && /(lightest|biggest|longest|cheapest|only)/.test(t)) bad.push(`${at} scopes a superlative to "these"`);
+          if (/(lightest|biggest|longest|cheapest|only)[^.?!]*\bof these\b/.test(t)) bad.push(`${at} scopes a superlative to "these"`);
           if (/closest we have/i.test(t)) bad.push(`${at} claims something is closest to a phone we have no data on`);
           if (/^(Great|Lovely|Sure thing|That's fine|No problem|OK|Right|Of course)\. (Good choice|Great choice|Great|Lovely|Sure thing|That's fine|No problem|Of course)\b/.test(t)) bad.push(`${at} stacks two acknowledgements`);
         }

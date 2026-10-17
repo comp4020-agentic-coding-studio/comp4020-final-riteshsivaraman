@@ -3,7 +3,8 @@
   "source": "docs/conversation-model/transcripts/round-2/s04.md",
   "notes": [
     "step 3: transcript throw-back was attribute_query(17e, Camera Control); no per-feature attribute throw-back exists, nearest is compare:17e:17 (whose answer covers Camera Control).",
-    "2026-10-17: the engine now asks feature questions only once use or budget is known (review L11), so the transcript's early hardware_features step is gone and its compare throw-back rides on the budget answer. The answer is about the two phones in play when it was asked (owedPool), even though the budget empties the pool."
+    "2026-10-17: the engine now asks feature questions only once use or budget is known (review L11), so the transcript's early hardware_features step is gone and its compare throw-back rides on the budget answer. The answer is about the two phones in play when it was asked (owedPool), even though the budget empties the pool.",
+    "2026-10-17: a phone left over by elimination must be accepted (here by a suggestion) before colour and storage are asked (review 2, D3); the recommend step was added."
   ],
   "steps": [
     {
@@ -83,6 +84,20 @@
       },
       "staffTone": "neutral",
       "customerTone": "impatient",
+      "expect": {
+        "models": 1
+      }
+    },
+    {
+      "staff": {
+        "t": "recommend",
+        "model": "17e"
+      },
+      "customer": {
+        "picks": [
+          "yes"
+        ]
+      },
       "expect": {
         "models": 1
       }

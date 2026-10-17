@@ -137,12 +137,13 @@ export function customerMove(sc: Scene, persona: Persona, rng: Rng, mem: Memory 
     reply = { picks: [yes ? (chance(rng, 0.85) ? "yes" : "unsure") : "no"], tone: t };
   } else if (pend.kind === "nudge") {
     const moves = menu.options.filter((o) => o.id.startsWith("drop:") || o.id.startsWith("raise:"));
-    const give = p.relax && sc.relaxDeclined >= p.resistance ? moves.find((o) => (p.relax!.key === "budget" ? o.id.startsWith("raise:") && (p.relax!.to === undefined || Number(o.id.slice(6)) <= p.relax!.to) : o.id === `drop:${p.relax!.key}`)) : undefined;
+    const give = p.relax && sc.relaxDeclined >= p.resistance ? moves.find((o) => (p.relax!.key === "budget" ? o.id.startsWith("raise:") && (p.relax!.to === undefined || Number(o.id.slice(6)) <= p.relax!.to) : o.id.startsWith("drop:") && o.id.slice(5).split("+").includes(p.relax!.key as string))) : undefined;
     if (give?.id.startsWith("drop:")) {
-      const key = give.id.slice(5) as keyof Constraints;
       mem.wants = { ...mem.wants };
-      delete mem.wants[key];
-      mem.conceded.add(key);
+      for (const key of give.id.slice(5).split("+") as (keyof Constraints)[]) {
+        delete mem.wants[key];
+        mem.conceded.add(key);
+      }
     } else if (give?.id.startsWith("raise:")) {
       mem.wants = { ...mem.wants, maxPrice: Number(give.id.slice(6)) };
       mem.conceded.add("maxPrice");
@@ -183,8 +184,9 @@ export function staffMove(sc: Scene, tr: StaffTraits, rng: Rng): { act: StaffAct
   const acts = staffActs(sc);
   const lastCustomerTone = [...sc.log].reverse().find((l) => l.who === "customer")?.tone;
   const impatient = lastCustomerTone === "impatient";
-  const picked: Tone = impatient ? weighted(rng, [{ item: "friendly", w: 3 }, { item: "neutral", w: 2 }]) : pickOne(rng, tr.tones);
+  const picked0: Tone = impatient ? weighted(rng, [{ item: "friendly", w: 3 }, { item: "neutral", w: 2 }]) : pickOne(rng, tr.tones);
   // Nobody greets a customer impatiently or unsurely.
+  const picked: Tone = picked0 === "impatient" && sc.turn <= 10 ? "neutral" : picked0; // short only after a long chat
   const t: Tone = sc.log.length === 0 && (picked === "impatient" || picked === "unsure") ? "neutral" : picked;
   const ctx = derive(sc);
   const models = ctx.ranked.length;
@@ -196,7 +198,9 @@ export function staffMove(sc: Scene, tr: StaffTraits, rng: Rng): { act: StaffAct
     else if (a.t === "ask") {
       const q = questionById(a.qid);
       w = a.qid === "opening_intent" && sc.turn === 0 ? 6 : a.qid === "known_model" && sc.turn === 0 ? 2 : 0.2 + v.gain * 3;
-      if (q.kind === "resolve") w = 3;
+      // What it is for and what it should cost come early; storage before colour.
+      if (a.qid === "use_case" || a.qid === "budget_ceiling") w += 1.5;
+      if (q.kind === "resolve") w = a.qid === "storage_tier_for_model" ? 4 : 3;
       w *= tr.thorough * (impatient ? 0.5 : 1);
     } else if (a.t === "offer_demo") w = (models <= 4 ? 1 + (5 - models) * 0.8 : 0.3) * tr.salesy * (impatient ? 2 : 1);
     else if (a.t === "reconfirm") w = 9; // they moved to a new phone: check their wishes still stand

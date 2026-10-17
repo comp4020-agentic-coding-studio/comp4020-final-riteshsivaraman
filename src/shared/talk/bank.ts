@@ -67,6 +67,7 @@ const givenCeiling = (ctx: Ctx): number | null => {
 };
 const NOTSURE: Option = { id: "notsure", label: "Not sure about this", neutral: true };
 const uniq = <T>(xs: T[]): T[] => [...new Set(xs)];
+const gbText = (n: number): string => (n >= 1024 ? `${n / 1024}TB` : `${n}GB`);
 const capitalise = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
 const nameOf = (id: string): string => modelById(id).name;
 // A reopened question can come up after the model has been dropped again, so its wording can't assume one.
@@ -347,7 +348,9 @@ export const BANK: QuestionDef[] = [
       const lead = ctx.ranked[0];
       return lead ? `The ${lead.name} has a ${lead.screenIn}" screen${lead.weightG ? ` and weighs ${lead.weightG}g` : ""}. Is that size what you're after?` : "Is the screen size right for you?";
     },
-    pre: (ctx) => ctx.ranked.length > 0 && ctx.ranked[0]!.screenIn >= 6.5 && ctx.ranked.some((m) => m.screenIn < ctx.ranked[0]!.screenIn),
+    // Retired: asked about a screen size nobody had mentioned, and with a phone fixed there is nothing smaller left to switch to
+    // (replay finding #2). To come back when a named phone can be traded down.
+    pre: () => false,
     options: (ctx) => [
       { id: "fine", label: "That size is fine for me", neutral: true },
       ...(ctx.ranked[0] ? [{ id: `smaller:${ctx.ranked[0].screenIn}`, label: "That's too big, show me smaller" }] : []),
@@ -366,9 +369,15 @@ export const BANK: QuestionDef[] = [
       const shown = uniq(ctx.pool.map((r) => r.storage));
       const full = ctx.model ? modelById(ctx.model).tiers.length : shown.length;
       const who = named(ctx, ctx.model) ? "it" : `the ${thePhone(ctx)}`;
-      return shown.length === full ? `${capitalise(who)} comes in ${orList(shown)}. Which would you like?` : `With what you've told me, you could have ${who} in ${orList(shown)}. Which would you like?`;
+      if (shown.length === full) return `${capitalise(who)} comes in ${orList(shown)}. Which would you like?`;
+      // Say what actually cut the list, not just that something did.
+      const model = ctx.model ? modelById(ctx.model) : null;
+      const byBudget = ctx.c.maxPrice !== undefined && model?.tiers.some((t) => t.price > ctx.c.maxPrice!);
+      const why = byBudget ? `Within your ${money(ctx.c.maxPrice!)} budget` : ctx.c.minGB !== undefined ? `Since you wanted at least ${gbText(ctx.c.minGB)}` : "With what you've told me";
+      return `${why}, you could have ${who} in ${orList(shown)}. Which would you like?`;
     },
-    pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.storage)).length > 1,
+    // Only for a phone they have accepted (named, chosen, liked after a demo, or agreed to a suggestion): a phone left over by elimination is not yet theirs.
+    pre: (ctx) => ctx.model !== null && ctx.sc.fixed !== undefined && uniq(ctx.pool.map((r) => r.storage)).length > 1,
     options: (ctx) => [
       ...uniq(ctx.pool.map((r) => r.storage)).map((st) => ({ id: `storage:${st}`, label: `Storage: ${st} (${money(Math.min(...ctx.pool.filter((r) => r.storage === st).map((r) => r.price)))})` })),
       ...(ctx.sc.answers["storage_tier_for_model"]?.picks.includes("notsure") ? [] : [NOTSURE]),
@@ -382,7 +391,7 @@ export const BANK: QuestionDef[] = [
     id: "colour_pick",
     kind: "resolve",
     ask: (ctx, reopen) => (reopen || named(ctx, ctx.model) ? `Which colour would you like${reopen ? " instead" : ""}?` : `Which colour for the ${thePhone(ctx)}?`),
-    pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.colour)).length > 1,
+    pre: (ctx) => ctx.model !== null && ctx.sc.fixed !== undefined && uniq(ctx.pool.map((r) => r.colour)).length > 1,
     options: (ctx) => {
       const here = uniq(ctx.pool.map((r) => r.colour));
       const others = uniq(MODELS.flatMap((m) => m.colours)).filter((col) => !here.includes(col)).sort();

@@ -72,6 +72,7 @@ const KEY_TEXT: Partial<Record<keyof Constraints, string>> = {
   storage: "that storage",
   colours: "the colour",
   lines: "the model line",
+  features: "the features",
 };
 
 export function relaxMoves(ctx: Ctx): RelaxMove[] {
@@ -81,6 +82,17 @@ export function relaxMoves(ctx: Ctx): RelaxMove[] {
     const without = { ...ctx.c };
     delete without[key];
     if (poolOf(without).length > 0) moves.push({ id: `drop:${key}`, label: `Give up ${KEY_TEXT[key]}` });
+  }
+  // When no single concession is enough, offer the smallest pair, so the menu is never just "hold firm".
+  if (moves.length === 0) {
+    const keys = (Object.keys(KEY_TEXT) as (keyof Constraints)[]).filter((k) => ctx.c[k] !== undefined);
+    for (let i = 0; i < keys.length; i++)
+      for (let j = i + 1; j < keys.length; j++) {
+        const without = { ...ctx.c };
+        delete without[keys[i]!];
+        delete without[keys[j]!];
+        if (poolOf(without).length > 0) moves.push({ id: `drop:${keys[i]}+${keys[j]}`, label: `Give up ${KEY_TEXT[keys[i]!]} and ${KEY_TEXT[keys[j]!]}` });
+      }
   }
   if (ctx.c.maxPrice !== undefined) {
     const looser = { ...ctx.c };
@@ -112,12 +124,15 @@ export function staffActs(sc: Scene): ActView[] {
     // After "ask about other phones" staff go back to questions before offering anything.
     const hold = sc.wantsMore && open.length > 0;
     if (!hold && demoCandidates(ctx).length > 0 && (ctx.ranked.length <= 4 || open.length === 0)) out.push(view({ t: "offer_demo" }, "Offer a demo"));
-    if (ctx.pool.length === 1) out.push(view({ t: "confirm" }, "Confirm the choice"));
+    // Not before the customer has accepted the phone: one left by elimination is still only a suggestion.
+    if (ctx.pool.length === 1 && sc.fixed !== undefined) out.push(view({ t: "confirm" }, "Confirm the choice"));
     // Wishes that came with them from a phone they moved away from are worth checking before building on them.
     if (sc.carried) out.push(view({ t: "reconfirm" }, "Check their earlier wishes still stand"));
     // Recommending something before learning anything about them would just be the cheapest phone.
     const informed = !!(sc.answers["use_case"] || sc.answers["budget_ceiling"]);
-    if (!hold && ctx.model === null && (informed || open.length === 0)) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
+    // A foldable is not suggested to someone who has not said whether they are open to one (unless it is all that is left).
+    const askedFold = !!sc.answers["form_factor"] || ctx.ranked.every((m) => m.foldable);
+    if (!hold && sc.fixed === undefined && (informed || open.length === 0)) for (const m of ctx.ranked.filter((m) => askedFold || !m.foldable).slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
   }
   for (const q of reopenable(ctx)) out.push(view({ t: "ask", qid: q.id, reopen: true }, `Reopen: ${q.id.replace(/_/g, " ")}`));
   // Every conversation starts with a greeting and an introduction: before anything else
@@ -230,7 +245,7 @@ function nearestModels(ctx: Ctx): string[] {
   const found: string[] = [];
   for (const m of relaxMoves(ctx)) {
     const c = { ...ctx.c };
-    if (m.id.startsWith("drop:")) delete c[m.id.slice(5) as keyof Constraints];
+    if (m.id.startsWith("drop:")) for (const key of m.id.slice(5).split("+")) delete c[key as keyof Constraints];
     else c.maxPrice = Number(m.id.slice(6));
     for (const r of poolOf(c)) if (!found.includes(r.model) && !ctx.sc.demoed.includes(r.model)) found.push(r.model);
   }
@@ -331,7 +346,7 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
   }
   // Staff owe an answer to whatever was thrown back, before or alongside their next move.
   if (reply.throwback) {
-    next.owed = reply.throwback;
+    next.owed = next.owed ? `${next.owed}|${reply.throwback}` : reply.throwback; // they can ask more than one thing at once
     next.owedPool = ctx.ranked.map((m) => m.id); // "of these" will mean the phones in play now, not after their answer
   }
 
@@ -451,7 +466,7 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     if (pick === "yes") switchModel(sc, p.model);
     else if (pick === "no") setAside(sc, p.model);
   } else if (p.kind === "nudge") {
-    if (pick.startsWith("drop:")) forget(sc, pick.slice(5) as keyof Constraints);
+    if (pick.startsWith("drop:")) for (const key of pick.slice(5).split("+")) forget(sc, key as keyof Constraints);
     else if (pick.startsWith("raise:")) {
       sc.answers["budget_ceiling"] = { picks: [`ceiling:${pick.slice(6)}`], turn: sc.turn };
       if (!sc.order.includes("budget_ceiling")) sc.order.push("budget_ceiling");
