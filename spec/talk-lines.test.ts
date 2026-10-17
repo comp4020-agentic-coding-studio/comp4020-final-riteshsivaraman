@@ -62,6 +62,8 @@ describe("every line of 400 simulated conversations", () => {
         // (an ellipsis may run on in lower case: "Let me see... which colour")
         if (/(^|[^.][.?!] )(?!iPhone)[a-z]/.test(t)) bad.push(`${at} has a sentence starting in lower case`);
         if (l.who === "customer") {
+          // Asked "would you like a look at it?", nobody answers by saying the phone's name back.
+          if (log[i - 1]?.text.endsWith("have a look at it?") && /iPhone/.test(t)) bad.push(`${at} names the phone again`);
           if (/Not sure/.test(t)) bad.push(`${at} has a bare menu label`);
           if (/\b(Sure\.|I guess|Happy to say|Quick answer|Just:|Look,)/.test(t)) bad.push(`${at} has a retired lead-in`);
           if (!/[.?!]$/.test(t)) bad.push(`${at} does not end like a sentence`);
@@ -69,6 +71,7 @@ describe("every line of 400 simulated conversations", () => {
           const prev = log[i - 1];
           if (prev?.picks?.some((p) => NEGATIVE.has(p)) && /^(Great|Lovely|Sure thing)\./.test(t)) bad.push(`${at} cheers a downbeat answer`);
           if (/^(Great|Lovely|Sure thing)\. (That's the listed price|We don't carry|Nothing fits|I can't promise)/.test(t)) bad.push(`${at} cheers bad news`);
+          if (/^(Great|Lovely|Sure thing|That's fine|No problem|OK|Right|Of course)\. (Good choice|Great choice|Great|Lovely|Sure thing|That's fine|No problem|Of course)\b/.test(t)) bad.push(`${at} stacks two acknowledgements`);
         }
         if (/  | \.|\.\.\.\./.test(t.replace(/\.\.\./g, ""))) bad.push(`${at} has stray spacing or punctuation`);
       });

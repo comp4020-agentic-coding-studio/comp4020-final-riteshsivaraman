@@ -187,7 +187,8 @@ export function staffLine(act: StaffAct, ctx: Ctx, tone: Tone, models: string[],
   const body = answer && base ? `${answer} ${base}` : answer || base;
   // No cheerful lead-in when the answer they are about to hear is bad news (no deals, not carried).
   const badNews = owed === "haggle" || (owed?.startsWith("not_carried:") ?? false) || act.t === "nudge" || act.t === "rescue";
-  const lead = staffLead(tone, turn, ctx.sc.log[ctx.sc.log.length - 1], badNews);
+  // A line that opens with its own acknowledgement ("Good choice.") needs no second one in front.
+  const lead = /^(Good choice|Great choice)/.test(body) ? "" : staffLead(tone, turn, ctx.sc.log[ctx.sc.log.length - 1], badNews);
   if (lead === "" || body === "") return lead + body;
   // A lead that ends mid-sentence ("Um, ") runs on into a lower-case start.
   return /(,|\.\.\.) $/.test(lead) ? lead + lcFirst(body) : lead + body;
@@ -269,7 +270,7 @@ const saidFor = (key: string, tone: Tone): string | undefined => {
 const GB = (n: number): string => (n >= 1024 ? `${n / 1024}TB` : `${n}GB`);
 
 // The pick as a customer would say it: a sentence of their own, never the menu text.
-function say(pick: string, picks: string[], label: string, qid: string | undefined, kind: string, tone: Tone, lab: (p: string) => string): string {
+function say(pick: string, picks: string[], label: string, qid: string | undefined, kind: string, tone: Tone, lab: (p: string) => string, onlyOne = false): string {
   if (pick === "notsure" || (kind !== "question" && pick === "unsure")) return NOT_SURE[tone];
   const t = (v: Record<Tone, string>): string => v[tone];
   const scope = qid ?? kind;
@@ -277,6 +278,8 @@ function say(pick: string, picks: string[], label: string, qid: string | undefin
   const fixed = saidFor(key, tone);
   if (fixed) return fixed;
   if (key === "size_fit_check/smaller") return "That's too big for me. Have you got anything smaller?";
+  // One phone on offer and everyone knows which: the answer is yes, not its name again.
+  if (kind === "offer_demo" && pick.startsWith("demo:") && onlyOne) return t({ friendly: "Yes please, I'd love to.", neutral: "Yes, please.", impatient: "Yes, go on.", unsure: "Um, OK, I suppose so?" });
   if (kind === "offer_demo" && pick.startsWith("demo:")) return t({ friendly: `Yes please, I'd love to see the ${modelById(pick.slice(5)).name}.`, neutral: `Let's see the ${modelById(pick.slice(5)).name}.`, impatient: `The ${modelById(pick.slice(5)).name}.`, unsure: `Maybe the ${modelById(pick.slice(5)).name}?` });
   if (kind === "rescue" && pick.startsWith("demo:")) return `Alright, let me see the ${modelById(pick.slice(5)).name}.`;
   if (kind === "nudge" && pick.startsWith("drop:")) return `OK, I can do without ${label.replace(/^Give up /, "")}.`;
@@ -330,7 +333,8 @@ export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, tur
   }
   if (reply.picks?.length) {
     const qid = pending.kind === "question" ? pending.qid : undefined;
-    const sentences = qid === "use_case" || qid === "colour_prefs" || qid === "colour_pick" || qid === "hardware_features" ? [say(reply.picks[0]!, reply.picks, optionLabel(opts, reply.picks[0]!), qid, pending.kind, reply.tone, lab)] : reply.picks.map((p) => say(p, reply.picks!, optionLabel(opts, p), qid, pending.kind, reply.tone, lab));
+    const onlyOne = pending.kind === "offer_demo" && pending.models.length === 1;
+    const sentences = qid === "use_case" || qid === "colour_prefs" || qid === "colour_pick" || qid === "hardware_features" ? [say(reply.picks[0]!, reply.picks, optionLabel(opts, reply.picks[0]!), qid, pending.kind, reply.tone, lab, onlyOne)] : reply.picks.map((p) => say(p, reply.picks!, optionLabel(opts, p), qid, pending.kind, reply.tone, lab, onlyOne));
     body = body ? `${sentences.join(" ")} ${body}` : sentences.join(" ");
   }
   // A little tone on the end of a statement: always grammatical, never a clash.

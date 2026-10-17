@@ -120,8 +120,17 @@ describe("demos", () => {
   it("acknowledges a phone they named instead of announcing that one phone fits", () => {
     let sc = ask(newScene(), "known_model", ["model:17e"]);
     sc = staff(sc, { t: "offer_demo" });
-    // The customer named it, so staff say "it" and do not introduce it a second time.
+    // The customer named it, so staff say "it" and do not introduce it a second time,
+    // and do not stack two acknowledgements ("Sure thing. Good choice.") whatever the tone.
     expect(sc.log.at(-1)!.text).toBe("Good choice. Would you like to have a look at it?");
+    for (const tone of ["friendly", "neutral", "impatient", "unsure"] as const) {
+      const t = staff(ask(newScene(), "known_model", ["model:17e"]), { t: "offer_demo" }, tone).log.at(-1)!.text;
+      expect(t, tone).toBe("Good choice. Would you like to have a look at it?");
+    }
+    // Their yes does not say the phone's name back either.
+    const yes = cust(sc, { picks: ["demo:17e"], tone: "unsure" }).log.at(-1)!.text;
+    expect(yes).toBe("Um, OK, I suppose so?");
+    expect(yes).not.toMatch(/iPhone/);
   });
 
   it("'show me another' makes staff offer another, and not ask something else", () => {
