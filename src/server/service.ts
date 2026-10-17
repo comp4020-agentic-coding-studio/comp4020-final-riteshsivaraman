@@ -19,6 +19,7 @@ import { designationOf, type EmployeeKind, type Specialty } from "../shared/prof
 import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID } from "../shared/slots.ts";
 import { takeOne } from "./stock.ts";
+import { emitEvent } from "./eventlog.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
 // colour — no storage picker exists yet (ADR 5) — so the server sells
@@ -66,6 +67,7 @@ const dist = (a: { x: number; z: number }, b: { x: number; z: number }): number 
 
 function log(ctx: Ctx, visitorId: string | null, type: string, data?: unknown): void {
   ctx.db.prepare("INSERT INTO events (ts, visitor_id, type, data) VALUES (?, ?, ?, ?)").run(ctx.now, visitorId, type, data === undefined ? null : JSON.stringify(data));
+  emitEvent(ctx.now, visitorId, type, data);
 }
 
 interface StateRow {

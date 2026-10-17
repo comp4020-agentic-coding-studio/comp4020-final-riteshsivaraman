@@ -36,6 +36,7 @@ import {
 import { avoidPeople } from "../shared/people.ts";
 import { clampToWalkable } from "../shared/world.ts";
 import { db } from "./db.ts";
+import { emitEvent } from "./eventlog.ts";
 
 // Presence: who is in the store right now, where they stand and which role
 // they are acting as. Held in memory on purpose. Positions change ten times a
@@ -49,6 +50,7 @@ interface Session extends VisitorInfo, Pose {
   look?: LookChoice;
   socket: WebSocket;
   lastMoveAt: number;
+  refused: boolean; // standing at a staff-only boundary: the refusal is logged once, not per step
 }
 
 const sessions = new Map<string, Session>(); // visitor id -> live session
@@ -85,7 +87,9 @@ function broadcast(message: ServerMessage, exceptId: string): void {
 }
 
 function logEvent(visitorId: string, type: string, data?: unknown): void {
-  insertEvent.run(Date.now(), visitorId, type, data === undefined ? null : JSON.stringify(data));
+  const ts = Date.now();
+  insertEvent.run(ts, visitorId, type, data === undefined ? null : JSON.stringify(data));
+  emitEvent(ts, visitorId, type, data);
 }
 
 const identityOf = (s: Session): Identity => ({ kind: s.kind, specialty: s.specialty, look: s.look });
@@ -209,12 +213,13 @@ export function handleConnection(socket: WebSocket): void {
         look: profile.look,
         socket,
         lastMoveAt: 0,
+        refused: false,
       };
       const others = [...sessions.values()].map(present);
       sessions.set(me.id, me);
 
       touchVisitor.run(Date.now(), me.id);
-      logEvent(me.id, "join");
+      logEvent(me.id, "join", { name: me.name, kind: me.kind, role: me.role });
       const ctx = serviceCtx();
       enter(ctx, me.id, profile, profile.name);
 
@@ -298,6 +303,15 @@ export function handleConnection(socket: WebSocket): void {
       if (![message.x, message.z, message.ry].every(Number.isFinite)) return;
       me.lastMoveAt = now;
       let p = clampToWalkable(me.role, message.x, message.z);
+      // D18: a customer asking for a spot only staff may stand on is held back
+      // here, on the server. Logged on the first refusal of each approach.
+      if (me.role === "customer") {
+        const staffP = clampToWalkable("staff", message.x, message.z);
+        const wanted = Math.hypot(staffP.x - message.x, staffP.z - message.z) < 0.05;
+        const held = Math.hypot(p.x - message.x, p.z - message.z) > 0.05;
+        if (wanted && held && !me.refused) logEvent(me.id, "staff_area_refused", { x: message.x, z: message.z });
+        me.refused = wanted && held;
+      }
       // people are solid: not through another visitor, staff or customer
       p = avoidPeople(p.x, p.z, otherVisitors(me.id), now);
       p = clampToWalkable(me.role, p.x, p.z);
