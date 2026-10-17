@@ -282,3 +282,19 @@ it builds, and say what was assumed): a picture plus a default per question
 is cheaper to correct than code, and answering "defaults" to the ones that are
 right takes seconds. The settled list went into
 `docs/conversation-model/decisions.md` so the next session loads it.
+
+## Restating the no-invented-facts rule in each subagent prompt made all three flag the same gap instead of filling it
+
+[`a0a8149`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a0a8149)
+
+Round 1 of the question-bank loop used three parallel subagents, one scenario
+each. A subagent sees only its delegation message, so each prompt carried the
+rules in full: facts only from `devices.md`, anything else UNKNOWN, menus
+only, and a required "assumptions I made" section. All three independently
+declined to state the iPhone 18 Pro Max's exact prices (the sheet says
+`[TK]`) and flagged the $2,299 figure they needed as an inference; A and C
+also refused "long battery" and "water resistant" claims. Lesson (week 9:
+a subagent sees only the delegation message, so restate every rule you want
+followed): the required assumptions section is what made the gap visible to
+me at review, rather than buried in plausible prose. The gap list ("NEEDS
+DATA") now drives what the Apple scrape has to cover.
