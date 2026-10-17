@@ -206,8 +206,13 @@ relevant to whatever comes next, each tied to a specific lesson a lecture
 taught, preferably from the latest weeks (8 to 10); an earlier week only when
 it fits better (e.g. drawing on persistence or
 decision-record guidance from an earlier week while building a later
-feature). Fetch live via the `comp4020:handbook` skill rather than recalling
-from memory.
+feature). Don't recall them from memory. The lectures are already summarised on this
+machine, outside the repo, in `~/Documents/ANU/3RD_YEAR/SEMESTER 2/COMP4020/Lectures/`:
+`lessons-by-week.md` (two lessons per week, matched against `LEARNINGS.md`),
+`final-checklist.md` (what to land in the final), and `week-1.md` to
+`week-10.md` (the lecture text, to quote from). Read those first. Use the
+`comp4020:handbook` skill only for course admin (dates, marking, policy) or a
+week not yet in that folder.
 
 ## One idea, carried all the way
 Every feature serves "someone's always watching." A feature that doesn't tie
