@@ -1,4 +1,4 @@
-import { askable, derive, gain, money, newScene, optionsFor, questionById, reopenable, rowsIf, type Contribution } from "./bank.ts";
+import { askable, derive, gain, money, newScene, optionsFor, questionById, reopenable, rowsIf, withoutAnswer, type Contribution } from "./bank.ts";
 import { modelById } from "./data.ts";
 import { customerLine, staffLine, throwbacks } from "./lines.ts";
 import { ceil100, poolOf, type Constraints, type Sku } from "./pool.ts";
@@ -89,6 +89,7 @@ export function staffActs(sc: Scene): ActView[] {
     }
     if (demoCandidates(ctx).length > 0 && (ctx.ranked.length <= 4 || open.length === 0)) out.push(view({ t: "offer_demo" }, "Offer a demo"));
     if (ctx.pool.length === 1) out.push(view({ t: "confirm" }, "Confirm the choice"));
+    if (ctx.model === null) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
   }
   for (const q of reopenable(ctx)) out.push(view({ t: "ask", qid: q.id, reopen: true }, `Reopen: ${q.id.replace(/_/g, " ")}`));
   if (sc.owed) out.push(view({ t: "answer" }, "Answer their question and leave it with them"));
@@ -96,7 +97,7 @@ export function staffActs(sc: Scene): ActView[] {
 }
 
 function describeForced(act: StaffAct): ActView {
-  const label = act.t === "demo" ? `Show the ${modelById(act.model).name}` : act.t === "ask" ? `Reopen: ${act.qid.replace(/_/g, " ")}` : act.t;
+  const label = act.t === "demo" ? `Show the ${modelById(act.model).name}` : act.t === "recommend" ? `Recommend the ${modelById(act.model).name}` : act.t === "ask" ? `Reopen: ${act.qid.replace(/_/g, " ")}` : act.t;
   return { act, label, gain: 0, hint: "the customer asked for this" };
 }
 
@@ -143,12 +144,14 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
   let multi = false;
   if (p.kind === "question") {
     const q = questionById(p.qid);
-    options = optionsFor(ctx, q);
+    options = optionsFor(p.reopen ? withoutAnswer(ctx, q.id) : ctx, q);
     multi = q.multi === true;
   } else if (p.kind === "offer_demo") {
     options = [...p.models.map((m) => ({ id: `demo:${m}`, label: `Demo the ${modelById(m).name}` })), { id: "decline", label: "No demo, keep going", neutral: true }];
   } else if (p.kind === "demo_reaction") {
     options = REACTIONS;
+  } else if (p.kind === "recommend") {
+    options = [{ id: "yes", label: "That sounds right" }, { id: "no", label: "Not that one" }, { id: "unsure", label: "Not sure yet", neutral: true }];
   } else if (p.kind === "nudge") {
     options = [...relaxMoves(ctx).map((m) => ({ id: m.id, label: m.label })), { id: "keep", label: "Keep it as it is", neutral: true }, { id: "unsure", label: "Not sure", neutral: true }];
   } else if (p.kind === "rescue") {
@@ -228,12 +231,16 @@ export function applyStaff(sc: Scene, act: StaffAct, tone: Tone): Scene | { erro
   else if (act.t === "demo") {
     next.demoed.push(act.model);
     next.pending = { kind: "demo_reaction", model: act.model };
+  } else if (act.t === "recommend") {
+    next.recommended.push(act.model);
+    next.pending = { kind: "recommend", model: act.model };
   } else if (act.t === "nudge") next.pending = { kind: "nudge" };
   else if (act.t === "rescue") next.pending = { kind: "rescue" };
   else if (act.t === "confirm") next.pending = { kind: "confirm" };
   else next.pending = { kind: "free" };
 
-  const move = owed && act.t !== "answer" ? `answer_throwback+${act.t}` : act.t === "ask" && act.reopen ? "reopen" : act.t === "demo" ? "demo_highlight" : act.t === "nudge" ? "nudge_relax" : act.t;
+  const base = act.t === "ask" && act.reopen ? "reopen" : act.t === "demo" ? "demo_highlight" : act.t === "nudge" ? "nudge_relax" : act.t;
+  const move = owed && act.t !== "answer" ? `answer_throwback+${base}` : base;
   next.turn++;
   next.toMove = "customer";
   // The line is spoken in the scene as it stood, so the state it quotes is what staff saw.
@@ -284,6 +291,17 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
 
 const same2 = (a: CustomerAction, b: CustomerAction): boolean => JSON.stringify(a) === JSON.stringify(b);
 
+// Giving up a requirement forgets the answers that set it, so those questions can be asked afresh.
+function forget(sc: Scene, key: keyof Constraints): void {
+  for (const qid of [...sc.order]) {
+    const a = sc.answers[qid];
+    if (a && questionById(qid).apply(a.picks).c?.[key] !== undefined) {
+      delete sc.answers[qid];
+      sc.order = sc.order.filter((q) => q !== qid);
+    }
+  }
+}
+
 // Applies a menu answer to the scene. Returns an error string if the pick is not allowed.
 function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): string | null {
   const p = menu.pending;
@@ -299,8 +317,6 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
     }
     if (k.gift) sc.gift = true;
     if (k.end) sc.ended = { how: "left", why: "went to another desk" };
-    // Saying something again about a constraint they gave up takes it back.
-    for (const key of Object.keys(k.c ?? {}) as (keyof Constraints)[]) sc.dropped = sc.dropped.filter((d) => d !== key);
     return null;
   }
   const pick = picks[0]!;
@@ -310,8 +326,11 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
   } else if (p.kind === "demo_reaction") {
     if (pick === "happy") sc.fixed = p.model;
     else if (pick === "expensive" || pick === "notforme") sc.excluded.push(p.model);
+  } else if (p.kind === "recommend") {
+    if (pick === "yes") sc.fixed = p.model;
+    else if (pick === "no") sc.excluded.push(p.model);
   } else if (p.kind === "nudge") {
-    if (pick.startsWith("drop:")) sc.dropped.push(pick.slice(5) as keyof Constraints);
+    if (pick.startsWith("drop:")) forget(sc, pick.slice(5) as keyof Constraints);
     else if (pick.startsWith("raise:")) {
       sc.answers["budget_ceiling"] = { picks: [`ceiling:${pick.slice(6)}`], turn: sc.turn };
       if (!sc.order.includes("budget_ceiling")) sc.order.push("budget_ceiling");

@@ -38,8 +38,8 @@ export function newScene(): Scene {
     answers: {},
     order: [],
     excluded: [],
-    dropped: [],
     demoed: [],
+    recommended: [],
     declinedDemo: [],
     relaxDeclined: 0,
     gift: false,
@@ -65,6 +65,8 @@ const givenCeiling = (ctx: Ctx): number | null => {
 const NOTSURE: Option = { id: "notsure", label: "Not sure", neutral: true };
 const uniq = <T>(xs: T[]): T[] => [...new Set(xs)];
 const nameOf = (id: string): string => modelById(id).name;
+// A reopened question can come up after the model has been dropped again, so its wording can't assume one.
+const thePhone = (ctx: Ctx): string => (ctx.model ? nameOf(ctx.model) : "phone");
 const valueOf = (picks: string[], prefix: string): string | undefined => picks.find((p) => p.startsWith(prefix))?.slice(prefix.length);
 const pickedIds = (picks: string[], prefix: string): string[] => picks.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length));
 const poolModels = (ctx: Ctx) => ctx.ranked;
@@ -299,13 +301,13 @@ export const BANK: QuestionDef[] = [
     id: "size_fit_check",
     kind: "hard",
     ask: (ctx) => {
-      const lead = ctx.ranked[0]!;
-      return `The ${lead.name} has a ${lead.screenIn}" screen${lead.weightG ? ` and weighs ${lead.weightG}g` : ""}. Is that size what you're after?`;
+      const lead = ctx.ranked[0];
+      return lead ? `The ${lead.name} has a ${lead.screenIn}" screen${lead.weightG ? ` and weighs ${lead.weightG}g` : ""}. Is that size what you're after?` : "Is the screen size right for you?";
     },
     pre: (ctx) => ctx.ranked.length > 0 && ctx.ranked[0]!.screenIn >= 6.5 && ctx.ranked.some((m) => m.screenIn < ctx.ranked[0]!.screenIn),
     options: (ctx) => [
       { id: "fine", label: "Yes, that size is fine", neutral: true },
-      { id: `smaller:${ctx.ranked[0]!.screenIn}`, label: "Too big, show me something smaller" },
+      ...(ctx.ranked[0] ? [{ id: `smaller:${ctx.ranked[0].screenIn}`, label: "Too big, show me something smaller" }] : []),
       NOTSURE,
     ],
     apply: (picks) => {
@@ -316,7 +318,7 @@ export const BANK: QuestionDef[] = [
   {
     id: "storage_tier_for_model",
     kind: "resolve",
-    ask: (ctx) => `The ${nameOf(ctx.model!)} comes in ${uniq(ctx.pool.map((r) => r.storage)).join(", ")}. Which one?`,
+    ask: (ctx) => `The ${thePhone(ctx)} comes in ${uniq(ctx.pool.map((r) => r.storage)).join(", ")}. Which one?`,
     pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.storage)).length > 1,
     options: (ctx) => [
       ...uniq(ctx.pool.map((r) => r.storage)).map((st) => ({ id: `storage:${st}`, label: `${st} (${money(Math.min(...ctx.pool.filter((r) => r.storage === st).map((r) => r.price)))})` })),
@@ -330,7 +332,7 @@ export const BANK: QuestionDef[] = [
   {
     id: "colour_pick",
     kind: "resolve",
-    ask: (ctx, reopen) => (reopen ? "Which colour would you like instead?" : `Which colour for the ${nameOf(ctx.model!)}?`),
+    ask: (ctx, reopen) => (reopen ? "Which colour would you like instead?" : `Which colour for the ${thePhone(ctx)}?`),
     pre: (ctx) => ctx.model !== null && uniq(ctx.pool.map((r) => r.colour)).length > 1,
     options: (ctx) => {
       const here = uniq(ctx.pool.map((r) => r.colour));
@@ -373,10 +375,18 @@ export function derive(sc: Scene): Ctx {
   }
   if (sc.excluded.length) c = mergeConstraints(c, { excluded: sc.excluded });
   if (sc.fixed) c = { ...c, model: sc.fixed };
-  for (const key of sc.dropped) delete c[key];
   const pool = poolOf(c);
   const ids = modelIds(pool);
   return { sc, c, s, pool, ranked: rank(pool, s), model: sc.fixed ?? (ids.length === 1 ? ids[0]! : null) };
+}
+
+// The scene as it was before this question was answered, for generating the
+// options of a reopen: "what else could the answer be, holding the rest fixed".
+// The original scene stays on ctx.sc, so "you said X, still right?" can quote it.
+export function withoutAnswer(ctx: Ctx, qid: string): Ctx {
+  const sc: Scene = { ...ctx.sc, answers: { ...ctx.sc.answers }, order: ctx.sc.order.filter((q) => q !== qid) };
+  delete sc.answers[qid];
+  return { ...derive(sc), sc: ctx.sc };
 }
 
 // What the pool would be if this question had these picks (without changing the scene).
@@ -408,9 +418,14 @@ export function askable(ctx: Ctx): QuestionDef[] {
   });
 }
 
-// Questions already answered that the customer could be asked to confirm again.
+// Questions already answered that the customer could be asked to confirm
+// again. With nothing left in the pool, only a question whose reopening could
+// bring something back is worth reopening; the rest would be a menu of dead ends.
 export const reopenable = (ctx: Ctx): QuestionDef[] =>
-  ctx.sc.order.map(questionById).filter((q) => q.kind !== "route" && (ctx.sc.answers[q.id]?.picks.length ?? 0) > 0);
+  ctx.sc.order
+    .map(questionById)
+    .filter((q) => q.kind !== "route" && (ctx.sc.answers[q.id]?.picks.length ?? 0) > 0)
+    .filter((q) => ctx.pool.length > 0 || withoutAnswer(ctx, q.id).pool.length > 0);
 
 // How much a question would narrow the pool: the share of rows the worst
 // non-neutral answer still leaves, inverted. Soft questions get a flat, lower

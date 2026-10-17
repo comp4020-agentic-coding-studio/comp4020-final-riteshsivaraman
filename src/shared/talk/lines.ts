@@ -131,6 +131,10 @@ export function staffBase(act: StaffAct, ctx: Ctx, models: string[]): string {
       const m = modelById(act.model);
       return `Here's the ${m.name}: ${highlights(m, ctx).join("; ")}. The demo unit might not be the colour we'd get you, and I'd have to check what's in stock. What do you think?`;
     }
+    case "recommend": {
+      const m = modelById(act.model);
+      return `I'd suggest the ${m.name}: ${highlights(m, ctx).join("; ")}. Does that sound right?`;
+    }
     case "nudge":
       return `Nothing fits ${describeConstraints(ctx.c).join(", ") || "that"}. How do you want to go?`;
     case "rescue":

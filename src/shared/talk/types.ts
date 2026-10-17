@@ -1,5 +1,5 @@
 import type { ModelRec } from "./data.ts";
-import type { Constraints, Signals, Sku } from "./pool.ts";
+import type { Signals, Sku, Constraints } from "./pool.ts";
 
 // The vocabulary of one phone-specialist conversation: two parties, taking
 // turns, every line a pick from a menu. Nothing here knows about a screen or a
@@ -32,6 +32,7 @@ export type Pending =
   | { kind: "question"; qid: string; reopen: boolean }
   | { kind: "offer_demo"; models: string[] }
   | { kind: "demo_reaction"; model: string }
+  | { kind: "recommend"; model: string }
   | { kind: "nudge" }
   | { kind: "rescue" }
   | { kind: "confirm" }
@@ -41,6 +42,7 @@ export type StaffAct =
   | { t: "ask"; qid: string; reopen?: boolean }
   | { t: "offer_demo" }
   | { t: "demo"; model: string }
+  | { t: "recommend"; model: string } // staff suggest one; the way forward when questions and demos run out
   | { t: "nudge" }
   | { t: "rescue" }
   | { t: "confirm" }
@@ -85,8 +87,8 @@ export interface Scene {
   order: string[]; // question ids in the order they were first answered
   fixed?: string; // the model the customer named or chose
   excluded: string[];
-  dropped: (keyof Constraints)[]; // constraints the customer agreed to give up
   demoed: string[];
+  recommended: string[];
   declinedDemo: string[];
   relaxDeclined: number;
   wanted?: string; // a model the customer asked for that we do not carry
