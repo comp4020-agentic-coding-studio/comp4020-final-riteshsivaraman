@@ -10,7 +10,11 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
-## In progress: conversation model rebuild (started 2026-10-17)
+## Conversation model: phone scene built, documented (2026-10-18)
+
+All six steps below landed (`687bafb` to `2f3c2f2`), then play-testing and two automated review passes (`32878f7` to `417f949`). Everything is in `docs/conversation-model/README.md` (start there). Next: Ritesh approves the POC, then the ADR, then the next scenes (`conversation-types.md`).
+
+(Original plan, kept:)
 
 Replacing the slot engine (`scripts/sim/`, the phones script in
 `src/shared/conversation.ts`) with a menu-only, pool-and-ranking model for the
@@ -532,3 +536,24 @@ CLAUDE.md's "Known gotchas."
 4. Run the fiction-integrity sweep (fresh subagent, no prior context) once
    the company name is real.
 5. `/comp4020:preflight`, then Ritesh decides on `/comp4020:ship`.
+
+## iOS phone-screen pilot (2026-10-17)
+
+Experimental, beside (not replacing) `ios-mockup-demo.html`. `ios-pilot/lock.html`
+and `home.html` are hand-drawn 390x844 pages (own icons, CSS wallpaper, Arial
+stack, no Apple assets). `?cutout=island|notch|punch` switches the camera
+cut-out per phone model (`ScreenCutout` in `phones-geo.ts`). `ios-pilot/capture.sh`
+renders 2x PNGs to `ios-pilot/out/` with the installed Chrome (no new dependency).
+Design source is a private Claude Design canvas (claude.ai/artifact/52NMJeXB3ViLGwpsTgjPrx);
+the repo HTML is a plain-page conversion of it, so edits made on the canvas
+need re-converting.
+Apple Design Resources (SF Pro, SF Symbols) were downloaded then moved out of the
+repo: licence only allows mock-ups for Apple-platform software, bars embedding.
+See D44 in SCOPE.md.
+
+Next: load the PNGs as the phone screen texture in place of `phoneScreen()`
+(`phones-art.ts:604`), then tap-through between lock, home and apps. Camera app
+with a real camera POV is a later extension. Per-model differences so far: cut-out only.
+Home screen has three empty rows below the icons (real one has more).
+
+2026-10-17 later: pilot look pushed (4th icon row, glass edge highlights, bolder labels). Capture now 237 x 512 to stay under the graphics-brief 512 px texture cap. Open question for Ritesh: the brief says "procedural only, drawn in code"; these PNGs are our own drawings but are baked files, so either accept them as an exception or redraw as canvas code. Nothing committed.

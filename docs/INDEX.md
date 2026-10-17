@@ -132,3 +132,5 @@ find every resource by reading this file, not by discovering it mid-task.
 - *(add further ADRs here as they're created — don't let this list go stale.)*
 - `docs/conversation-model/mockup-v0.html` — static mockup of the proposed phone-specialist conversation model (v0, for correction before any code).
 - `docs/conversation-model/` — conversation-model design: `decisions.md` (settled so far), `devices.json` + `devices-v2-notes.md` (sourced attributes, 2026-10-17), `transcripts/round-1/`.
+- `docs/conversation-model/README.md` — **start here** for the conversation model: status, where everything is, commands, what is not done. Siblings: `how-we-built-it.md` (the whole process), `engine-reference.md`, `new-scene-playbook.md`, `conversation-types.md` (brainstorm of every store conversation), `prompts.md` (reusable subagent prompts), `review/` (automated review reports), `replay-findings.md`.
+- `src/shared/talk/`, `spec/talk-*.test.ts`, `scripts/talk-transcripts.ts`, `poc/talk/` — the engine, its specs, the transcript tool and the playable page (`pnpm test:talk`, `pnpm poc`).
