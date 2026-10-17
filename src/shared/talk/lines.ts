@@ -1,7 +1,7 @@
 import { describeConstraints, money, questionById } from "./bank.ts";
 import { modelById, type ModelRec } from "./data.ts";
 import { cheapest } from "./pool.ts";
-import type { Ctx, CustomerReply, Option, StaffAct, Tone } from "./types.ts";
+import type { Ctx, CustomerReply, Line, Option, Pending, StaffAct, Tone } from "./types.ts";
 
 // Wording. Every line is built from the scene's state and the sourced data, so
 // nobody can say anything the data does not back: a staff claim is read off a
@@ -9,26 +9,33 @@ import type { Ctx, CustomerReply, Option, StaffAct, Tone } from "./types.ts";
 // small wrapper on top. These wrappers are placeholders for wording Ritesh
 // reviews and rewrites [TK]; the four tones are fixed, the phrases are not.
 
-const STAFF_TONE: Record<Tone, string[]> = {
-  friendly: ["", "Great. ", "Lovely. ", "Sure thing. "],
-  neutral: [""],
-  impatient: ["Right. ", "OK. ", "Next, "],
-  unsure: ["Um, ", "So, I think... ", "Let me see... "],
-};
-const CUSTOMER_TONE: Record<Tone, string[]> = {
-  friendly: ["", "Sure. ", "Happy to say: "],
-  neutral: [""],
-  impatient: ["Look, ", "Just: ", "Quick answer: "],
-  unsure: ["Um, ", "I guess ", "Hmm. "],
-};
-const wrap = (table: Record<Tone, string[]>, tone: Tone, turn: number, text: string): string => {
-  // The very first line of a conversation is a plain hello, whatever the tone.
-  const lead = turn <= 1 ? "" : table[tone][turn % table[tone].length]!;
-  if (lead === "" || text === "") return lead === "" ? text : lead + text;
-  // A lead that ends mid-sentence ("Um, ") runs on into a lower-case start.
-  return /(,|\.\.\.) $/.test(lead) ? lead + text.charAt(0).toLowerCase() + text.slice(1) : lead + text;
+// Tone is carried by phrasing, never by a lead-in stuck on the front of
+// whatever the menu label happens to be (that is how "Sure." ended up in front
+// of "Not sure."). A customer says each pick as a sentence built for it, with
+// a variant per tone; staff lead-ins depend on how the customer's last answer
+// went. The phrases are placeholders for wording Ritesh rewrites [TK]; the
+// four tones are fixed.
+
+// What a customer's answer sounded like, so staff do not say "Great." to "Not sure."
+const NEGATIVE = new Set(["notsure", "unsure", "no", "notforme", "expensive", "keep", "decline", "think", "another", "avg", "notyet"]);
+
+const staffLead = (tone: Tone, turn: number, prev: Line | undefined, badNews: boolean): string => {
+  if (turn <= 1) return ""; // the first line is a plain hello, whatever the tone
+  const downbeat = badNews || (prev?.who === "customer" && (prev.picks?.some((p) => NEGATIVE.has(p)) ?? false));
+  const pool: Record<Tone, string[]> = {
+    friendly: downbeat ? ["No problem. ", "That's fine. "] : ["", "Great. ", "Lovely. ", "Sure thing. "],
+    neutral: [""],
+    impatient: ["Right. ", "OK. "],
+    unsure: ["Um, ", "Let me see... "],
+  };
+  const lead = pool[tone][turn % pool[tone].length]!;
+  return lead;
 };
 
+const lcFirst = (t: string): string => t.charAt(0).toLowerCase() + t.slice(1);
+const capFirst = (t: string): string => t.charAt(0).toUpperCase() + t.slice(1);
+const stop = (t: string): string => (/[.?!]$/.test(t) ? t : t + ".");
+const names = (ids: string[]): string => ids.map((i) => modelById(i).name).join(", ");
 // The sign-off staff give when a scene ends. Payment is a different scene (and
 // likely a different person), so a sale hands over to the till.
 export function closingLine(ended: { how: "bought" } | { how: "left"; why: string }): string {
@@ -37,7 +44,7 @@ export function closingLine(ended: { how: "bought" } | { how: "left"; why: strin
   return "No worries at all. I'm here if you want another look.";
 }
 
-const names = (ids: string[]): string => ids.map((i) => modelById(i).name).join(", ");
+const list = (xs: string[], word = "and"): string => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} ${word} ${xs[xs.length - 1]}`);
 
 // ---- facts a staff member may read out about a model ----
 
@@ -162,12 +169,25 @@ export function staffLine(act: StaffAct, ctx: Ctx, tone: Tone, models: string[],
   const answer = owed ? answerThrowback(owed, ctx) : "";
   const base = staffBase(act, ctx, models);
   const body = answer && base ? `${answer} ${base}` : answer || base;
-  return wrap(STAFF_TONE, tone, turn, body);
+  // No cheerful lead-in when the answer they are about to hear is bad news (no deals, not carried).
+  const badNews = owed === "haggle" || (owed?.startsWith("not_carried:") ?? false);
+  const lead = staffLead(tone, turn, ctx.sc.log[ctx.sc.log.length - 1], badNews);
+  if (lead === "" || body === "") return lead + body;
+  // A lead that ends mid-sentence ("Um, ") runs on into a lower-case start.
+  return /(,|\.\.\.) $/.test(lead) ? lead + lcFirst(body) : lead + body;
 }
 
 // ---- customer lines ----
 
-const labelOf = (opts: Option[], pick: string): string => {
+// "Not sure" in each tone: the one line every question can get.
+const NOT_SURE: Record<Tone, string> = {
+  friendly: "Hmm, I'm not sure, sorry.",
+  neutral: "I'm not sure.",
+  impatient: "I don't know, honestly.",
+  unsure: "Um... I'm really not sure.",
+};
+
+const optionLabel = (opts: Option[], pick: string): string => {
   const o = opts.find((x) => x.id === pick);
   if (o) return o.label;
   const p = opts.find((x) => x.param && pick.startsWith(x.param.prefix));
@@ -175,7 +195,41 @@ const labelOf = (opts: Option[], pick: string): string => {
   return pick;
 };
 
-export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, turn: number): string {
+const noParen = (t: string): string => t.replace(/\s*\(.*\)$/, "");
+
+// The pick as a customer would say it, as a full sentence. Picks whose label is
+// already a sentence ("Yes, a separate telephoto lens") are said as is.
+function say(pick: string, picks: string[], label: string, qid: string | undefined, kind: string, tone: Tone, lab: (p: string) => string): string {
+  if (pick === "notsure" || (kind !== "question" && pick === "unsure")) return NOT_SURE[tone];
+  const t = (v: Record<Tone, string>): string => v[tone];
+  if (kind === "offer_demo" && pick.startsWith("demo:")) return t({ friendly: `Yes please, I'd love to see the ${modelById(pick.slice(5)).name}.`, neutral: `Let's see the ${modelById(pick.slice(5)).name}.`, impatient: `The ${modelById(pick.slice(5)).name}.`, unsure: `Maybe the ${modelById(pick.slice(5)).name}?` });
+  if (kind === "rescue" && pick.startsWith("demo:")) return `Let me see the ${modelById(pick.slice(5)).name}.`;
+  if (kind === "nudge" && pick.startsWith("drop:")) return `Let's drop ${label.replace(/^Drop /, "")}.`;
+  if (kind !== "question") return stop(label);
+  if (qid === "known_model" && pick.startsWith("model:")) return t({ friendly: `The ${label}, please.`, neutral: `The ${label}.`, impatient: `The ${label}.`, unsure: `I think the ${label}?` });
+  if (qid === "known_model" && pick.startsWith("unlisted:")) return `I was after the ${pick.slice(9)}.`;
+  if (qid === "model_family") return t({ friendly: `I was thinking of the ${noParen(label)}.`, neutral: `The ${noParen(label)}.`, impatient: `The ${noParen(label)}.`, unsure: `Maybe the ${noParen(label)}?` });
+  if (qid === "colour_prefs" || qid === "colour_pick") {
+    const cols = picks.filter((p) => p.startsWith("colour:")).map((p) => p.slice(7));
+    return t({ friendly: `I'd love ${list(cols, "or")}.`, neutral: `${capFirst(list(cols, "or"))}, please.`, impatient: `${capFirst(list(cols, "or"))}.`, unsure: `Maybe ${list(cols, "or")}?` });
+  }
+  if (qid === "storage_tier_for_model") return t({ friendly: `The ${noParen(label)}, please.`, neutral: `The ${noParen(label)}.`, impatient: `${noParen(label)}.`, unsure: `Maybe the ${noParen(label)}?` });
+  if (qid === "storage_need") return t({ friendly: `At least ${label}, I think.`, neutral: `At least ${label}.`, impatient: `${label} at least.`, unsure: `Maybe ${label} at least?` });
+  if (qid === "budget_ceiling" && (pick.startsWith("ceiling:") || label.startsWith("Up to"))) return t({ friendly: `${label.replace(/^Yes, /, "")}.`.replace(/^up/, "Up"), neutral: `${label}.`, impatient: `${label}, that's it.`, unsure: `Maybe ${lcFirst(label)}?` });
+  if (qid === "use_case") {
+    const uses = picks.filter((p) => p !== "notsure").map((p) => lcFirst(noParen(lab(p))));
+    return t({ friendly: `Mostly ${list(uses)}.`, neutral: `${capFirst(list(uses))}.`, impatient: `${capFirst(list(uses))}, that's all.`, unsure: `Probably ${list(uses)}, I think.` });
+  }
+  if (qid === "hardware_features") {
+    const fs = picks.filter((p) => p !== "notsure" && p !== "none").map((p) => lcFirst(noParen(lab(p))));
+    return fs.length ? t({ friendly: `${capFirst(list(fs))} would be nice.`, neutral: `${capFirst(list(fs))}.`, impatient: `${capFirst(list(fs))}.`, unsure: `Maybe ${list(fs)}?` }) : "None of those matter to me.";
+  }
+  if (qid === "screen_size_pref") return t({ friendly: `${noParen(label)}, I think.`, neutral: `${noParen(label)}.`, impatient: `${noParen(label)}.`, unsure: `Maybe ${lcFirst(noParen(label))}?` });
+  return stop(label);
+}
+
+export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, turn: number, pending: Pending): string {
+  const lab = (p: string): string => optionLabel(opts, p);
   let body = "";
   if (reply.action) {
     const a = reply.action;
@@ -185,11 +239,20 @@ export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, tur
       a.t === "change" ? `Can I change my answer about ${questionById(a.qid).id.replace(/_/g, " ")}?` :
       a.t === "leave" ? "I'll leave it there, thanks." :
       "Go on.";
-  } else if (reply.picks) {
-    body = reply.picks.map((p) => labelOf(opts, p)).join("; ");
   }
-  if (reply.throwback) body = `${body ? body.replace(/[.?!]$/, "") + ". " : ""}${throwbackLabel(reply.throwback, ctx)}`;
+  if (reply.picks?.length) {
+    const qid = pending.kind === "question" ? pending.qid : undefined;
+    const sentences = qid === "use_case" || qid === "colour_prefs" || qid === "colour_pick" || qid === "hardware_features" ? [say(reply.picks[0]!, reply.picks, optionLabel(opts, reply.picks[0]!), qid, pending.kind, reply.tone, lab)] : reply.picks.map((p) => say(p, reply.picks!, optionLabel(opts, p), qid, pending.kind, reply.tone, lab));
+    body = body ? `${sentences.join(" ")} ${body}` : sentences.join(" ");
+  }
+  // A little tone on the end of a statement: always grammatical, never a clash.
+  const sureAnswer = reply.picks?.every((p) => !NEGATIVE.has(p)) ?? false;
+  if (body && /\.$/.test(body) && !reply.throwback) {
+    if (reply.tone === "friendly" && sureAnswer && turn % 3 === 0) body += " Thanks!";
+    if (reply.tone === "impatient" && turn % 3 === 0) body += " Can we keep going?";
+  }
+  if (reply.throwback) body = `${body ? stop(body) + " " : ""}${throwbackLabel(reply.throwback, ctx)}`;
   // Their first words back are a hello.
   if (turn === 2 && body) return `Hi. ${body}`;
-  return wrap(CUSTOMER_TONE, reply.tone, turn, body);
+  return body;
 }

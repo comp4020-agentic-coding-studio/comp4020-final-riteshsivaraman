@@ -301,7 +301,7 @@ export function applyCustomer(sc: Scene, reply: CustomerReply): Scene | { error:
   next.turn++;
   next.pending = null;
   next.toMove = "staff";
-  log(next, { who: "customer", tone: reply.tone, move, picks: reply.picks, throwback: reply.throwback, text: customerLine(reply, menu.options, ctx, next.turn) });
+  log(next, { who: "customer", tone: reply.tone, move, picks: reply.picks, throwback: reply.throwback, text: customerLine(reply, menu.options, ctx, next.turn, menu.pending) });
   // No scene ends in silence: staff sign off.
   if (next.ended) {
     next.turn++;

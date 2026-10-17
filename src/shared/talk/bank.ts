@@ -140,7 +140,11 @@ export const BANK: QuestionDef[] = [
       })),
       NOTSURE,
     ],
-    apply: (picks) => ({ c: { lines: pickedIds(picks, "line:") } }),
+    // "Not sure" picks no line, and an empty list of allowed lines would mean no phone at all.
+    apply: (picks) => {
+      const lines = pickedIds(picks, "line:");
+      return lines.length ? { c: { lines } } : {};
+    },
   },
   {
     id: "use_case",
