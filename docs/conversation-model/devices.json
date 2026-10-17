@@ -1,0 +1,1237 @@
+[
+  {
+    "model": "iPhone Duo",
+    "specs_page": "https://www.apple.com/au/iphone-duo/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+    "screen_inches": {
+      "value": {
+        "inner": "7.6-inch (diagonal) all-screen OLED folding display",
+        "outer": "5.4-inch (diagonal) all-screen OLED display"
+      },
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "display_tech": {
+      "value": {
+        "inner": "Super Retina XDR display; 1878-by-2670-pixel resolution at 430 ppi; Nano-texture finish; Wide-angle OLEDs",
+        "outer": "Super Retina XDR display; 1398-by-2034-pixel resolution at 460 ppi"
+      },
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "refresh_rate_promotion": {
+      "value": "ProMotion technology with adaptive refresh rates up to 120Hz (both displays)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "always_on": {
+      "value": "Always-On display (both displays)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dynamic_island": {
+      "value": "Dynamic Island (both displays)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "brightness": {
+      "value": "1,000 nits max brightness (typical); 1,600 nits peak brightness (HDR); 3,000 nits peak brightness (outdoor); 1 nit minimum brightness (both displays)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "chip": {
+      "value": "A20 Pro chip; 6-core CPU with 2 super cores and 4 efficiency cores; 7-core GPU with Neural Accelerators; Dual 16-core Neural Engine",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dimensions_mm": {
+      "value": {
+        "open": "Width 164.6 mm, Height 117.8 mm, Depth 5.2 mm",
+        "closed": "Width 84.1 mm, Height 117.8 mm, Depth 11.3 mm"
+      },
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "weight_g": {
+      "value": "254 grams (8.96 ounces) (listed for both Open and Closed)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "materials_frame": {
+      "value": "Titanium foldable design; Ceramic Shield 2 front; Ceramic Shield back. Buy page: Case materials 'Titanium frame and hinge cover'",
+      "source": "https://www.apple.com/au/iphone-duo/specs/ ; https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+      "fetched": "2026-10-17"
+    },
+    "colours": {
+      "value": [
+        "Night Sky",
+        "Star White"
+      ],
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "storage_tiers": [
+      {
+        "storage": "256GB",
+        "priceAUD": 3499,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo"
+      },
+      {
+        "storage": "512GB",
+        "priceAUD": 3899,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo"
+      },
+      {
+        "storage": "1TB",
+        "priceAUD": 4699,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo"
+      },
+      {
+        "storage": "2TB",
+        "priceAUD": 5899,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo"
+      }
+    ],
+    "rear_cameras": {
+      "value": [
+        "48MP Fusion Main: 26 mm, f/1.6, sensor-shift OIS; also enables 12MP optical-quality 2x Telephoto: 52 mm, f/1.6",
+        "48MP Fusion Ultra Wide: 13 mm, f/2.2, 120 degree field of view"
+      ],
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "optical_zoom": {
+      "value": "2x optical-quality zoom in, 2x optical zoom out; 4x optical-quality zoom range; digital zoom up to 10x",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "front_camera": {
+      "value": {
+        "outer": "12MP Center Stage camera, f/2.2 aperture",
+        "inner": "Under-display FaceTime camera, f/1.8 aperture, 1080p video recording at 30 or 60 fps"
+      },
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "video_recording": {
+      "value": [
+        "4K Dolby Vision video recording at 24 fps, 25 fps, 30 fps, 60 fps, 100 fps (Fusion Main) or 120 fps (Fusion Main)",
+        "1080p Dolby Vision video recording at 25 fps, 30 fps, 60 fps or 120 fps (Fusion Main)",
+        "720p Dolby Vision video recording at 30 fps",
+        "Cinematic mode up to 4K Dolby Vision at 60 fps",
+        "Action mode up to 2.8K Dolby Vision at 60 fps",
+        "Slo-mo video support for 1080p up to 240 fps and 4K Dolby Vision up to 120 fps (Fusion Main)",
+        "Video formats recorded: HEVC and H.264"
+      ],
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "battery_video_playback": {
+      "value": "Up to 44 hours when using the outer display; up to 31 hours when using the inner display (streamed: up to 37 / 26 hours; typical use: up to 24 hours)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wired": {
+      "value": "USB-C; fast-charge-capable: up to 50% charge in around 20 minutes with 60W-capable adapter or higher (available separately)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wireless": {
+      "value": "MagSafe wireless charging up to 25W; Qi2 wireless charging up to 25W; up to 50% in around 30 minutes with 35W adapter or higher paired with MagSafe Charger",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "water_dust": {
+      "value": "Rated IP68 (maximum depth of 6 metres for up to 30 minutes) under IEC standard 60529",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "five_g": {
+      "value": "5G (sub-6 GHz) with 4x4 MIMO; Gigabit LTE with 4x4 MIMO",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "wifi": {
+      "value": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "bluetooth": {
+      "value": "Bluetooth 6",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "sim": {
+      "value": "Dual eSIM (two active eSIMs; stores eight or more eSIMs); not compatible with physical SIM cards",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "usb_c_port": {
+      "value": "USB-C connector with support for Charging, DisplayPort, USB 3 (up to 10 Gbps)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "action_button": {
+      "value": "No Action button (buy page: '— No Action button'); spec page button list shows Volume up/down, Camera Control, Side button",
+      "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+      "fetched": "2026-10-17"
+    },
+    "camera_control": {
+      "value": "Camera Control listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "face_id": null,
+    "touch_id_note": {
+      "value": "Touch ID fingerprint sensor built into the side button (stated instead of Face ID)",
+      "source": "https://www.apple.com/au/iphone-duo/specs/",
+      "fetched": "2026-10-17"
+    },
+    "trade_in": {
+      "value": "Get up to A$235-A$1,595 in credit towards iPhone Duo or iPhone 18 Pro when you trade in an eligible iPhone 13 or higher",
+      "source": "https://www.apple.com/au/shop/buy-iphone",
+      "fetched": "2026-10-17"
+    },
+    "applecare": null
+  },
+  {
+    "model": "iPhone 18 Pro",
+    "specs_page": "https://www.apple.com/au/iphone-18-pro/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro",
+    "screen_inches": {
+      "value": "6.3-inch (diagonal) all-screen OLED display",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "display_tech": {
+      "value": "Super Retina XDR display; 2622-by-1206-pixel resolution at 460 ppi",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "refresh_rate_promotion": {
+      "value": "ProMotion technology with adaptive refresh rates up to 120Hz (Both models)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "always_on": {
+      "value": "Always-On display (Both models)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dynamic_island": {
+      "value": "Dynamic Island (Both models)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "brightness": {
+      "value": "1,000 nits max brightness (typical); 1,600 nits peak brightness (HDR); 3,000 nits peak brightness (outdoor); 1 nit minimum brightness",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "chip": {
+      "value": "A20 Pro chip; 6-core CPU with 2 super cores and 4 efficiency cores; 7-core GPU with Neural Accelerators; Dual 16-core Neural Engine",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dimensions_mm": {
+      "value": "Width 71.9 mm, Height 150.0 mm, Depth 8.75 mm",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "weight_g": {
+      "value": "211 grams (7.44 ounces)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "materials_frame": {
+      "value": "Aluminium unibody design; Ceramic Shield 2 front; Ceramic Shield back",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "colours": {
+      "value": [
+        "Black",
+        "Silver",
+        "Glacier",
+        "Burgundy"
+      ],
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "storage_tiers": [
+      {
+        "storage": "256GB",
+        "priceAUD": 2099,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      },
+      {
+        "storage": "512GB",
+        "priceAUD": 2499,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      },
+      {
+        "storage": "1TB",
+        "priceAUD": 3299,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      },
+      {
+        "storage": "2TB",
+        "priceAUD": 4499,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      }
+    ],
+    "rear_cameras": {
+      "value": [
+        "48MP Fusion Main with variable aperture (f/1.48, f/1.8, f/2.8, f/4.0): 24 mm; also enables 12MP optical-quality 2x Telephoto: 48 mm",
+        "48MP Fusion Ultra Wide: 13 mm, f/2.2, 120 degree field of view",
+        "48MP Fusion Telephoto: 100 mm (4x), f/2.8; also enables 12MP optical-quality 8x Telephoto: 200 mm, f/2.8"
+      ],
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "optical_zoom": {
+      "value": "8x optical-quality zoom in, 2x optical zoom out; 16x optical-quality zoom range; digital zoom up to 40x",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "front_camera": {
+      "value": "18MP Center Stage camera, f/1.9 aperture, autofocus with Focus Pixels",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "video_recording": {
+      "value": [
+        "4K Dolby Vision video recording at 24 fps, 25 fps, 30 fps, 60 fps, 100 fps (Fusion Main) or 120 fps (Fusion Main)",
+        "1080p Dolby Vision video recording at 25 fps, 30 fps, 60 fps or 120 fps (Fusion Main)",
+        "720p Dolby Vision video recording at 30 fps",
+        "Cinematic mode up to 4K Dolby Vision at 60 fps",
+        "Action mode up to 2.8K Dolby Vision at 60 fps",
+        "ProRes video recording up to 4K at 120 fps with external recording",
+        "Slo-mo video support for 1080p up to 240 fps and 4K Dolby Vision up to 120 fps (Fusion Main)",
+        "Video formats recorded: HEVC, H.264, ProRes and ProRes RAW"
+      ],
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "battery_video_playback": {
+      "value": "Up to 34 hours (streamed: up to 31 hours; typical use: up to 23 hours)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wired": {
+      "value": "USB-C; fast-charge-capable: up to 50% charge in around 15 minutes when using 60W-capable adapter or higher with Adjustable Voltage Supply (available separately)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wireless": {
+      "value": "MagSafe wireless charging up to 25W; Qi2 wireless charging up to 25W; up to 50% in 30 minutes with 35W adapter or higher paired with MagSafe Charger",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "water_dust": {
+      "value": "Rated IP68 (maximum depth of 6 metres for up to 30 minutes) under IEC standard 60529",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "five_g": {
+      "value": "5G (sub-6 GHz) with 4x4 MIMO; Gigabit LTE with 4x4 MIMO",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "wifi": {
+      "value": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "bluetooth": {
+      "value": "Bluetooth 6",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "sim": {
+      "value": "Dual SIM (nano-SIM and eSIM); Dual eSIM support",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "usb_c_port": {
+      "value": "USB-C connector with support for Charging, DisplayPort, USB 3 (up to 10 Gbps)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "action_button": {
+      "value": "Action button listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "camera_control": {
+      "value": "Camera Control listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "face_id": {
+      "value": "Face ID, enabled by TrueDepth technology in the Center Stage front camera",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "trade_in": {
+      "value": "Get up to A$235-A$1,595 in credit towards iPhone Duo or iPhone 18 Pro when you trade in an eligible iPhone 13 or higher",
+      "source": "https://www.apple.com/au/shop/buy-iphone",
+      "fetched": "2026-10-17"
+    },
+    "applecare": null
+  },
+  {
+    "model": "iPhone 18 Pro Max",
+    "specs_page": "https://www.apple.com/au/iphone-18-pro/specs/ (shared page covering both models; apple.com/au/iphone-18-pro-max/specs/ returned 404)",
+    "buy_page": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro",
+    "screen_inches": {
+      "value": "6.9-inch (diagonal) all-screen OLED display",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "display_tech": {
+      "value": "Super Retina XDR display; 2868-by-1320-pixel resolution at 460 ppi",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "refresh_rate_promotion": {
+      "value": "ProMotion technology with adaptive refresh rates up to 120Hz (Both models)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "always_on": {
+      "value": "Always-On display (Both models)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dynamic_island": {
+      "value": "Dynamic Island (Both models)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "brightness": {
+      "value": "1,000 nits max brightness (typical); 1,600 nits peak brightness (HDR); 3,000 nits peak brightness (outdoor); 1 nit minimum brightness",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "chip": {
+      "value": "A20 Pro chip; 6-core CPU with 2 super cores and 4 efficiency cores; 7-core GPU with Neural Accelerators; Dual 16-core Neural Engine",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dimensions_mm": {
+      "value": "Width 78.0 mm, Height 163.4 mm, Depth 8.75 mm",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "weight_g": {
+      "value": "249 grams (8.78 ounces)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "materials_frame": {
+      "value": "Aluminium unibody design; Ceramic Shield 2 front; Ceramic Shield back",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "colours": {
+      "value": [
+        "Black",
+        "Silver",
+        "Glacier",
+        "Burgundy"
+      ],
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "storage_tiers": [
+      {
+        "storage": "256GB",
+        "priceAUD": 2299,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      },
+      {
+        "storage": "512GB",
+        "priceAUD": 2699,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      },
+      {
+        "storage": "1TB",
+        "priceAUD": 3499,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      },
+      {
+        "storage": "2TB",
+        "priceAUD": 4699,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-18-pro"
+      }
+    ],
+    "rear_cameras": {
+      "value": [
+        "48MP Fusion Main with variable aperture (f/1.48, f/1.8, f/2.8, f/4.0): 24 mm; also enables 12MP optical-quality 2x Telephoto: 48 mm",
+        "48MP Fusion Ultra Wide: 13 mm, f/2.2, 120 degree field of view",
+        "48MP Fusion Telephoto: 100 mm (4x), f/2.8; also enables 12MP optical-quality 8x Telephoto: 200 mm, f/2.8"
+      ],
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "optical_zoom": {
+      "value": "8x optical-quality zoom in, 2x optical zoom out; 16x optical-quality zoom range; digital zoom up to 40x",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "front_camera": {
+      "value": "18MP Center Stage camera, f/1.9 aperture, autofocus with Focus Pixels",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "video_recording": {
+      "value": [
+        "4K Dolby Vision video recording at 24 fps, 25 fps, 30 fps, 60 fps, 100 fps (Fusion Main) or 120 fps (Fusion Main)",
+        "1080p Dolby Vision video recording at 25 fps, 30 fps, 60 fps or 120 fps (Fusion Main)",
+        "720p Dolby Vision video recording at 30 fps",
+        "Cinematic mode up to 4K Dolby Vision at 60 fps",
+        "Action mode up to 2.8K Dolby Vision at 60 fps",
+        "ProRes video recording up to 4K at 120 fps with external recording",
+        "Slo-mo video support for 1080p up to 240 fps and 4K Dolby Vision up to 120 fps (Fusion Main)",
+        "Video formats recorded: HEVC, H.264, ProRes and ProRes RAW"
+      ],
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "battery_video_playback": {
+      "value": "Up to 43 hours (streamed: up to 38 hours; typical use: up to 29 hours)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wired": {
+      "value": "USB-C; fast-charge-capable: up to 50% charge in around 15 minutes when using 60W-capable adapter or higher with Adjustable Voltage Supply (available separately)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wireless": {
+      "value": "MagSafe wireless charging up to 25W; Qi2 wireless charging up to 25W; up to 50% in 30 minutes with 35W adapter or higher paired with MagSafe Charger",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "water_dust": {
+      "value": "Rated IP68 (maximum depth of 6 metres for up to 30 minutes) under IEC standard 60529",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "five_g": {
+      "value": "5G (sub-6 GHz) with 4x4 MIMO; Gigabit LTE with 4x4 MIMO",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "wifi": {
+      "value": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "bluetooth": {
+      "value": "Bluetooth 6",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "sim": {
+      "value": "Dual SIM (nano-SIM and eSIM); Dual eSIM support",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "usb_c_port": {
+      "value": "USB-C connector with support for Charging, DisplayPort, USB 3 (up to 10 Gbps)",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "action_button": {
+      "value": "Action button listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "camera_control": {
+      "value": "Camera Control listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "face_id": {
+      "value": "Face ID, enabled by TrueDepth technology in the Center Stage front camera",
+      "source": "https://www.apple.com/au/iphone-18-pro/specs/",
+      "fetched": "2026-10-17"
+    },
+    "trade_in": null,
+    "applecare": null
+  },
+  {
+    "model": "iPhone Air",
+    "specs_page": "https://www.apple.com/au/iphone-air/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-iphone/iphone-air",
+    "screen_inches": {
+      "value": "6.5-inch (diagonal) all-screen OLED display",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "display_tech": {
+      "value": "Super Retina XDR display; 2736-by-1260-pixel resolution at 460 ppi",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "refresh_rate_promotion": {
+      "value": "ProMotion technology with adaptive refresh rates up to 120Hz",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "always_on": {
+      "value": "Always-On display",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dynamic_island": {
+      "value": "Dynamic Island",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "brightness": {
+      "value": "1,000 nits max brightness (typical); 1,600 nits peak brightness (HDR); 3,000 nits peak brightness (outdoor); 1 nit minimum brightness",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "chip": {
+      "value": "A19 Pro chip; 6-core CPU with 2 performance and 4 efficiency cores; 5-core GPU with Neural Accelerators; 16-core Neural Engine",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dimensions_mm": {
+      "value": "Width 74.7 mm, Height 156.2 mm, Depth 5.64 mm",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "weight_g": {
+      "value": "165 grams (5.82 ounces)",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "materials_frame": {
+      "value": "Titanium design; Ceramic Shield 2 front; Ceramic Shield back. Buy page: Case materials 'Titanium frame'",
+      "source": "https://www.apple.com/au/iphone-air/specs/ ; https://www.apple.com/au/shop/buy-iphone/iphone-air",
+      "fetched": "2026-10-17"
+    },
+    "colours": {
+      "value": [
+        "Space Black",
+        "Cloud White",
+        "Light Gold",
+        "Sky Blue"
+      ],
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "storage_tiers": [
+      {
+        "storage": "256GB",
+        "priceAUD": 1899,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-air"
+      },
+      {
+        "storage": "512GB",
+        "priceAUD": 2299,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-air"
+      },
+      {
+        "storage": "1TB",
+        "priceAUD": 3099,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-air"
+      }
+    ],
+    "rear_cameras": {
+      "value": [
+        "48MP Fusion camera system: 48MP Fusion Main: 26 mm, f/1.6, sensor-shift OIS; also enables 12MP optical-quality 2x Telephoto: 52 mm, f/1.6"
+      ],
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "optical_zoom": {
+      "value": "Spec page: digital zoom up to 10x (no optical range line). Buy page: 'Optical zoom options 1x, 2x'",
+      "source": "https://www.apple.com/au/iphone-air/specs/ ; https://www.apple.com/au/shop/buy-iphone/iphone-air",
+      "fetched": "2026-10-17"
+    },
+    "front_camera": {
+      "value": "18MP Center Stage camera, f/1.9 aperture, autofocus with Focus Pixels",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "video_recording": {
+      "value": [
+        "4K Dolby Vision video recording at 24 fps, 25 fps, 30 fps or 60 fps",
+        "1080p Dolby Vision video recording at 25 fps, 30 fps or 60 fps",
+        "720p Dolby Vision video recording at 30 fps",
+        "Action mode up to 2.8K Dolby Vision at 60 fps",
+        "Slo-mo video support for 1080p at 120 fps or 240 fps",
+        "Video formats recorded: HEVC and H.264"
+      ],
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "battery_video_playback": {
+      "value": "Up to 27 hours (streamed: up to 22 hours); with iPhone Air MagSafe Battery: up to 40 hours (streamed: up to 35 hours)",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wired": {
+      "value": "USB-C; fast-charge-capable: up to 50% charge in 30 minutes with 20W adapter or higher (available separately)",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wireless": {
+      "value": "MagSafe wireless charging up to 20W; Qi2 wireless charging up to 20W; 30W adapter or higher paired with MagSafe Charger for 50% in 30 minutes",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "water_dust": {
+      "value": "Rated IP68 (maximum depth of 6 metres for up to 30 minutes) under IEC standard 60529",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "five_g": {
+      "value": "5G (sub-6 GHz) with 4x4 MIMO; Gigabit LTE with 4x4 MIMO",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "wifi": {
+      "value": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "bluetooth": {
+      "value": "Bluetooth 6",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "sim": {
+      "value": "Dual eSIM (two active eSIMs; stores eight or more eSIMs); not compatible with physical SIM cards",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "usb_c_port": {
+      "value": "USB-C connector with support for Charging, USB 2 (up to 480 Mbps)",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "action_button": {
+      "value": "Action button listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "camera_control": {
+      "value": "Camera Control listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "face_id": {
+      "value": "Face ID, enabled by TrueDepth technology in the Center Stage front camera",
+      "source": "https://www.apple.com/au/iphone-air/specs/",
+      "fetched": "2026-10-17"
+    },
+    "trade_in": null,
+    "applecare": null
+  },
+  {
+    "model": "iPhone 17",
+    "specs_page": "https://www.apple.com/au/iphone-17/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-iphone/iphone-17",
+    "screen_inches": {
+      "value": "6.3-inch (diagonal) all-screen OLED display",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "display_tech": {
+      "value": "Super Retina XDR display; 2622-by-1206-pixel resolution at 460 ppi",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "refresh_rate_promotion": {
+      "value": "ProMotion technology with adaptive refresh rates up to 120Hz",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "always_on": {
+      "value": "Always-On display",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dynamic_island": {
+      "value": "Dynamic Island",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "brightness": {
+      "value": "1,000 nits max brightness (typical); 1,600 nits peak brightness (HDR); 3,000 nits peak brightness (outdoor); 1 nit minimum brightness",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "chip": {
+      "value": "A19 chip; 6-core CPU with 2 performance and 4 efficiency cores; 5-core GPU with Neural Accelerators; 16-core Neural Engine",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dimensions_mm": {
+      "value": "Width 71.5 mm, Height 149.6 mm, Depth 7.95 mm",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "weight_g": {
+      "value": "177 grams (6.24 ounces)",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "materials_frame": {
+      "value": "Aluminium design; Ceramic Shield 2 front; Colour-infused glass back (Black, Mist Blue, Sage, Lavender)",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "colours": {
+      "value": [
+        "Black",
+        "White",
+        "Mist Blue",
+        "Sage",
+        "Lavender"
+      ],
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "storage_tiers": [
+      {
+        "storage": "256GB",
+        "priceAUD": 1549,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-17"
+      },
+      {
+        "storage": "512GB",
+        "priceAUD": 1949,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-17"
+      }
+    ],
+    "rear_cameras": {
+      "value": [
+        "48MP Fusion Main: 26 mm, f/1.6, sensor-shift OIS; also enables 12MP optical-quality 2x Telephoto: 52 mm, f/1.6",
+        "48MP Fusion Ultra Wide: 13 mm, f/2.2, 120 degree field of view"
+      ],
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "optical_zoom": {
+      "value": "2x optical zoom in, 2x optical zoom out; 4x optical zoom range; digital zoom up to 10x",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "front_camera": {
+      "value": "18MP Center Stage camera, f/1.9 aperture, autofocus with Focus Pixels",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "video_recording": {
+      "value": [
+        "4K Dolby Vision video recording at 24 fps, 25 fps, 30 fps or 60 fps",
+        "1080p Dolby Vision video recording at 25 fps, 30 fps or 60 fps",
+        "720p Dolby Vision video recording at 30 fps",
+        "Cinematic mode up to 4K Dolby Vision at 30 fps",
+        "Action mode up to 2.8K Dolby Vision at 60 fps",
+        "Slo-mo video support for 1080p at 120 fps or 240 fps",
+        "Video formats recorded: HEVC and H.264"
+      ],
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "battery_video_playback": {
+      "value": "Up to 30 hours (streamed: up to 27 hours)",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wired": {
+      "value": "USB-C; fast-charge-capable: up to 50% charge in 20 minutes with 40W adapter or higher (available separately)",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wireless": {
+      "value": "MagSafe wireless charging up to 25W; Qi2 wireless charging up to 25W; 30W adapter or higher paired with MagSafe Charger for 50% in 30 minutes",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "water_dust": {
+      "value": "Rated IP68 (maximum depth of 6 metres for up to 30 minutes) under IEC standard 60529",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "five_g": {
+      "value": "5G (sub-6 GHz) with 4x4 MIMO; Gigabit LTE with 4x4 MIMO",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "wifi": {
+      "value": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "bluetooth": {
+      "value": "Bluetooth 6",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "sim": {
+      "value": "Dual SIM (nano-SIM and eSIM); Dual eSIM support",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "usb_c_port": {
+      "value": "USB-C connector with support for Charging, DisplayPort, USB 2 (up to 480 Mbps)",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "action_button": {
+      "value": "Action button listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "camera_control": {
+      "value": "Camera Control listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "face_id": {
+      "value": "Face ID, enabled by TrueDepth technology in the Center Stage front camera",
+      "source": "https://www.apple.com/au/iphone-17/specs/",
+      "fetched": "2026-10-17"
+    },
+    "trade_in": null,
+    "applecare": null
+  },
+  {
+    "model": "iPhone 17e",
+    "specs_page": "https://www.apple.com/au/iphone-17e/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-iphone/iphone-17e",
+    "screen_inches": {
+      "value": "6.1-inch (diagonal) all-screen OLED display",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "display_tech": {
+      "value": "Super Retina XDR display; 2532-by-1170-pixel resolution at 460 ppi",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "refresh_rate_promotion": {
+      "value": "Buy page card: '— No ProMotion technology'",
+      "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+      "fetched": "2026-10-17"
+    },
+    "always_on": {
+      "value": "Buy page card: '— No Always-On display'",
+      "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+      "fetched": "2026-10-17"
+    },
+    "dynamic_island": {
+      "value": "Buy page card: '— No Dynamic Island'",
+      "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+      "fetched": "2026-10-17"
+    },
+    "brightness": {
+      "value": "800 nits max brightness (typical); 1,200 nits peak brightness (HDR)",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "chip": {
+      "value": "A19 chip; 6-core CPU with 2 performance and 4 efficiency cores; 4-core GPU with Neural Accelerators; 16-core Neural Engine",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dimensions_mm": {
+      "value": "Width 71.5 mm, Height 146.7 mm, Depth 7.80 mm",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "weight_g": {
+      "value": "170 grams (6.00 ounces)",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "materials_frame": {
+      "value": "Aluminium design; Ceramic Shield 2 front; Glass back",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "colours": {
+      "value": [
+        "Black",
+        "White",
+        "Soft Pink"
+      ],
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "storage_tiers": [
+      {
+        "storage": "256GB",
+        "priceAUD": 1149,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-17e"
+      },
+      {
+        "storage": "512GB",
+        "priceAUD": 1549,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-17e"
+      }
+    ],
+    "rear_cameras": {
+      "value": [
+        "48MP Fusion camera system: 48MP Fusion Main: 26 mm, f/1.6, optical image stabilisation; also enables 12MP 2x Telephoto: 52 mm, f/1.6"
+      ],
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "optical_zoom": {
+      "value": "Spec page: digital zoom up to 10x (no optical range line). Buy page: 'Optical zoom options 1x, 2x'",
+      "source": "https://www.apple.com/au/iphone-17e/specs/ ; https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+      "fetched": "2026-10-17"
+    },
+    "front_camera": {
+      "value": "12MP TrueDepth camera, f/1.9 aperture, autofocus with Focus Pixels",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "video_recording": {
+      "value": [
+        "4K Dolby Vision video recording at 24 fps, 25 fps, 30 fps or 60 fps",
+        "1080p Dolby Vision video recording at 25 fps, 30 fps or 60 fps",
+        "720p Dolby Vision video recording at 30 fps",
+        "Slo-mo video support for 1080p at 120 fps or 240 fps",
+        "Video formats recorded: HEVC and H.264"
+      ],
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "battery_video_playback": {
+      "value": "Up to 26 hours (streamed: up to 21 hours)",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wired": {
+      "value": "USB-C; fast-charge-capable: up to 50% charge in 30 minutes with 20W adapter or higher (available separately)",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wireless": {
+      "value": "MagSafe wireless charging up to 15W; Qi2 wireless charging up to 15W",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "water_dust": {
+      "value": "Rated IP68 (maximum depth of 6 metres for up to 30 minutes) under IEC standard 60529",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "five_g": {
+      "value": "5G (sub-6 GHz) with 4x4 MIMO; Gigabit LTE with 4x4 MIMO",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "wifi": {
+      "value": "Wi-Fi 6 (802.11ax) with 2x2 MIMO",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "bluetooth": {
+      "value": "Bluetooth 5.3",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "sim": {
+      "value": "Dual SIM (nano-SIM and eSIM); Dual eSIM support",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "usb_c_port": {
+      "value": "USB-C connector with support for Charging, USB 2 (up to 480 Mbps)",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "action_button": {
+      "value": "Action button listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "camera_control": {
+      "value": "Buy page card: '— No Camera Control for faster access to photo and video tools'; not in spec page button list",
+      "source": "https://www.apple.com/au/shop/buy-iphone/iphone-duo",
+      "fetched": "2026-10-17"
+    },
+    "face_id": {
+      "value": "Face ID, enabled by TrueDepth camera for facial recognition",
+      "source": "https://www.apple.com/au/iphone-17e/specs/",
+      "fetched": "2026-10-17"
+    },
+    "trade_in": null,
+    "applecare": null
+  },
+  {
+    "model": "iPhone 16",
+    "specs_page": "https://www.apple.com/au/iphone-16/specs/",
+    "buy_page": "https://www.apple.com/au/shop/buy-iphone/iphone-16",
+    "screen_inches": {
+      "value": "6.1-inch (diagonal) all-screen OLED display",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "display_tech": {
+      "value": "Super Retina XDR display; 2556-by-1179-pixel resolution at 460 ppi",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "refresh_rate_promotion": null,
+    "always_on": null,
+    "dynamic_island": {
+      "value": "Dynamic Island",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "brightness": {
+      "value": "1,000 nits max brightness (typical); 1,600 nits peak brightness (HDR); 2,000 nits peak brightness (outdoor); 1 nit minimum brightness",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "chip": {
+      "value": "A18 chip; 6-core CPU with 2 performance and 4 efficiency cores; 5-core GPU; 16-core Neural Engine",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "dimensions_mm": {
+      "value": "Width 71.6 mm, Height 147.6 mm, Depth 7.80 mm",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "weight_g": {
+      "value": "170 grams (6.00 ounces)",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "materials_frame": {
+      "value": "Aluminium design; Ceramic Shield front; Colour-infused glass back (Black, Pink, Teal, Ultramarine)",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "colours": {
+      "value": [
+        "Black",
+        "White",
+        "Pink",
+        "Teal",
+        "Ultramarine"
+      ],
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "storage_tiers": [
+      {
+        "storage": "128GB",
+        "priceAUD": 1349,
+        "source": "https://www.apple.com/au/shop/buy-iphone/iphone-16"
+      }
+    ],
+    "rear_cameras": {
+      "value": [
+        "48MP Fusion Main: 26 mm, f/1.6, sensor-shift OIS; also enables 12MP 2x Telephoto: 52 mm, f/1.6",
+        "12MP Ultra Wide: 13 mm, f/2.2, 120 degree field of view"
+      ],
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "optical_zoom": {
+      "value": "2x optical zoom in, 2x optical zoom out; 4x optical zoom range; digital zoom up to 10x",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "front_camera": {
+      "value": "TrueDepth Camera: 12MP camera, f/1.9 aperture, autofocus with Focus Pixels",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "video_recording": {
+      "value": [
+        "4K Dolby Vision video recording at 24 fps, 25 fps, 30 fps or 60 fps",
+        "1080p Dolby Vision video recording at 25 fps, 30 fps or 60 fps",
+        "720p Dolby Vision video recording at 30 fps",
+        "Cinematic mode up to 4K Dolby Vision at 30 fps",
+        "Action mode up to 2.8K Dolby Vision at 60 fps",
+        "Slo-mo video support for 1080p at 120 fps or 240 fps",
+        "Video formats recorded: HEVC and H.264"
+      ],
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "battery_video_playback": {
+      "value": "Up to 22 hours (streamed: up to 18 hours; audio playback: up to 80 hours)",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wired": {
+      "value": "USB-C; fast-charge-capable: up to 50% charge in 30 minutes with 20W adapter or higher (available separately)",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "charging_wireless": {
+      "value": "MagSafe wireless charging up to 25W; Qi2 wireless charging up to 25W; 30W adapter or higher paired with MagSafe Charger for 50% in 30 minutes",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "water_dust": {
+      "value": "Rated IP68 (maximum depth of 6 metres for up to 30 minutes) under IEC standard 60529",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "five_g": {
+      "value": "5G (sub-6 GHz) with 4x4 MIMO; Gigabit LTE with 4x4 MIMO",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "wifi": {
+      "value": "Wi-Fi 7 (802.11be) with 2x2 MIMO",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "bluetooth": {
+      "value": "Bluetooth 5.3",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "sim": {
+      "value": "Dual SIM (nano-SIM and eSIM); Dual eSIM support",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "usb_c_port": {
+      "value": "USB-C connector with support for Charging, DisplayPort, USB 2 (up to 480 Mbps)",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "action_button": {
+      "value": "Action button listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "camera_control": {
+      "value": "Camera Control listed under External Buttons and Connectors",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "face_id": {
+      "value": "Face ID, enabled by the TrueDepth camera for facial recognition",
+      "source": "https://www.apple.com/au/iphone-16/specs/",
+      "fetched": "2026-10-17"
+    },
+    "trade_in": {
+      "value": "Get A$60 - A$1,595 off an iPhone 16 when you trade in an iPhone X or newer",
+      "source": "https://www.apple.com/au/shop/buy-iphone/iphone-16",
+      "fetched": "2026-10-17"
+    },
+    "applecare": null
+  }
+]
