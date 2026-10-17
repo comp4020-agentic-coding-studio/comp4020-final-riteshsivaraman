@@ -16,6 +16,12 @@ Crit 10 narrates "who did what" from `flyctl logs`; until now only "listening on
 
 Open: role is self-chosen (`DEV_ROLE_SWITCH`), decide before the crit whether to back it. Not yet run against the deployed app: do `flyctl logs --no-tail` after the next deploy. Throttled-connection check not done.
 
+## Conversation model, client trial: new engine inside the real store (2026-10-18)
+
+Ritesh: "also work on a very simple port of the conversation model to the actual store simulation UI. we can fix this later if required." `7d7a577`: `src/client/src/TalkPhone.tsx` runs `src/shared/talk`'s scene/npc engine in plain React state inside the real 3D store, triggered by a temporary `T` key (not `E`, so it never touches the real `talk_start` flow) when `net.hint` is the phones specialist. No socket, no SQLite, no events row — same scope as `poc/talk/`, just mounted in the HUD instead of a bare page. Verified live in a running dev instance (forced `net.hint`, played several real turns including the budget question narrowing the pool to the iPhone 17e); Esc closes cleanly, HUD unaffected.
+
+Deferred, matching `docs/conversation-model/README.md`'s existing "Not done" list: event-log wiring, checkout handoff, a real trigger UX, removing the temporary keybind. Ran alongside two other agents working in `src/shared/talk/`+docs (laptop scene) and `src/server/`+ADRs (crit 10 logging) tonight; touched neither.
+
 ## Conversation model: phone scene built, documented (2026-10-18)
 
 All six steps below landed (`687bafb` to `2f3c2f2`), then play-testing and two automated review passes (`32878f7` to `417f949`). Everything is in `docs/conversation-model/README.md` (start there). Next: Ritesh approves the POC, then the ADR, then the next scenes (`conversation-types.md`).
