@@ -337,3 +337,24 @@ invariants somebody thought to write, and reading real transcripts is how the
 missing ones turn up. Two new specs now reproduce it (they go red on seeds 8
 and 9 with the old rule restored), and the habit going forward is to add the
 spec before the fix.
+
+## An automated reviewer on fresh seeds caught problems my own fixes introduced, and it needed checking before I trusted it
+
+[`1be68cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/1be68cf),
+[`c6b9987`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/c6b9987)
+
+Ritesh suggested automating what he had been doing by hand: generate many
+NPC-vs-NPC conversations with the menus logged, and have a Haiku agent read
+them. The first pass (40 conversations) reported 38 patterns; I spot-checked
+five against the transcripts and all held, rejected three as already-decided,
+and fixed the rest. The second pass, on different seeds with a list of what
+was decided, reported 25 patterns and one regression, and two of its three
+blockers were things I had just introduced: my "of the ones we've been looking
+at" wording was a false claim when nothing had been narrowed, and my fix for
+"it" had left a phone that elimination alone had reduced to one being
+confirmed as though the customer had chosen it. Lesson (week 9: a fresh-context
+reviewer beats the writer; and week 5: do not trust a report you have not
+checked): the reviewer is cheap and finds what the writer cannot see, but it
+is noisy, so every claim gets a spot-check and every fix gets re-reviewed on
+seeds it has not seen. The review reports and the specs that pin each
+finding are in the repo.
