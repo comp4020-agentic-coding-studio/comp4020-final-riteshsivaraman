@@ -128,8 +128,10 @@ Keep `WORKLOG.md` current in the repo (not `~/.claude/plans/`, which is
 local-only and won't survive a fresh session or machine). Append to
 `LEARNINGS.md` as Ritesh learns something about prompting or working with AI
 coding assistants — not stack gotchas; that's what the file tracked before
-this was flagged and is being redirected (see the file's own header). Cite
-the commit(s) each entry is about. Every reply says whether that turn added a
+this was flagged and is being redirected (see the file's own header). Every
+entry must tie to a named lesson from a COMP4020 lecture (say which week and
+what it said); if it doesn't, it isn't an entry. Cite the commit(s) each
+entry is about. Every reply says whether that turn added a
 LEARNINGS.md entry. Log cuts as they happen in `CUTS.md` (what, why, when)
 rather than reconstructing them from memory later — a cut made under
 deadline pressure is real process evidence, not just a loose end.
@@ -200,8 +202,9 @@ report what was opened. **Any URL or page opens in Safari, never Brave or the
 default browser:** `open -a Safari <url>`, not a bare `open <url>`.
 
 End every response with one or two lessons from the COMP4020 lecture notes
-relevant to whatever comes next — not necessarily the most recent lecture,
-whichever week's content actually applies (e.g. drawing on persistence or
+relevant to whatever comes next, each tied to a specific lesson a lecture
+taught, preferably from the latest weeks (8 to 10); an earlier week only when
+it fits better (e.g. drawing on persistence or
 decision-record guidance from an earlier week while building a later
 feature). Fetch live via the `comp4020:handbook` skill rather than recalling
 from memory.
