@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AdditiveBlending,
   CanvasTexture,
@@ -10,6 +10,8 @@ import {
   Object3D,
   RepeatWrapping,
   SRGBColorSpace,
+  type Texture,
+  TextureLoader,
 } from "three";
 import { NPCS, isStaff, npcPose } from "../../../shared/npcs.ts";
 import { CEILING, FLOOR } from "../../../shared/protocol.ts";
@@ -184,6 +186,59 @@ export function ceilingTexture(w: number, d: number): CanvasTexture {
   return tex;
 }
 
+// A generated photograph on a panel (Ritesh, 2026-10-19: "replace all handmade
+// graphics posters with actual stuff using the image generation tool"). Files
+// live in public/posters, made with the course image proxy from prompts that
+// ask for no text, logos or brand names. `fx`/`fy` say which part of the
+// picture to keep when it is cropped to the panel's shape.
+export interface Photo {
+  src: string;
+  fx?: number;
+  fy?: number;
+}
+
+const PHOTO = (name: string, fx = 0.5, fy = 0.5): Photo => ({ src: `/posters/${name}.webp`, fx, fy });
+// by wall and position in plan.ts's SIDE_WALL
+export const WALL_PHOTOS: Record<string, Photo> = {
+  "+x:0": PHOTO("phone-hero", 0.7),
+  "+x:1": PHOTO("phone-hand", 0.62),
+  "+x:2": PHOTO("card"),
+  "-x:0": PHOTO("phone-backs", 0.55),
+  "-x:1": PHOTO("dark-banner", 0.5),
+  "-x:2": PHOTO("laptop", 0.72),
+};
+export const BACK_WALL_PHOTOS: Photo[] = [PHOTO("repair-bench", 0.4), PHOTO("shelf-audio", 0.5), PHOTO("gradient")];
+
+export function usePhoto(photo: Photo | undefined, aspect: number): Texture | null {
+  const [tex, setTex] = useState<Texture | null>(null);
+  useEffect(() => {
+    if (!photo) return;
+    let dead = false;
+    new TextureLoader().load(photo.src, (t) => {
+      if (dead) return;
+      t.colorSpace = SRGBColorSpace;
+      t.anisotropy = 4;
+      const img = t.image as { width: number; height: number };
+      const imgAspect = img.width / img.height;
+      // cover: fill the panel and crop the rest, around (fx, fy)
+      if (aspect < imgAspect) {
+        const r = aspect / imgAspect;
+        t.repeat.set(r, 1);
+        t.offset.set((1 - r) * (photo.fx ?? 0.5), 0);
+      } else {
+        const r = imgAspect / aspect;
+        t.repeat.set(1, r);
+        t.offset.set(0, (1 - r) * (photo.fy ?? 0.5));
+      }
+      setTex(t);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [photo?.src, photo?.fx, photo?.fy, aspect]);
+  return photo ? tex : null;
+}
+
 export function Poster({
   position,
   rotY,
@@ -191,6 +246,7 @@ export function Poster({
   dark = false,
   w = 2.2,
   h = 2,
+  photo,
 }: {
   position: [number, number, number];
   rotY: number;
@@ -198,8 +254,11 @@ export function Poster({
   dark?: boolean;
   w?: number;
   h?: number;
+  photo?: Photo;
 }) {
-  const map = useMemo(() => posterTexture(pair[0], pair[1], dark), [pair, dark]);
+  const drawn = useMemo(() => posterTexture(pair[0], pair[1], dark), [pair, dark]);
+  const shot = usePhoto(photo, w / h);
+  const map = shot ?? drawn;
   return (
     <group position={position} rotation={[0, rotY, 0]}>
       <mesh>
@@ -408,14 +467,18 @@ export function LightBox({
   z,
   w,
   kind,
+  photo,
 }: {
   side: -1 | 1;
   z: number;
   w: number;
   kind: "phones" | "laptops" | "card";
+  photo?: Photo;
 }) {
-  const map = useMemo(() => lightboxTexture(kind), [kind]);
+  const drawn = useMemo(() => lightboxTexture(kind), [kind]);
   const h = LIGHTBOX_H;
+  const shot = usePhoto(photo, (w * 0.92) / (h * 0.78));
+  const map = shot ?? drawn;
   const y = LIGHTBOX_BOTTOM + h / 2;
   return (
     <group position={[side * (FACE_X - 0.03), y, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
@@ -474,7 +537,7 @@ export function WallSections() {
         <group key={side}>
           {SIDE_WALL[side === 1 ? "+x" : "-x"].map((f, i) => {
             if (f.kind === "lightbox") {
-              return <LightBox key={i} side={side} z={f.z} w={f.w} kind={f.art} />;
+              return <LightBox key={i} side={side} z={f.z} w={f.w} kind={f.art} photo={WALL_PHOTOS[`${side === 1 ? "+x" : "-x"}:${i}`]} />;
             }
             if (f.kind === "display") {
               return (
@@ -486,6 +549,7 @@ export function WallSections() {
                   dark
                   w={f.w}
                   h={f.h}
+                  photo={WALL_PHOTOS[`${side === 1 ? "+x" : "-x"}:${i}`]}
                 />
               );
             }
@@ -794,6 +858,7 @@ export function ShopShell() {
           dark
           w={BACK_WALL.screenW}
           h={BACK_WALL.screenH}
+          photo={BACK_WALL_PHOTOS[i]}
         />
       ))}
       {BACK_WALL.markX.map((x) => (
