@@ -81,6 +81,11 @@ function Hud() {
             ))}
         </div>
       )}
+      {live.waitingAt && !live.talking && (
+        <div className="escort-banner">
+          Wait near {live.waitingAt.label}. {live.waitingAt.who} will come and find you.
+        </div>
+      )}
       {live.escort && (
         <div className="escort-banner">
           {live.escort.text}

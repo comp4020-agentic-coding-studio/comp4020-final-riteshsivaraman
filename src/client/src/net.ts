@@ -102,6 +102,11 @@ class Net {
   hint: { id: string; name: string; intentId?: string } | null = null;
   // intent to talk (server-authoritative): who has shown intent to whom
   intents = new Map<string, IntentView>();
+  // told to wait somewhere for someone to fetch you, if you are
+  get waitingAt(): { x: number; z: number; label: string; who: string } | null {
+    for (const i of this.intents.values()) if (i.state === "held" && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName };
+    return null;
+  }
   // a member of staff is walking you somewhere (to a demo device, to the till)
   escort: { id: string; kind: "demo" | "till"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } } | null = null;
   // the conversation as the scene should treat it: while you are being walked

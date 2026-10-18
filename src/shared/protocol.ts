@@ -90,7 +90,9 @@ export interface IntentView {
   toId: string;
   toName: string;
   reason: "greet" | "help" | "ask" | "pay";
-  state: "queued" | "open";
+  // held: told to wait near `wait` and not yet being fetched
+  state: "queued" | "open" | "held";
+  wait?: { x: number; z: number; label: string };
   since: number; // server time
 }
 

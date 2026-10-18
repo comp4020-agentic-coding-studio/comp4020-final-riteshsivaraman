@@ -12,7 +12,7 @@ import {
   type StepResult,
   type World,
 } from "../shared/conversation.ts";
-import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor } from "../shared/duty.ts";
+import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { NPCS, npcPose } from "../shared/npcs.ts";
 import type { CustomerView, Engagement, Inspection, IntentView, ServerMessage, StaffTurnView, TurnView } from "../shared/protocol.ts";
 import { engagedMoment } from "../shared/engage.ts";
@@ -509,6 +509,8 @@ function tillEng(ctx: Ctx, script: ScriptId, npcId: string, customerId: string, 
 export const INTENT_BEAT_MS = 1000; // an NPC accepts this long after it arrives
 export const INTENT_GIVE_UP_MS = 30_000; // staff who showed intent leave after this long ignored
 const INTENT_CANCEL_DIST = 9; // metres the customer may wander from where they asked
+const WAIT_RADIUS = 2.0; // metres: "at" the spot they were told to wait at
+const WAIT_LEAVE_DIST = 3.2; // beyond this the wait starts again
 
 interface IntentRow {
   id: string;
@@ -518,17 +520,22 @@ interface IntentRow {
   staff_id: string;
   staff_kind: "npc" | "visitor";
   reason: IntentView["reason"];
-  status: "queued" | "open" | "accepted" | "expired" | "cancelled";
+  status: "held" | "queued" | "open" | "accepted" | "expired" | "cancelled";
   created_at: number;
   opened_at: number | null;
   arrived_at: number | null;
   at_x: number | null;
   at_z: number | null;
   ended_at: number | null;
+  wait_x: number | null;
+  wait_z: number | null;
+  wait_label: string | null;
+  delay_ms: number | null;
+  wait_since: number | null;
 }
 
 const liveIntentOf = (db: Database.Database, customerId: string, staffId: string): IntentRow | undefined =>
-  db.prepare("SELECT * FROM intents WHERE customer_id = ? AND staff_id = ? AND status IN ('queued','open') LIMIT 1").get(customerId, staffId) as IntentRow | undefined;
+  db.prepare("SELECT * FROM intents WHERE customer_id = ? AND staff_id = ? AND status IN ('held','queued','open') LIMIT 1").get(customerId, staffId) as IntentRow | undefined;
 
 function intentView(ctx: Ctx, r: IntentRow): IntentView {
   return {
@@ -538,13 +545,14 @@ function intentView(ctx: Ctx, r: IntentRow): IntentView {
     toId: r.to_id,
     toName: nameOf(ctx, r.to_id),
     reason: r.reason,
-    state: r.status === "queued" ? "queued" : "open",
+    state: r.status === "held" ? "held" : r.status === "queued" ? "queued" : "open",
+    ...(r.status === "held" && r.wait_x !== null && r.wait_z !== null ? { wait: { x: r.wait_x, z: r.wait_z, label: r.wait_label ?? "there" } } : {}),
     since: r.opened_at ?? r.created_at,
   };
 }
 
 export function intentViews(ctx: Ctx): IntentView[] {
-  return (ctx.db.prepare("SELECT * FROM intents WHERE status IN ('queued','open') ORDER BY created_at, rowid").all() as IntentRow[]).map((r) => intentView(ctx, r));
+  return (ctx.db.prepare("SELECT * FROM intents WHERE status IN ('held','queued','open') ORDER BY created_at, rowid").all() as IntentRow[]).map((r) => intentView(ctx, r));
 }
 
 const intentMessage = (ctx: Ctx, r: IntentRow): Outgoing => ({ to: "all", message: { type: "intent", ...intentView(ctx, r) } });
@@ -578,26 +586,29 @@ function endIntent(ctx: Ctx, r: IntentRow, why: "accepted" | "expired" | "cancel
 }
 
 function endLiveIntents(ctx: Ctx, match: (r: IntentRow) => boolean, why: "accepted" | "cancelled"): Outgoing[] {
-  const rows = (ctx.db.prepare("SELECT * FROM intents WHERE status IN ('queued','open')").all() as IntentRow[]).filter(match);
+  const rows = (ctx.db.prepare("SELECT * FROM intents WHERE status IN ('held','queued','open')").all() as IntentRow[]).filter(match);
   return rows.flatMap((r) => endIntent(ctx, r, why, "superseded"));
 }
 
 // Shows intent to talk. `fromId` is whoever initiated (the customer, or the
 // staff member coming to find them); the other end is whoever must accept.
-function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: string; staffKind: "npc" | "visitor"; reason: IntentView["reason"] }): Outgoing[] {
+function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: string; staffKind: "npc" | "visitor"; reason: IntentView["reason"]; hold?: { x: number; z: number; label: string } }): Outgoing[] {
   if (liveIntentOf(ctx.db, p.customerId, p.staffId)) return [];
   const at = ctx.position(p.customerId) ?? { x: 0, z: 0 };
-  const busy = staffBusy(ctx, p.staffId, p.staffKind);
+  const held = !!p.hold;
+  const busy = !held && staffBusy(ctx, p.staffId, p.staffKind);
   const id = randomUUID();
   const toId = p.fromId === p.customerId ? p.staffId : p.customerId;
-  const status = busy ? "queued" : "open";
+  const status = held ? "held" : busy ? "queued" : "open";
+  // how long they take to come once you are there: a few seconds, not instant
+  const delay = held ? 3000 + Math.floor(Math.random() * 5000) : null;
   ctx.db
-    .prepare("INSERT INTO intents (id, from_id, to_id, customer_id, staff_id, staff_kind, reason, status, created_at, opened_at, at_x, at_z) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(id, p.fromId, toId, p.customerId, p.staffId, p.staffKind, p.reason, status, ctx.now, busy ? null : ctx.now, at.x, at.z);
+    .prepare("INSERT INTO intents (id, from_id, to_id, customer_id, staff_id, staff_kind, reason, status, created_at, opened_at, at_x, at_z, wait_x, wait_z, wait_label, delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(id, p.fromId, toId, p.customerId, p.staffId, p.staffKind, p.reason, status, ctx.now, busy || held ? null : ctx.now, at.x, at.z, p.hold?.x ?? null, p.hold?.z ?? null, p.hold?.label ?? null, delay);
   const row = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(id) as IntentRow;
-  log(ctx, p.customerId, "intent_shown", { intentId: id, from: p.fromId, to: toId, reason: p.reason, queued: busy });
+  log(ctx, p.customerId, "intent_shown", { intentId: id, from: p.fromId, to: toId, reason: p.reason, queued: busy, held });
   const out: Outgoing[] = [intentMessage(ctx, row)];
-  if (!busy) out.push(...beginApproach(row));
+  if (!busy && !held) out.push(...beginApproach(row));
   else if (p.fromId === p.customerId) out.push(notice(p.customerId, `${nameOf(ctx, p.staffId)} is with someone. They will come to you as soon as they are free.`));
   return out;
 }
@@ -641,7 +652,7 @@ function acceptIntent(ctx: Ctx, r: IntentRow): Outgoing[] {
 // ignored for long enough give up, and anyone who has left cancels theirs.
 export function settleIntents(ctx: Ctx): Outgoing[] {
   const out: Outgoing[] = [];
-  const rows = ctx.db.prepare("SELECT * FROM intents WHERE status IN ('queued','open') ORDER BY created_at, rowid").all() as IntentRow[];
+  const rows = ctx.db.prepare("SELECT * FROM intents WHERE status IN ('held','queued','open') ORDER BY created_at, rowid").all() as IntentRow[];
   for (const r0 of rows) {
     let r = r0;
     const cpos = ctx.position(r.customer_id);
@@ -649,6 +660,23 @@ export function settleIntents(ctx: Ctx): Outgoing[] {
     if (!cpos || !ctx.present.includes(r.customer_id) || staffGone) {
       out.push(...endIntent(ctx, r, "cancelled", staffGone ? "staff left" : "customer left"));
       continue;
+    }
+    if (r.status === "held") {
+      // told to wait at a spot: only once they are there, for a few seconds, does help come
+      const spot = { x: r.wait_x ?? cpos.x, z: r.wait_z ?? cpos.z };
+      const d = dist(cpos, spot);
+      if (d > WAIT_LEAVE_DIST) {
+        if (r.wait_since !== null) ctx.db.prepare("UPDATE intents SET wait_since = NULL WHERE id = ?").run(r.id); // wandered off: the wait starts again
+        continue;
+      }
+      if (d > WAIT_RADIUS) continue;
+      if (r.wait_since === null) {
+        ctx.db.prepare("UPDATE intents SET wait_since = ? WHERE id = ?").run(ctx.now, r.id);
+        continue;
+      }
+      if (ctx.now - r.wait_since < (r.delay_ms ?? 0)) continue;
+      ctx.db.prepare("UPDATE intents SET status = 'queued' WHERE id = ?").run(r.id);
+      r = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(r.id) as IntentRow;
     }
     if (r.status === "queued") {
       if (staffBusy(ctx, r.staff_id, r.staff_kind)) continue;
@@ -695,6 +723,7 @@ export function requestTalk(ctx: Ctx, customerId: string, withId: string): Outgo
 
 // The target of an intent presses E.
 function acceptIncoming(ctx: Ctx, acceptorId: string, r: IntentRow): Outgoing[] {
+  if (r.status === "held") return [notice(acceptorId, `${nameOf(ctx, r.from_id)} will fetch you once you are waiting at ${r.wait_label ?? "the spot"}.`)];
   if (r.status !== "open") return [notice(acceptorId, "They are with someone else; they will be with you as soon as they are free.")];
   if (r.to_id !== acceptorId) return [];
   const cpos = ctx.position(r.customer_id);
@@ -708,7 +737,7 @@ function acceptIncoming(ctx: Ctx, acceptorId: string, r: IntentRow): Outgoing[] 
 }
 
 export function acceptIntentById(ctx: Ctx, acceptorId: string, intentId: string): Outgoing[] {
-  const r = ctx.db.prepare("SELECT * FROM intents WHERE id = ? AND status IN ('queued','open')").get(intentId) as IntentRow | undefined;
+  const r = ctx.db.prepare("SELECT * FROM intents WHERE id = ? AND status IN ('held','queued','open')").get(intentId) as IntentRow | undefined;
   if (!r) return [notice(acceptorId, "They are not waiting for you any more.")];
   return acceptIncoming(ctx, acceptorId, r);
 }
@@ -723,7 +752,7 @@ function cancelIntentsOf(ctx: Ctx, visitorId: string): Outgoing[] {
 // busy one, the lightest load; an NPC of the post when no one holds it.
 function pickHelper(ctx: Ctx, post: string): { id: string; kind: "npc" | "visitor" } | null {
   const off = offDuty(ctx);
-  const load = (id: string): number => (ctx.db.prepare("SELECT COUNT(*) AS n FROM intents WHERE staff_id = ? AND status IN ('queued','open')").get(id) as { n: number }).n;
+  const load = (id: string): number => (ctx.db.prepare("SELECT COUNT(*) AS n FROM intents WHERE staff_id = ? AND status IN ('held','queued','open')").get(id) as { n: number }).n;
   const humans = ctx.employees.filter((e) => designationOfEmployee(e) === post).map((e) => ({ id: e.id, kind: "visitor" as const }));
   const npcs = Object.keys(NPC_DESIGNATION)
     .filter((id) => NPC_DESIGNATION[id] === post && !off.includes(id))
@@ -740,14 +769,17 @@ const pickHelperId = (ctx: Ctx, post: string): string | null => pickHelper(ctx, 
 
 // The customer needs `post`: a particular person is sent for them, who walks
 // over and shows intent (a human gets it as a mission).
-export function assignHelper(ctx: Ctx, customerId: string, post: string): { out: Outgoing[]; helperName: string | null } {
+export function assignHelper(ctx: Ctx, customerId: string, post: string): { out: Outgoing[]; helperName: string | null; waitLabel?: string | null } {
   if (!scriptFor(post)) return { out: [], helperName: null };
-  const existing = ctx.db.prepare("SELECT staff_id FROM intents WHERE customer_id = ? AND reason = 'help' AND status IN ('queued','open') LIMIT 1").get(customerId) as { staff_id: string } | undefined;
+  const existing = ctx.db.prepare("SELECT staff_id FROM intents WHERE customer_id = ? AND reason = 'help' AND status IN ('held','queued','open') LIMIT 1").get(customerId) as { staff_id: string } | undefined;
   if (existing) return { out: [], helperName: nameOf(ctx, existing.staff_id) };
   const helper = pickHelper(ctx, post);
   if (!helper) return { out: [], helperName: null };
-  const out = showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "help" });
-  return { out, helperName: nameOf(ctx, helper.id) };
+  // an NPC sent for you does not appear at once: you are told to wait near the
+  // area, and they come when you are there. A person walks themselves (a mission).
+  const hold = helper.kind === "npc" ? waitSpotFor(post) : null;
+  const out = showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "help", ...(hold ? { hold } : {}) });
+  return { out, helperName: nameOf(ctx, helper.id), waitLabel: hold?.label ?? null };
 }
 
 // ---- walking a customer somewhere (Ritesh, 2026-10-19) ----
@@ -1092,14 +1124,19 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
       log(ctx, row.customer_id, "help_requested", { needs: e.needs });
       const a = assignHelper(ctx, row.customer_id, e.needs);
       out.push(...a.out);
-      if (a.helperName) helper = a.helperName;
+      if (a.helperName) helper = a.waitLabel ? `${a.helperName}|${a.waitLabel}` : a.helperName;
     }
   }
   log(ctx, row.customer_id, "turn", { conversationId: row.id, from: from.node, choice: choiceId, to: r.state.node });
 
   const next: ConvData = { ...data, conv: r.state, awaiting: "customer", pending: undefined };
   saveConv(ctx, row, next, r.turn.ended);
-  const say = helper ? `Of course. ${helper} will come and find you. Have a look around while you wait.` : r.turn.say;
+  const [helperName, waitLabel] = (helper ?? "").split("|");
+  const say = helper
+    ? waitLabel
+      ? `Of course. Wait near ${waitLabel} and ${helperName} will come and find you.`
+      : `Of course. ${helperName} will come and find you. Have a look around while you wait.`
+    : r.turn.say;
   out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, r.turn.choices, r.turn.ended, "customer") } });
   if (r.turn.ended) {
     if (row.with_kind === "visitor") out.push({ to: row.with_id, message: { type: "notice", text: `${nameOf(ctx, row.customer_id)} is done with you.` } });

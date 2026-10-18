@@ -193,6 +193,15 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX escorts_customer ON escorts (customer_id, status);
   `,
+  // 9: a referral waits. "Wait near X and Theo will fetch you": the intent is
+  // 'held' until the customer has been at X for a randomised few seconds.
+  `
+  ALTER TABLE intents ADD COLUMN wait_x REAL;
+  ALTER TABLE intents ADD COLUMN wait_z REAL;
+  ALTER TABLE intents ADD COLUMN wait_label TEXT;
+  ALTER TABLE intents ADD COLUMN delay_ms INTEGER;
+  ALTER TABLE intents ADD COLUMN wait_since INTEGER;
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

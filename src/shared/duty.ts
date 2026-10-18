@@ -1,3 +1,6 @@
+import { NPCS, npcPose } from "./npcs.ts";
+import { resolveCollisions } from "./world.ts";
+
 // Who holds which post. Every NPC has a designation, and so does every
 // employee a user controls. While a person holds a post the NPC for it is off
 // duty; with two people on the same post, two NPCs of that post are (D35).
@@ -35,6 +38,18 @@ export function scriptFor(designation: string): "greeter" | "phones" | null {
   if (designation === "greeter") return "greeter";
   if (designation === "specialist:phones") return "phones";
   return null;
+}
+
+// Where a customer is told to wait for someone to fetch them: near the area
+// the post covers, clear of the furniture. A post without one is not asked to
+// wait (the helper comes straight away).
+export function waitSpotFor(post: string): { x: number; z: number; label: string } | null {
+  if (post !== "specialist:phones") return null;
+  const def = NPCS.find((n) => n.id === "spec-phones");
+  if (!def) return null;
+  const station = npcPose(def, 1000);
+  const p = resolveCollisions(station.x + 1.8, station.z);
+  return { x: p.x, z: p.z, label: "the phones area" };
 }
 
 // Every NPC is a named person, so "Theo will come and get you" is Theo and

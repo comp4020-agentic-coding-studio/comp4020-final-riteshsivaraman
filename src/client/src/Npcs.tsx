@@ -8,7 +8,7 @@ import { settledPeople } from "../../shared/people.ts";
 import { STORE_Y } from "../../shared/protocol.ts";
 import { Actor, type ActorState } from "./gfx/Actor.tsx";
 import { net } from "./net.ts";
-import { IntentBadge } from "./IntentBadge.tsx";
+import { NameFloat } from "./NameFloat.tsx";
 import { NPC_NAME } from "../../shared/duty.ts";
 
 // Staff and customers, drawn from the shared clock (see shared/npcs.ts and
@@ -82,13 +82,7 @@ export function Npcs() {
       {NPCS.map((n, i) => (
         <group key={n.id} visible={false}>
           <Actor id={n.id} shirt={n.colour} uniform={uniforms[i]} getState={() => states.current[i]} />
-          <Html position={[0, 2.05, 0]} center distanceFactor={7} style={{ pointerEvents: "none" }}>
-            <div className="name-float">
-              <b>{NPC_NAME[n.id] ?? n.id}</b>
-              <i>NPC</i>
-              <IntentBadge id={n.id} />
-            </div>
-          </Html>
+          <NameFloat id={n.id} name={NPC_NAME[n.id] ?? n.id} npc y={2.05} />
           {LABELS && (
             <Html position={[0, 2.35, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
               <div

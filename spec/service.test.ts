@@ -631,7 +631,7 @@ describe("intent to talk (Ritesh, 2026-10-19)", () => {
     expect(last(acceptIntentById(ctx(T), "e1", intent.id), "c1", "turn")).toMatchObject({ withId: "e1" });
   });
 
-  it("sends a named person for a customer who needs help, and the greeter says who", () => {
+  it("tells you to wait at a spot and sends a named person only once you are there, after a delay", () => {
     const g = npc("greeter-1");
     addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
     startTalk(ctx(), "c1", "greeter-1");
@@ -639,9 +639,39 @@ describe("intent to talk (Ritesh, 2026-10-19)", () => {
     chooseTurn(ctx(), "c1", id, "phone");
     const done = chooseTurn(ctx(), "c1", id, "help");
     const intent = last(done, "all", "intent")!;
-    expect(intent).toMatchObject({ fromId: "spec-phones", toId: "c1", fromName: "Theo", reason: "help" });
-    expect(last(done, "c1", "turn")?.say).toMatch(/Theo will come and find you/);
-    expect(last(done, "all", "engaged")).toMatchObject({ npcId: "spec-phones", pending: true });
+    expect(intent).toMatchObject({ fromId: "spec-phones", toId: "c1", fromName: "Theo", reason: "help", state: "held" });
+    expect(intent.wait?.label).toBe("the phones area");
+    expect(last(done, "c1", "turn")?.say).toMatch(/Wait near the phones area and Theo will come and find you/);
+    expect(last(done, "all", "engaged")).toBeUndefined(); // nobody walks over yet
+    // not at the spot: nothing happens, however long
+    closeTalk(ctx(), "c1");
+    expect(settleIntents(ctx(NOW + 60_000))).toEqual([]);
+    // at the spot: the wait starts, and Theo comes only after the delay (3 to 8 s)
+    positions.set("c1", { x: intent.wait!.x, z: intent.wait!.z });
+    expect(settleIntents(ctx(NOW + 61_000))).toEqual([]);
+    expect(last(settleIntents(ctx(NOW + 61_000 + 2900)), "all", "engaged")).toBeUndefined();
+    const came = settleIntents(ctx(NOW + 61_000 + 8100));
+    expect(last(came, "all", "engaged")).toMatchObject({ npcId: "spec-phones", visitorId: "c1", pending: true });
+    expect(last(came, "all", "intent")).toMatchObject({ state: "open" });
+  });
+
+  it("starts the wait again if you wander off the spot", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    startTalk(ctx(), "c1", "greeter-1");
+    const id = (db.prepare("SELECT id FROM conversations WHERE customer_id = 'c1'").get() as { id: string }).id;
+    chooseTurn(ctx(), "c1", id, "phone");
+    const intent = last(chooseTurn(ctx(), "c1", id, "help"), "all", "intent")!;
+    closeTalk(ctx(), "c1");
+    const spot = { x: intent.wait!.x, z: intent.wait!.z };
+    positions.set("c1", spot);
+    settleIntents(ctx(NOW + 1000)); // wait begins
+    positions.set("c1", { x: spot.x + 5, z: spot.z });
+    settleIntents(ctx(NOW + 5000)); // wandered off: reset
+    positions.set("c1", spot);
+    settleIntents(ctx(NOW + 6000)); // wait begins again
+    expect(last(settleIntents(ctx(NOW + 6000 + 2900)), "all", "engaged")).toBeUndefined();
+    expect(last(settleIntents(ctx(NOW + 6000 + 8100)), "all", "engaged")).toMatchObject({ npcId: "spec-phones" });
   });
 
   it("gives the mission to a person holding the post, not the NPC", () => {

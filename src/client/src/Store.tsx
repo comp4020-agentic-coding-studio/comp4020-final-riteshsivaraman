@@ -14,7 +14,7 @@ import { avoidPeople } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions, TABLE_H } from "../../shared/world.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
-import { IntentBadge } from "./IntentBadge.tsx";
+import { NameFloat } from "./NameFloat.tsx";
 import { TABLE_ASSIGNMENTS } from "../../shared/assignments.ts";
 import { productById } from "../../shared/catalogue.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
@@ -365,12 +365,7 @@ function Remotes() {
             }
             getState={() => speeds.current.get(r.info.id) ?? { walking: false, mode: "idle", mood: "neutral" }}
           />
-          <Html position={[0, 2.0, 0]} center distanceFactor={7} style={{ pointerEvents: "none" }}>
-            <div className="name-float player">
-              <b>{r.info.name}</b>
-              <IntentBadge id={r.info.id} />
-            </div>
-          </Html>
+          <NameFloat id={r.info.id} name={r.info.name} npc={false} y={2.0} />
         </group>
       ))}
     </group>
@@ -536,6 +531,25 @@ function EscortMarker() {
   );
 }
 
+// Where you were told to wait for someone to fetch you.
+function WaitMarker() {
+  const live = useNet();
+  const ref = useRef<Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const mat = ref.current.material as MeshBasicMaterial;
+    mat.opacity = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 3);
+  });
+  const w = live.waitingAt;
+  if (!w) return null;
+  return (
+    <mesh ref={ref} position={[w.x, STORE_Y + 0.02, w.z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.8, 0.95, 40]} />
+      <meshBasicMaterial color="#8cf0b4" transparent opacity={0.5} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
 function InspectMarkers() {
   const live = useNet();
   return (
@@ -604,6 +618,7 @@ export function Store() {
       <InspectMarkers />
       <DeviceHintGlow />
       <EscortMarker />
+      <WaitMarker />
       <Player />
     </Canvas>
   );
