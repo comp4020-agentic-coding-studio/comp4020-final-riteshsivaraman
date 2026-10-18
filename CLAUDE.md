@@ -127,9 +127,10 @@ the app itself. The repo's own docs are expected to say it's a COMP4020
 project. `.claude/agents/fiction-integrity-reviewer.md` runs this check.
 
 ## Keys never touch this repo
-Gemini key (D8, runtime AI with a fallback; boundary still open) and
-anything else secret goes in Fly secrets
-(`fly secrets set`), never in a file, never asked for in chat.
+The runtime-AI key (D8; OpenRouter now, `mise.local.toml`'s `OPENROUTER_API_KEY`,
+switched from Gemini after its free tier proved unusable) and anything else
+secret goes in Fly secrets (`fly secrets set`), never in a file, never asked
+for in chat.
 
 ## Session handoff
 Keep `WORKLOG.md` current in the repo (not `~/.claude/plans/`, which is
@@ -205,12 +206,11 @@ check — notice it and say so: propose turning it into a skill rather than
 quietly repeating the ad hoc version each time. Consistency here matters
 more than cleverness.
 
-## Teach, don't just report
-When reporting finished work, take the chance to actually explain how that
-part of the app works — the mechanism, not just the diff — since this is
-Ritesh's app to understand and defend at a crit, not just to have built. A
-status update that only says what changed is a missed opportunity if the
-underlying structure is new to him.
+## Reporting: teach, open what he has to read, close with a lecture lesson
+When reporting finished work, explain how that part of the app works — the
+mechanism, not just the diff — since this is Ritesh's app to understand and
+defend at a crit, not just to have built. A status update that only says what
+changed is a missed opportunity if the underlying structure is new to him.
 
 When a report's "what I need from you" list involves reading something (a
 file, a diff, a commit, a drawing, a running page), open all of it for him
@@ -223,15 +223,14 @@ default browser:** `open -a Safari <url>`, not a bare `open <url>`.
 End every response with one or two lessons from the COMP4020 lecture notes
 relevant to whatever comes next, each tied to a specific lesson a lecture
 taught, preferably from the latest weeks (8 to 10); an earlier week only when
-it fits better (e.g. drawing on persistence or
-decision-record guidance from an earlier week while building a later
-feature). Don't recall them from memory. The lectures are already summarised on this
-machine, outside the repo, in `~/Documents/ANU/3RD_YEAR/SEMESTER 2/COMP4020/Lectures/`:
-`lessons-by-week.md` (two lessons per week, matched against `LEARNINGS.md`),
-`final-checklist.md` (what to land in the final), and `week-1.md` to
-`week-10.md` (the lecture text, to quote from). Read those first. Use the
-`comp4020:handbook` skill only for course admin (dates, marking, policy) or a
-week not yet in that folder.
+it fits better. Don't recall them from memory: the lectures are already
+summarised outside the repo in
+`~/Documents/ANU/3RD_YEAR/SEMESTER 2/COMP4020/Lectures/` — `lessons-by-week.md`
+(two lessons per week, matched against `LEARNINGS.md`), `final-checklist.md`
+(what to land in the final), and `week-1.md` to `week-10.md` (the lecture text
+itself, to quote from). Read those first; use the `comp4020:handbook` skill
+only for course admin (dates, marking, policy) or a week not yet in that
+folder.
 
 ## One idea, carried all the way
 Every feature serves "someone's always watching." A feature that doesn't tie
