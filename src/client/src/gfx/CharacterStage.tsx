@@ -203,7 +203,10 @@ function Person({ char, seed, offset = 0, expr, manual, walking, auto, independe
     }
     const m = mood.current;
     for (const key of ["browY", "browTilt", "lid", "curve", "open", "width"] as const) follow(m as unknown as Record<string, number>, key, target[key], false, snapPose ? 1 : dt);
-    const blink = (t.current + offset * 0.7 + 1.7) % 3.4 < 0.12 ? 1.2 : 0; // eyes open at t = 0
+    // 0.55, not 1.2 (see Actor.tsx's matching fix): 1.2 drove lidAmount to
+    // near its 1.35 fully-shut cap on every blink, reading as eyes properly
+    // closed rather than a quick flutter. eyes open at t = 0
+    const blink = (t.current + offset * 0.7 + 1.7) % 3.4 < 0.12 ? 0.55 : 0;
     // a handshake: the hands meet halfway to the other member of the interaction
     const partner = agent?.plan ? agent.plan.plan.members.map((id) => agents[id]).find((o) => o && o !== agent) : undefined;
     const meet = partner ? { x: (root.position.x + partner.char.root.position.x) / 2, z: (root.position.z + partner.char.root.position.z) / 2 } : undefined;

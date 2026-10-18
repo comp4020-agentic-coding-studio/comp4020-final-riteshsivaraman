@@ -527,11 +527,17 @@ export function buildCharacter(
   // pairs the "device" behaviour with an actual catalogued object instead of
   // an invented generic slab (Ritesh, 2026-10-12).
 
-  // staff uniform: a cap in the role's colour, and a badge on the chest
+  // staff uniform: a cap in the role's colour, and a badge on the chest.
+  // The dome's radius was 0.128 against a head of half-width 0.081/half-height
+  // 0.108 (head-geo.ts): wider than the head itself, so it sat like a
+  // lampshade with a gap of empty space on both sides (Ritesh, played live).
+  // Scaled the whole cap down by the same ~0.69 factor (0.088/0.128) rather
+  // than re-tuning each dimension by eye, so the dome, its placement and the
+  // brim all shrink together and stay proportioned to each other.
   if (opts.uniform?.cap) {
     const cap = new Color(opts.uniform.cap);
-    add(new SphereGeometry(0.128, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), head, cap, hm(0, 0.022, 0.004));
-    add(new BoxGeometry(0.15, 0.012, 0.085), head, cap, hm(0, 0.026, -0.108));
+    add(new SphereGeometry(0.088, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), head, cap, hm(0, 0.015, 0.004));
+    add(new BoxGeometry(0.103, 0.012, 0.058), head, cap, hm(0, 0.018, -0.074));
   }
   if (opts.uniform?.badge) {
     add(new BoxGeometry(0.075, 0.095, 0.012), spine, new Color(opts.uniform.badge), at(0.085, Y(1.25), -0.121));

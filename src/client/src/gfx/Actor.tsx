@@ -85,7 +85,11 @@ export function Actor({
     const target = EXPRESSIONS.find((e) => e.name === s.mood) ?? EXPRESSIONS[0];
     const m = mood.current;
     for (const key of ["browY", "browTilt", "lid", "curve", "open", "width"] as const) follow(m as unknown as Record<string, number>, key, target[key], false, SNAP ? 1 : dt);
-    const blink = (t.current + seed * 0.013 + 1.7) % 3.4 < 0.12 ? 1.2 : 0;
+    // 0.55, not the old 1.2: added to a resting lidAmount that is already
+    // negative for most moods (neutral -0.3), 1.2 pushed lidAmount close to
+    // the 1.35 fully-shut cap on every blink, so a quick blink read as the
+    // eyes being properly closed rather than a flutter (Ritesh, played live).
+    const blink = (t.current + seed * 0.013 + 1.7) % 3.4 < 0.12 ? 0.55 : 0;
     // the head: where the body stands and faces, in the world, against the point
     let gaze: { yaw: number; pitch: number } | undefined;
     if (s.gaze && char.root.parent) {
