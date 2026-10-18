@@ -9,7 +9,9 @@ import { PRODUCTS, productById } from "./catalogue.ts";
 // The visitor picks from a short list each turn (SCOPE D9). The server owns the
 // state and applies the effects; this only says what comes next.
 
-export type ScriptId = "greeter" | "phones";
+// "till" is the payment at the Genius Bar: reached only after a sale, never
+// asked for, so it is not a post's `scriptFor`.
+export type ScriptId = "greeter" | "phones" | "till";
 
 // Where a visitor is in their visit (the player_state table).
 export type PlayerStateName =
@@ -40,6 +42,8 @@ export interface ConvState {
   node: string;
   product?: string;
   colour?: string;
+  // what is being paid for, set when a till conversation begins
+  sale?: { name: string; colour: string; storage: string; price: number };
 }
 
 export interface Choice {
@@ -60,7 +64,10 @@ export type Effect =
   | { type: "request_help"; needs: string }
   // put one unit aside. The server does this atomically and, if someone else
   // got there first, runs the step again with the new stock.
-  | { type: "reserve"; product: string; colour: string };
+  | { type: "reserve"; product: string; colour: string }
+  // the sale at the till went through, or was called off
+  | { type: "paid"; method: "card" | "phone" }
+  | { type: "payment_cancelled" };
 
 export interface StepResult {
   state: ConvState;
@@ -140,11 +147,30 @@ function turnFor(s: ConvState, world: World): Turn {
         return end("No problem. I'm here if you want anything.");
     }
   }
+  if (s.script === "till") {
+    switch (s.node) {
+      case "hello":
+        return ask(
+          s.sale
+            ? `Hi. That's the ${s.sale.name} in ${s.sale.colour}, ${s.sale.storage}, A$${s.sale.price.toLocaleString("en-AU")}. How would you like to pay?`
+            : "Hi, this is the Genius Bar. How can I help?",
+          [
+            { id: "pay:card", label: "Pay by card" },
+            { id: "pay:phone", label: "Pay with my phone" },
+            { id: "cancel", label: "I've changed my mind" },
+          ],
+        );
+      case "paid":
+        return end("That's gone through. Thanks, enjoy your new phone.");
+      case "cancelled":
+        return end("No problem, I'll put it back. Have a look around if you like.");
+    }
+  }
   return end("");
 }
 
-export function begin(script: ScriptId, world: World): StepResult {
-  const state: ConvState = { script, node: "hello" };
+export function begin(script: ScriptId, world: World, sale?: ConvState["sale"]): StepResult {
+  const state: ConvState = { script, node: "hello", ...(sale ? { sale } : {}) };
   return { state, turn: turnFor(state, world), effects: [{ type: "player_state", state: "in_conversation" }] };
 }
 
@@ -183,6 +209,13 @@ export function step(state: ConvState, choiceId: string, world: World): StepResu
         return go("to_bar", {}, [{ type: "player_state", state: "waiting_for_help", want: "repair", needs: "genius" }]);
       case "pickup":
         return go("to_bar", {}, [{ type: "player_state", state: "waiting_for_help", want: "pickup", needs: "genius" }]);
+    }
+  }
+
+  if (state.script === "till") {
+    if (state.node === "hello") {
+      if (choiceId === "cancel") return go("cancelled", {}, [{ type: "payment_cancelled" }, { type: "player_state", state: "browsing" }]);
+      return go("paid", {}, [{ type: "paid", method: choiceId === "pay:phone" ? "phone" : "card" }, { type: "player_state", state: "browsing" }]);
     }
   }
 

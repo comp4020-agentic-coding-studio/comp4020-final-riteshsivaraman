@@ -58,7 +58,8 @@ export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Mome
   const goal = e.lead ? { x: e.lead.x, z: e.lead.z } : servicePoint(start, e.at);
   const path = planPath({ x: start.x, z: start.z }, goal, "staff");
   const t = Math.max(0, (nowMs - e.since) / 1000);
-  const p = along(path, t);
+  // already standing where it is to stand (an NPC at the bar taking payment): no walk
+  const p = Math.hypot(goal.x - start.x, goal.z - start.z) < 0.01 || path.pts.length < 2 ? { x: goal.x, z: goal.z, ry: 0, walking: false } : along(path, t);
   if (p.walking) return asMoment(p, "idle", "smile", "going over to help a visitor");
   if (e.lead) {
     // led the customer here: waiting at the spot, facing what they came to see

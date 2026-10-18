@@ -713,8 +713,9 @@ describe("being walked to the till after a sale", () => {
     // the sale: the scene ends as 'bought' (the conversation row is finished as the engine would)
     const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(hello.conversationId) as { data: string };
     const data = JSON.parse(row.data);
-    data.scene.ended = { how: "bought", sku: "x" };
+    data.scene.ended = { how: "bought", sku: { model: "17", storage: "256GB", gb: 256, colour: "Lavender", price: 1399 } };
     db.prepare("UPDATE conversations SET data = ?, ended_at = 5 WHERE id = ?").run(JSON.stringify(data), hello.conversationId);
+    db.prepare("UPDATE player_state SET state = 'browsing', with_id = NULL WHERE visitor_id = 'c1'").run(); // as finishing the conversation does
     const out = closeTalk(ctx(), "c1");
     expect(last(out, "c1", "escort")).toMatchObject({ kind: "till", npcId: "spec-phones" });
     expect(last(out, "c1", "escort")!.text).toMatch(/Dev|Ines/);
@@ -723,5 +724,41 @@ describe("being walked to the till after a sale", () => {
     const arrived = settleIntents(ctx(NOW + 60_000));
     expect(last(arrived, "c1", "escort_end")).toBeDefined();
     expect(last(arrived, "all", "released")).toMatchObject({ npcId: "spec-phones" });
+    // at the bar, whoever takes payment shows intent and stays put behind the bar
+    const pay = last(arrived, "all", "intent")!;
+    expect(pay).toMatchObject({ toId: "c1", reason: "pay" });
+    expect(["Dev", "Ines"]).toContain(pay.fromName);
+    expect(last(arrived, "all", "engaged")!.lead).toBeDefined();
+    // the customer accepts and is asked to pay for that phone
+    const asked = acceptIntentById(ctx(NOW + 60_000), "c1", pay.id);
+    const turn = last(asked, "c1", "turn")!;
+    expect(turn.say).toMatch(/iPhone 17 in Lavender, 256GB, A\$1,399/);
+    expect(turn.choices.map((c) => c.id)).toEqual(["pay:card", "pay:phone", "cancel"]);
+    const paid = chooseTurn(ctx(NOW + 61_000), "c1", turn.conversationId, "pay:card");
+    expect(last(paid, "c1", "turn")).toMatchObject({ ended: true });
+    expect(last(paid, "c1", "turn")!.say).toMatch(/gone through/);
+    expect(eventTypes()).toContain("purchase_paid");
+    // a paid sale is never offered for payment again
+    closeTalk(ctx(NOW + 62_000), "c1");
+    expect(last(requestTalk(ctx(NOW + 63_000), "c1", "genius-1"), "all", "intent")).toBeUndefined();
+  });
+
+  it("lets you call the sale off at the till", () => {
+    const p = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
+    const hello = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(hello.conversationId) as { data: string };
+    const data = JSON.parse(row.data);
+    data.scene.ended = { how: "bought", sku: { model: "17", storage: "256GB", gb: 256, colour: "Lavender", price: 1399 } };
+    db.prepare("UPDATE conversations SET data = ?, ended_at = 5 WHERE id = ?").run(JSON.stringify(data), hello.conversationId);
+    db.prepare("UPDATE player_state SET state = 'browsing', with_id = NULL WHERE visitor_id = 'c1'").run(); // as finishing the conversation does
+    const esc = last(closeTalk(ctx(), "c1"), "c1", "escort")!;
+    positions.set("c1", esc.goal);
+    const pay = last(settleIntents(ctx(NOW + 60_000)), "all", "intent")!;
+    const turn = last(acceptIntentById(ctx(NOW + 60_000), "c1", pay.id), "c1", "turn")!;
+    const out = chooseTurn(ctx(NOW + 61_000), "c1", turn.conversationId, "cancel");
+    expect(last(out, "c1", "turn")!.say).toMatch(/put it back/);
+    expect(eventTypes()).toContain("purchase_cancelled");
+    expect(eventTypes()).not.toContain("purchase_paid");
   });
 });

@@ -89,7 +89,7 @@ export interface IntentView {
   fromName: string;
   toId: string;
   toName: string;
-  reason: "greet" | "help" | "ask";
+  reason: "greet" | "help" | "ask" | "pay";
   state: "queued" | "open";
   since: number; // server time
 }

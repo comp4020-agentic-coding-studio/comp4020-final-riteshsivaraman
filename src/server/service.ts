@@ -185,6 +185,7 @@ interface ConvData {
   pending?: { choiceId: string; label: string }; // what the customer picked, waiting for the employee
   at?: { x: number; z: number };
   eng?: Engagement; // how the NPC is currently drawn, so a walk can start from where it stands
+  saleOf?: string; // a till conversation: the sale conversation being paid for
 }
 
 // The new talk engine's state for a "phones" conversation held with an NPC
@@ -248,7 +249,7 @@ export function engagements(db: Database.Database): Engagement[] {
   const live = rows.map((r) => ({ npcId: r.with_id, visitorId: r.customer_id, since: r.started_at, at: dataOf(r).at ?? { x: 0, z: 0 } }));
   // an NPC that has walked over to show intent (not yet accepted) stands there too
   const pending = (db.prepare("SELECT * FROM intents WHERE status = 'open' AND staff_kind = 'npc'").all() as IntentRow[]).map(
-    (r): Engagement => ({ npcId: r.staff_id, visitorId: r.customer_id, since: r.opened_at ?? r.created_at, at: { x: r.at_x ?? 0, z: r.at_z ?? 0 }, pending: true }),
+    intentEngagement,
   );
   return [...live, ...pending];
 }
@@ -468,9 +469,11 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   }
 
   const world = stockWorld(ctx.db);
-  const first = begin(script, world);
+  const unpaid = script === "till" ? unpaidSale(ctx, customerId) : null;
+  const first = begin(script, world, unpaid?.sale);
   const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: first.state.node, data: null, started_at: ctx.now, ended_at: null };
-  const data: ConvData = { conv: first.state, awaiting: "customer", at, ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at } } : {}) };
+  const eng: Engagement = tillEng(ctx, script, withId, customerId, engagedSince, at);
+  const data: ConvData = { conv: first.state, awaiting: "customer", at, ...(withKind === "npc" ? { eng } : {}), ...(unpaid ? { saleOf: unpaid.convId } : {}) };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
     .run(row.id, customerId, withId, withKind, script, row.node, JSON.stringify(data), ctx.now);
@@ -479,9 +482,18 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   const out: Outgoing[] = [...cleared, { to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, withId), first.turn.say, first.turn.choices, false, "customer") } }];
   const sm = stateMessage(ctx, customerId);
   if (sm) out.push(sm);
-  if (withKind === "npc") out.push({ to: "all", message: { type: "engaged", npcId: withId, visitorId: customerId, since: engagedSince, at } });
+  if (withKind === "npc") out.push({ to: "all", message: { type: "engaged", ...eng } });
   out.push(staffViewMessage(ctx));
   return out;
+}
+
+// How an NPC is drawn while it talks. At the till it does not leave the bar.
+function tillEng(ctx: Ctx, script: ScriptId, npcId: string, customerId: string, since: number, at: { x: number; z: number }): Engagement {
+  const e: Engagement = { npcId, visitorId: customerId, since, at };
+  if (script !== "till") return e;
+  const def = NPCS.find((n) => n.id === npcId);
+  const p = def ? npcPose(def, since) : at;
+  return { ...e, from: { x: p.x, z: p.z }, lead: { x: p.x, z: p.z, fx: at.x, fz: at.z } };
 }
 
 // ---- intent to talk (Ritesh, 2026-10-19) ----
@@ -590,15 +602,25 @@ function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: 
   return out;
 }
 
-const beginApproach = (r: IntentRow): Outgoing[] =>
-  r.staff_kind === "npc" ? [{ to: "all", message: { type: "engaged", npcId: r.staff_id, visitorId: r.customer_id, since: r.opened_at ?? r.created_at, at: { x: r.at_x ?? 0, z: r.at_z ?? 0 }, pending: true } }] : [];
+// How an NPC with an open intent is drawn. A person coming to find you walks
+// over; the Genius Bar stays behind the bar, facing you, to take payment.
+function intentEngagement(r: IntentRow): Engagement {
+  const since = r.opened_at ?? r.created_at;
+  const at = { x: r.at_x ?? 0, z: r.at_z ?? 0 };
+  const base: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since, at, pending: true };
+  if (r.reason !== "pay") return base;
+  const def = NPCS.find((n) => n.id === r.staff_id);
+  const p = def ? npcPose(def, since) : at;
+  return { ...base, from: { x: p.x, z: p.z }, lead: { x: p.x, z: p.z, fx: at.x, fz: at.z } };
+}
+
+const beginApproach = (r: IntentRow): Outgoing[] => (r.staff_kind === "npc" ? [{ to: "all", message: { type: "engaged", ...intentEngagement(r) } }] : []);
 
 // Where the staff end of an intent is, and whether they have got to the
 // customer. An NPC's position is the same pure function the clients draw.
 function staffEnd(ctx: Ctx, r: IntentRow, cpos: { x: number; z: number }): { arrived: boolean } {
   if (r.staff_kind === "npc") {
-    const e: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since: r.opened_at ?? r.created_at, at: { x: r.at_x ?? 0, z: r.at_z ?? 0 }, pending: true };
-    return { arrived: !engagedMoment(r.staff_id, e, ctx.now).walking };
+    return { arrived: !engagedMoment(r.staff_id, intentEngagement(r), ctx.now).walking };
   }
   const spos = ctx.position(r.staff_id);
   return { arrived: !!spos && dist(spos, cpos) <= TALK_RANGE };
@@ -607,7 +629,7 @@ function staffEnd(ctx: Ctx, r: IntentRow, cpos: { x: number; z: number }): { arr
 function acceptIntent(ctx: Ctx, r: IntentRow): Outgoing[] {
   const emp = ctx.employees.find((e) => e.id === r.staff_id);
   const designation = r.staff_kind === "npc" ? NPC_DESIGNATION[r.staff_id] : emp ? designationOfEmployee(emp) : undefined;
-  const script = designation ? scriptFor(designation) : null;
+  const script: ScriptId | null = r.reason === "pay" ? "till" : designation ? scriptFor(designation) : null;
   const cpos = ctx.position(r.customer_id);
   if (!script || !cpos) return endIntent(ctx, r, "cancelled", "no conversation to have");
   const out = endIntent(ctx, r, "accepted", "accepted");
@@ -835,20 +857,54 @@ function startDemoEscort(ctx: Ctx, row: ConvRow, talkModelId: string): Outgoing[
   return beginEscort(ctx, { customerId: row.customer_id, staffId: row.with_id, kind: "demo", slotId: spot.slotId, conversationId: row.id, from, goal: spot.goal, face: spot.face, stand: spot.stand, text: `Follow ${nameOf(ctx, row.with_id)} to the ${modelName}` });
 }
 
+// The customer's last sale that has not been paid for or called off: the talk
+// engine ends a conversation as 'bought' with the chosen phone, and the till
+// picks it up from there. Stock is not touched here: the talk engine's phones
+// are not yet tied to the shop's stock table [TK].
+function unpaidSale(ctx: Ctx, customerId: string): { convId: string; sale: NonNullable<ConvState["sale"]> } | null {
+  const rows = ctx.db
+    .prepare("SELECT * FROM conversations WHERE customer_id = ? AND with_kind = 'npc' AND ended_at IS NOT NULL ORDER BY ended_at DESC, rowid DESC LIMIT 5")
+    .all(customerId) as ConvRow[];
+  for (const r of rows) {
+    const d = anyDataOf(r);
+    if (!isTalkData(d) || d.scene.ended?.how !== "bought") continue;
+    const settled = ctx.db
+      .prepare("SELECT 1 FROM events WHERE visitor_id = ? AND type IN ('purchase_paid','purchase_cancelled') AND data LIKE ? LIMIT 1")
+      .get(customerId, `%"saleOf":"${r.id}"%`);
+    if (settled) continue;
+    const sku = d.scene.ended.sku;
+    return { convId: r.id, sale: { name: modelById(sku.model).name, colour: sku.colour, storage: sku.storage, price: sku.price } };
+  }
+  return null;
+}
+
 function startTillEscort(ctx: Ctx, row: ConvRow): Outgoing[] {
   const eng = (anyDataOf(row) as AnyConvData).eng;
   const from = npcPlace(ctx, eng, row.with_id);
-  const genius = nameOf(ctx, pickHelperId(ctx, "genius") ?? "genius-1");
+  const helper = pickHelper(ctx, "genius");
+  const genius = nameOf(ctx, helper?.id ?? "genius-1");
+  // stand at the till in front of whoever will take payment
+  const def = helper?.kind === "npc" ? NPCS.find((n) => n.id === helper.id) : undefined;
+  const stand = { x: def ? npcPose(def, ctx.now).x : TILL_STAND.x, z: TILL_STAND.z };
   return beginEscort(ctx, {
     customerId: row.customer_id,
     staffId: row.with_id,
     kind: "till",
     from,
-    goal: { x: TILL_STAND.x - 1.0, z: TILL_STAND.z },
-    face: { x: TILL_STAND.x, z: TILL_STAND.z },
-    stand: TILL_STAND,
+    goal: { x: stand.x - 1.0, z: stand.z },
+    face: stand,
+    stand,
     text: `Follow ${nameOf(ctx, row.with_id)} to the Genius Bar, where ${genius} will take your payment`,
   });
+}
+
+// At the Genius Bar: whoever takes payment shows intent, and the customer
+// accepts (E) to pay. Nothing is offered if there is nothing to pay for.
+function startPayment(ctx: Ctx, customerId: string): Outgoing[] {
+  if (!unpaidSale(ctx, customerId)) return [];
+  const helper = pickHelper(ctx, "genius");
+  if (!helper) return [notice(customerId, "There is nobody at the Genius Bar right now.")];
+  return showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "pay" });
 }
 
 function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoing[] {
@@ -864,7 +920,7 @@ function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoi
     out.push({ to: "all", message: { type: "engaged", ...eng } });
   } else {
     out.push({ to: "all", message: { type: "released", npcId: e.staff_id } });
-    if (e.kind === "till" && why === "done") out.push(notice(e.customer_id, "This is the Genius Bar. Someone here will take your payment."));
+    if (e.kind === "till" && why === "done") out.push(...startPayment(ctx, e.customer_id));
   }
   return out;
 }
@@ -1023,6 +1079,15 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
         with_id: r.turn.ended ? null : row.with_id,
       });
       log(ctx, row.customer_id, "state", { state: to, want: e.want ?? null, needs: e.needs ?? null });
+    } else if (e.type === "paid" || e.type === "payment_cancelled") {
+      // the sale at the till: recorded, so it is never offered for payment twice
+      log(ctx, row.customer_id, e.type === "paid" ? "purchase_paid" : "purchase_cancelled", {
+        conversationId: row.id,
+        saleOf: data.saleOf ?? null,
+        by: row.with_id,
+        method: e.type === "paid" ? e.method : null,
+        sale: from.sale ?? null,
+      });
     } else if (e.type === "request_help") {
       log(ctx, row.customer_id, "help_requested", { needs: e.needs });
       const a = assignHelper(ctx, row.customer_id, e.needs);

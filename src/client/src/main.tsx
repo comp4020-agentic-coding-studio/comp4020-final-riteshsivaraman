@@ -75,7 +75,7 @@ function Hud() {
             .map((i) => (
               <div key={i.id}>
                 {i.state === "queued" ? "Next: " : ""}
-                {i.reason === "help" ? "Meet" : "Go to"} {i.toName}
+                {i.reason === "pay" ? "Take payment from" : i.reason === "help" ? "Meet" : "Go to"} {i.toName}
                 {i.reason === "help" ? ", who is waiting for help" : ""}
               </div>
             ))}
