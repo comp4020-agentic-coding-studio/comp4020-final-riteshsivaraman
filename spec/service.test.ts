@@ -150,20 +150,38 @@ describe("the phones specialist and stock", () => {
   const storageOf18Pro = defaultStorage(productById("iphone-18-pro")!);
   const storageOf17 = defaultStorage(productById("iphone-17")!);
 
-  function atColours(customer: string, product = "iphone-18-pro"): string {
-    const s = npc("spec-phones");
-    positions.set(customer, { x: s.x + 1, z: s.z });
-    const id = last(startTalk(ctx(), customer, "spec-phones"), customer, "turn")!.conversationId;
+  // A human-staffed "phones" conversation, not the NPC one: stock reservation
+  // is still the old engine's job (shared/conversation.ts). The new talk
+  // engine (2026-10-19, service-scene/server-wiring work) only ever drives an
+  // NPC-staffed "phones" conversation (usesTalkEngine in service.ts) and its
+  // own "bought" ending does not yet reserve real stock — the two product
+  // catalogues (src/shared/talk/data.ts, sourced from devices.json, vs
+  // src/shared/catalogue.ts's PRODUCTS/stock table) use different ids and
+  // were never reconciled by the wiring proposal, so this is a named,
+  // deliberate gap (docs/conversation-model/server-wiring-proposal.md), not
+  // a silent one. These specs move to a human specialist so the race/holding
+  // behaviour they test keeps running on the engine that actually has it.
+  function employeeAtColours(employeeId: string, customer: string, product = "iphone-18-pro"): string {
+    if (!employees.some((e) => e.id === employeeId)) addVisitor(employeeId, "Sam", { x: 0, z: 0 }, "specialist", "phones");
+    positions.set(customer, { x: 1, z: 0 });
+    const id = last(startTalk(ctx(), customer, employeeId), customer, "turn")!.conversationId;
     chooseTurn(ctx(), customer, id, "show");
+    staffRespond(ctx(), employeeId, id, "reply");
     chooseTurn(ctx(), customer, id, `product:${product}`);
+    staffRespond(ctx(), employeeId, id, "reply");
     return id;
+  }
+
+  function colourTurn(employeeId: string, customer: string, id: string, choice: string): Outgoing[] {
+    chooseTurn(ctx(), customer, id, choice);
+    return staffRespond(ctx(), employeeId, id, "reply");
   }
 
   it("takes a unit off the shelf when you choose one that is in stock, and holds it", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const id = atColours("c1");
-    const out = chooseTurn(ctx(), "c1", id, "colour:Glacier");
+    const id = employeeAtColours("e1", "c1");
+    const out = colourTurn("e1", "c1", id, "colour:Glacier");
     expect(last(out, "c1", "turn")?.ended).toBe(true);
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
     expect(stateOf(db, "c1")?.state).toBe("in_purchase");
@@ -175,8 +193,8 @@ describe("the phones specialist and stock", () => {
   it("will not sell what is out of stock, and says so", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     db.prepare("UPDATE stock SET qty = 0 WHERE product = 'iphone-18-pro' AND colour = 'Silver' AND storage = ?").run(storageOf18Pro);
-    const id = atColours("c1");
-    const out = chooseTurn(ctx(), "c1", id, "colour:Silver");
+    const id = employeeAtColours("e1", "c1");
+    const out = colourTurn("e1", "c1", id, "colour:Silver");
     expect(last(out, "c1", "turn")?.say).toMatch(/out of stock/);
     expect(last(out, "c1", "turn")?.ended).toBe(false);
     expect(db.prepare("SELECT COUNT(*) AS n FROM reservations").get()).toEqual({ n: 0 });
@@ -186,8 +204,8 @@ describe("the phones specialist and stock", () => {
   it("gives a held unit back when the time is up, with no timer (the next call catches up)", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const id = atColours("c1");
-    chooseTurn(ctx(), "c1", id, "colour:Glacier");
+    const id = employeeAtColours("e1", "c1");
+    colourTurn("e1", "c1", id, "colour:Glacier");
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
     expect(releaseExpired(ctx(NOW + HOLD_MS - 1))).toBe(0);
     expect(releaseExpired(ctx(NOW + HOLD_MS))).toBe(1);
@@ -199,8 +217,8 @@ describe("the phones specialist and stock", () => {
   it("gives it back at once when the visitor leaves", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const id = atColours("c1");
-    chooseTurn(ctx(), "c1", id, "colour:Glacier");
+    const id = employeeAtColours("e1", "c1");
+    colourTurn("e1", "c1", id, "colour:Glacier");
     leaveStore(ctx(), "c1");
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before);
     expect(stateOf(db, "c1")?.state).toBe("leaving");
@@ -212,13 +230,82 @@ describe("the phones specialist and stock", () => {
     addVisitor("c2", "Biscuit", { x: 0, z: 0 });
     expect(START_STOCK["iphone-17"].Black[storageOf17]).toBe(1);
     // c1 first
-    const a = atColours("c1", "iphone-17");
-    chooseTurn(ctx(), "c1", a, "colour:Black");
+    const a = employeeAtColours("e1", "c1", "iphone-17");
+    colourTurn("e1", "c1", a, "colour:Black");
     expect(stockOf(db, "iphone-17", "Black", storageOf17)).toBe(0);
     // the specialist is free again for c2, and the last unit is gone
-    const b = atColours("c2", "iphone-17");
-    const out = chooseTurn(ctx(), "c2", b, "colour:Black");
+    const b = employeeAtColours("e1", "c2", "iphone-17");
+    const out = colourTurn("e1", "c2", b, "colour:Black");
     expect(last(out, "c2", "turn")?.say).toMatch(/out of stock/);
+  });
+});
+
+// The new talk engine (src/shared/talk/), wired 2026-10-19 (Ritesh: phone
+// only, coexist not replace — docs/conversation-model/server-wiring-
+// proposal.md), drives an NPC-staffed "phones" conversation instead of
+// shared/conversation.ts's old phones script. A human-staffed "phones"
+// conversation (the describe block above) still uses the old engine.
+describe("the phones specialist, the new talk engine (NPC only)", () => {
+  function atSpecPhones(customer: string): { x: number; z: number } {
+    const s = npc("spec-phones");
+    positions.set(customer, { x: s.x + 1, z: s.z });
+    return s;
+  }
+
+  it("opens with the new engine's own question bank, not the old script's", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+    atSpecPhones("c1");
+    const out = startTalk(ctx(), "c1", "spec-phones");
+    const turn = last(out, "c1", "turn")!;
+    expect(turn.ended).toBe(false);
+    // the old script's first line is "What can I show you?" with a
+    // show/leave choice; the new engine opens with the did-you-have-a-model-
+    // in-mind / opening_intent question instead (decisions.md: "start with
+    // did you already have a phone in mind?").
+    expect(turn.choices.some((c) => c.id === "show")).toBe(false);
+    expect(turn.choices.length).toBeGreaterThan(0);
+  });
+
+  it("persists a real Scene in conversations.data, not the old ConvState shape", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+    atSpecPhones("c1");
+    const id = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!.conversationId;
+    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(id) as { data: string };
+    const data = JSON.parse(row.data) as { engine?: string; scene?: { answers: unknown; log: unknown[] } };
+    expect(data.engine).toBe("talk");
+    expect(data.scene?.log.length).toBeGreaterThan(0); // staff's opening line(s) already in the engine's own log
+  });
+
+  it("writes a talk_turn event per turn, tagged with the conversation id", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+    atSpecPhones("c1");
+    const opened = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const id = opened.conversationId;
+    const firstChoiceId = opened.choices[0]!.id;
+    const out = chooseTurn(ctx(), "c1", id, firstChoiceId);
+    expect(last(out, "c1", "turn")).toBeDefined();
+    const rows = db.prepare("SELECT type, data FROM events WHERE visitor_id = 'c1' AND type = 'talk_turn'").all() as Array<{ type: string; data: string }>;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(JSON.parse(rows[0]!.data)).toMatchObject({ conversationId: id, choice: firstChoiceId });
+  });
+
+  it("ends the conversation, logs it and releases the NPC, the same as the old engine does", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+    atSpecPhones("c1");
+    const opened = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const id = opened.conversationId;
+    // "Leave" is always a standing action on the customer's menu (scene.ts's
+    // customerMenu), whatever question happens to be pending — the stable
+    // way to end the scene deterministically without depending on the
+    // specific bank question an NPC staff opens with.
+    const leave = opened.choices.find((c) => c.label === "Leave");
+    expect(leave).toBeDefined();
+    const out = chooseTurn(ctx(), "c1", id, leave!.id);
+    expect(last(out, "c1", "turn")?.ended).toBe(true);
+    const row = db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id) as { ended_at: number | null };
+    expect(row.ended_at).not.toBeNull();
+    expect(eventTypes()).toContain("conversation_ended");
+    expect(stateOf(db, "c1")?.state).toBe("browsing");
   });
 });
 
