@@ -14,6 +14,14 @@ ambiguous requirement by picking the most plausible reading and proceeding —
 stop and ask. A wrong guess built on top of other code is more expensive to
 unwind than a short pause would have cost.
 
+A confident negative claim ("X isn't built", "there's no mechanism for Y") is
+exactly the kind of thing this rule is for: before writing one into a design
+doc or SCOPE.md, grep the whole subsystem it's about, not just the one file
+already open — a claim that's wrong in the stronger direction ("doesn't exist
+at all" when a narrower version does) can survive into a published decision
+before anyone reads the code that disproves it (LEARNINGS, `9e511ca`,
+corrected `e3ab3cb`).
+
 For a decision affecting multiple users or expensive to reverse (per the week
 8 lecture: stack, user/person definition, persistence, real-time mechanism —
 see the ADR note below), lay out the real options and their costs first,
@@ -172,6 +180,17 @@ cover more than was actually seen.
   `pty`) works fine. Don't trust a piped smoke test of an interactive CLI
   (`scripts/sim/`) that hangs or shows a shifted answer — verify through a
   real pty before concluding the tool itself is broken.
+- A rotation, heading or camera-offset sign that "looks right on a
+  read-through" isn't evidence — three separate bugs in one session (idle-staff
+  heading, phone-lean tilt, inspect camera pitch) all had correct-looking trig
+  next to a backwards sign. The only acceptable check is an actual render, or
+  a test made to fail against the old code first (LEARNINGS, `2ed2c7a`,
+  `a3b8070`, `df52978`).
+- A defect check that only measures one direction of the defect (e.g. "mark
+  hidden behind the surface") passes while the opposite failure (mark
+  floating off the surface) ships silently. For any "X pokes through/into Y"
+  check, assert both directions, not just the one the first bug happened to
+  be (LEARNINGS, `0f564d4`, `9b74a21`).
 
 ## Keep this file honest
 When a new rule is needed, integrate it into an existing section rather than
