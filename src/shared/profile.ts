@@ -5,6 +5,9 @@ import { validateLook, type LookChoice } from "./look.ts";
 // controls; the choice is trusted for now (no accounts, D35).
 
 export const EMPLOYEE_KINDS = ["greeter", "specialist", "genius", "stock", "technician"] as const;
+// What a real person can join as. The other posts are NPCs only (Ritesh,
+// 2026-10-19): the store opens with two specialists and more are real users.
+export const JOINABLE_KINDS = ["specialist"] as const;
 export type EmployeeKind = (typeof EMPLOYEE_KINDS)[number];
 export const SPECIALTIES = ["phones", "laptops", "tablets", "audio"] as const;
 export type Specialty = (typeof SPECIALTIES)[number];
@@ -49,7 +52,7 @@ export function cleanName(raw: unknown): string | undefined {
 // without a valid lane gets phones, and the look keeps only allowed values.
 export function validateProfile(raw: unknown): Profile {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const kind: Kind = (EMPLOYEE_KINDS as readonly string[]).includes(r.kind as string) ? (r.kind as EmployeeKind) : "customer";
+  const kind: Kind = (JOINABLE_KINDS as readonly string[]).includes(r.kind as string) ? (r.kind as EmployeeKind) : "customer";
   const profile: Profile = { kind };
   if (kind === "specialist") {
     profile.specialty = (SPECIALTIES as readonly string[]).includes(r.specialty as string) ? (r.specialty as Specialty) : "phones";

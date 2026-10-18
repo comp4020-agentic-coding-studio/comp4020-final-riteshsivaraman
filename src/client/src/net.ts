@@ -104,7 +104,7 @@ class Net {
   intents = new Map<string, IntentView>();
   // told to wait somewhere for someone to fetch you, if you are
   get waitingAt(): { x: number; z: number; label: string; who: string; reason: string } | null {
-    for (const i of this.intents.values()) if (i.state === "held" && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName, reason: i.reason };
+    for (const i of this.intents.values()) if ((i.state === "held" || (i.state === "open" && i.human)) && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName, reason: i.reason };
     return null;
   }
   // a member of staff is walking you somewhere (to a demo device, to the till)

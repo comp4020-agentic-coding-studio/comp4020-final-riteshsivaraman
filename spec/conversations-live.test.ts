@@ -98,7 +98,7 @@ it("takes a customer to the phones team, and lets an employee claim and serve th
 
   // an employee comes in and is shown the customer
   const { v: employee, welcome } = await join({ kind: "specialist", specialty: "phones", name: "Sam" });
-  expect(welcome.offDuty).toContain("spec-phones");
+  expect(welcome.offDuty).not.toContain("spec-phones"); // an extra pair of hands, not a replacement
   const view = (await employee.next((m) => m.type === "staff_view" && m.customers.some((c) => c.id === customer.id))) as Extract<ServerMessage, { type: "staff_view" }>;
   expect(view.customers.find((c) => c.id === customer.id)).toMatchObject({ state: "waiting_for_help", needs: "specialist:phones" });
 

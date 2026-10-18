@@ -99,9 +99,9 @@ describe("roles", () => {
     expect(new Set(NPCS.map((n) => n.id)).size).toBe(NPCS.length);
   });
 
-  it("gives every specialist one kind of product, covering all four", () => {
+  it("opens with two specialists, who both help with anything", () => {
     const specs = CAST.filter((c) => c.role === "specialist");
-    expect(new Set(specs.map((s) => s.specialty)).size).toBe(4);
+    expect(specs.map((s) => s.id).sort()).toEqual(["spec-phones", "spec-phones-2"]);
   });
 
   it("gives every customer a reason to come, and several different ones", () => {
@@ -206,17 +206,12 @@ describe("purposes are served by the right people", () => {
     for (const c of customers) expect(partnersOf(c.id), c.id).toContain("greeter-1");
   });
 
-  it("sends a customer looking for a kind of product to the specialist for that kind", () => {
-    const want: Record<string, string> = { phone: "spec-phones", laptop: "spec-laptops", tablet: "spec-tablets", audio: "spec-audio" };
+  it("sends a customer looking for a kind of product to a specialist", () => {
     let checked = 0;
     for (const c of customers) {
-      const spec = c.purpose ? want[c.purpose] : undefined;
-      if (!spec) continue;
+      if (!c.purpose || !["phone", "laptop", "tablet", "audio"].includes(c.purpose)) continue;
       // helped, unless the day was nearly over
-      const partners = partnersOf(c.id);
-      const wrong = partners.filter((p) => p.startsWith("spec-") && p !== spec);
-      expect(wrong, `${c.id} (${c.purpose}) was helped by the wrong specialist`).toEqual([]);
-      if (partners.includes(spec)) checked++;
+      if (partnersOf(c.id).some((p) => p.startsWith("spec-"))) checked++;
     }
     expect(checked).toBeGreaterThanOrEqual(6);
   });
@@ -239,20 +234,19 @@ describe("purposes are served by the right people", () => {
     expect(partnersOf("stock-runner").filter((p) => p.startsWith("genius-")).length).toBeGreaterThan(0);
   });
 
-  it("only has specialists helping people at a table of their kind", () => {
-    const groupAt = (x: number, z: number): string | undefined => {
-      let best: { g: string; d: number } | undefined;
-      for (const s of STATIONS) {
-        const d = Math.hypot(s.at.x - x, s.at.z - z);
-        if (d < 1.6 && (!best || d < best.d)) best = { g: s.group, d };
-      }
-      return best?.g;
-    };
+  it("has specialists help people at a product table", () => {
+    const atTable = (x: number, z: number): boolean => STATIONS.some((s) => Math.hypot(s.at.x - x, s.at.z - z) < 1.6);
     for (const id of staffIds.filter((i) => castOf(i).role === "specialist")) {
-      const want = castOf(id).specialty;
       for (const s of timelineOf(id).filter((x) => x.kind === "act")) {
-        expect(groupAt(s.at!.x, s.at!.z), `${id} at (${s.at!.x.toFixed(1)}, ${s.at!.z.toFixed(1)})`).toBe(want);
+        expect(atTable(s.at!.x, s.at!.z), `${id} at (${s.at!.x.toFixed(1)}, ${s.at!.z.toFixed(1)})`).toBe(true);
       }
+    }
+  });
+
+  it("gives floor staff something to do between customers: they do not just stand", () => {
+    for (const id of ["greeter-1", "spec-phones", "spec-phones-2", "genius-1", "genius-2"]) {
+      const kinds = new Set(timelineOf(id).filter((s) => s.kind !== "away").map((s) => `${s.kind}:${s.mode}`));
+      expect(kinds.size, `${id} did only ${[...kinds].join(", ")}`).toBeGreaterThanOrEqual(4);
     }
   });
 });

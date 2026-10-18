@@ -16,7 +16,9 @@ describe("a profile", () => {
   });
 
   it("keeps a valid employee kind, and a specialist always has a lane", () => {
-    expect(validateProfile({ kind: "genius" })).toEqual({ kind: "genius" });
+    // only a specialist can be joined as: the other posts are NPCs
+    expect(validateProfile({ kind: "genius" })).toEqual({ kind: "customer" });
+    expect(validateProfile({ kind: "greeter" })).toEqual({ kind: "customer" });
     expect(validateProfile({ kind: "specialist" })).toEqual({ kind: "specialist", specialty: "phones" });
     expect(validateProfile({ kind: "specialist", specialty: "audio" })).toEqual({ kind: "specialist", specialty: "audio" });
     expect(validateProfile({ kind: "specialist", specialty: "weapons" }).specialty).toBe("phones");
@@ -62,6 +64,8 @@ describe("posts", () => {
     expect(npcsOffDuty(["greeter", "greeter"])).toEqual(["greeter-1"]); // only one NPC greeter to stand down
     expect(npcsOffDuty(["genius"])).toEqual(["genius-1"]);
     expect(npcsOffDuty(["genius", "genius"]).sort()).toEqual(["genius-1", "genius-2"]);
-    expect(npcsOffDuty(["genius", "specialist:phones"]).sort()).toEqual(["genius-1", "spec-phones"]);
+    // a person joining as a specialist is an extra: it stands nobody down
+    expect(npcsOffDuty(["genius", "specialist:phones"]).sort()).toEqual(["genius-1"]);
+    expect(npcsOffDuty(["specialist:phones", "specialist:phones", "specialist:phones"])).toEqual([]);
   });
 });

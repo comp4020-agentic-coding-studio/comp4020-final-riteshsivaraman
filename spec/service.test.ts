@@ -319,12 +319,13 @@ describe("the phones specialist, the new talk engine (NPC only)", () => {
 });
 
 describe("employees", () => {
-  it("take the NPC's post: it goes off duty while they are in, and cannot be talked to", () => {
+  it("joining as a specialist is an extra: the NPC specialists stay on duty", () => {
     const s = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: s.x + 1, z: s.z });
     addVisitor("e1", "Sam", { x: s.x + 2, z: s.z }, "specialist", "phones");
     const out = startTalk(ctx(), "c1", "spec-phones");
-    expect(last(out, "c1", "notice")?.text).toMatch(/not on today/);
+    expect(last(out, "c1", "notice")?.text).toBeUndefined();
+    expect(last(out, "c1", "turn")).toMatchObject({ withId: "spec-phones" });
   });
 
   it("serve a customer through menus on both sides", () => {
@@ -473,22 +474,14 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
     expect(tryNpcAutoClaim(ctx(), "c1")).toEqual([]);
   });
 
-  it("will not claim through an NPC a human already holds the post for", () => {
-    const s = npc("spec-phones");
-    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
-    addVisitor("e1", "Sam", s, "specialist", "phones"); // takes the post off duty
-    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
-    expect(tryNpcAutoClaim(ctx(), "c1")).toEqual([]);
-    expect(stateOf(db, "c1")?.state).toBe("waiting_for_help"); // left for the human to claim
-  });
-
   it("will not double-book an NPC already serving someone else", () => {
     const s = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: s.x, z: s.z });
     addVisitor("c2", "Biscuit", { x: s.x, z: s.z });
     for (const id of ["c1", "c2"]) db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = ?").run(id);
-    expect(last(tryNpcAutoClaim(ctx(), "c1"), "c1", "turn")).toBeDefined();
-    expect(tryNpcAutoClaim(ctx(), "c2")).toEqual([]);
+    expect(last(tryNpcAutoClaim(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "spec-phones" });
+    // the second NPC specialist takes the second customer, never the busy one
+    expect(last(tryNpcAutoClaim(ctx(), "c2"), "c2", "turn")).toMatchObject({ withId: "spec-phones-2" });
   });
 });
 
@@ -674,6 +667,13 @@ describe("intent to talk (Ritesh, 2026-10-19)", () => {
     expect(last(settleIntents(ctx(NOW + 6000 + 8100)), "all", "engaged")).toMatchObject({ npcId: "spec-phones" });
   });
 
+  it("gives the mission to a real user first, even when an NPC is free", () => {
+    addVisitor("e1", "Victor", { x: 5, z: 5 }, "specialist", "phones");
+    addVisitor("c1", "Stacy", { x: 0, z: 0 });
+    const a = assignHelper(ctx(), "c1", "specialist:phones");
+    expect(last(a.out, "all", "intent")).toMatchObject({ fromId: "e1" });
+  });
+
   it("gives the mission to a person holding the post, not the NPC", () => {
     addVisitor("e1", "Victor", { x: 5, z: 5 }, "specialist", "phones");
     const g = npc("greeter-1");
@@ -684,7 +684,9 @@ describe("intent to talk (Ritesh, 2026-10-19)", () => {
     const done = chooseTurn(ctx(), "c1", id, "help");
     expect(last(done, "all", "intent")).toMatchObject({ fromId: "e1", fromName: "Victor", toId: "c1", reason: "help" });
     expect(last(done, "all", "engaged")).toBeUndefined(); // a person walks themselves
-    expect(last(done, "c1", "turn")?.say).toMatch(/Victor will come and find you/);
+    expect(last(done, "c1", "turn")?.say).toMatch(/Wait near the phones area and Victor will come and find you/);
+    // both ends are shown the spot: the customer waits there, the specialist is guided to it
+    expect(last(done, "all", "intent")).toMatchObject({ state: "open", human: true, wait: { label: "the phones area" } });
   });
 });
 

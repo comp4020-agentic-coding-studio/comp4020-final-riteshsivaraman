@@ -7,10 +7,10 @@ import { resolveCollisions } from "./world.ts";
 
 export const NPC_DESIGNATION: Record<string, string> = {
   "greeter-1": "greeter",
+  // two specialists to start with; real users who join are extra ones, and
+  // never stand these down (Ritesh, 2026-10-19)
   "spec-phones": "specialist:phones",
-  "spec-laptops": "specialist:laptops",
-  "spec-tablets": "specialist:tablets",
-  "spec-audio": "specialist:audio",
+  "spec-phones-2": "specialist:phones",
   "genius-1": "genius",
   "genius-2": "genius",
   "stock-runner": "stock",
@@ -21,10 +21,11 @@ export const NPC_DESIGNATION: Record<string, string> = {
 };
 
 // The NPCs that stand down, given the designation each employed person holds.
-// The first NPCs of a post, in the table's order, go first.
+// The first NPCs of a post, in the table's order, go first. A person joining as
+// a specialist does not displace one: they are an extra pair of hands.
 export function npcsOffDuty(held: ReadonlyArray<string>): string[] {
   const count = new Map<string, number>();
-  for (const d of held) count.set(d, (count.get(d) ?? 0) + 1);
+  for (const d of held) if (!d.startsWith("specialist:")) count.set(d, (count.get(d) ?? 0) + 1);
   const off: string[] = [];
   for (const [d, n] of count) {
     const npcs = Object.entries(NPC_DESIGNATION).filter(([, des]) => des === d).map(([id]) => id);
@@ -56,19 +57,28 @@ export function waitSpotFor(post: string): { x: number; z: number; label: string
 // nobody else (Ritesh, 2026-10-19). Names are drawn from the entry screen's
 // existing pool (names.ts), not invented; NPC_LABEL below stays the role
 // description used where a name would read oddly.
-const STAFF_NAMES = ["Maya", "Theo", "Priya", "Marcus", "Zoe", "Dev", "Ines", "Owen", "Felix", "Hana", "Jonah", "Ruby"];
+const STAFF_NAMES: Record<string, string> = {
+  "greeter-1": "Maya",
+  "spec-phones": "Theo",
+  "spec-phones-2": "Priya",
+  "genius-1": "Dev",
+  "genius-2": "Ines",
+  "stock-runner": "Owen",
+  "stock-1": "Felix",
+  "stock-2": "Hana",
+  "tech-1": "Jonah",
+  "tech-2": "Ruby",
+};
 const CUSTOMER_NAMES = ["Ravi", "Amara", "Leo", "Freya", "Kofi", "Lena", "Mateo", "Noor", "Hugo", "Isla", "Arjun", "Mei", "Ben", "Sana"];
 export const NPC_NAME: Record<string, string> = {
-  ...Object.fromEntries(Object.keys(NPC_DESIGNATION).map((id, i) => [id, STAFF_NAMES[i]])),
+  ...STAFF_NAMES,
   ...Object.fromEntries(CUSTOMER_NAMES.map((n, i) => [`cust-${i + 1}`, n])),
 };
 
 export const NPC_LABEL: Record<string, string> = {
   "greeter-1": "the greeter",
-  "spec-phones": "the phones specialist",
-  "spec-laptops": "the laptops specialist",
-  "spec-tablets": "the tablets specialist",
-  "spec-audio": "the audio specialist",
+  "spec-phones": "a phones specialist",
+  "spec-phones-2": "a phones specialist",
   "genius-1": "a genius",
   "genius-2": "a genius",
   "stock-runner": "the stock runner",

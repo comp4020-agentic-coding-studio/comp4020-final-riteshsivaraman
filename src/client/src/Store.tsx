@@ -513,40 +513,66 @@ function DeviceHintGlow() {
   );
 }
 
-// Where a member of staff is walking you to: a ring on the floor to stand in.
-function EscortMarker() {
-  const live = useNet();
-  const ref = useRef<Mesh>(null);
+// A place to go: a ring on the floor and a downward arrow bobbing above it
+// (Ritesh, 2026-10-19: "implement this for everything"). One component for
+// every "go here": where you were told to wait, where staff are walking you,
+// the till, and for a specialist the customer they are to meet.
+function GuideMarker({ x, z, colour, radius = 0.7 }: { x: number; z: number; colour: string; radius?: number }) {
+  const ring = useRef<Mesh>(null);
+  const arrow = useRef<Group>(null);
   useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const mat = ref.current.material as MeshBasicMaterial;
-    mat.opacity = 0.45 + 0.3 * Math.sin(clock.elapsedTime * 4);
+    const t = clock.elapsedTime;
+    if (ring.current) (ring.current.material as MeshBasicMaterial).opacity = 0.45 + 0.3 * Math.sin(t * 4);
+    if (arrow.current) {
+      arrow.current.position.y = STORE_Y + 1.55 + Math.sin(t * 3) * 0.12;
+      arrow.current.rotation.y = t * 1.2;
+    }
   });
-  if (!live.escort || live.myInspectSlot) return null;
   return (
-    <mesh ref={ref} position={[live.escort.goal.x, STORE_Y + 0.02, live.escort.goal.z]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.45, 0.6, 40]} />
-      <meshBasicMaterial color="#ffd23f" transparent opacity={0.6} depthWrite={false} toneMapped={false} />
-    </mesh>
+    <group position={[x, 0, z]}>
+      <mesh ref={ring} position={[0, STORE_Y + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[radius * 0.78, radius, 40]} />
+        <meshBasicMaterial color={colour} transparent opacity={0.6} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <group ref={arrow} position={[0, STORE_Y + 1.55, 0]}>
+        {/* a cone pointing down on a short stem */}
+        <mesh position={[0, -0.12, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.2, 0.34, 4]} />
+          <meshBasicMaterial color={colour} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, 0.14, 0]}>
+          <boxGeometry args={[0.1, 0.24, 0.1]} />
+          <meshBasicMaterial color={colour} toneMapped={false} />
+        </mesh>
+      </group>
+    </group>
   );
 }
 
-// Where you were told to wait for someone to fetch you.
-function WaitMarker() {
+// Every place you have been told to go.
+function GuideMarkers() {
   const live = useNet();
-  const ref = useRef<Mesh>(null);
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const mat = ref.current.material as MeshBasicMaterial;
-    mat.opacity = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 3);
-  });
+  const out: Array<{ key: string; x: number; z: number; colour: string }> = [];
+  // where staff are walking you (a demo device, the till): yellow
+  if (live.escort && !live.myInspectSlot) out.push({ key: "escort", x: live.escort.goal.x, z: live.escort.goal.z, colour: "#ffd23f" });
+  // where you were told to wait to be fetched: green
   const w = live.waitingAt;
-  if (!w) return null;
+  if (w) out.push({ key: "wait", x: w.x, z: w.z, colour: "#8cf0b4" });
+  // a specialist: where to meet each customer you have been sent for: blue
+  if (live.isEmployee && live.you) {
+    for (const i of live.intents.values()) {
+      if (i.fromId !== live.you.id || i.state === "queued") continue;
+      const r = live.remotes.get(i.toId);
+      const spot = i.wait ?? (r ? { x: r.x, z: r.z } : null);
+      if (spot) out.push({ key: `meet:${i.id}`, x: spot.x, z: spot.z, colour: "#6cc4ff" });
+    }
+  }
   return (
-    <mesh ref={ref} position={[w.x, STORE_Y + 0.02, w.z]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.8, 0.95, 40]} />
-      <meshBasicMaterial color="#8cf0b4" transparent opacity={0.5} depthWrite={false} toneMapped={false} />
-    </mesh>
+    <>
+      {out.map((m) => (
+        <GuideMarker key={m.key} x={m.x} z={m.z} colour={m.colour} />
+      ))}
+    </>
   );
 }
 
@@ -617,8 +643,7 @@ export function Store() {
       <Interact />
       <InspectMarkers />
       <DeviceHintGlow />
-      <EscortMarker />
-      <WaitMarker />
+      <GuideMarkers />
       <Player />
     </Canvas>
   );

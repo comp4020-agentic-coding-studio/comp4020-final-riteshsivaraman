@@ -93,6 +93,7 @@ export interface IntentView {
   // held: told to wait near `wait` and not yet being fetched
   state: "queued" | "open" | "held";
   wait?: { x: number; z: number; label: string };
+  human?: boolean; // the person coming is a real user (they walk themselves)
   since: number; // server time
 }
 

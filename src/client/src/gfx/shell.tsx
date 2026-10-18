@@ -61,8 +61,8 @@ import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W,
 import { Device } from "./Device.tsx";
 import { Desktop, Monitor } from "./computers.tsx";
 import { DESKTOP_WALL_MODELS, HEADPHONES_WALL_MODEL, MONITOR_WALL_MODELS } from "../../../shared/assignments.ts";
-import { BackFurniture, RepairBenches, StorageRacks, Stools, bayFrames } from "./furniture.tsx";
-import { bayStock } from "./phones.tsx";
+import { BackFurniture, BayShelves, RepairBenches, StorageRacks, Stools, bayFrames } from "./furniture.tsx";
+import { BayStock } from "./phones-stock.tsx";
 import { BackCeiling, BackDetails, BackFloor, BackPartitions, BackPerimeter, DockSurround } from "./back-of-house.tsx";
 
 
@@ -446,8 +446,9 @@ const BAND_LOW = WALL_BANDS.low; // top of the dark lower band: the bench height
 const BAND_MID = WALL_BANDS.mid; // top of the mid band: bottom of the lightboxes
 
 export function WallSections() {
-  const frames = useMemo(() => bayFrames(), []);
-  const { stock, flats } = useMemo(() => bayStock(), []);
+  // piers and back panels, metal shelves with a lip and a lit strip, and the
+  // packaged stock (phones-stock.tsx) instead of plain coloured blocks
+  const frames = useMemo(() => bayFrames({ shelves: false }), []);
   const bandTex = useMemo(() => wallTexture(15), []);
   const faceRot = (side: -1 | 1): number => (side === -1 ? Math.PI / 2 : -Math.PI / 2);
   return (
@@ -467,8 +468,8 @@ export function WallSections() {
         )),
       )}
       <BoxField boxes={frames} roughness={0.5} />
-      <BoxField boxes={stock} />
-      <BoxField boxes={flats} roughness={0.35} />
+      <BayShelves />
+      <BayStock />
       {([-1, 1] as const).map((side) => (
         <group key={side}>
           {SIDE_WALL[side === 1 ? "+x" : "-x"].map((f, i) => {

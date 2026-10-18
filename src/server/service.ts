@@ -546,7 +546,8 @@ function intentView(ctx: Ctx, r: IntentRow): IntentView {
     toName: nameOf(ctx, r.to_id),
     reason: r.reason,
     state: r.status === "held" ? "held" : r.status === "queued" ? "queued" : "open",
-    ...(r.status === "held" && r.wait_x !== null && r.wait_z !== null ? { wait: { x: r.wait_x, z: r.wait_z, label: r.wait_label ?? "there" } } : {}),
+    ...(r.wait_x !== null && r.wait_z !== null ? { wait: { x: r.wait_x, z: r.wait_z, label: r.wait_label ?? "there" } } : {}),
+    ...(r.staff_kind === "visitor" ? { human: true } : {}),
     since: r.opened_at ?? r.created_at,
   };
 }
@@ -592,7 +593,7 @@ function endLiveIntents(ctx: Ctx, match: (r: IntentRow) => boolean, why: "accept
 
 // Shows intent to talk. `fromId` is whoever initiated (the customer, or the
 // staff member coming to find them); the other end is whoever must accept.
-function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: string; staffKind: "npc" | "visitor"; reason: IntentView["reason"]; hold?: { x: number; z: number; label: string } }): Outgoing[] {
+function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: string; staffKind: "npc" | "visitor"; reason: IntentView["reason"]; hold?: { x: number; z: number; label: string }; hint?: { x: number; z: number; label: string } }): Outgoing[] {
   if (liveIntentOf(ctx.db, p.customerId, p.staffId)) return [];
   const at = ctx.position(p.customerId) ?? { x: 0, z: 0 };
   const held = !!p.hold;
@@ -604,7 +605,7 @@ function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: 
   const delay = held ? 3000 + Math.floor(Math.random() * 5000) : null;
   ctx.db
     .prepare("INSERT INTO intents (id, from_id, to_id, customer_id, staff_id, staff_kind, reason, status, created_at, opened_at, at_x, at_z, wait_x, wait_z, wait_label, delay_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(id, p.fromId, toId, p.customerId, p.staffId, p.staffKind, p.reason, status, ctx.now, busy || held ? null : ctx.now, at.x, at.z, p.hold?.x ?? null, p.hold?.z ?? null, p.hold?.label ?? null, delay);
+    .run(id, p.fromId, toId, p.customerId, p.staffId, p.staffKind, p.reason, status, ctx.now, busy || held ? null : ctx.now, at.x, at.z, (p.hold ?? p.hint)?.x ?? null, (p.hold ?? p.hint)?.z ?? null, (p.hold ?? p.hint)?.label ?? null, delay);
   const row = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(id) as IntentRow;
   log(ctx, p.customerId, "intent_shown", { intentId: id, from: p.fromId, to: toId, reason: p.reason, queued: busy, held });
   const out: Outgoing[] = [intentMessage(ctx, row)];
@@ -761,7 +762,17 @@ function pickHelper(ctx: Ctx, post: string): { id: string; kind: "npc" | "visito
       return !!n && npcPose(n, ctx.now).present;
     })
     .map((id) => ({ id, kind: "npc" as const }));
-  const ranked = [...humans, ...npcs].sort((a, b) => Number(staffBusy(ctx, a.id, a.kind)) - Number(staffBusy(ctx, b.id, b.kind)) || load(a.id) - load(b.id) || Number(a.kind === "npc") - Number(b.kind === "npc"));
+  // real users first, even a busy one (they take the next customer when free);
+  // only a person already holding two waiting customers is passed over for a
+  // free NPC (Ritesh, 2026-10-19: "a priority to be assigned to real user staff")
+  const overloaded = (c: { id: string; kind: "npc" | "visitor" }): number => (c.kind === "visitor" && load(c.id) >= 2 ? 1 : 0);
+  const ranked = [...humans, ...npcs].sort(
+    (a, b) =>
+      overloaded(a) - overloaded(b) ||
+      Number(a.kind === "npc") - Number(b.kind === "npc") ||
+      Number(staffBusy(ctx, a.id, a.kind)) - Number(staffBusy(ctx, b.id, b.kind)) ||
+      load(a.id) - load(b.id),
+  );
   return ranked[0] ?? null;
 }
 
@@ -777,9 +788,10 @@ export function assignHelper(ctx: Ctx, customerId: string, post: string): { out:
   if (!helper) return { out: [], helperName: null };
   // an NPC sent for you does not appear at once: you are told to wait near the
   // area, and they come when you are there. A person walks themselves (a mission).
-  const hold = helper.kind === "npc" ? waitSpotFor(post) : null;
-  const out = showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "help", ...(hold ? { hold } : {}) });
-  return { out, helperName: nameOf(ctx, helper.id), waitLabel: hold?.label ?? null };
+  const spot = waitSpotFor(post);
+  const hold = helper.kind === "npc" ? spot : null;
+  const out = showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "help", ...(hold ? { hold } : {}), ...(!hold && spot ? { hint: spot } : {}) });
+  return { out, helperName: nameOf(ctx, helper.id), waitLabel: spot?.label ?? null };
 }
 
 // ---- walking a customer somewhere (Ritesh, 2026-10-19) ----

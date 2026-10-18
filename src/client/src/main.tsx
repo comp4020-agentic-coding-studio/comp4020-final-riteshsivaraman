@@ -76,6 +76,7 @@ function Hud() {
               <div key={i.id}>
                 {i.state === "queued" ? "Next: " : ""}
                 {i.reason === "pay" ? "Take payment from" : i.reason === "help" ? "Meet" : "Go to"} {i.toName}
+                {i.wait ? ` near ${i.wait.label}` : ""}
                 {i.reason === "help" ? ", who is waiting for help" : ""}
               </div>
             ))}

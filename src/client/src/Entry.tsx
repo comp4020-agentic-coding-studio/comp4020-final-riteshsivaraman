@@ -113,8 +113,8 @@ function Swatches({ label, options, value, onChange }: { label: string; options:
 
 export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
   const saved = useMemo(() => readProfile(), []);
-  const [kind, setKind] = useState<Kind>(saved?.kind ?? "customer");
-  const [specialty, setSpecialty] = useState<Specialty>(saved?.specialty ?? "phones");
+  const [kind, setKind] = useState<Kind>(saved?.kind === "specialist" ? "specialist" : "customer"); // only a specialist can be joined as
+  const [specialty] = useState<Specialty>("phones"); // phones is the only post with customer conversations
   const [gender, setGender] = useState<Gender>(saved?.look?.gender ?? pick(GENDERS));
   const [look, setLook] = useState<LookChoice>(() => (saved?.look?.seed ? { ...saved.look } : rollLook(saved?.look?.gender ?? gender)));
   const [name, setName] = useState(saved?.name ?? randomName(look.gender ?? gender));
@@ -187,27 +187,10 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
 
           <div className="group">
             <h2>You are</h2>
-            <Segmented label="Customer or employee" options={["customer", "employee"] as const} value={employee ? "employee" : "customer"} onChange={(v) => setKind(v === "customer" ? "customer" : employee ? kind : "greeter")} show={(v) => (v === "customer" ? "A customer" : "An employee")} />
+            <Segmented label="Customer or specialist" options={["customer", "employee"] as const} value={employee ? "employee" : "customer"} onChange={(v) => setKind(v === "customer" ? "customer" : "specialist")} show={(v) => (v === "customer" ? "A customer" : "A phones specialist")} />
             {employee && (
               <div className="posts">
-                <div className="chips" role="radiogroup" aria-label="Your post">
-                  {EMPLOYEE_KINDS.map((k) => (
-                    <button key={k} type="button" role="radio" aria-checked={k === kind} className={k === kind ? "chip on" : "chip"} style={{ ["--c" as string]: EMPLOYEE_COLOUR[k] }} onClick={() => setKind(k)}>
-                      <i /> {KIND_LABEL[k]}
-                    </button>
-                  ))}
-                </div>
-                {kind === "specialist" && (
-                  <div className="chips" role="radiogroup" aria-label="Which products">
-                    {SPECIALTIES.map((s) => (
-                      <button key={s} type="button" role="radio" aria-checked={s === specialty} className={s === specialty ? "chip on" : "chip"} onClick={() => setSpecialty(s)}>
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <p className="note">{KIND_BLURB[kind as EmployeeKind]}</p>
-                {!HAS_SCRIPT(kind as EmployeeKind, specialty) && <p className="note warn">No customer conversations for this post yet. You can still walk about.</p>}
+                <p className="note">The store opens with two specialists. Join as an extra one: customers are sent to you first, and you serve them from the staff panel.</p>
               </div>
             )}
           </div>

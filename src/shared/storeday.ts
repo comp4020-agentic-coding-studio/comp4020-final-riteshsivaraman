@@ -366,9 +366,68 @@ class Timeline {
     this.heading = headingTo(this.pos.x, this.pos.z, f.x, f.z);
     this.t = until;
   }
+  // staff with something to do between customers (see `idle`)
+  life = false;
+  stationsNear: Station[] = [];
+
+  // wait here until time t. Staff do not freeze: between customers they
+  // glance round, fold their arms, check a tablet, tidy a nearby table and
+  // come back, all from fixed seeds so every client sees the same thing
+  // (Ritesh, 2026-10-19: "a lot of them just stand around and do nothing").
+  idle(until: number): void {
+    if (!this.life || this.seated) {
+      this.stand(until);
+      return;
+    }
+    const home = { ...this.pos };
+    const base = this.heading;
+    const seed = Array.from(this.id).reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
+    let n = 0;
+    while (until - this.t > 2.2 && n++ < 400) {
+      const gap = until - this.t;
+      const r = rand(seed * 977 + Math.floor(this.t * 7) + n * 13);
+      const r2 = rand(seed * 331 + Math.floor(this.t * 5) + n * 29);
+      const look = (off: number): Pt => ({ x: home.x - Math.sin(base + off) * 3, z: home.z - Math.cos(base + off) * 3 });
+      if (r < 0.22 && gap > 16 && this.stationsNear.length > 0) {
+        // tidy a nearby table: walk over, work at it a while, come back
+        const s = this.stationsNear[Math.floor(r2 * this.stationsNear.length) % this.stationsNear.length];
+        const there = planPath(home, s.at, "staff");
+        if (there.secs * 2 + 9 < gap - 1) {
+          this.moveTo(s.at, [], "tidying a display");
+          this.stand(this.t + 5 + r2 * 5, "straightening the display", "work", "focused", s.face);
+          this.moveTo(home, [], "back to their spot");
+          continue;
+        }
+      }
+      if (r < 0.34 && gap > 10) {
+        // a few steps along the floor and back
+        const off = (r2 < 0.5 ? -1 : 1) * (1.4 + r2 * 1.6);
+        const to = [{ x: home.x + off, z: home.z }, { x: home.x, z: home.z + off }, { x: home.x - off, z: home.z }].find((p) => free(p));
+        if (to) {
+          const there = planPath(home, to, "staff");
+          if (there.secs * 2 + 5 < gap - 1) {
+            this.moveTo(to, [], "walking the floor");
+            this.stand(this.t + 2 + r2 * 3, "keeping an eye on the floor", "idle", "neutral", look(r2 - 0.5));
+            this.moveTo(home, [], "back to their spot");
+            continue;
+          }
+        }
+      }
+      const d = Math.min(gap, 3.5 + r2 * 4.5);
+      if (r < 0.5) this.stand(this.t + d, "looking around the store", "idle", "neutral", look((r2 - 0.5) * 2.2));
+      else if (r < 0.64) this.stand(this.t + d, "keeping an eye on the floor", "crossed", "neutral", look((r2 - 0.5) * 1.2));
+      else if (r < 0.78) this.stand(this.t + d, "checking their phone", "phone", "neutral", look(0));
+      else if (r < 0.9) this.stand(this.t + d, "thinking something over", "think", "curious", look((r2 - 0.5) * 1.6));
+      else this.stand(this.t + d, "having a stretch", "idle", "smile", look(0));
+    }
+    this.stand(until);
+  }
   // set off at time `depart` (waiting where they are until then), return when they arrive
   walk(to: Pt, depart: number, intent: string, via: Pt[] = []): number {
-    this.stand(depart);
+    this.idle(depart);
+    return this.moveTo(to, via, intent);
+  }
+  moveTo(to: Pt, via: Pt[], intent: string): number {
     this.seated = false; // anyone walking has got up
     let at = this.t;
     for (const target of [...via, to]) {
@@ -431,7 +490,6 @@ export interface CastMember {
 
 const CAPS: Record<StaffRole, string> = { greeter: "#4caf50", specialist: "#ffd23f", genius: "#ff6f61", stock: "#9c6ade", technician: "#29b6f6" };
 const STAFF_SHIRT = "#2f5d9e";
-const SPEC_ORDER: SpecialtyGroup[] = ["phones", "laptops", "tablets", "audio"];
 
 // the customers, each with a reason to be here
 const PURPOSES: Purpose[] = ["phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse", "audio", "consult", "repair", "phone"];
@@ -439,7 +497,10 @@ const CUSTOMER_SHIRTS = ["#e07a5f", "#81b29a", "#f2cc8f", "#9b72aa", "#6d9dc5", 
 
 export const CAST: CastMember[] = [
   { id: "greeter-1", role: "greeter", shirt: STAFF_SHIRT, cap: CAPS.greeter },
-  ...SPEC_ORDER.map((g): CastMember => ({ id: `spec-${g}`, role: "specialist", specialty: g, shirt: STAFF_SHIRT, cap: CAPS.specialist })),
+  // two specialists to start with; both help with anything, and real users who
+  // join as specialists are extra
+  { id: "spec-phones", role: "specialist", specialty: "phones", shirt: STAFF_SHIRT, cap: CAPS.specialist },
+  { id: "spec-phones-2", role: "specialist", specialty: "phones", shirt: STAFF_SHIRT, cap: CAPS.specialist },
   { id: "genius-1", role: "genius", shirt: STAFF_SHIRT, cap: CAPS.genius },
   { id: "genius-2", role: "genius", shirt: STAFF_SHIRT, cap: CAPS.genius },
   { id: "stock-runner", role: "stock", shirt: STAFF_SHIRT, cap: CAPS.stock },
@@ -457,11 +518,10 @@ const STOCK_AISLE_V: [number, number] = [
   (BACK_SHELF_ROW_Z[1] - BR + 0.62 + BACK_LAYOUT.spineV0) / 2,
 ];
 const POSTS: Record<string, Pt> = {
-  "greeter-1": { x: 0, z: SHOP_FRONT + 1.0 },
+  // to the side of the doorway, not in the middle of everyone's way in
+  "greeter-1": { x: -(ENTRANCE_HALF + 0.9), z: SHOP_FRONT + 1.0 },
   "spec-phones": { x: -4.5, z: -3.0 },
-  "spec-laptops": { x: 1.6, z: 0.5 },
-  "spec-tablets": { x: -1.6, z: -2.0 },
-  "spec-audio": { x: 4.9, z: -2.0 },
+  "spec-phones-2": { x: 4.6, z: 0.5 },
   "genius-1": { x: -1.8, z: BEHIND_BAR_Z },
   "genius-2": { x: 1.8, z: BEHIND_BAR_Z },
   "stock-runner": { x: DOOR_X, z: BR + 1.4 },
@@ -505,11 +565,19 @@ function build(): void {
     // every role — greeter included — facing away from their own door
     // (Ritesh, 2026-10-12: "all the staff suddenly turned to face the back
     // of the store and went still").
-    const tl = new Timeline(c.id, "staff", post, c.role === "technician" ? BENCH_FACE[c.id] : { x: post.x, z: post.z - (post.z < 0 ? 2 : 1) }, idleFor(c));
+    const idleFace: Pt = c.role === "technician" ? BENCH_FACE[c.id] : c.role === "greeter" ? { x: 0, z: post.z - 0.4 } : { x: post.x, z: post.z - (post.z < 0 ? 2 : 1) };
+    const tl = new Timeline(c.id, "staff", post, idleFace, idleFor(c));
+    // those who work the floor have things to do between customers
+    if (c.role === "greeter" || c.role === "specialist" || c.role === "genius" || c.id === "stock-runner") {
+      tl.life = true;
+      if (c.role === "specialist") tl.stationsNear = STATIONS.filter((s) => Math.hypot(s.at.x - post.x, s.at.z - post.z) < 7);
+    }
     staff.set(c.id, tl);
   }
   const greeter = staff.get("greeter-1")!;
-  const specialistFor = (g: SpecialtyGroup): Timeline => staff.get(`spec-${g}`)!;
+  // both specialists cover everything: whoever is free soonest comes over
+  const specialists = [staff.get("spec-phones")!, staff.get("spec-phones-2")!];
+  const specialistFor = (_g: SpecialtyGroup): Timeline => specialists.reduce((a, b) => (a.t <= b.t ? a : b));
   const geniuses = [staff.get("genius-1")!, staff.get("genius-2")!];
   const runner = staff.get("stock-runner")!;
 
@@ -725,7 +793,7 @@ function build(): void {
       const post = POSTS[c.id];
       if (Math.hypot(tl.pos.x - post.x, tl.pos.z - post.z) > 0.2) tl.walk(post, tl.t, "back to their place");
     }
-    tl.stand(CYCLE);
+    tl.idle(CYCLE);
     timelines.set(tl.id, tl);
   }
 }
