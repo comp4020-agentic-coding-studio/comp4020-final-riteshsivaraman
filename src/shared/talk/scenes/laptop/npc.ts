@@ -1,16 +1,21 @@
 import { derive, questionById } from "./bank.ts";
+import * as coreNpc from "../../core/npc.ts";
 import { MODELS, modelById } from "./data.ts";
 import { ceil100, poolOf, type Constraints } from "./pool.ts";
-import { chance, pickOne, weighted, type Rng } from "../../core/rng.ts";
+import { chance, pickOne, type Rng } from "../../core/rng.ts";
 import { applyCustomer, applyStaff, customerMenu, staffActs, type CustomerMenu } from "./scene.ts";
 import { type CustomerReply, type Scene, type StaffAct, type Tone } from "./types.ts";
 
 // NPCs for the laptop scene. Same shape as src/shared/talk/npc.ts (phones):
 // neither side is scripted, both choose among legal moves with weights and a
-// little noise. rng.ts now comes from core/ (it never depended on phones),
-// which is why this import is the one real difference from the phone
-// version's "./rng.ts" -- everything else below is the phone npc.ts with
-// phone fields swapped for laptop ones.
+// little noise. staffMove, runConversation, randomStaff, tone() and pickN()
+// are byte-identical with the phone scene's and now live once in
+// core/npc.ts (phase 2 step 3); the rest (customerMove, compatible,
+// consistent, answerQuestion, randomPersona) stays here, same as phones,
+// because each touches a Sku/Constraints field whose shape differs per scene
+// (core/npc.ts's file header explains why).
+export const randomStaff = coreNpc.randomStaff;
+export type StaffTraits = coreNpc.StaffTraits;
 
 export interface Persona {
   id: string;
@@ -58,7 +63,7 @@ function consistent(sc: Scene, p: Persona, qid: string, picks: string[]): boolea
   return true;
 }
 
-const tone = (sc: Scene, p: Persona, rng: Rng): Tone => (sc.patience <= 3 ? "impatient" : pickOne(rng, p.tones));
+const tone = (sc: Scene, p: Persona, rng: Rng): Tone => coreNpc.tone(sc.patience, p.tones, rng);
 
 function answerQuestion(sc: Scene, p: Persona, menu: CustomerMenu, rng: Rng): string[] {
   if (menu.pending.kind !== "question") return [];
@@ -162,49 +167,23 @@ export function customerMove(sc: Scene, persona: Persona, rng: Rng, mem: Memory 
 
 const fits = (id: string, p: Persona): boolean => poolOf({ ...p.wants, model: id }).length > 0;
 
-export interface StaffTraits {
-  thorough: number;
-  salesy: number;
-  tones: Tone[];
-}
-
 export function staffMove(sc: Scene, tr: StaffTraits, rng: Rng): { act: StaffAct; tone: Tone } {
   const acts = staffActs(sc);
-  const lastCustomerTone = [...sc.log].reverse().find((l) => l.who === "customer")?.tone;
-  const impatient = lastCustomerTone === "impatient";
-  const picked0: Tone = impatient ? weighted(rng, [{ item: "friendly", w: 3 }, { item: "neutral", w: 2 }]) : pickOne(rng, tr.tones);
-  const picked: Tone = picked0 === "impatient" && sc.turn <= 10 ? "neutral" : picked0;
-  const t: Tone = sc.log.length === 0 && (picked === "impatient" || picked === "unsure") ? "neutral" : picked;
   const ctx = derive(sc);
-  const models = ctx.ranked.length;
-  const weights = acts.map((v) => {
-    const a = v.act;
-    let w = 0;
-    if (acts.length === 1) w = 1;
-    else if (a.t === "ask" && a.reopen) w = ctx.pool.length === 0 ? 1 : 0;
-    else if (a.t === "ask") {
-      const q = questionById(a.qid);
-      w = a.qid === "opening_intent" && sc.turn === 0 ? 6 : a.qid === "known_model" && sc.turn === 0 ? 2 : 0.2 + v.gain * 3;
-      if (a.qid === "use_case" || a.qid === "budget_ceiling") w += 1.5;
-      if (q.kind === "resolve") w = a.qid === "storage_tier_for_model" ? 4 : 3;
-      w *= tr.thorough * (impatient ? 0.5 : 1);
-    } else if (a.t === "offer_demo") w = (models <= 4 ? 1 + (5 - models) * 0.8 : 0.3) * tr.salesy * (impatient ? 2 : 1);
-    else if (a.t === "reconfirm") w = 9;
-    else if (a.t === "recommend") w = (acts.some((x) => x.act.t === "ask" && !x.act.reopen) ? 0.3 : 6) * tr.salesy;
-    else if (a.t === "confirm") w = 12;
-    else if (a.t === "nudge") w = 10;
-    else if (a.t === "rescue") w = 5;
-    else if (a.t === "answer") w = 0.5;
-    return { item: a, w };
-  });
-  return { act: weighted(rng, weights), tone: t };
+  return coreNpc.staffMove(
+    acts,
+    sc,
+    tr,
+    rng,
+    ctx.pool.length,
+    ctx.ranked.length,
+    (qid) => questionById(qid).kind,
+    "opening_intent",
+    "known_model",
+    ["use_case", "budget_ceiling"],
+    (qid) => (qid === "storage_tier_for_model" ? 4 : 3),
+  );
 }
-
-export const randomStaff = (rng: Rng): StaffTraits => ({
-  thorough: 0.6 + rng(),
-  salesy: 0.6 + rng(),
-  tones: ["friendly", "neutral", ...(chance(rng, 0.25) ? (["unsure"] as Tone[]) : []), ...(chance(rng, 0.12) ? (["impatient"] as Tone[]) : [])],
-});
 
 export function randomPersona(rng: Rng, id = "random"): Persona {
   const tones: Tone[] = pickOne(rng, [["friendly", "neutral"], ["neutral"], ["neutral", "impatient"], ["friendly", "unsure"]]) as Tone[];
@@ -235,33 +214,21 @@ export function randomPersona(rng: Rng, id = "random"): Persona {
   };
 }
 
-function pickN<T>(rng: Rng, xs: T[], n: number): T[] {
-  const left = [...xs];
-  const out: T[] = [];
-  while (out.length < n && left.length) out.push(left.splice(Math.floor(rng() * left.length), 1)[0]!);
-  return out;
-}
+const pickN = coreNpc.pickN;
 
-export interface RunResult {
-  scene: Scene;
-  turns: number;
-  stuck?: string;
-}
+export type RunResult = coreNpc.RunResult<Scene>;
 
 export function runConversation(persona: Persona, staff: StaffTraits, rng: Rng, start: Scene, maxTurns = 80): RunResult {
-  let sc = start;
   const mem: Memory = { wants: persona.wants, conceded: new Set() };
-  while (!sc.ended && sc.turn < maxTurns) {
-    const sm = staffActs(sc);
-    if (sm.length === 0) return { scene: sc, turns: sc.turn, stuck: "no legal staff move" };
-    const s = staffMove(sc, staff, rng);
-    const a = applyStaff(sc, s.act, s.tone);
-    if ("error" in a) return { scene: sc, turns: sc.turn, stuck: `staff: ${a.error}` };
-    const menu = customerMenu(a);
-    if (!menu || (menu.options.length === 0 && menu.actions.length === 0)) return { scene: a, turns: a.turn, stuck: "no legal customer move" };
-    const c = applyCustomer(a, customerMove(a, persona, rng, mem));
-    if ("error" in c) return { scene: a, turns: a.turn, stuck: `customer: ${c.error}` };
-    sc = c;
-  }
-  return { scene: sc, turns: sc.turn, stuck: sc.ended ? undefined : "did not finish" };
+  return coreNpc.runConversation<Scene, StaffAct, CustomerReply>(
+    staffActs,
+    applyStaff,
+    customerMenu,
+    applyCustomer,
+    (sc, r) => staffMove(sc, staff, r),
+    (sc, r) => customerMove(sc, persona, r, mem),
+    rng,
+    start,
+    maxTurns,
+  );
 }
