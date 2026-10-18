@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
+import { CEILING, FLOOR } from "../src/shared/protocol.ts";
 import { renderCeiling, renderDocument, renderMallPlan, renderPlan, renderWalls } from "../src/shared/blueprint.ts";
 
 // Promise: the blueprints Ritesh approves and the model the 3D scene and the
@@ -25,4 +26,12 @@ it("has a committed printable document that matches the model", () => {
 
 it("has a committed mall drawing that matches the model", () => {
   expect(readFileSync("docs/blueprint/canberra-mall.svg", "utf8")).toBe(renderMallPlan());
+});
+
+it("states the shop's size in the blueprint README as the model has it", () => {
+  const w = FLOOR.maxX - FLOOR.minX;
+  const d = Math.round((FLOOR.maxZ - FLOOR.minZ) * 10) / 10;
+  const readme = readFileSync("docs/blueprint/README.md", "utf8");
+  expect(readme).toContain(`**${w} m wide, ${d} m deep, ${CEILING} m high**`);
+  expect(readme).toContain(`| ${w} x ${d} x ${CEILING} m |`);
 });

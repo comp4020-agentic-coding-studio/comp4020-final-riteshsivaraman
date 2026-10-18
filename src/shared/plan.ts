@@ -6,8 +6,8 @@
 // are z (0 is the middle of the shop, negative is the glass front).
 //
 // Scale: the wall features were placed from the rectified reference
-// photographs (SCOPE.md 3f) for a shop 10 m deep. The shop is now 15.4 m deep
-// (Ritesh, 2026-10-11), so the features keep their order and proportions along
+// photographs (SCOPE.md 3f) for a shop 10 m deep. The shop is now 18.2 m deep
+// (Ritesh, 2026-10-11, SCOPE D23 and D24), so the features keep their order and proportions along
 // the wall: positions are stretched from the old front-to-bay span to the new
 // one (wallZ), widths by WALL_W_STRETCH. Heights are unchanged.
 import { ENTRANCE_HALF, FLOOR } from "./protocol.ts";
