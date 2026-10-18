@@ -21,6 +21,7 @@ import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
 import { TABLE_ASSIGNMENTS } from "../shared/assignments.ts";
 import { clampToWalkable, COUNTER } from "../shared/world.ts";
+import { nearestStaffSpot } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
 import { takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
@@ -890,7 +891,7 @@ function demoSpot(ctx: Ctx, customerId: string, talkModelId: string): { slotId: 
   if (!s) return null;
   const sx = s.x + (s.side === "-x" ? -STAND_OFF_DEVICE : STAND_OFF_DEVICE);
   const stand = clampToWalkable("customer", sx, s.z);
-  const goal = clampToWalkable("staff", sx, s.z + 0.9);
+  const goal = nearestStaffSpot(clampToWalkable("staff", sx, s.z + 0.9)); // never in a table
   return { slotId: s.id, stand, goal, face: { x: s.x, z: s.z } };
 }
 
@@ -937,7 +938,7 @@ function startTillEscort(ctx: Ctx, row: ConvRow): Outgoing[] {
     staffId: row.with_id,
     kind: "till",
     from,
-    goal: { x: stand.x - 1.0, z: stand.z },
+    goal: nearestStaffSpot({ x: stand.x - 1.0, z: stand.z }),
     face: stand,
     stand,
     text: `Follow ${nameOf(ctx, row.with_id)} to the Genius Bar, where ${genius} will take your payment`,

@@ -1,7 +1,7 @@
 import type { Behaviour } from "./behaviour.ts";
 import type { Engagement } from "./protocol.ts";
 import { headingTo, wrap } from "./steering.ts";
-import { momentOf, planPath, type Moment } from "./storeday.ts";
+import { momentOf, nearestStaffSpot, planPath, staffCanStand, type Moment } from "./storeday.ts";
 
 // An NPC being served by a visitor (D1): it drops its timetable, walks to the
 // visitor, stands facing them while they talk, and when released walks back and
@@ -22,7 +22,22 @@ export function servicePoint(from: Pt, visitor: Pt): Pt {
   const dx = from.x - visitor.x;
   const dz = from.z - visitor.z;
   const d = Math.hypot(dx, dz) || 1;
-  return { x: visitor.x + (dx / d) * STAND_OFF, z: visitor.z + (dz / d) * STAND_OFF };
+  const ideal = { x: visitor.x + (dx / d) * STAND_OFF, z: visitor.z + (dz / d) * STAND_OFF };
+  if (staffCanStand(ideal)) return ideal;
+  // the ideal spot is in a table or against one (the visitor stands beside it):
+  // stand where there is room instead, as near to the same side as possible,
+  // so nobody walks through furniture to talk (Ritesh, 2026-10-19)
+  const a0 = Math.atan2(dz, dx);
+  for (const r of [STAND_OFF, STAND_OFF + 0.3, STAND_OFF + 0.7]) {
+    for (let k = 1; k <= 12; k++) {
+      for (const sign of k === 12 ? [1] : [1, -1]) {
+        const a = a0 + sign * k * (Math.PI / 12);
+        const c = { x: visitor.x + Math.cos(a) * r, z: visitor.z + Math.sin(a) * r };
+        if (staffCanStand(c)) return c;
+      }
+    }
+  }
+  return nearestStaffSpot(ideal);
 }
 
 function along(path: { pts: Pt[]; secs: number }, t: number): { x: number; z: number; ry: number; walking: boolean } {

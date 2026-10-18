@@ -301,6 +301,20 @@ function route(from: Pt, to: Pt, role: "staff" | "customer"): Pt[] {
   return out;
 }
 
+// Whether a member of staff can stand on this point (not in or hard against
+// furniture), and the nearest point where they can.
+export function staffCanStand(p: Pt): boolean {
+  const g = blockedGrid("staff");
+  const [c, r] = cellOf(p);
+  return !g[r * COLS + c];
+}
+export function nearestStaffSpot(p: Pt): Pt {
+  if (staffCanStand(p)) return p;
+  const g = blockedGrid("staff");
+  const [c, r] = openCell(g, p);
+  return centreOf(c, r);
+}
+
 export function planPath(from: Pt, to: Pt, role: "staff" | "customer"): Path {
   const key = `${role}|${from.x.toFixed(2)},${from.z.toFixed(2)}|${to.x.toFixed(2)},${to.z.toFixed(2)}`;
   const hit = pathCache.get(key);

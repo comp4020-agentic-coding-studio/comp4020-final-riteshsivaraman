@@ -254,6 +254,32 @@ export const IPHONE_18_PRO: PhoneModelSpec = {
   ],
 };
 
+// iPhone 18 Pro Max (6.9"). [TK] ESTIMATE, not Apple's numbers: the 18 Pro's
+// body and camera layout scaled up by the screen sizes (6.9 / 6.3), thickness
+// unchanged, so the demo unit is the right shape and about the right size.
+// Replace with the tech-spec dimensions from apple.com/au/iphone-18-pro-max/
+// specs before this is shown as accurate (Ritesh, 2026-10-19: it should be
+// available for demo).
+const MAX_K = 6.9 / 6.3;
+const sc2 = ([a, b]: [number, number]): [number, number] => [a * MAX_K, b * MAX_K];
+export const IPHONE_18_PRO_MAX: PhoneModelSpec = {
+  ...IPHONE_18_PRO,
+  id: "iphone-18-pro-max",
+  length: IPHONE_18_PRO.length * MAX_K,
+  width: IPHONE_18_PRO.width * MAX_K,
+  cornerRadius: IPHONE_18_PRO.cornerRadius * MAX_K,
+  plateau: {
+    ...IPHONE_18_PRO.plateau,
+    width: IPHONE_18_PRO.plateau.width * MAX_K,
+    height: IPHONE_18_PRO.plateau.height * MAX_K,
+    radius: IPHONE_18_PRO.plateau.radius * MAX_K,
+    inset: IPHONE_18_PRO.plateau.inset * MAX_K,
+    lenses: IPHONE_18_PRO.plateau.lenses.map((l) => ({ pos: sc2(l.pos), r: l.r * MAX_K })),
+    extras: IPHONE_18_PRO.plateau.extras?.map((x) => ({ ...x, pos: sc2(x.pos), r: x.r * MAX_K })),
+  },
+  buttons: IPHONE_18_PRO.buttons?.map((b) => ({ ...b, y: b.y * MAX_K, len: b.len * MAX_K })),
+};
+
 // ---- the rest of the current iPhone line (references/product-line.md §1) ----
 //
 // Body dimensions are Apple's own tech-spec numbers (via WebSearch summaries
@@ -466,6 +492,7 @@ export const IPHONE_17E: PhoneModelSpec = {
 export const PHONE_MODELS: Record<string, PhoneModelSpec> = {
   [IPHONE_DUO.id]: IPHONE_DUO,
   [IPHONE_18_PRO.id]: IPHONE_18_PRO,
+  [IPHONE_18_PRO_MAX.id]: IPHONE_18_PRO_MAX,
   [IPHONE_AIR.id]: IPHONE_AIR,
   [IPHONE_17.id]: IPHONE_17,
   [IPHONE_17E.id]: IPHONE_17E,

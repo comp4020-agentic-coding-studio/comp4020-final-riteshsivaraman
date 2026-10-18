@@ -26,7 +26,7 @@ export const TABLE_ASSIGNMENTS: Record<string, Partial<Record<Side, string>>> = 
   T1: { "-x": "iphone-duo", "+x": "iphone-18-pro" }, // nearest the door: the foldable and the flagship
   T2: { "-x": "iphone-air", "+x": "iphone-17" },
   T8: { "-x": "iphone-17e", "+x": "iphone-16" },
-  T9: { "-x": "iphone-18-pro", "+x": "iphone-17" }, // flagship repeated, as real stores often do
+  T9: { "-x": "iphone-18-pro-max", "+x": "iphone-17" }, // the biggest flagship (an estimated body, see phones-geo.ts)
   T10: { "-x": "iphone-air", "+x": "iphone-duo" },
   T11: { "-x": "iphone-16", "+x": "iphone-17e" },
   // tablet tables

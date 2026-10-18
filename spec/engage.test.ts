@@ -101,3 +101,33 @@ describe("a look", () => {
     expect(validateLook({ seed: "x".repeat(40) }).seed).toBeUndefined();
   });
 });
+
+describe("walking over to a visitor never goes through furniture", () => {
+  // Ritesh, 2026-10-19: "don't let staff walk through a table during convo".
+  // Every point of the route, and the spot they stop at, is clear floor for staff.
+  it("stops and routes only over floor staff can stand on, wherever the visitor is", async () => {
+    const { planPath } = await import("../src/shared/storeday.ts");
+    const { solidsFor, clampToWalkable } = await import("../src/shared/world.ts");
+    const solids = solidsFor("staff");
+    const inside = (p: { x: number; z: number }) => solids.some((b) => Math.abs(p.x - b.x) < b.w / 2 - 0.02 && Math.abs(p.z - b.z) < b.d / 2 - 0.02);
+    let checked = 0;
+    for (const id of ["spec-phones", "spec-phones-2", "greeter-1", "genius-1"]) {
+      for (const t of [0, 120, 300]) {
+        const start = momentOf(id, t * 1000);
+        if (!start.present) continue;
+        for (let x = -5; x <= 5; x += 1.25) {
+          for (let z = -8; z <= 8.5; z += 1.25) {
+            const v = clampToWalkable("customer", x, z);
+            if (Math.hypot(v.x - x, v.z - z) > 0.05 || solids.some((b) => Math.abs(x - b.x) < b.w / 2 && Math.abs(z - b.z) < b.d / 2)) continue;
+            const goal = servicePoint(start, v);
+            expect(inside(goal), `${id} stops in furniture for a visitor at (${x}, ${z}): (${goal.x.toFixed(2)}, ${goal.z.toFixed(2)})`).toBe(false);
+            const bad = planPath({ x: start.x, z: start.z }, goal, "staff").pts.find(inside);
+            expect(bad, `${id} walks through furniture to a visitor at (${x}, ${z})`).toBeUndefined();
+            checked++;
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(200);
+  });
+});

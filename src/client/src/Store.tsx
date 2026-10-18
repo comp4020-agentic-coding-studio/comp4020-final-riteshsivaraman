@@ -15,6 +15,7 @@ import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions, TABLE_H } from "../../shared/world.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
 import { NameFloat } from "./NameFloat.tsx";
+import { modelById } from "../../shared/talk/data.ts";
 import { TABLE_ASSIGNMENTS } from "../../shared/assignments.ts";
 import { productById } from "../../shared/catalogue.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
@@ -387,7 +388,15 @@ const DEVICE_HINT_COS = 0.5; // within about a 60° cone of where you're looking
 const PILOT_PHONE_MODEL = new URLSearchParams(location.search).get("pilotPhone") ?? undefined;
 const nameOfSlot = (slot: DeviceSlot): string => {
   const modelId = PILOT_PHONE_MODEL ?? TABLE_ASSIGNMENTS[slot.tableId]?.[slot.side];
-  return (modelId && productById(modelId)?.name) || "device";
+  if (!modelId) return "device";
+  const named = productById(modelId)?.name;
+  if (named) return named;
+  // a model the catalogue has no price list for yet (the 18 Pro Max): the talk data names it
+  try {
+    return modelById(modelId.replace(/^iphone-/, "")).name;
+  } catch {
+    return "device";
+  }
 };
 function Interact() {
   const { camera } = useThree();
