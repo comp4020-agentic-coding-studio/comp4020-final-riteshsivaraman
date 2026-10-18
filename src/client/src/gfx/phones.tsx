@@ -57,7 +57,6 @@ import {
   WALL_BANDS,
 } from "../../../shared/plan.ts";
 import { net } from "../net.ts";
-import { IOS_PILOT, iosPhoneScreen } from "./phones-ios.ts";
 import { WOOD, WALL, SILVER, STAND, DEVICE_COLOURS, BOX_COLOURS, HALF_W, DOOR_W, DOOR_X, DOOR_H, BENCH_X, BENCH_HALF, FACE_X, canvasTexture, labelTexture, BoxField, Sign, std, BlobShadow, type Cuboid, type Kind } from "./common.tsx";
 import {
   buildEarbuds,
@@ -112,7 +111,6 @@ export function screenTexture(
 ): CanvasTexture {
   const aspect = kind === "phone" ? (opts.aspect ?? 2) : 0;
   const cutout: ScreenCutout = opts.cutout ?? "island";
-  if (kind === "phone" && IOS_PILOT) return iosPhoneScreen(mode, aspect, cutout); // experiment: phones-ios.ts, `?ios=1`
   const key = `${kind}:${variant}:${mode}` + (kind === "phone" && (aspect !== 2 || cutout !== "island") ? `:${aspect.toFixed(2)}:${cutout}` : "");
   let tex = screenCache.get(key);
   if (tex) return tex;
