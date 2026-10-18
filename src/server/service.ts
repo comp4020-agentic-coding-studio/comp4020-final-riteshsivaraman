@@ -791,6 +791,8 @@ export function assignHelper(ctx: Ctx, customerId: string, post: string): { out:
   const spot = waitSpotFor(post);
   const hold = helper.kind === "npc" ? spot : null;
   const out = showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "help", ...(hold ? { hold } : {}), ...(!hold && spot ? { hint: spot } : {}) });
+  // a real user is told straight away: this is their customer
+  if (helper.kind === "visitor") out.push(notice(helper.id, `New customer: ${nameOf(ctx, customerId)} is waiting${spot ? ` near ${spot.label}` : ""}. Go and meet them.`));
   return { out, helperName: nameOf(ctx, helper.id), waitLabel: spot?.label ?? null };
 }
 
