@@ -371,6 +371,26 @@ kbd {
   display: flex;
   flex-direction: column;
 }
+/* a name floating over a head: plain, large, outlined so it reads on any
+   background. Players are green; NPCs are white with a small "NPC". */
+.name-float {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font: 600 20px/1.1 system-ui, sans-serif;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+.name-float.player {
+  color: #8cf0b4;
+}
+.name-float i {
+  font: 600 10px system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
 .name-chip {
   font-style: normal;
   font-size: 9px;
@@ -543,7 +563,7 @@ kbd {
 }
 .intent-badge {
   margin-top: 2px;
-  font-size: 10px;
+  font: 600 13px system-ui, sans-serif;
   color: #ffd23f;
 }
 .missions {

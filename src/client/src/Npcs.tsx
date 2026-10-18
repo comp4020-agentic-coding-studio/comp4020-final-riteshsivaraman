@@ -82,12 +82,10 @@ export function Npcs() {
       {NPCS.map((n, i) => (
         <group key={n.id} visible={false}>
           <Actor id={n.id} shirt={n.colour} uniform={uniforms[i]} getState={() => states.current[i]} />
-          <Html position={[0, 2.05, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
-            <div className="name-tag" style={{ borderColor: n.cap ?? "#fff" }}>
-              <b>
-                {NPC_NAME[n.id] ?? n.id} <i className="name-chip npc">NPC</i>
-              </b>
-              <span>{n.specialty ? `${n.specialty} specialist` : n.role}</span>
+          <Html position={[0, 2.05, 0]} center distanceFactor={7} style={{ pointerEvents: "none" }}>
+            <div className="name-float">
+              <b>{NPC_NAME[n.id] ?? n.id}</b>
+              <i>NPC</i>
               <IntentBadge id={n.id} />
             </div>
           </Html>

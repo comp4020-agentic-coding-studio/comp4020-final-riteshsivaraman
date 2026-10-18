@@ -365,12 +365,9 @@ function Remotes() {
             }
             getState={() => speeds.current.get(r.info.id) ?? { walking: false, mode: "idle", mood: "neutral" }}
           />
-          <Html position={[0, 2.0, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
-            <div className="name-tag" style={{ borderColor: r.identity.kind === "customer" ? "#fff" : EMPLOYEE_COLOUR[r.identity.kind] }}>
-              <b>
-                {r.info.name} <i className="name-chip player">Player</i>
-              </b>
-              <span>{r.identity.kind === "specialist" ? `${r.identity.specialty} specialist` : r.identity.kind}</span>
+          <Html position={[0, 2.0, 0]} center distanceFactor={7} style={{ pointerEvents: "none" }}>
+            <div className="name-float player">
+              <b>{r.info.name}</b>
               <IntentBadge id={r.info.id} />
             </div>
           </Html>
