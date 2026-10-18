@@ -443,6 +443,58 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+/* a grouped, collapsed set of choices (e.g. "Ask for a demo", "other
+   colours") — folded away by default so a rarely-used or mostly-irrelevant
+   bucket doesn't sit at the same visual weight as what's actually on offer */
+.talk-group {
+  grid-column: 1 / -1;
+}
+.talk-group-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px dashed #b8bec6;
+  background: transparent;
+  color: #555;
+  cursor: pointer;
+}
+.talk-group-toggle:hover {
+  border-color: #1d1f23;
+  color: #1d1f23;
+}
+.talk-group-count {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.talk-group-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.talk-group-items button {
+  font: inherit;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #b8bec6;
+  background: #fff;
+  cursor: pointer;
+}
+.talk-group-items button:hover {
+  border-color: #1d1f23;
+}
+@media (max-width: 560px) {
+  .talk-group-items {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* the employee panel */
 .staff {

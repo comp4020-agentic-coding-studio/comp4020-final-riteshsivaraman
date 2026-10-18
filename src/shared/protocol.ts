@@ -39,13 +39,18 @@ export interface CustomerView {
   note: string | null; // a note left when they were handed on
 }
 
-// The menu a visitor is shown, and whose turn it is.
+// The menu a visitor is shown, and whose turn it is. `group` is optional and
+// purely presentational: the old engine's choices never set it (ungrouped,
+// rendered flat as before); the new talk engine's richer menu uses it to fold
+// a long or mostly-irrelevant set of options (every model's demo/pick action,
+// a colour nobody stocks) under a named, collapsed heading instead of
+// dumping everything at one visual weight (Ritesh, 2026-10-19, live feedback).
 export interface TurnView {
   conversationId: string;
   withId: string;
   withName: string;
   say: string;
-  choices: Array<{ id: string; label: string }>;
+  choices: Array<{ id: string; label: string; group?: string }>;
   ended: boolean;
   awaiting: "customer" | "staff"; // whose turn: a customer waits on staff, shown no menu
 }

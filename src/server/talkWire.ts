@@ -29,7 +29,7 @@ import type { CustomerReply, Scene, Tone } from "../shared/talk/types.ts";
 
 export interface TalkTurn {
   say: string;
-  choices: Array<{ id: string; label: string }>;
+  choices: Array<{ id: string; label: string; group?: string }>;
   ended: boolean;
 }
 
@@ -56,10 +56,31 @@ const ACTION = "act:";
 // that exercise multi-pick (spec/talk-scene.test.ts's colour_prefs/
 // hardware_features cases) aren't reachable through this wire path yet,
 // same documented limitation as throw-backs above.
+// The engine's own menu already carries the grouping Ritesh asked for
+// (Option.group, e.g. "other colours" — core/types.ts's own comment says
+// "the UI may fold a long group away"); this just hadn't been carried onto
+// the wire. menu.actions has no such field (every model's demo/pick action
+// is always offered, every turn, regardless of what's being asked), which is
+// exactly why the colour screen still showed "Go with the iPhone 18 Pro":
+// bucket those by action type into a named group too, so the pending
+// question's own options stay the only thing shown at top level.
+function actionGroup(a: CustomerMenu["actions"][number]): string | undefined {
+  switch (a.action.t) {
+    case "demo":
+      return "Ask for a demo";
+    case "pick":
+      return "Choose a different phone";
+    case "change":
+      return "Change an earlier answer";
+    default:
+      return undefined; // leave/ok: always a top-level, single, standing action
+  }
+}
+
 function menuToTurn(menu: CustomerMenu): TalkTurn {
   const choices: TalkTurn["choices"] = [
-    ...menu.options.map((o) => ({ id: `${OPTION}${o.id}`, label: o.label })),
-    ...menu.actions.map((a, i) => ({ id: `${ACTION}${i}`, label: a.label })),
+    ...menu.options.map((o) => ({ id: `${OPTION}${o.id}`, label: o.label, group: o.group })),
+    ...menu.actions.map((a, i) => ({ id: `${ACTION}${i}`, label: a.label, group: actionGroup(a) })),
   ];
   return { say: menu.prompt, choices, ended: false };
 }
