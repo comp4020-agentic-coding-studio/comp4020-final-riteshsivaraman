@@ -102,4 +102,12 @@ export interface Line {
   after: Snapshot;
 }
 
-export type Ended<Sku> = { how: "bought"; sku: Sku } | { how: "left"; why: string };
+// The default outcome shape (buy or leave) fits any scene whose only two ways
+// to end are "took the item" or "walked away" -- true for phone and laptop,
+// not for a service scene with its own richer outcome set (fixed now, booked,
+// cannot fix, declines a quote). A scene that needs a different ending shape
+// passes its own as Outcome; phone/laptop pass nothing and keep today's type
+// unchanged (docs/conversation-model/service-scene-proposal.md section 1d:
+// "bought"/"left" is not even the right *shape* of distinction for a scene
+// that doesn't buy anything, so this is scene-supplied, not a shared union).
+export type Ended<Sku, Outcome = { how: "bought"; sku: Sku } | { how: "left"; why: string }> = Outcome;
