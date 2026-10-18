@@ -8,6 +8,8 @@ import { settledPeople } from "../../shared/people.ts";
 import { STORE_Y } from "../../shared/protocol.ts";
 import { Actor, type ActorState } from "./gfx/Actor.tsx";
 import { net } from "./net.ts";
+import { IntentBadge } from "./IntentBadge.tsx";
+import { NPC_NAME } from "../../shared/duty.ts";
 
 // Staff and customers, drawn from the shared clock (see shared/npcs.ts and
 // shared/storeday.ts), so everyone sees the same people in the same places,
@@ -80,8 +82,17 @@ export function Npcs() {
       {NPCS.map((n, i) => (
         <group key={n.id} visible={false}>
           <Actor id={n.id} shirt={n.colour} uniform={uniforms[i]} getState={() => states.current[i]} />
+          <Html position={[0, 2.05, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
+            <div className="name-tag" style={{ borderColor: n.cap ?? "#fff" }}>
+              <b>
+                {NPC_NAME[n.id] ?? n.id} <i className="name-chip npc">NPC</i>
+              </b>
+              <span>{n.specialty ? `${n.specialty} specialist` : n.role}</span>
+              <IntentBadge id={n.id} />
+            </div>
+          </Html>
           {LABELS && (
-            <Html position={[0, 2.05, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
+            <Html position={[0, 2.35, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
               <div
                 style={{
                   background: "rgba(20,22,26,0.78)",

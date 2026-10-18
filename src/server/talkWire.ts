@@ -29,7 +29,7 @@ import type { CustomerReply, Scene, Tone } from "../shared/talk/types.ts";
 
 export interface TalkTurn {
   say: string;
-  choices: Array<{ id: string; label: string; group?: string }>;
+  choices: Array<{ id: string; label: string; group?: string; standing?: boolean }>;
   ended: boolean;
 }
 
@@ -80,7 +80,7 @@ function actionGroup(a: CustomerMenu["actions"][number]): string | undefined {
 function menuToTurn(menu: CustomerMenu): TalkTurn {
   const choices: TalkTurn["choices"] = [
     ...menu.options.map((o) => ({ id: `${OPTION}${o.id}`, label: o.label, group: o.group })),
-    ...menu.actions.map((a, i) => ({ id: `${ACTION}${i}`, label: a.label, group: actionGroup(a) })),
+    ...menu.actions.map((a, i) => ({ id: `${ACTION}${i}`, label: a.label, group: actionGroup(a), standing: actionGroup(a) === undefined })),
   ];
   return { say: menu.prompt, choices, ended: false };
 }

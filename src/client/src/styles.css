@@ -371,6 +371,25 @@ kbd {
   display: flex;
   flex-direction: column;
 }
+.name-chip {
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
+.name-chip.npc {
+  background: #5b6470;
+  color: #fff;
+}
+.name-chip.player {
+  background: #2fa56b;
+  color: #fff;
+}
 .name-tag span {
   opacity: 0.8;
   text-transform: capitalize;
@@ -379,10 +398,11 @@ kbd {
 /* the conversation box */
 .talk {
   position: fixed;
-  left: 50%;
+  right: 18px;
   bottom: 18px;
-  transform: translateX(-50%);
-  width: min(720px, calc(100vw - 24px));
+  /* on the side, not the bottom centre: the camera is on the other person's
+     face (Ritesh, 2026-10-19: "can't see the other guy's face") */
+  width: min(380px, calc(100vw - 24px));
   box-sizing: border-box;
   padding: 14px 18px 16px;
   background: rgba(250, 251, 252, 0.97);
@@ -422,8 +442,12 @@ kbd {
   font-size: 12px;
 }
 .talk-choices {
+  /* the name/leave tags poke out above the box, so the box itself must not
+     clip: only the list of choices scrolls if the screen is short */
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 .talk-choices button {
@@ -474,7 +498,7 @@ kbd {
 }
 .talk-group-items {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
   margin-top: 8px;
 }
@@ -494,6 +518,113 @@ kbd {
   .talk-group-items {
     grid-template-columns: 1fr;
   }
+}
+
+@media (max-width: 560px) {
+  .talk {
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}
+
+.escort-banner {
+  position: fixed;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  background: #1d1f23;
+  color: #fff;
+  border-radius: 10px;
+  font: 14px system-ui, sans-serif;
+  z-index: 20;
+  max-width: calc(100vw - 24px);
+}
+.intent-badge {
+  margin-top: 2px;
+  font-size: 10px;
+  color: #ffd23f;
+}
+.missions {
+  position: fixed;
+  left: 12px;
+  top: 64px;
+  max-width: 260px;
+  padding: 8px 12px;
+  background: rgba(20, 22, 26, 0.85);
+  color: #fff;
+  border-radius: 8px;
+  font: 13px system-ui, sans-serif;
+  z-index: 15;
+}
+.missions b {
+  display: block;
+  margin-bottom: 2px;
+  color: #ffd23f;
+}
+
+/* conversation presentation: portrait, answer cards, quiet exits */
+.talk-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 6px 0 12px;
+}
+.talk-head .talk-say {
+  margin: 0;
+  flex: 1;
+  min-height: 2.8em;
+  cursor: default;
+}
+.talk-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #1d1f23;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 18px;
+}
+.talk-choices button.talk-card {
+  padding: 12px 14px;
+  font-weight: 500;
+  animation: talk-in 160ms ease-out both;
+}
+.talk-choices button.talk-card:hover {
+  background: #1d1f23;
+  color: #fff;
+}
+.talk-choices button.talk-card kbd {
+  opacity: 0.55;
+  margin-right: 4px;
+}
+.talk-standing {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.talk-choices .talk-standing button {
+  padding: 5px 12px;
+  font-size: 13px;
+  border: 0;
+  background: transparent;
+  color: #555;
+  text-decoration: underline;
+}
+.talk-choices .talk-standing button:hover {
+  color: #1d1f23;
+}
+@keyframes talk-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk-choices button.talk-card { animation: none; }
 }
 
 /* the employee panel */

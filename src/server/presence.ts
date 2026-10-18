@@ -23,6 +23,12 @@ import {
   handOn,
   inspections,
   leaveConversation,
+  closeTalk,
+  requestTalk,
+  acceptIntentById,
+  settleIntents,
+  cancelEscort,
+  intentViews,
   leaveStore,
   startInspect,
   startTalk,
@@ -234,6 +240,7 @@ export function handleConnection(socket: WebSocket): void {
         offDuty: (dutyMessage(ctx).message as { offDuty: string[] }).offDuty,
         engaged: engagements(db),
         inspecting: inspections(db),
+        intents: intentViews(ctx),
       });
       broadcast({ type: "joined", visitor: present(me) }, me.id);
       // someone has come in: the posts held, and the customers employees see
@@ -249,11 +256,27 @@ export function handleConnection(socket: WebSocket): void {
 
     // conversations and employees coordinating (service.ts)
     if (me && message.type === "talk_start" && typeof message.withId === "string") {
-      deliver(startTalk(serviceCtx(), me.id, message.withId));
+      deliver(requestTalk(serviceCtx(), me.id, message.withId));
       return;
     }
     if (me && message.type === "talk_choose" && typeof message.conversationId === "string" && typeof message.choice === "string") {
       deliver(chooseTurn(serviceCtx(), me.id, message.conversationId, message.choice));
+      return;
+    }
+    if (me && message.type === "intent_accept" && typeof message.intentId === "string") {
+      deliver(acceptIntentById(serviceCtx(), me.id, message.intentId));
+      return;
+    }
+    if (me && message.type === "escort_cancel") {
+      deliver(cancelEscort(serviceCtx(), me.id));
+      return;
+    }
+    if (me && message.type === "intent_poll") {
+      deliver(settleIntents(serviceCtx()));
+      return;
+    }
+    if (me && message.type === "talk_close") {
+      deliver(closeTalk(serviceCtx(), me.id));
       return;
     }
     if (me && message.type === "talk_leave") {
@@ -322,6 +345,7 @@ export function handleConnection(socket: WebSocket): void {
       // a customer who hasn't been approached yet, checked on their own
       // movement rather than any timer (D32/D40)
       if (me.kind === "customer") deliver(tryGreeterApproach(serviceCtx(), me.id));
+      deliver(settleIntents(serviceCtx()));
     }
   });
 

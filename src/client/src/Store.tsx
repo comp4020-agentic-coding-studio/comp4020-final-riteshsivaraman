@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { PMREMGenerator, Vector3 } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
+import { engagedMoment } from "../../shared/engage.ts";
 import { NPC_DESIGNATION, NPC_LABEL, scriptFor } from "../../shared/duty.ts";
 import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { poseChanged } from "../../shared/pose.ts";
@@ -13,6 +14,7 @@ import { avoidPeople } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions, TABLE_H } from "../../shared/world.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
+import { IntentBadge } from "./IntentBadge.tsx";
 import { TABLE_ASSIGNMENTS } from "../../shared/assignments.ts";
 import { productById } from "../../shared/catalogue.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
@@ -44,6 +46,16 @@ const INSPECT_RADIUS = 0.32; // metres — close, a real zoomed-in look (Ritesh,
 const INSPECT_TARGET = new Vector3();
 const INSPECT_OFFSET = new Vector3();
 const PROJECT_TMP = new Vector3();
+// A conversation pans the camera in close on the other person's face (Ritesh,
+// 2026-10-19: "slightly pans into their face and zooms in... you can actually
+// see them talk"), the same eased-approach shape as the device-inspect camera
+// above, not a cut. Held a little further back than a device inspect (people
+// are bigger and the panel sits over the bottom of the screen), roughly level
+// with the face rather than looking down on it.
+const TALK_HEAD_Y = 1.55; // engage.ts's own gaze height for a person's face
+const TALK_RADIUS = 0.9; // metres from the face — close, but not nose-to-nose
+const TALK_TARGET = new Vector3();
+const TALK_OFFSET = new Vector3();
 // device-targeting reticle point, in normalised device coordinates
 // (-1..1, y up): low and centred, not the crosshair-dead-centre of the view
 const TARGET_NDC_X = 0;
@@ -62,6 +74,12 @@ function Player() {
   // true while easing back out of an inspection — the same motion as panning
   // in, run in reverse (Ritesh, 2026-10-12), not a snap
   const exiting = useRef(false);
+  // conversation camera: the id it last panned to (so a new conversation
+  // starting re-captures the stand pose to return to) and whether it is
+  // currently easing back out after the conversation ended
+  const wasTalkingWith = useRef<string | null>(null);
+  const talkStandPose = useRef({ ry: 0, pitch: 0 });
+  const talkExiting = useRef(false);
 
   useEffect(() => {
     // `?at=x,z,yawDegrees` starts the camera elsewhere, for screenshots and
@@ -76,6 +94,7 @@ function Player() {
     const down = (e: KeyboardEvent) => {
       keys.add(e.code);
       if ((e.code === "Escape" || e.code === "KeyE") && net.myInspectSlot) net.inspectEnd();
+      else if (e.code === "Escape" && net.escort) net.escortCancel();
     };
     const up = (e: KeyboardEvent) => keys.delete(e.code);
     const blur = () => keys.clear();
@@ -105,6 +124,9 @@ function Player() {
         orbit.current.pitch = Math.max(-0.1, Math.min(1.3, orbit.current.pitch - e.movementY * 0.006));
         return;
       }
+      // a conversation holds the camera on the other person's face: dragging
+      // doesn't fight that (same as it already doesn't move you while talking)
+      if (net.talking !== null) return;
       camera.rotation.y -= e.movementX * 0.003;
       camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x - e.movementY * 0.003));
     };
@@ -181,8 +203,66 @@ function Player() {
       }
     }
 
+    // A conversation: pan in on the other person's face (Ritesh, 2026-10-19),
+    // the same eased-approach shape as inspecting a device, so it reads as the
+    // camera choosing to lean in, not a cut. `withId` is an NPC's engage.ts
+    // position when it has walked over to stand and talk (not its scripted
+    // route — mid-walkover it hasn't arrived yet, so there is nothing to aim
+    // at besides where it already stands), or another visitor's own reported
+    // position if a human is staffing the desk.
+    const talkWithId = net.talking?.withId ?? null;
+    if (talkWithId) {
+      const eng = net.engaged.get(talkWithId);
+      const remote = net.remotes.get(talkWithId);
+      const now = net.serverNow();
+      const at = eng ? engagedMoment(talkWithId, eng, now) : remote ? { x: remote.x, z: remote.z } : npcPose(NPCS.find((n) => n.id === talkWithId) ?? NPCS[0]!, now);
+      if (wasTalkingWith.current !== talkWithId) {
+        wasTalkingWith.current = talkWithId;
+        talkExiting.current = false;
+        talkStandPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
+      }
+      TALK_TARGET.set(at.x, STORE_Y + TALK_HEAD_Y, at.z);
+      // stand off on the near side, between where you are now and their face,
+      // so the pan reads as leaning toward them rather than swinging around
+      const dx = camera.position.x - TALK_TARGET.x;
+      const dz = camera.position.z - TALK_TARGET.z;
+      const d = Math.hypot(dx, dz) || 1;
+      TALK_OFFSET.set((dx / d) * TALK_RADIUS, 0, (dz / d) * TALK_RADIUS);
+      const ease = 1 - Math.exp(-6 * dt); // a touch slower than the device pan: a lean, not a snap-zoom
+      camera.position.x += (TALK_TARGET.x + TALK_OFFSET.x - camera.position.x) * ease;
+      camera.position.y += (TALK_TARGET.y - camera.position.y) * ease;
+      camera.position.z += (TALK_TARGET.z + TALK_OFFSET.z - camera.position.z) * ease;
+      camera.lookAt(TALK_TARGET);
+      return; // the position sent to others (net.me) is untouched: only the local view moves
+    }
+    if (wasTalkingWith.current) {
+      // conversation ended: ease back to standing where you actually are,
+      // looking the way you were — the exact reverse of panning in, not a snap
+      talkExiting.current = true;
+      wasTalkingWith.current = null;
+    }
+    if (talkExiting.current) {
+      const ease = 1 - Math.exp(-6 * dt);
+      const ty = STORE_Y + EYE_HEIGHT;
+      camera.position.x += (net.me.x - camera.position.x) * ease;
+      camera.position.y += (ty - camera.position.y) * ease;
+      camera.position.z += (net.me.z - camera.position.z) * ease;
+      camera.rotation.y += wrap(talkStandPose.current.ry - camera.rotation.y) * ease;
+      camera.rotation.x += (talkStandPose.current.pitch - camera.rotation.x) * ease;
+      const atPos = Math.hypot(camera.position.x - net.me.x, camera.position.y - ty, camera.position.z - net.me.z) < 0.01;
+      const atRot = Math.abs(wrap(talkStandPose.current.ry - camera.rotation.y)) < 0.01 && Math.abs(talkStandPose.current.pitch - camera.rotation.x) < 0.01;
+      if (atPos && atRot) {
+        talkExiting.current = false;
+        camera.position.set(net.me.x, ty, net.me.z);
+        camera.rotation.order = "YXZ";
+        camera.rotation.set(talkStandPose.current.pitch, talkStandPose.current.ry, 0);
+      } else {
+        return; // still easing out: movement stays suspended, same as the talk itself did
+      }
+    }
+
     // in a conversation you stand and read; the keys pick from the menu
-    const talking = net.turn !== null;
+    const talking = net.talking !== null;
     const forward = talking ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = talking ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
 
@@ -285,14 +365,15 @@ function Remotes() {
             }
             getState={() => speeds.current.get(r.info.id) ?? { walking: false, mode: "idle", mood: "neutral" }}
           />
-          {r.identity.kind !== "customer" && (
-            <Html position={[0, 2.0, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
-              <div className="name-tag" style={{ borderColor: EMPLOYEE_COLOUR[r.identity.kind] }}>
-                <b>{r.info.name}</b>
-                <span>{r.identity.kind === "specialist" ? `${r.identity.specialty} specialist` : r.identity.kind}</span>
-              </div>
-            </Html>
-          )}
+          <Html position={[0, 2.0, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
+            <div className="name-tag" style={{ borderColor: r.identity.kind === "customer" ? "#fff" : EMPLOYEE_COLOUR[r.identity.kind] }}>
+              <b>
+                {r.info.name} <i className="name-chip player">Player</i>
+              </b>
+              <span>{r.identity.kind === "specialist" ? `${r.identity.specialty} specialist` : r.identity.kind}</span>
+              <IntentBadge id={r.info.id} />
+            </div>
+          </Html>
         </group>
       ))}
     </group>
@@ -320,8 +401,9 @@ function Interact() {
   const { camera } = useThree();
   useEffect(() => {
     const press = (e: KeyboardEvent) => {
-      if (e.code !== "KeyE" || e.repeat || net.turn) return;
-      if (net.hint) net.talkStart(net.hint.id);
+      if (e.code !== "KeyE" || e.repeat || net.talking) return;
+      if (net.hint?.intentId) net.intentAccept(net.hint.intentId);
+      else if (net.hint) net.talkStart(net.hint.id);
       else if (net.deviceHint && !net.myInspectSlot) net.inspectStart(net.deviceHint.slotId);
     };
     window.addEventListener("keydown", press);
@@ -339,7 +421,7 @@ function Interact() {
     // the same table re-picks it, the way aiming a reticle would, rather than
     // always locking onto whichever is nearest in the world.
     let bestDevice: { slot: DeviceSlot; sd: number } | null = null;
-    if (!net.turn && !net.myInspectSlot && net.status === "open") {
+    if (!net.talking && !net.myInspectSlot && net.status === "open") {
       for (const s of DEVICE_SLOTS) {
         if (net.inspections.has(s.id)) continue;
         const dx = s.x - net.me.x;
@@ -361,10 +443,28 @@ function Interact() {
       net.changed();
     }
 
-    let best: { id: string; name: string; d: number } | null = null;
+    let best: { id: string; name: string; d: number; intentId?: string } | null = null;
     const free = net.state === "arriving" || net.state === "browsing" || net.state === "waiting_for_help";
-    if (net.identity.kind === "customer" && free && !net.turn && net.status === "open") {
+    // someone has shown intent to talk to you and is close enough: E accepts it
+    // (customers and staff alike). Your own outstanding intents are not offered again.
+    const myId = net.you?.id;
+    if (myId && !net.talking && net.status === "open" && (free || net.identity.kind !== "customer")) {
+      const now = net.serverNow();
+      for (const it of net.intents.values()) {
+        if (it.toId !== myId || it.state !== "open") continue;
+        const e = net.engaged.get(it.fromId);
+        const rem = net.remotes.get(it.fromId);
+        const pos = e ? engagedMoment(it.fromId, e, now) : rem;
+        if (!pos) continue;
+        const d = Math.hypot(pos.x - net.me.x, pos.z - net.me.z);
+        if (d > TALK_HINT_RANGE) continue;
+        if (!best || d < best.d) best = { id: it.fromId, name: it.fromName, d, intentId: it.id };
+      }
+    }
+    const waitingOn = new Set([...net.intents.values()].filter((i) => i.fromId === myId).map((i) => i.toId));
+    if (!best && net.identity.kind === "customer" && free && !net.talking && net.status === "open") {
       const consider = (id: string, name: string, x: number, z: number) => {
+        if (waitingOn.has(id)) return;
         const dx = x - net.me.x;
         const dz = z - net.me.z;
         const d = Math.hypot(dx, dz);
@@ -386,8 +486,9 @@ function Interact() {
         if (post && scriptFor(post)) consider(r.info.id, r.info.name, r.x, r.z);
       }
     }
-    const next = best ? { id: (best as { id: string }).id, name: (best as { name: string }).name } : null;
-    if (next?.id !== net.hint?.id) {
+    const b = best as { id: string; name: string; intentId?: string } | null;
+    const next = b ? { id: b.id, name: b.name, intentId: b.intentId } : null;
+    if (next?.id !== net.hint?.id || next?.intentId !== net.hint?.intentId) {
       net.hint = next;
       net.changed();
     }
@@ -416,6 +517,24 @@ function DeviceHintGlow() {
     <mesh ref={ref} position={[slot.x, STORE_Y + TABLE_H + 0.002, slot.z]} rotation={[-Math.PI / 2, 0, 0]}>
       <ringGeometry args={[0.09, 0.12, 32]} />
       <meshBasicMaterial color="#ffffff" transparent opacity={0.5} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
+
+// Where a member of staff is walking you to: a ring on the floor to stand in.
+function EscortMarker() {
+  const live = useNet();
+  const ref = useRef<Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const mat = ref.current.material as MeshBasicMaterial;
+    mat.opacity = 0.45 + 0.3 * Math.sin(clock.elapsedTime * 4);
+  });
+  if (!live.escort || live.myInspectSlot) return null;
+  return (
+    <mesh ref={ref} position={[live.escort.goal.x, STORE_Y + 0.02, live.escort.goal.z]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.45, 0.6, 40]} />
+      <meshBasicMaterial color="#ffd23f" transparent opacity={0.6} depthWrite={false} toneMapped={false} />
     </mesh>
   );
 }
@@ -487,6 +606,7 @@ export function Store() {
       <Interact />
       <InspectMarkers />
       <DeviceHintGlow />
+      <EscortMarker />
       <Player />
     </Canvas>
   );

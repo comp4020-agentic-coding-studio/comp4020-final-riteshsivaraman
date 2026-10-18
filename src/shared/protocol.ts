@@ -50,7 +50,7 @@ export interface TurnView {
   withId: string;
   withName: string;
   say: string;
-  choices: Array<{ id: string; label: string; group?: string }>;
+  choices: Array<{ id: string; label: string; group?: string; standing?: boolean }>; // standing: always-available exits (leave, back, carry on), shown quietly
   ended: boolean;
   awaiting: "customer" | "staff"; // whose turn: a customer waits on staff, shown no menu
 }
@@ -71,6 +71,27 @@ export interface Engagement {
   visitorId: string;
   since: number; // server time
   at: { x: number; z: number }; // where the visitor stood when it began
+  // true while the NPC has walked over to show intent to talk but the other
+  // side has not accepted yet: it stands facing them, not yet talking
+  pending?: boolean;
+  // set while the NPC is walking a customer somewhere: it starts from `from`
+  // (not its timetable) and stops at `lead`, facing (fx, fz)
+  from?: { x: number; z: number };
+  lead?: { x: number; z: number; fx: number; fz: number };
+}
+
+// Intent to talk (Ritesh, 2026-10-19): a conversation starts with one side
+// showing intent and the other accepting, never by one side opening it. A
+// busy person's intents wait ('queued') until they are free.
+export interface IntentView {
+  id: string;
+  fromId: string;
+  fromName: string;
+  toId: string;
+  toName: string;
+  reason: "greet" | "help" | "ask";
+  state: "queued" | "open";
+  since: number; // server time
 }
 
 // Someone inspecting a device (D39, first pass: phone only, stays on the
@@ -96,6 +117,15 @@ export type ClientMessage =
   | { type: "talk_choose"; conversationId: string; choice: string }
   // walk away mid-conversation, from either side (Esc)
   | { type: "talk_leave" }
+  // dismissed the final turn: the NPC is let go only now
+  | { type: "talk_close" }
+  // accept someone's intent to talk to you (E on the prompt)
+  | { type: "intent_accept"; intentId: string }
+  // "let the server catch up": sent while an intent involving you is open, so
+  // the one-second beat and the give-up are checked without a server timer
+  | { type: "intent_poll" }
+  // give up following a member of staff (Esc while being walked somewhere)
+  | { type: "escort_cancel" }
   // an employee's side
   | { type: "staff_respond"; conversationId: string; action: "reply" | "hand_to_genius" | "end" }
   | { type: "claim"; customerId: string }
@@ -126,6 +156,7 @@ export type ServerMessage =
       offDuty: string[];
       engaged: Engagement[];
       inspecting: Inspection[];
+      intents: IntentView[];
     }
   | { type: "joined"; visitor: Present }
   | { type: "moved"; id: string; x: number; z: number; ry: number }
@@ -137,6 +168,11 @@ export type ServerMessage =
   | { type: "staff_view"; customers: CustomerView[] }
   | { type: "duty"; offDuty: string[] }
   | ({ type: "engaged" } & Engagement)
+  | ({ type: "intent" } & IntentView)
+  | { type: "intent_end"; id: string; why: "accepted" | "expired" | "cancelled" }
+  // a member of staff is walking you somewhere: follow them; `goal` is where you should stand
+  | { type: "escort"; id: string; kind: "demo" | "till"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } }
+  | { type: "escort_end"; id: string }
   | { type: "released"; npcId: string }
   | ({ type: "inspecting" } & Inspection)
   | { type: "inspect_ended"; slotId: string }

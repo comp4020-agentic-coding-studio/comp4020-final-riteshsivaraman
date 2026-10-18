@@ -54,12 +54,22 @@ const asMoment = (p: { x: number; z: number; ry: number; walking: boolean }, mod
 
 // Where an engaged NPC is at server time `nowMs`.
 export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Moment {
-  const start = momentOf(npcId, e.since);
-  const goal = servicePoint(start, e.at);
+  const start = e.from ? { x: e.from.x, z: e.from.z } : momentOf(npcId, e.since);
+  const goal = e.lead ? { x: e.lead.x, z: e.lead.z } : servicePoint(start, e.at);
   const path = planPath({ x: start.x, z: start.z }, goal, "staff");
   const t = Math.max(0, (nowMs - e.since) / 1000);
   const p = along(path, t);
   if (p.walking) return asMoment(p, "idle", "smile", "going over to help a visitor");
+  if (e.lead) {
+    // led the customer here: waiting at the spot, facing what they came to see
+    const ry = headingTo(goal.x, goal.z, e.lead.fx, e.lead.fz);
+    return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "idle", "smile", "showing a customer the way"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };
+  }
+  if (e.pending) {
+    // arrived, showing intent: facing them, waiting to be accepted
+    const ry = headingTo(goal.x, goal.z, e.at.x, e.at.z);
+    return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "idle", "smile", "waiting for a visitor to accept"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };
+  }
   // arrived: facing the visitor, talking
   const ry = headingTo(goal.x, goal.z, e.at.x, e.at.z);
   return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "talk", "smile", "helping a visitor"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };

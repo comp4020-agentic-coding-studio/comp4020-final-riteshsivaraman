@@ -8,6 +8,7 @@ import type {
   Engagement,
   Identity,
   Inspection,
+  IntentView,
   Present,
   Role,
   ServerMessage,
@@ -98,7 +99,17 @@ class Net {
   customers: CustomerView[] = [];
   notice: { text: string; at: number } | null = null;
   // who is close enough to talk to, set by the scene
-  hint: { id: string; name: string } | null = null;
+  hint: { id: string; name: string; intentId?: string } | null = null;
+  // intent to talk (server-authoritative): who has shown intent to whom
+  intents = new Map<string, IntentView>();
+  // a member of staff is walking you somewhere (to a demo device, to the till)
+  escort: { id: string; kind: "demo" | "till"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } } | null = null;
+  // the conversation as the scene should treat it: while you are being walked
+  // somewhere it is on hold, so you can move and the camera is free
+  get talking(): TurnView | null {
+    return this.escort ? null : this.turn;
+  }
+  private intentPoller: ReturnType<typeof setInterval> | null = null;
   // devices being inspected right now, by slot id (D39) — server-authoritative,
   // so another visitor sees the same thing live, including one who joins mid-look
   inspections = new Map<string, Inspection>();
@@ -187,6 +198,8 @@ class Net {
         this.engaged = new Map(message.engaged.map((e) => [e.npcId, e]));
         this.released.clear();
         this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
+        this.intents = new Map(message.intents.map((i) => [i.id, i]));
+        this.pollIntents();
         this.myInspectSlot = message.inspecting.find((i) => i.visitorId === message.you.id)?.slotId ?? null;
         this.remotes.clear();
         for (const o of message.others) this.addRemote(o);
@@ -233,6 +246,26 @@ class Net {
         this.engaged.set(message.npcId, message);
         this.released.delete(message.npcId);
         return true;
+      case "intent": {
+        const { type: _t, ...view } = message;
+        this.intents.set(view.id, view);
+        this.pollIntents();
+        return true;
+      }
+      case "escort": {
+        const { type: _t, ...e } = message;
+        this.escort = e;
+        this.pollIntents();
+        return true;
+      }
+      case "escort_end":
+        if (this.escort?.id === message.id) this.escort = null;
+        this.pollIntents();
+        return true;
+      case "intent_end":
+        this.intents.delete(message.id);
+        this.pollIntents();
+        return true;
       case "released": {
         const e = this.engaged.get(message.npcId);
         if (e) {
@@ -272,6 +305,25 @@ class Net {
 
   // ---- what the visitor does ----
 
+  // the server decides when a beat has passed or someone gave up, but it has
+  // no timer: while an intent involving you is open, ask it to catch up
+  private pollIntents(): void {
+    const mine = (this.you ? [...this.intents.values()].some((i) => i.fromId === this.you!.id || i.toId === this.you!.id) : false) || this.escort !== null;
+    if (mine && !this.intentPoller) this.intentPoller = setInterval(() => this.send({ type: "intent_poll" }), 500);
+    else if (!mine && this.intentPoller) {
+      clearInterval(this.intentPoller);
+      this.intentPoller = null;
+    }
+  }
+
+  escortCancel(): void {
+    if (this.escort && !this.myInspectSlot) this.send({ type: "escort_cancel" });
+  }
+
+  intentAccept(intentId: string): void {
+    this.send({ type: "intent_accept", intentId });
+  }
+
   talkStart(withId: string): void {
     this.send({ type: "talk_start", withId });
   }
@@ -301,6 +353,7 @@ class Net {
 
   closeTurn(): void {
     if (this.turn?.ended) {
+      this.send({ type: "talk_close" });
       this.turn = null;
       this.changed();
     }

@@ -146,6 +146,53 @@ export const MIGRATIONS: string[] = [
   );
   ALTER TABLE conversations ADD COLUMN case_id TEXT REFERENCES cases(id);
   `,
+  // 7: intent to talk. A conversation starts with one side showing intent
+  // (a greeter walking over, a customer pressing E at a specialist) and the
+  // other accepting; a busy person's intents queue (status 'queued') until
+  // they are free. Deadlines (the one-second beat before an NPC accepts, the
+  // give-up) are columns read on the next request, never a timer.
+  `
+  CREATE TABLE intents (
+    id          TEXT PRIMARY KEY,
+    from_id     TEXT NOT NULL,
+    to_id       TEXT NOT NULL,
+    customer_id TEXT NOT NULL REFERENCES visitors(id),
+    staff_id    TEXT NOT NULL,
+    staff_kind  TEXT NOT NULL,
+    reason      TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    opened_at   INTEGER,
+    arrived_at  INTEGER,
+    at_x        REAL,
+    at_z        REAL,
+    ended_at    INTEGER
+  );
+  CREATE INDEX intents_live ON intents (status, staff_id);
+  CREATE INDEX intents_customer ON intents (customer_id, status);
+  `,
+  // 8: a member of staff walking a customer somewhere (to a demo device, to
+  // the till). The walk itself is a pure function of these columns (engage.ts),
+  // so every client draws it the same and nothing needs a timer.
+  `
+  CREATE TABLE escorts (
+    id              TEXT PRIMARY KEY,
+    customer_id     TEXT NOT NULL REFERENCES visitors(id),
+    staff_id        TEXT NOT NULL,
+    kind            TEXT NOT NULL,
+    slot_id         TEXT,
+    conversation_id TEXT,
+    status          TEXT NOT NULL,
+    created_at      INTEGER NOT NULL,
+    ended_at        INTEGER,
+    at_x REAL, at_z REAL,
+    from_x REAL, from_z REAL,
+    goal_x REAL, goal_z REAL,
+    face_x REAL, face_z REAL,
+    stand_x REAL, stand_z REAL
+  );
+  CREATE INDEX escorts_customer ON escorts (customer_id, status);
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

@@ -137,6 +137,9 @@ it("has stock on the shelves in the running app (the shop is not all sold out)",
   employee.send({ type: "move", x: 0.6, z: 0, ry: 0 });
   await pause(150);
   customer.send({ type: "talk_start", withId: employee.id });
+  // a person has to accept (E on the prompt); the conversation does not open by itself
+  const intent = (await employee.next((m) => m.type === "intent" && m.fromId === customer.id)) as Extract<ServerMessage, { type: "intent" }>;
+  employee.send({ type: "intent_accept", intentId: intent.id });
   const hello = (await customer.next((m) => m.type === "turn")) as Extract<ServerMessage, { type: "turn" }>;
   customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "show" });
   const ask = (await employee.next((m) => m.type === "staff_turn")) as Extract<ServerMessage, { type: "staff_turn" }>;

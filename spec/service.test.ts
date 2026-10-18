@@ -12,6 +12,14 @@ import {
   handOn,
   HOLD_MS,
   leaveConversation,
+  closeTalk,
+  endInspect,
+  acceptIntentById,
+  requestTalk,
+  settleIntents,
+  assignHelper,
+  INTENT_BEAT_MS,
+  INTENT_GIVE_UP_MS,
   leaveStore,
   tryGreeterApproach,
   tryNpcAutoClaim,
@@ -128,7 +136,8 @@ describe("the greeter, end to end", () => {
     chooseTurn(ctx(), "c1", id, "phone");
     const done = chooseTurn(ctx(), "c1", id, "help");
     expect(last(done, "c1", "turn")?.ended).toBe(true);
-    expect(last(done, "all", "released")).toMatchObject({ npcId: "greeter-1" });
+    expect(last(done, "all", "released")).toBeUndefined(); // held until the final turn is closed
+    expect(last(closeTalk(ctx(), "c1"), "all", "released")).toMatchObject({ npcId: "greeter-1" });
     const s = stateOf(db, "c1")!;
     expect(s.state).toBe("waiting_for_help");
     expect(s.needs).toBe("specialist:phones");
@@ -412,7 +421,8 @@ describe("walking away mid-conversation (Esc, either side)", () => {
     const id = last(startTalk(ctx(), "c1", "greeter-1"), "c1", "turn")!.conversationId;
     const out = leaveConversation(ctx(), "c1");
     expect(last(out, "c1", "turn")).toMatchObject({ ended: true });
-    expect(last(out, "all", "released")).toMatchObject({ npcId: "greeter-1" });
+    expect(last(out, "all", "released")).toBeUndefined();
+    expect(last(closeTalk(ctx(), "c1"), "all", "released")).toMatchObject({ npcId: "greeter-1" });
     expect(stateOf(db, "c1")?.state).toBe("browsing");
     expect(db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id)).not.toEqual({ ended_at: null });
     expect(eventTypes()).toContain("conversation_ended");
@@ -483,11 +493,18 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
 });
 
 describe("the greeter approaching a new customer on its own (tryGreeterApproach)", () => {
-  it("approaches an arriving customer nearby", () => {
+  it("shows intent to an arriving customer nearby, who then accepts", () => {
     const g = npc("greeter-1");
     addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
     const out = tryGreeterApproach(ctx(), "c1");
-    expect(last(out, "c1", "turn")).toMatchObject({ withId: "greeter-1", ended: false });
+    // intent first: the greeter walks over, nothing opens by itself
+    expect(last(out, "all", "intent")).toMatchObject({ fromId: "greeter-1", toId: "c1", reason: "greet", state: "open" });
+    expect(last(out, "all", "engaged")).toMatchObject({ npcId: "greeter-1", pending: true });
+    expect(last(out, "c1", "turn")).toBeUndefined();
+    expect(stateOf(db, "c1")?.state).toBe("arriving");
+    // the customer presses E once the greeter has arrived
+    const later = ctx(NOW + 60_000);
+    expect(last(acceptIntentById(later, "c1", last(out, "all", "intent")!.id), "c1", "turn")).toMatchObject({ withId: "greeter-1", ended: false });
     expect(stateOf(db, "c1")?.state).toBe("in_conversation");
   });
 
@@ -495,7 +512,8 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     const g = npc("greeter-1");
     addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
     const first = tryGreeterApproach(ctx(), "c1");
-    const id = last(first, "c1", "turn")!.conversationId;
+    const intentId = last(first, "all", "intent")!.id;
+    const id = last(acceptIntentById(ctx(NOW + 60_000), "c1", intentId), "c1", "turn")!.conversationId;
     leaveConversation(ctx(), "c1"); // back to browsing
     expect(stateOf(db, "c1")?.state).toBe("browsing");
     expect(tryGreeterApproach(ctx(), "c1")).toEqual([]);
@@ -539,5 +557,171 @@ describe("the event log", () => {
     const before = eventCount();
     startTalk(ctx(), "c1", "greeter-1");
     expect(eventCount()).toBe(before);
+  });
+});
+
+describe("intent to talk (Ritesh, 2026-10-19)", () => {
+  const T = NOW + 60_000; // long enough for any NPC to have walked over
+
+  it("a customer asking a free NPC shows intent; the NPC accepts one beat after arriving", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    const asked = requestTalk(ctx(), "c1", "greeter-1");
+    expect(last(asked, "all", "intent")).toMatchObject({ fromId: "c1", toId: "greeter-1", reason: "ask", state: "open" });
+    expect(last(asked, "c1", "turn")).toBeUndefined();
+    expect(settleIntents(ctx(T))).toEqual([]); // it has arrived, the beat has started
+    expect(last(settleIntents(ctx(T + INTENT_BEAT_MS - 1)), "c1", "turn")).toBeUndefined();
+    const out = settleIntents(ctx(T + INTENT_BEAT_MS));
+    expect(last(out, "c1", "turn")).toMatchObject({ withId: "greeter-1", ended: false });
+    expect(last(out, "all", "intent_end")).toMatchObject({ why: "accepted" });
+    expect(eventTypes()).toEqual(expect.arrayContaining(["intent_shown", "intent_accepted", "conversation_started"]));
+  });
+
+  it("nobody starts a conversation with someone already engaged: the intent waits until they are free", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    addVisitor("c2", "Biscuit", { x: g.x - 1, z: g.z });
+    requestTalk(ctx(), "c1", "greeter-1");
+    settleIntents(ctx(T));
+    settleIntents(ctx(T + INTENT_BEAT_MS)); // c1 is now with the greeter
+    const second = requestTalk(ctx(T + 2000), "c2", "greeter-1");
+    expect(last(second, "all", "intent")).toMatchObject({ fromId: "c2", state: "queued" });
+    expect(last(second, "c2", "notice")?.text).toMatch(/with someone/);
+    expect(last(second, "all", "engaged")).toBeUndefined();
+    // still engaged on the final turn: c2 keeps waiting
+    const id = (db.prepare("SELECT id FROM conversations WHERE customer_id = 'c1'").get() as { id: string }).id;
+    chooseTurn(ctx(T + 3000), "c1", id, "look");
+    expect(last(settleIntents(ctx(T + 4000)), "c2", "turn")).toBeUndefined();
+    // c1 dismisses the last turn: the greeter is free, c2's intent opens and the NPC walks over
+    const freed = closeTalk(ctx(T + 5000), "c1");
+    expect(last(freed, "all", "released")).toMatchObject({ npcId: "greeter-1" });
+    expect(last(freed, "all", "engaged")).toMatchObject({ npcId: "greeter-1", visitorId: "c2", pending: true });
+    expect(last(settleIntents(ctx(T + 5000 + 60_000)), "c2", "turn")).toBeUndefined(); // arrived, beat starts
+    expect(last(settleIntents(ctx(T + 5000 + 60_000 + INTENT_BEAT_MS)), "c2", "turn")).toMatchObject({ withId: "greeter-1" });
+  });
+
+  it("an NPC that showed intent and is ignored gives up after 30 seconds and walks back", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    tryGreeterApproach(ctx(), "c1");
+    settleIntents(ctx(T));
+    expect(last(settleIntents(ctx(T + INTENT_GIVE_UP_MS - 1)), "all", "intent_end")).toBeUndefined();
+    const out = settleIntents(ctx(T + INTENT_GIVE_UP_MS));
+    expect(last(out, "all", "intent_end")).toMatchObject({ why: "expired" });
+    expect(last(out, "all", "released")).toMatchObject({ npcId: "greeter-1" });
+  });
+
+  it("a customer who leaves cancels their intents", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    requestTalk(ctx(), "c1", "greeter-1");
+    const out = leaveStore(ctx(), "c1");
+    expect(last(out, "all", "intent_end")).toMatchObject({ why: "cancelled" });
+    expect(last(out, "all", "released")).toMatchObject({ npcId: "greeter-1" });
+  });
+
+  it("a person accepts a customer's intent by pressing E; nothing opens before that", () => {
+    addVisitor("e1", "Sam", { x: 0.6, z: 0 }, "specialist", "phones");
+    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+    const asked = requestTalk(ctx(), "c1", "e1");
+    const intent = last(asked, "all", "intent")!;
+    expect(intent).toMatchObject({ fromId: "c1", toId: "e1", toName: "Sam" });
+    expect(last(settleIntents(ctx(T)), "c1", "turn")).toBeUndefined(); // a person has to accept
+    expect(last(acceptIntentById(ctx(T), "c1", intent.id), "c1", "turn")).toBeUndefined(); // the asker cannot accept their own
+    expect(last(acceptIntentById(ctx(T), "e1", intent.id), "c1", "turn")).toMatchObject({ withId: "e1" });
+  });
+
+  it("sends a named person for a customer who needs help, and the greeter says who", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    startTalk(ctx(), "c1", "greeter-1");
+    const id = (db.prepare("SELECT id FROM conversations WHERE customer_id = 'c1'").get() as { id: string }).id;
+    chooseTurn(ctx(), "c1", id, "phone");
+    const done = chooseTurn(ctx(), "c1", id, "help");
+    const intent = last(done, "all", "intent")!;
+    expect(intent).toMatchObject({ fromId: "spec-phones", toId: "c1", fromName: "Theo", reason: "help" });
+    expect(last(done, "c1", "turn")?.say).toMatch(/Theo will come and find you/);
+    expect(last(done, "all", "engaged")).toMatchObject({ npcId: "spec-phones", pending: true });
+  });
+
+  it("gives the mission to a person holding the post, not the NPC", () => {
+    addVisitor("e1", "Victor", { x: 5, z: 5 }, "specialist", "phones");
+    const g = npc("greeter-1");
+    addVisitor("c1", "Stacy", { x: g.x + 1, z: g.z });
+    startTalk(ctx(), "c1", "greeter-1");
+    const id = (db.prepare("SELECT id FROM conversations WHERE customer_id = 'c1'").get() as { id: string }).id;
+    chooseTurn(ctx(), "c1", id, "phone");
+    const done = chooseTurn(ctx(), "c1", id, "help");
+    expect(last(done, "all", "intent")).toMatchObject({ fromId: "e1", fromName: "Victor", toId: "c1", reason: "help" });
+    expect(last(done, "all", "engaged")).toBeUndefined(); // a person walks themselves
+    expect(last(done, "c1", "turn")?.say).toMatch(/Victor will come and find you/);
+  });
+});
+
+describe("being walked to a demo device (Ritesh, 2026-10-19)", () => {
+  const T = NOW + 60_000;
+
+  it("walks you to a real device of that model, opens it on arrival, and carries on when you put it down", () => {
+    const p = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
+    const opened = startTalk(ctx(), "c1", "spec-phones");
+    const hello = last(opened, "c1", "turn")!;
+    const demo = hello.choices.find((c) => /^Ask for a demo of the (iPhone 17|iPhone 16|iPhone Air)$/.test(c.label));
+    expect(demo, hello.choices.map((c) => c.label).join(" | ")).toBeDefined();
+    const out = chooseTurn(ctx(), "c1", hello.conversationId, demo!.id);
+    const esc = last(out, "c1", "escort")!;
+    expect(esc).toMatchObject({ kind: "demo", npcId: "spec-phones", npcName: "Theo" });
+    expect(esc.text).toMatch(/^Follow Theo to the iPhone/);
+    const lead = last(out, "all", "engaged")!;
+    expect(lead.lead).toBeDefined();
+    expect(lead.from).toBeDefined();
+    // the menu is on hold until they have looked
+    expect(last(chooseTurn(ctx(), "c1", hello.conversationId, "anything"), "c1", "notice")?.text).toMatch(/Follow Theo first/);
+    // not there yet: nothing opens
+    positions.set("c1", { x: 4, z: 7 });
+    expect(last(settleIntents(ctx(T)), "c1", "turn")).toBeUndefined();
+    expect(db.prepare("SELECT COUNT(*) AS n FROM inspections").get()).toEqual({ n: 0 });
+    // standing at the spot they were shown: the device opens by itself
+    positions.set("c1", esc.goal);
+    const arrived = settleIntents(ctx(T));
+    expect(last(arrived, "all", "inspecting")).toMatchObject({ visitorId: "c1" });
+    // Esc: the conversation is theirs again and the NPC comes back to them
+    const done = endInspect(ctx(T + 5000), "c1", "stopped inspecting");
+    expect(last(done, "c1", "escort_end")).toBeDefined();
+    expect(last(done, "all", "engaged")).toMatchObject({ npcId: "spec-phones", visitorId: "c1" });
+    expect(last(done, "all", "engaged")!.lead).toBeUndefined();
+    expect(last(chooseTurn(ctx(T + 6000), "c1", hello.conversationId, "anything"), "c1", "notice")?.text).not.toMatch(/Follow/);
+    expect(eventTypes()).toEqual(expect.arrayContaining(["escort_started", "inspect_start", "escort_ended"]));
+  });
+
+  it("gives up if the customer never follows", () => {
+    const p = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
+    const hello = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const demo = hello.choices.find((c) => /^Ask for a demo of the/.test(c.label))!;
+    chooseTurn(ctx(), "c1", hello.conversationId, demo.id);
+    const out = settleIntents(ctx(NOW + 130_000));
+    expect(last(out, "c1", "escort_end")).toBeDefined();
+  });
+});
+
+describe("being walked to the till after a sale", () => {
+  it("the specialist walks you to the Genius Bar when you dismiss the sale, and says who takes payment", () => {
+    const p = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
+    const hello = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    // the sale: the scene ends as 'bought' (the conversation row is finished as the engine would)
+    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(hello.conversationId) as { data: string };
+    const data = JSON.parse(row.data);
+    data.scene.ended = { how: "bought", sku: "x" };
+    db.prepare("UPDATE conversations SET data = ?, ended_at = 5 WHERE id = ?").run(JSON.stringify(data), hello.conversationId);
+    const out = closeTalk(ctx(), "c1");
+    expect(last(out, "c1", "escort")).toMatchObject({ kind: "till", npcId: "spec-phones" });
+    expect(last(out, "c1", "escort")!.text).toMatch(/Dev|Ines/);
+    expect(last(out, "all", "released")).toBeUndefined(); // still leading the way
+    positions.set("c1", last(out, "c1", "escort")!.goal);
+    const arrived = settleIntents(ctx(NOW + 60_000));
+    expect(last(arrived, "c1", "escort_end")).toBeDefined();
+    expect(last(arrived, "all", "released")).toMatchObject({ npcId: "spec-phones" });
   });
 });
