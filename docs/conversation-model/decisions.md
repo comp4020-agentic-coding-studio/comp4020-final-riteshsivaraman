@@ -243,3 +243,45 @@ vocabulary in `core/types.ts`/`core/npc.ts` is purchase-family only, and a new s
 family (like this one) should expect to define its own `Pending`/`StaffAct`/`staffMove` rather than
 trying to fit the existing ones. Whether service's own vocabulary generalises to a second
 fault-diagnosis-style scene is the next open question, not assumed here.
+
+## Wiring the talk engine into the real server, phone only (Ritesh, 2026-10-19)
+
+After `server-wiring-proposal.md` laid out the six axes without picking, Ritesh chose: **phone
+only** (axis 5, option A) and **coexist, not replace** (axis 4, the forced-coexistence reading --
+the old engine's `"greeter"` script has no new-engine equivalent yet regardless of what else is
+chosen). Axes 1/2 (persistence, event-log granularity) followed the existing precedent the
+proposal found already in the codebase: a `Scene` persisted after every turn in the same
+`conversations.data` JSON column the old engine already uses, and one `events` row per turn,
+matching the old engine's own `"turn"` event exactly in grain.
+
+**What actually got built** (`src/server/talkWire.ts`, `service.ts`): an NPC-staffed "phones"
+conversation (`usesTalkEngine`'s own condition -- script `"phones"` and `withKind: "npc"`) now runs
+the real phone scene; everything else, including a human-staffed "phones" conversation, is
+untouched. `conversations.data` is a tagged union now (`{conv, ...}` or `{engine: "talk", scene}`),
+so an old row is never misread as a new one. The wire protocol was kept to the lighter option
+(axis 3, option A): the engine's menu is flattened into the existing `TurnView` shape, so `net.ts`
+and `Talk.tsx` needed zero changes -- the real cost is throw-backs and multi-pick questions are not
+reachable through this wire path yet (noted in `talkWire.ts`'s own comments, not hidden).
+
+**A real gap found mid-build, not predicted by the proposal:** the new engine's model ids
+(`src/shared/talk/data.ts`, from `devices.json`) and the store's stock/catalogue ids
+(`src/shared/catalogue.ts`) were never reconciled -- different id schemes entirely (`"duo"` vs
+`"iphone-duo"`), and the old engine's storage picker doesn't exist on the new engine's side either.
+So a "bought" ending from the new engine does not yet reserve real stock. This is scoped out
+explicitly, not silently: the old stock/reservation specs (last-unit race, hold-and-release) were
+moved from the NPC-staffed path to a human-staffed one in the same commit, so that coverage keeps
+running on the engine that actually has the behaviour, and four new specs cover the new engine's
+wiring itself (opens with its own bank, persists a real `Scene`, writes `talk_turn` events, ends
+and releases the NPC).
+
+**Verified live**, not just by spec: two separate WebSocket clients played real conversations
+(a `left` and a `bought` outcome) against the actual running server; `conversations.data` and the
+`events` table in the real SQLite file were read directly and matched what was expected; the
+greeter path's stored row shape was confirmed unchanged. The `flyctl`-style stdout log line for
+each `talk_turn`/`conversation_ended` event was also checked by eye against the format crit 10
+needs to narrate from.
+
+**Next real decision, not resolved here:** whether to reconcile the two product catalogues (so
+"bought" can reserve real stock) before or after wiring laptop/service, and whether a human-staffed
+"phones" conversation gets the richer menu (throw-backs, multi-pick, tone) the new engine actually
+supports, or stays on the old engine indefinitely.

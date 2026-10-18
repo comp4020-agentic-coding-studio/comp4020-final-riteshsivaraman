@@ -10,6 +10,21 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## Conversation model: phone scene wired into the real server (2026-10-19)
+
+Ritesh's call after reviewing `server-wiring-proposal.md`'s six laid-out options: phone only,
+coexist with the old engine rather than replace it. An NPC-staffed "phones" conversation now runs
+the real talk engine (`src/server/talkWire.ts`) -- `Scene` persisted in `conversations.data`, one
+`events` row per turn, verified live against two separate WebSocket clients and the real SQLite
+file, not just specs. The greeter script and any human-staffed "phones" conversation are completely
+untouched, still the old engine.
+
+Real gap found mid-build: the new engine's model ids and the store's stock/catalogue ids were never
+reconciled, so a "bought" ending doesn't reserve real stock yet. Named in `decisions.md`, not
+hidden -- the old stock-reservation specs moved to a human-staffed path so that coverage keeps
+running on the engine that actually has it, and four new specs cover the new wiring itself. Full
+detail: `docs/conversation-model/decisions.md`'s 2026-10-19 entry, `README.md`'s status table.
+
 ## Conversation model: laptop scene built overnight (2026-10-18)
 
 Ritesh asked for an overnight run to build out more conversation types, after first checking the

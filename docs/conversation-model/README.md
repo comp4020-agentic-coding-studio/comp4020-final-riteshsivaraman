@@ -23,7 +23,7 @@ noise, so nothing is scripted.
 
 | | |
 |---|---|
-| Phone-purchase scene | Working end to end: engine, NPCs, POC page, two-tab mode |
+| Phone-purchase scene | Working end to end: engine, NPCs, POC page, two-tab mode. **Wired into the real server** (2026-10-19, Ritesh: phone-only, coexist -- `server-wiring-proposal.md`): an NPC-staffed "phones" conversation runs this engine for real, with its `Scene` persisted in `conversations.data` and one `events` row per turn, verified live against two WebSocket clients and the real SQLite file |
 | Laptop-purchase scene (G3) | Built and tested overnight (Ritesh's standing authorization; see decisions.md). Engine, NPCs, sourced data (`laptops.json`), specs, a transcript generator. **Not yet**: an automated reviewer pass on fresh seeds, Ritesh playing either side, wording review -- see conversation-types.md's G3 entry |
 | **Core extraction** | **Done, in 3 checked-in steps** (`core-extraction-proposal.md`, reviewed by Ritesh before each step): `core/engine.ts` now holds the one real implementation of `derive`/`askable`/`gain`/the turn protocol/`validatePicks`/`hintText`, `core/npc.ts` holds `staffMove`/`runConversation`/`randomStaff`. Phone and laptop are thin wrappers over this; all 140 of their specs pass unchanged. What's still correctly scene-owned, not a gap: `pool.ts`, the bank's question content, `lines.ts`, and `confirm`/`reconfirm`/`keepPreferences`/`compatible`/`consistent`/`customerMove`/`randomPersona` (see engine-reference.md) |
 | **Device-service scene (G1), v1** | Built on top of the extracted core -- the real test of whether it generalizes beyond two purchase scenes (`service-scene-proposal.md`, reviewed by Ritesh before building). It does **not** reuse `core/npc.ts`'s `staffMove` or any of `core/types.ts`'s `Pending`/`StaffAct`/`CustomerAction`/`Ended` -- those turned out to be purchase-family vocabulary, not pool-shape-generic (see engine-reference.md). It does reuse `core/engine.ts`'s fold wholesale. Phone-only, 4 symptoms, one deterministic `run_check` staff move, one mandatory data-loss gate verified failing-first |
@@ -64,6 +64,7 @@ Read in this order.
 | `scripts/talk-transcripts.ts`, `scripts/talk-laptop-transcripts.ts`, `scripts/talk-service-transcripts.ts` | generate NPC-vs-NPC transcripts for reading, one per scene |
 | `poc/talk/` | the throwaway HTML page (`pnpm poc`) -- phone scene only; laptop has no page |
 | `.talk-runs/` | generated transcripts (gitignored; regenerate any time) |
+| `src/server/talkWire.ts` | wires the phone scene into `service.ts` for an NPC-staffed "phones" conversation: a deterministic per-conversation RNG, the `TurnView`-flattening of the engine's menu, the stock-reservation gap noted in its own header |
 | `LEARNINGS.md` | entries from this work, each tied to a course lecture lesson |
 | `WORKLOG.md` | dated entries under "Conversation model" |
 
@@ -87,8 +88,13 @@ The page takes a hash: `#role=staff|customer&vs=npc&seed=7` (against an NPC) or
 ## Not done (and who decides)
 
 - **ADR** superseding ADR 6: waits for Ritesh's approval of the POC (his call, 2026-10-17).
-- **Wiring** to the real server, SQLite, the `events` table and the 3D store. The engine is
-  pure (state in, state out); the event-log rule in CLAUDE.md applies the moment it is wired.
+- **Wiring to the real server**: done for phone only, coexisting with the old engine
+  (`src/server/talkWire.ts`, `server-wiring-proposal.md`, 2026-10-19). An NPC-staffed "phones"
+  conversation is real: `Scene` persisted in `conversations.data`, one `events` row per turn.
+  **Not wired:** laptop, service, a human-staffed "phones" conversation (still the old engine --
+  the new engine's richer menu has no staff-side UI yet), and the "bought" ending does not reserve
+  real stock (the new engine's model ids and the store's catalogue/stock ids were never
+  reconciled -- a separate piece of work, named in `server-wiring-proposal.md`, not hidden).
 - **Wording is placeholder** ([TK]): all phrases are in each scene's `lines.ts`; Ritesh rewrites
   them in his voice. Service's lines are especially placeholder-heavy (v1 proved the mechanism,
   not the wording).
