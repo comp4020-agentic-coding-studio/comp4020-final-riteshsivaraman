@@ -25,7 +25,7 @@ import { nearestStaffSpot } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
 import { takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
-import { beginTalk, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
+import { beginTalk, currentTurn, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import type { Scene } from "../shared/talk/types.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
@@ -895,10 +895,23 @@ function demoSpot(ctx: Ctx, customerId: string, talkModelId: string): { slotId: 
   return { slotId: s.id, stand, goal, face: { x: s.x, z: s.z } };
 }
 
+// The demo line is written as if you are already at the device ("Here it is.").
+// Said before you get there, or with nothing to show, it reads wrong, so the
+// opening is swapped for one that fits.
+const reworded = (say: string, opening: string): string => say.replace(/^(?:[A-Z][a-z']+[.!] ){0,2}(?:Here it is\.|Here's the [^.]+\.)/, opening);
+
 function startDemoEscort(ctx: Ctx, row: ConvRow, talkModelId: string): Outgoing[] {
   const modelName = modelById(talkModelId).name;
   const spot = demoSpot(ctx, row.customer_id, talkModelId);
-  if (!spot) return [notice(row.customer_id, `${nameOf(ctx, row.with_id)} says the ${modelName} is not out on the floor right now.`)];
+  if (!spot) {
+    // nothing to walk to (someone is already looking at the last one): the line
+    // should not say "here it is" over an empty table
+    const d = anyDataOf(row);
+    const base = isTalkData(d) ? currentTurn(d.scene) : null;
+    const out: Outgoing[] = [notice(row.customer_id, `${nameOf(ctx, row.with_id)}: the ${modelName} is not out to try right now.`)];
+    if (base) out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), reworded(base.say, `I can't show you one right now, but here's the ${modelName}.`), base.choices, false, "customer") } });
+    return out;
+  }
   const eng = (anyDataOf(row) as AnyConvData).eng;
   const from = npcPlace(ctx, eng, row.with_id);
   return beginEscort(ctx, { customerId: row.customer_id, staffId: row.with_id, kind: "demo", slotId: spot.slotId, conversationId: row.id, from, goal: spot.goal, face: spot.face, stand: spot.stand, text: `Follow ${nameOf(ctx, row.with_id)} to the ${modelName}` });
@@ -968,6 +981,12 @@ function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoi
     const eng: Engagement = { npcId: e.staff_id, visitorId: e.customer_id, since: ctx.now, at: cpos, from: { x: e.goal_x, z: e.goal_z } };
     setEng(ctx, conv.id, eng);
     out.push({ to: "all", message: { type: "engaged", ...eng } });
+    // back from the device: the line about it no longer says "here it is"
+    const d = anyDataOf(conv);
+    if (isTalkData(d)) {
+      const t = currentTurn(d.scene);
+      out.push({ to: e.customer_id, message: { type: "turn", ...turnView(conv, nameOf(ctx, conv.with_id), reworded(t.say, "So, that's the one."), t.choices, false, "customer") } });
+    }
   } else {
     out.push({ to: "all", message: { type: "released", npcId: e.staff_id } });
     if (e.kind === "till" && why === "done") out.push(...startPayment(ctx, e.customer_id, { x: e.stand_x, z: e.stand_z }));

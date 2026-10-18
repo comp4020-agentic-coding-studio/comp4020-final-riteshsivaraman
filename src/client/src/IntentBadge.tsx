@@ -20,6 +20,8 @@ export function IntentBadge({ id }: { id: string }) {
         : `wants to talk to ${target}`
       : it.state === "queued"
         ? `${source} is waiting`
-        : `${source} wants to talk`;
+        : source === "you"
+          ? "you want to talk"
+          : `${source} wants to talk`;
   return <div className="intent-badge">💬 {text}</div>;
 }

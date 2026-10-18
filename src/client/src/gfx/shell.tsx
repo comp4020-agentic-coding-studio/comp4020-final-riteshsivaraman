@@ -247,6 +247,7 @@ export function Poster({
   w = 2.2,
   h = 2,
   photo,
+  bezel,
 }: {
   position: [number, number, number];
   rotY: number;
@@ -255,16 +256,26 @@ export function Poster({
   w?: number;
   h?: number;
   photo?: Photo;
+  bezel?: boolean; // a thin black edge round a picture (the one dark panel)
 }) {
   const drawn = useMemo(() => posterTexture(pair[0], pair[1], dark), [pair, dark]);
   const shot = usePhoto(photo, w / h);
   const map = shot ?? drawn;
   return (
     <group position={position} rotation={[0, rotY, 0]}>
-      <mesh>
-        <boxGeometry args={[w + 0.12, h + 0.12, 0.06]} />
-        <meshBasicMaterial color={dark ? "#2a2d33" : "#ffffff"} />
-      </mesh>
+      {photo ? (
+        bezel && (
+          <mesh>
+            <boxGeometry args={[w + 0.06, h + 0.06, 0.05]} />
+            <meshBasicMaterial color="#000000" />
+          </mesh>
+        )
+      ) : (
+        <mesh>
+          <boxGeometry args={[w + 0.12, h + 0.12, 0.06]} />
+          <meshBasicMaterial color={dark ? "#2a2d33" : "#ffffff"} />
+        </mesh>
+      )}
       <mesh position={[0, 0, 0.035]}>
         <planeGeometry args={[w, h]} />
         <meshBasicMaterial map={map} toneMapped={false} />
@@ -477,11 +488,24 @@ export function LightBox({
 }) {
   const drawn = useMemo(() => lightboxTexture(kind), [kind]);
   const h = LIGHTBOX_H;
-  const shot = usePhoto(photo, (w * 0.92) / (h * 0.78));
+  const shot = usePhoto(photo, w / h);
   const map = shot ?? drawn;
   const y = LIGHTBOX_BOTTOM + h / 2;
+  const group = { position: [side * (FACE_X - 0.03), y, z] as [number, number, number], rotation: [0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0] as [number, number, number] };
+  // a picture fills the whole panel: no white backing, no inset, no halo
+  // (Ritesh, 2026-10-19: "not have that awkward white background / frame / border")
+  if (photo) {
+    return (
+      <group {...group}>
+        <mesh position={[0, 0, 0.002]}>
+          <planeGeometry args={[w, h]} />
+          <meshBasicMaterial map={shot} color={shot ? "#ffffff" : "#222222"} toneMapped={false} />
+        </mesh>
+      </group>
+    );
+  }
   return (
-    <group position={[side * (FACE_X - 0.03), y, z]} rotation={[0, side === -1 ? Math.PI / 2 : -Math.PI / 2, 0]}>
+    <group {...group}>
       {/* the light it throws on the wall around it */}
       <mesh position={[0, 0, 0.0005]}>
         <planeGeometry args={[w + 0.9, h + 0.9]} />
@@ -550,6 +574,7 @@ export function WallSections() {
                   w={f.w}
                   h={f.h}
                   photo={WALL_PHOTOS[`${side === 1 ? "+x" : "-x"}:${i}`]}
+                  bezel
                 />
               );
             }

@@ -26,7 +26,10 @@ const BACK = 0.045; // nearest a box may stand to the wall face
 const FRONT = 0.25; // where a box's front stands, from the wall face
 const HERO_FRONT = 0.258; // a hero item set forward to the plate's edge
 const CLEAR = BAY_SHELVES.step - PLATE_T - 0.01; // under the shelf above
-const HALF_RUN = BAY_W / 2 - 0.035; // usable half width along the shelf
+// usable half width along the shelf. The piers stand proud of the bay, so from
+// any angle the outermost facings vanish behind them: keep clear of that band
+// rather than draw boxes nobody can see (Ritesh, 2026-10-19)
+const HALF_RUN = BAY_W / 2 - 0.12;
 const GAP = 0.008;
 
 interface Item {
@@ -168,7 +171,8 @@ function place(side: -1 | 1, bay: number): PlacedBox[] {
       const cu = u + d.w / 2;
       // rows behind the facing, back to the panel (only seen from an angle,
       // but a shelf with one box and air behind it reads as hollow)
-      const depthRows = Math.max(1, Math.min(3, Math.floor((front - BACK) / d.d)));
+      // one row only: the ones behind it were never visible and cost draws
+      const depthRows = 1;
       for (let r = sold ? 1 : 0; r < (sold ? Math.max(1, depthRows) : depthRows); r++) {
         const dist = front - d.d / 2 - r * d.d;
         if (dist - d.d / 2 < BACK - 1e-6) break;

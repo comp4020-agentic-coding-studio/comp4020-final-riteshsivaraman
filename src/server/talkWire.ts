@@ -85,6 +85,12 @@ function menuToTurn(menu: CustomerMenu): TalkTurn {
   return { say: menu.prompt, choices, ended: false };
 }
 
+// The menu the customer has now, as a turn (to show it again, e.g. after a demo).
+export function currentTurn(sc: Scene): TalkTurn {
+  const menu = customerMenu(sc);
+  return menu ? menuToTurn(menu) : { say: lastLine(sc), choices: [], ended: !!sc.ended };
+}
+
 function lastLine(sc: Scene): string {
   return sc.log[sc.log.length - 1]?.text ?? "";
 }

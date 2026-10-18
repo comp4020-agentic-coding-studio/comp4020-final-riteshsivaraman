@@ -722,6 +722,8 @@ describe("being walked to a demo device (Ritesh, 2026-10-19)", () => {
     expect(last(done, "c1", "escort_end")).toBeDefined();
     expect(last(done, "all", "engaged")).toMatchObject({ npcId: "spec-phones", visitorId: "c1" });
     expect(last(done, "all", "engaged")!.lead).toBeUndefined();
+    // back from the device the line no longer says "here it is"
+    expect(last(done, "c1", "turn")!.say).toMatch(/^So, that's the one\./);
     expect(last(chooseTurn(ctx(T + 6000), "c1", hello.conversationId, "anything"), "c1", "notice")?.text).not.toMatch(/Follow/);
     expect(eventTypes()).toEqual(expect.arrayContaining(["escort_started", "inspect_start", "escort_ended"]));
   });
