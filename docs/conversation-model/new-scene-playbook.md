@@ -2,7 +2,7 @@
 status: draft
 what: Recipe for building the next conversation scene on this system, what is phone-specific versus generic today, and the pitfalls already paid for. Compact first version.
 date: 2026-10-18
-source: the phone-scene build (see how-we-built-it.md), updated after porting the laptop scene the same night (Claude, overnight run under Ritesh's standing authorization; see decisions.md). The generalisation section was a proposal; porting laptop tested it and found it did not land as planned -- see below.
+source: the phone-scene build (see how-we-built-it.md); the laptop port that first tested the generalisation claim and found it hadn't landed; then a real core extraction, done in two checked-in steps with Ritesh reviewing each before the next began (phase 2 steps 1 and 2 -- docs/conversation-model/core-extraction-proposal.md). Claude's account.
 ---
 
 # Playbook: building the next scene
@@ -19,34 +19,47 @@ source: the phone-scene build (see how-we-built-it.md), updated after porting th
 9. **Replays** of the transcripts (prompt D), **seeded simulation** with the invariants in `spec/talk-sim.test.ts`, **wording specs** like `spec/talk-lines.test.ts`.
 10. **Play it, paste transcripts, fix with a spec each.** Then the **review loop** (`scripts/talk-transcripts.ts` plus prompt E on fresh seeds, spot-check before acting).
 
-## Generic today vs phone-specific (updated after porting laptop)
+## Generic today vs phone-specific (updated through phase 2 step 2)
 
-The plan below was to do the scene-definition refactor *while* porting laptop, on the theory
-that porting first and extracting what the two scenes actually share would avoid designing a
-generic core from imagination. Laptop was ported (`src/shared/talk/scenes/laptop/`); **the
-extraction did not happen** -- what's below is what's actually true of the code today, not the
-plan that was supposed to produce it.
+The first attempt did the scene-definition refactor *while* porting laptop in one unsupervised
+overnight pass; the extraction didn't happen (only `core/rng.ts` and `core/types.ts`'s original
+contents were genuinely pulled out, and laptop was ported by near-verbatim copy-paste). The fix
+was process, not more code: a short, reviewed design doc first
+(`core-extraction-proposal.md`, phase 1 -- no code, a real line-by-line diff of what the two
+scenes actually shared), then the extraction itself in small steps, each checked in with Ritesh
+before the next began. Two steps have landed this way; what follows is what's actually true of
+the code today.
 
-- **Actually extracted into `core/` and reused by both scenes:** only `core/rng.ts` (the seeded
-  generator and its helpers) and `core/types.ts` (`Tone`, `Role`, `Option`, `Answer`, the
-  tone-to-expression map). That's it.
-- **Still fully duplicated, not shared:** the turn protocol (`scene.ts`'s `staffActs`/
-  `applyStaff`/`customerMenu`/`applyCustomer`), `derive()`-as-a-fold and its helpers (`askable`,
-  `reopenable`, `gain`, `withoutAnswer`, `rowsIf`, `optionsFor`), the NPC loop shape
-  (`npc.ts`'s `customerMove`/`staffMove`/`runConversation`), obligations (`forced`/`owed`). Every
-  one of these exists twice, nearly line-for-line, once under `src/shared/talk/` for phones and
-  once under `src/shared/talk/scenes/laptop/` for laptops. Porting laptop *by copying* did confirm
-  these shapes are identical across two real scenes (the files really do read as the same logic
-  with phone nouns swapped for laptop ones) -- that's useful evidence for the next attempt -- but
-  confirming an abstraction is possible is not the same as having built it.
-- **Genuinely scene-specific, as expected:** `data.ts` (the sourced catalogue and its schema),
-  the attributes in `pool.ts`, every question in `bank.ts`, the facts and phrasing in `lines.ts`,
-  the personas in `npc.ts`.
-- **Still a proposed refactor, not built:** the scene-definition object (`items`, `constraints`,
-  `signals`, `bank`, `moves`, `outcomes`, `wording`) with the engine generic over it, so
-  `scenes/phone/` and `scenes/laptop/` share a real `core/engine.ts`. Doing this *now*, against
-  two real scenes instead of one, is lower-risk than the original plan to do it blind -- but it
-  is still a from-scratch extraction pass, not a cleanup of something half-done.
+- **Actually extracted into `core/` and reused by both scenes:**
+  - `core/rng.ts` (seeded generator), `core/types.ts` (`Tone`, `Role`, `Option`, `Answer`, the
+    tone-to-expression map, and -- added in step 2, once the diff showed them byte-identical --
+    `Pending`, `StaffAct`, `CustomerAction`, `CustomerReply`, `Snapshot`, `Line`, and `Ended<Sku>`).
+  - `core/engine.ts`, step 1: `derive`, `withoutAnswer`, `rowsIf`, `optionsFor`, `askable`,
+    `reopenable`, `gain` -- the question-bank fold, one body each, generic over a small
+    `EngineDeps` interface.
+  - `core/engine.ts`, step 2: `demoCandidates`, `relaxMoves`, `hintText`, `validatePicks`,
+    `nearestModels`, `eligibleRecommendations` -- the turn-protocol pieces that turned out to be
+    pure rules with no scene-specific branch inside them. Each scene's `scene.ts` now calls these
+    instead of reimplementing them.
+- **Deliberately left duplicated, as a real exception, not a shortcut:** `staffActs`,
+  `applyStaff`, `customerMenu`, `applyCustomer` themselves, because their `confirm`/`reconfirm`/
+  `keepPreferences` branches depend on more than phase 1's guessed "which axes vary" hook could
+  honestly cover -- a laptop's extra memory axis means different *option ids* exist at
+  confirm-time (a `memory` change phone never offers), not just a different answer to a yes/no
+  check. Turning this into a hook now would mean inventing 5-6 more callbacks from only two data
+  points, which is the same mistake ("a rule that fits the examples but not the data") the first
+  attempt made at a larger scale. Left scene-owned on purpose, with the reasoning written down in
+  `core/engine.ts`'s comments, so a real third scene can settle whether this needs a hook or is
+  just always scene work.
+- **Still fully duplicated, not yet attempted:** the NPC loop shape (`npc.ts`'s `customerMove`/
+  `staffMove`/`runConversation`) -- step 3, not yet done.
+- **Genuinely scene-specific, as expected, not part of the plan to share:** `data.ts` (the sourced
+  catalogue and its schema), the attributes in `pool.ts`, every question in `bank.ts`, the facts
+  and phrasing in `lines.ts`.
+- **What made step 2 land differently from the first attempt:** stopping to design before coding
+  (phase 1), then stopping again mid-step-2 when the confirm/reconfirm cluster turned out deeper
+  than planned, to ask whether to force a hook or leave it scene-owned, rather than guessing
+  silently and writing it up afterwards as if it had been the plan all along.
 
 ## Pitfalls already paid for (details: how-we-built-it.md section 7)
 - Two correct rules interacting (test pairs of features, not each alone).

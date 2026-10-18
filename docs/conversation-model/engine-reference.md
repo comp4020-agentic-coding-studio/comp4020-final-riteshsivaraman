@@ -2,7 +2,7 @@
 status: working
 what: How the conversation engine in src/shared/talk works: layers, modules, the state, the turn protocol, how options and legal moves are computed, the rules the engine enforces, the NPCs, the wording system, the tests that guard it, and where to extend it. Covers both the phone scene and the laptop scene added 2026-10-18, and says plainly which parts are actually shared between them and which are duplicated.
 date: 2026-10-18
-source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/talk/scenes/laptop/*.ts and spec/talk-*.test.ts, updated the night the laptop scene was added (Claude, overnight run under Ritesh's standing authorization; see decisions.md). Claude's account; the code is the source of truth.
+source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/talk/scenes/laptop/*.ts and spec/talk-*.test.ts, updated through phase 2 step 2 of the core extraction (Claude, with Ritesh reviewing and approving each step in session; see decisions.md and core-extraction-proposal.md). Claude's account; the code is the source of truth.
 ---
 
 # Engine reference
@@ -10,41 +10,65 @@ source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/ta
 ## 1. Layers
 
 There are now two scenes on this engine, phone (`src/shared/talk/`) and laptop
-(`src/shared/talk/scenes/laptop/`). As of phase 2 step 1 of the core extraction
-(`docs/conversation-model/core-extraction-proposal.md`), `core/rng.ts`, `core/types.ts` and now
-**`core/engine.ts`** are genuinely shared: `derive`, `withoutAnswer`, `rowsIf`, `optionsFor`,
-`askable`, `reopenable` and `gain` each have exactly one body, in `core/engine.ts`, generic over
-a small `EngineDeps` interface (pool functions, the bank array, a `withAnswer` scene-copy helper).
-Each scene's `bank.ts` is now a thin wrapper re-exporting these under its own concrete types, so
-every existing import of `bank.ts` keeps working unchanged. **Everything else below `bank.ts`'s
-question content -- the pool logic in `pool.ts`, the actual `QuestionDef`s, `scene.ts`'s turn
-protocol, `npc.ts`'s NPC loop, and all of `lines.ts`'s wording -- is still duplicated, not shared.**
-That's steps 2 and 3 of the same extraction, not yet done. Read new-scene-playbook.md's "Generic
-today vs phone-specific" for the full account of what's proven generic vs still duplicated.
+(`src/shared/talk/scenes/laptop/`). As of phase 2 step 2 of the core extraction
+(`docs/conversation-model/core-extraction-proposal.md`), `core/rng.ts`, `core/types.ts` and
+**`core/engine.ts`** are genuinely shared, in two layers:
+
+- **The question-bank machinery (step 1):** `derive`, `withoutAnswer`, `rowsIf`, `optionsFor`,
+  `askable`, `reopenable` and `gain` each have exactly one body, generic over a small `EngineDeps`
+  interface (pool functions, the bank array, a `withAnswer` scene-copy helper). Each scene's
+  `bank.ts` is a thin wrapper re-exporting these under its own concrete types.
+- **The turn-protocol pieces that turned out to be pure rules (step 2):** `demoCandidates`,
+  `relaxMoves`, `hintText`, `validatePicks`, `nearestModels` and `eligibleRecommendations` (the
+  recommend loop's one real hook: phone won't recommend an unasked foldable, laptop has no such
+  gate) each have exactly one body too. Each scene's `scene.ts` calls these instead of
+  reimplementing them -- `demoCandidates(ctx)` and `relaxMoves(ctx)` in `scene.ts` are now
+  one-line wrappers, not the algorithm itself.
+
+**What step 2 found was NOT as generalizable as phase 1's diff guessed, and was deliberately left
+duplicated rather than forced:** `staffActs`, `applyStaff`, `customerMenu` and `applyCustomer`
+themselves stay in each scene's `scene.ts`, because their `confirm`/`reconfirm`/`keepPreferences`
+branches turned out to depend on more than "which axes vary" -- a laptop has a memory axis a phone
+doesn't, so the actual *option ids* at confirm time differ (laptop offers a `memory` change phone
+never has), not just whether a check passes. Phase 1's proposed `confirmExtraOptions`/
+`parseStorageTier` hooks would have had to grow into a much larger, more speculative interface to
+cover this honestly, built from only two data points -- exactly the "a rule that fits the examples
+but not the data" mistake new-scene-playbook.md warns against. So this cluster (plus the pure-data
+`ASK_LABEL`/`KEY_TEXT` maps and item-noun wording) stays scene-owned, documented as a real
+exception rather than hidden. **`pool.ts`, the actual `QuestionDef`s, `npc.ts`'s NPC loop, and all
+of `lines.ts`'s wording are still fully duplicated** -- `npc.ts` is step 3 of this extraction, not
+yet done; `pool.ts` and `lines.ts` are correctly scene-specific and not part of the plan to share.
+Read new-scene-playbook.md's "Generic today vs phone-specific" for the full account.
 
 ```
-                 core/rng.ts    core/types.ts    core/engine.ts
-                 (seeded RNG)   (Tone, Role,     (derive, withoutAnswer, rowsIf,
-                      │          Option, Answer,  optionsFor, askable, reopenable,
-                      │          tone→expression) gain -- genuinely shared now)
-                      │                │                │
-        ┌─────────────┴────────────────┴────────────────┴─────────────┐
-        v                                                              v
-  PHONE SCENE (src/shared/talk/)                      LAPTOP SCENE (src/shared/talk/scenes/laptop/)
-  devices.json ─> data.ts ─> pool.ts                  laptops.json ─> data.ts ─> pool.ts
-                     │                                                   │
-              bank.ts (thin wrapper over core/engine.ts,          bank.ts (thin wrapper,
-              plus this scene's own QuestionDef[])                same shape)
-                     │                                                   │
-          ┌──────────┴──────────┐                           ┌──────────┴──────────┐
-          v                     v                            v                     v
-       scene.ts              lines.ts                     scene.ts              lines.ts
-       (still duplicated)   (scene-specific,               (still duplicated)   (scene-specific,
-          │                  correctly so)                    │                  correctly so)
-          └──────────┬──────────┘                           └──────────┬──────────┘
-                      v                                                 v
-                   npc.ts                                            npc.ts
-          (still duplicated; same shape both scenes -- the next step of the extraction)
+                 core/rng.ts    core/types.ts         core/engine.ts
+                 (seeded RNG)   (Tone, Role, Option,  (derive..gain, AND
+                      │          Answer, Pending,      demoCandidates, relaxMoves,
+                      │          StaffAct, Customer-   hintText, validatePicks,
+                      │          Action/Reply, Line,   nearestModels,
+                      │          Snapshot, Ended<Sku>) eligibleRecommendations)
+                      │                │                      │
+        ┌─────────────┴────────────────┴──────────────────────┴─────────────┐
+        v                                                                    v
+  PHONE SCENE (src/shared/talk/)                        LAPTOP SCENE (src/shared/talk/scenes/laptop/)
+  devices.json ─> data.ts ─> pool.ts                    laptops.json ─> data.ts ─> pool.ts
+                     │                                                     │
+              bank.ts (thin wrapper over core/engine.ts,            bank.ts (thin wrapper,
+              plus this scene's own QuestionDef[])                  same shape)
+                     │                                                     │
+          ┌──────────┴──────────┐                             ┌──────────┴──────────┐
+          v                     v                              v                     v
+       scene.ts              lines.ts                       scene.ts              lines.ts
+  (thin calls into core    (scene-specific,              (thin calls into core    (scene-specific,
+   engine helpers, plus     correctly so)                 engine helpers, plus     correctly so)
+   confirm/reconfirm/                                      confirm/reconfirm/
+   keepPreferences, kept                                   keepPreferences, kept
+   scene-owned -- see                                      scene-owned -- see
+   above)                                                  above)
+          └──────────┬──────────┘                             └──────────┬──────────┘
+                      v                                                   v
+                   npc.ts                                              npc.ts
+          (still duplicated; same shape both scenes -- step 3 of the extraction, not yet done)
 ```
 
 Within one scene, `types.ts` holds the scene's own vocabulary (re-exporting `core/types.ts`'s

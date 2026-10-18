@@ -1,4 +1,5 @@
 import { askable, derive, gain, money, newScene, optionsFor, questionById, reopenable, rowsIf, withoutAnswer, type Contribution } from "./bank.ts";
+import * as engine from "./core/engine.ts";
 import { MODELS, modelById } from "./data.ts";
 import { closingLine, customerLine, staffLine, throwbacks } from "./lines.ts";
 import { ceil100, poolOf, type Constraints, type Sku } from "./pool.ts";
@@ -9,6 +10,18 @@ import { TONE_EXPRESSION, type Ctx, type CustomerAction, type CustomerReply, typ
 // and an NPC choose from exactly the same list, and anything not on the list
 // is refused. The scene is plain data (cloneable, serialisable), so the two
 // browser tabs of the proof of concept can pass it back and forth.
+//
+// Phase 2 step 2 of the core extraction
+// (docs/conversation-model/core-extraction-proposal.md): relaxMoves,
+// demoCandidates, nearestModels, validPicks and the recommend-eligibility
+// filter now call core/engine.ts, which found them byte-identical (modulo
+// scene-specific types) against scenes/laptop/scene.ts. staffActs,
+// applyStaff, customerMenu and applyCustomer stay here -- they still hold
+// confirm/reconfirm/keepPreferences, which turned out to need more than a
+// "which axes vary" hook (laptop's extra memory axis changes which option ids
+// exist, not just whether a check passes); see the long comment above
+// core/engine.ts's relaxMoves for why that stayed scene-owned rather than
+// forced into a premature generic shape.
 
 export { newScene, derive };
 
@@ -52,7 +65,7 @@ export interface ActView {
 // A phone the customer has already seen is not offered again (they can still
 // ask for it), and one they said no to is not offered either.
 export function demoCandidates(ctx: Ctx): string[] {
-  return ctx.ranked.filter((m) => !ctx.sc.declinedDemo.includes(m.id) && !ctx.sc.demoed.includes(m.id)).slice(0, 4).map((m) => m.id);
+  return engine.demoCandidates(ctx.ranked, ctx.sc.demoed, ctx.sc.declinedDemo);
 }
 
 // ---- relaxing a requirement that left nothing ----
@@ -76,31 +89,7 @@ const KEY_TEXT: Partial<Record<keyof Constraints, string>> = {
 };
 
 export function relaxMoves(ctx: Ctx): RelaxMove[] {
-  const moves: RelaxMove[] = [];
-  for (const key of Object.keys(KEY_TEXT) as (keyof Constraints)[]) {
-    if (ctx.c[key] === undefined) continue;
-    const without = { ...ctx.c };
-    delete without[key];
-    if (poolOf(without).length > 0) moves.push({ id: `drop:${key}`, label: `Give up ${KEY_TEXT[key]}` });
-  }
-  // When no single concession is enough, offer the smallest pair, so the menu is never just "hold firm".
-  if (moves.length === 0) {
-    const keys = (Object.keys(KEY_TEXT) as (keyof Constraints)[]).filter((k) => ctx.c[k] !== undefined);
-    for (let i = 0; i < keys.length; i++)
-      for (let j = i + 1; j < keys.length; j++) {
-        const without = { ...ctx.c };
-        delete without[keys[i]!];
-        delete without[keys[j]!];
-        if (poolOf(without).length > 0) moves.push({ id: `drop:${keys[i]}+${keys[j]}`, label: `Give up ${KEY_TEXT[keys[i]!]} and ${KEY_TEXT[keys[j]!]}` });
-      }
-  }
-  if (ctx.c.maxPrice !== undefined) {
-    const looser = { ...ctx.c };
-    delete looser.maxPrice;
-    const next = [...new Set(poolOf(looser).map((r) => ceil100(r.price)))].filter((p) => p > ctx.c.maxPrice!).sort((a, b) => a - b);
-    for (const p of next.slice(0, 2)) moves.push({ id: `raise:${p}`, label: `Raise my budget to ${money(p)}` });
-  }
-  return moves;
+  return engine.relaxMoves(ctx.c, KEY_TEXT, poolOf, ceil100, money);
 }
 
 // ---- the staff's menu ----
@@ -132,7 +121,7 @@ export function staffActs(sc: Scene): ActView[] {
     const informed = !!(sc.answers["use_case"] || sc.answers["budget_ceiling"]);
     // A foldable is not suggested to someone who has not said whether they are open to one (unless it is all that is left).
     const askedFold = !!sc.answers["form_factor"] || ctx.ranked.every((m) => m.foldable);
-    if (!hold && sc.fixed === undefined && (informed || open.length === 0)) for (const m of ctx.ranked.filter((m) => askedFold || !m.foldable).slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
+    if (!hold && sc.fixed === undefined && (informed || open.length === 0)) for (const m of engine.eligibleRecommendations(ctx.ranked, (m) => askedFold || !m.foldable)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
   }
   for (const q of reopenable(ctx)) out.push(view({ t: "ask", qid: q.id, reopen: true }, `Reopen: ${q.id.replace(/_/g, " ")}`));
   // Every conversation starts with a greeting and an introduction: before anything else
@@ -153,13 +142,8 @@ function hintFor(ctx: Ctx, qid: string): string {
   if (q.kind !== "hard" && q.kind !== "resolve") return "adds a signal, keeps the pool";
   const opts = optionsFor(ctx, q).filter((o) => !o.neutral && !o.param);
   const models = opts.map((o) => modelCountIf(ctx, qid, o.id));
-  // When the models don't change, the question is still narrowing storage or colour rows.
-  if (models.every((n) => n === ctx.ranked.length)) {
-    const rows = opts.map((o) => rowsIf(ctx, qid, [o.id]));
-    return `${ctx.pool.length} options → ${rows.length > 6 ? rows.slice(0, 6).join(" / ") + " …" : rows.join(" / ")}`;
-  }
-  const shown = models.length > 6 ? `${models.slice(0, 6).join(" / ")} …` : models.join(" / ");
-  return `${ctx.ranked.length} models → ${shown}`;
+  const rows = opts.map((o) => rowsIf(ctx, qid, [o.id]));
+  return engine.hintText(ctx.pool.length, ctx.ranked.length, models, rows);
 }
 
 function modelCountIf(ctx: Ctx, qid: string, pick: string): number {
@@ -242,32 +226,12 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
 // When nothing fits and the customer won't relax, the nearest models are the
 // ones the pool would hold with the fewest constraints dropped.
 function nearestModels(ctx: Ctx): string[] {
-  const found: string[] = [];
-  for (const m of relaxMoves(ctx)) {
-    const c = { ...ctx.c };
-    if (m.id.startsWith("drop:")) for (const key of m.id.slice(5).split("+")) delete c[key as keyof Constraints];
-    else c.maxPrice = Number(m.id.slice(6));
-    for (const r of poolOf(c)) if (!found.includes(r.model) && !ctx.sc.demoed.includes(r.model)) found.push(r.model);
-  }
-  return found.slice(0, 2);
+  return engine.nearestModels(ctx.c, relaxMoves(ctx), poolOf, ctx.sc.demoed);
 }
 
 // ---- validation of a pick against a menu ----
 
-function validPicks(picks: string[], options: Option[], multi: boolean): string | null {
-  if (picks.length === 0) return "pick something";
-  if (!multi && picks.length > 1) return "pick one";
-  for (const pick of picks) {
-    if (options.some((o) => o.id === pick && !o.param)) continue;
-    const p = options.find((o) => o.param && pick.startsWith(o.param.prefix));
-    if (p?.param) {
-      const n = Number(pick.slice(p.param.prefix.length));
-      if (Number.isFinite(n) && n >= p.param.min && n <= p.param.max && n % p.param.step === 0) continue;
-    }
-    return `"${pick}" is not on the menu`;
-  }
-  return null;
-}
+const validPicks = engine.validatePicks;
 
 // ---- staff move ----
 

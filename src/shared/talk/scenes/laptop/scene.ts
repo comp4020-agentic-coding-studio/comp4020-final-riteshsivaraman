@@ -1,19 +1,20 @@
 import { askable, derive, gain, money, newScene, optionsFor, questionById, reopenable, rowsIf, withoutAnswer, type Contribution } from "./bank.ts";
+import * as engine from "../../core/engine.ts";
 import { MODELS, modelById } from "./data.ts";
 import { closingLine, customerLine, staffLine, throwbacks } from "./lines.ts";
 import { ceil100, poolOf, type Constraints, type Sku } from "./pool.ts";
 import { TONE_EXPRESSION, type Ctx, type CustomerAction, type CustomerReply, type Line, type Option, type Pending, type Scene, type StaffAct, type Tone } from "./types.ts";
 
-// The laptop scene's turn engine. This file is close to a line-for-line port
-// of src/shared/talk/scene.ts (phones): the turn protocol -- staffActs,
-// applyStaff, customerMenu, applyCustomer, relaxMoves, demoCandidates -- does
-// not depend on what the pool holds, only on Constraints/Ctx/Scene having the
-// shape bank.ts's derive() produces. The only real differences from the phone
-// version are the KEY_TEXT labels (laptop constraint names instead of phone
-// ones) and keepPreferences (memory/storage instead of storage/colour nuance
-// -- a laptop has no "exact tier becomes a floor" subtlety around a resolve
-// question the way a phone's storage does, because budget and storage are
-// already separate axes here).
+// The laptop scene's turn engine. relaxMoves, demoCandidates, nearestModels,
+// validPicks and the recommend-eligibility filter now call core/engine.ts
+// (phase 2 step 2 of the core extraction:
+// docs/conversation-model/core-extraction-proposal.md), which found them
+// byte-identical to src/shared/talk/scene.ts's versions modulo scene-specific
+// types. staffActs, applyStaff, customerMenu and applyCustomer stay here --
+// they still hold confirm/reconfirm/keepPreferences, which need more than a
+// "which axes vary" hook (a laptop's extra memory axis changes which option
+// ids exist at all, not just whether a check passes); see the comment above
+// core/engine.ts's relaxMoves for why that stayed scene-owned.
 
 export { newScene, derive };
 
@@ -51,7 +52,7 @@ export interface ActView {
 }
 
 export function demoCandidates(ctx: Ctx): string[] {
-  return ctx.ranked.filter((m) => !ctx.sc.declinedDemo.includes(m.id) && !ctx.sc.demoed.includes(m.id)).slice(0, 4).map((m) => m.id);
+  return engine.demoCandidates(ctx.ranked, ctx.sc.demoed, ctx.sc.declinedDemo);
 }
 
 export interface RelaxMove {
@@ -72,30 +73,7 @@ const KEY_TEXT: Partial<Record<keyof Constraints, string>> = {
 };
 
 export function relaxMoves(ctx: Ctx): RelaxMove[] {
-  const moves: RelaxMove[] = [];
-  for (const key of Object.keys(KEY_TEXT) as (keyof Constraints)[]) {
-    if (ctx.c[key] === undefined) continue;
-    const without = { ...ctx.c };
-    delete without[key];
-    if (poolOf(without).length > 0) moves.push({ id: `drop:${key}`, label: `Give up ${KEY_TEXT[key]}` });
-  }
-  if (moves.length === 0) {
-    const keys = (Object.keys(KEY_TEXT) as (keyof Constraints)[]).filter((k) => ctx.c[k] !== undefined);
-    for (let i = 0; i < keys.length; i++)
-      for (let j = i + 1; j < keys.length; j++) {
-        const without = { ...ctx.c };
-        delete without[keys[i]!];
-        delete without[keys[j]!];
-        if (poolOf(without).length > 0) moves.push({ id: `drop:${keys[i]}+${keys[j]}`, label: `Give up ${KEY_TEXT[keys[i]!]} and ${KEY_TEXT[keys[j]!]}` });
-      }
-  }
-  if (ctx.c.maxPrice !== undefined) {
-    const looser = { ...ctx.c };
-    delete looser.maxPrice;
-    const next = [...new Set(poolOf(looser).map((r) => ceil100(r.price)))].filter((p) => p > ctx.c.maxPrice!).sort((a, b) => a - b);
-    for (const p of next.slice(0, 2)) moves.push({ id: `raise:${p}`, label: `Raise my budget to ${money(p)}` });
-  }
-  return moves;
+  return engine.relaxMoves(ctx.c, KEY_TEXT, poolOf, ceil100, money);
 }
 
 export function staffActs(sc: Scene): ActView[] {
@@ -119,7 +97,8 @@ export function staffActs(sc: Scene): ActView[] {
     if (ctx.pool.length === 1 && sc.fixed !== undefined) out.push(view({ t: "confirm" }, "Confirm the choice"));
     if (sc.carried) out.push(view({ t: "reconfirm" }, "Check their earlier wishes still stand"));
     const informed = !!(sc.answers["use_case"] || sc.answers["budget_ceiling"]);
-    if (!hold && sc.fixed === undefined && (informed || open.length === 0)) for (const m of ctx.ranked.slice(0, 3)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
+    // No foldable-style eligibility gate for laptops (every model is always recommendable).
+    if (!hold && sc.fixed === undefined && (informed || open.length === 0)) for (const m of engine.eligibleRecommendations(ctx.ranked, () => true)) out.push(view({ t: "recommend", model: m.id }, `Recommend the ${m.name}`));
   }
   for (const q of reopenable(ctx)) out.push(view({ t: "ask", qid: q.id, reopen: true }, `Reopen: ${q.id.replace(/_/g, " ")}`));
   if (sc.log.length === 0) return out.filter((v) => v.act.t === "ask" && (v.act.qid === "opening_intent" || v.act.qid === "known_model"));
@@ -137,12 +116,8 @@ function hintFor(ctx: Ctx, qid: string): string {
   if (q.kind !== "hard" && q.kind !== "resolve") return "adds a signal, keeps the pool";
   const opts = optionsFor(ctx, q).filter((o) => !o.neutral && !o.param);
   const models = opts.map((o) => modelCountIf(ctx, qid, o.id));
-  if (models.every((n) => n === ctx.ranked.length)) {
-    const rows = opts.map((o) => rowsIf(ctx, qid, [o.id]));
-    return `${ctx.pool.length} options → ${rows.length > 6 ? rows.slice(0, 6).join(" / ") + " …" : rows.join(" / ")}`;
-  }
-  const shown = models.length > 6 ? `${models.slice(0, 6).join(" / ")} …` : models.join(" / ");
-  return `${ctx.ranked.length} models → ${shown}`;
+  const rows = opts.map((o) => rowsIf(ctx, qid, [o.id]));
+  return engine.hintText(ctx.pool.length, ctx.ranked.length, models, rows);
 }
 
 function modelCountIf(ctx: Ctx, qid: string, pick: string): number {
@@ -220,30 +195,10 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
 }
 
 function nearestModels(ctx: Ctx): string[] {
-  const found: string[] = [];
-  for (const m of relaxMoves(ctx)) {
-    const c = { ...ctx.c };
-    if (m.id.startsWith("drop:")) for (const key of m.id.slice(5).split("+")) delete c[key as keyof Constraints];
-    else c.maxPrice = Number(m.id.slice(6));
-    for (const r of poolOf(c)) if (!found.includes(r.model) && !ctx.sc.demoed.includes(r.model)) found.push(r.model);
-  }
-  return found.slice(0, 2);
+  return engine.nearestModels(ctx.c, relaxMoves(ctx), poolOf, ctx.sc.demoed);
 }
 
-function validPicks(picks: string[], options: Option[], multi: boolean): string | null {
-  if (picks.length === 0) return "pick something";
-  if (!multi && picks.length > 1) return "pick one";
-  for (const pick of picks) {
-    if (options.some((o) => o.id === pick && !o.param)) continue;
-    const p = options.find((o) => o.param && pick.startsWith(o.param.prefix));
-    if (p?.param) {
-      const n = Number(pick.slice(p.param.prefix.length));
-      if (Number.isFinite(n) && n >= p.param.min && n <= p.param.max && n % p.param.step === 0) continue;
-    }
-    return `"${pick}" is not on the menu`;
-  }
-  return null;
-}
+const validPicks = engine.validatePicks;
 
 export function applyStaff(sc: Scene, act: StaffAct, tone: Tone): Scene | { error: string } {
   const legal = staffActs(sc);
