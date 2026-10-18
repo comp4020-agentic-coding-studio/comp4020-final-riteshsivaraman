@@ -87,6 +87,17 @@ that eliminate), the **soft signals** (answers that only re-rank), the **mandato
 what a real store allows is `[verify]` and must be sourced before it is said (D37).
 
 ## G1. Device service, phone: intake and diagnosis
+
+**Built, v1, 2026-10-18** (`src/shared/talk/scenes/service/`, proposal at
+`service-scene-proposal.md`, reviewed by Ritesh before building). Phone-only, 4 of this
+sketch's symptoms, the `run_check` staff move, the mandatory data-loss gate (verified
+failing-first), outcomes fixed-now/booked/cannot-fix/declines/left. **Deferred to a later
+pass:** the "replace the device" cross-scene handoff below (needs conversation-types.md
+section I's case object, which doesn't exist yet), G2's other device classes, loaner/
+warranty/eligibility policy beyond a `[TK]` placeholder, an automated reviewer pass, and
+Ritesh playing it. This was also the scene that tested whether the core extraction
+(`core-extraction-proposal.md`) actually generalises beyond two purchase scenes -- see
+`engine-reference.md` for what it found needed to stay scene-owned.
 - **Parties:** customer, technician or Genius (S8, T4). **Goal:** reach an outcome the customer accepts.
 - **Pool:** candidate faults and repair options for that model (for example screen replacement, battery
   service, water-damage assessment, software reset, nothing wrong). Not products: the *ranking* is "most likely

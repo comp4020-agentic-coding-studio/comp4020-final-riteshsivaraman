@@ -72,6 +72,37 @@ different third scene (device-service, G1 — a pool of fault explanations, not 
 test of whether `core/engine.ts`/`core/npc.ts`'s current shape holds, and is Ritesh's next call, not
 assumed here.
 
+## Conversation model: device-service scene (G1) built, the real test lands (2026-10-18)
+
+Ritesh's next call above was "yes, build it." Same checkpoint discipline as the core extraction:
+`docs/conversation-model/service-scene-proposal.md` (phase 1, no code) reviewed and approved before
+anything was built, two small core-type changes made and verified harmless first (`695d588`:
+`Ended<Sku>` made generic over an outcome type), then the scene itself.
+
+Built: `src/shared/talk/scenes/service/` (data, pool, types, bank, scene, lines, npc) -- phone-only
+intake/diagnosis, 4 symptoms, a deterministic `run_check` staff move, a mandatory data-loss gate
+built as a real blocking precondition, outcomes fixed-now/booked/cannot-fix/declines/left.
+`spec/talk-service-{data,pool,sim,lines}.test.ts` (22 specs, 162 total), `scripts/
+talk-service-transcripts.ts`. Commits: `a85a37a` (scene), `5805afa` (specs + transcripts).
+
+**The answer the whole exercise was for:** the question-bank fold (`core/engine.ts` step 1) is
+proven pool-shape-generic -- it held with zero changes against a pool of fault explanations, not
+products. `core/types.ts`'s `Pending`/`StaffAct`/`CustomerAction`/`Ended` and `core/npc.ts`'s
+`staffMove` are NOT pool-shape-generic -- they are purchase-family vocabulary that only looked
+shared because the first two scenes were both purchases. Service defines its own small versions
+instead of forcing a fit. Full account: `engine-reference.md` section 11, `decisions.md`'s matching
+entry.
+
+One real bug found while wiring the bank (not predicted): `symptom` had to be a `"route"` question,
+not `"hard"`, since this scene's pool starts empty (unlike phone/laptop's full catalogue) and
+`symptom` populates it rather than narrowing an existing one. The data-loss gate was verified
+failing-first: deliberately removed, confirmed the relevant specs went red for the right reason,
+restored.
+
+Not done: an automated reviewer pass, Ritesh playing either side, wording review (heavier
+placeholder than usual -- v1 proved the mechanism, not the words), and his review of the
+real-vs-invented policy split in `data.ts`.
+
 ## Crit 10 prep: stdout log and the authorisation note (2026-10-18)
 
 Crit 10 narrates "who did what" from `flyctl logs`; until now only "listening on" reached stdout. `a60962b`: `src/server/eventlog.ts` turns every events row into one line (`<iso time> [tag] type user=<id> k=v`), called beside both INSERTs (`service.ts` `log()`, `presence.ts` `logEvent()`). Conversation lines share a tag; tokens and typed notes are kept out. `spec/eventlog.test.ts` pins the format. D18's server clamp was already there (`clampToWalkable` in `presence.ts`, tested in `presence.test.ts`); added a `staff_area_refused` event for the first refusal per approach, and join now logs name, kind and role. ADR 3 has a new addendum (what each action checks, the self-chosen-role gap). `reflections/crit-10.md` is a skeleton only.

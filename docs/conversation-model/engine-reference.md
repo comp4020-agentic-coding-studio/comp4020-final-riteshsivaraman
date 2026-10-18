@@ -1,18 +1,21 @@
 ---
 status: working
-what: How the conversation engine in src/shared/talk works: layers, modules, the state, the turn protocol, how options and legal moves are computed, the rules the engine enforces, the NPCs, the wording system, the tests that guard it, and where to extend it. Covers both the phone scene and the laptop scene added 2026-10-18, and says plainly which parts are actually shared between them and which are duplicated.
+what: How the conversation engine in src/shared/talk works: layers, modules, the state, the turn protocol, how options and legal moves are computed, the rules the engine enforces, the NPCs, the wording system, the tests that guard it, and where to extend it. Covers the phone, laptop and device-service scenes, and says plainly which parts are actually shared between them and which are duplicated.
 date: 2026-10-18
-source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/talk/scenes/laptop/*.ts and spec/talk-*.test.ts, updated through phase 2 step 3 (the final step) of the core extraction (Claude, with Ritesh reviewing and approving each step in session; see decisions.md and core-extraction-proposal.md). Claude's account; the code is the source of truth.
+source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/talk/scenes/{laptop,service}/*.ts and spec/talk-*.test.ts, updated through phase 2 step 3 (the final step) of the core extraction and then through the device-service scene (Claude, with Ritesh reviewing and approving each step/proposal in session; see decisions.md, core-extraction-proposal.md and service-scene-proposal.md). Claude's account; the code is the source of truth.
 ---
 
 # Engine reference
 
 ## 1. Layers
 
-There are now two scenes on this engine, phone (`src/shared/talk/`) and laptop
-(`src/shared/talk/scenes/laptop/`). The three-step core extraction
-(`docs/conversation-model/core-extraction-proposal.md`) is complete: `core/rng.ts`,
-`core/types.ts`, **`core/engine.ts`** and **`core/npc.ts`** are genuinely shared, in three layers:
+There are now three scenes on this engine: phone (`src/shared/talk/`), laptop
+(`src/shared/talk/scenes/laptop/`) and device-service (`src/shared/talk/scenes/service/`). The
+three-step core extraction (`docs/conversation-model/core-extraction-proposal.md`) is complete:
+`core/rng.ts`, `core/types.ts`, **`core/engine.ts`** and **`core/npc.ts`** are genuinely shared
+between phone and laptop, in three layers. Section 11 below covers what the service scene (the
+first genuinely different scene shape -- a pool of fault explanations, not products) actually
+reused from this shared core and what it correctly did not.
 
 - **The question-bank machinery (step 1):** `derive`, `withoutAnswer`, `rowsIf`, `optionsFor`,
   `askable`, `reopenable` and `gain` each have exactly one body, generic over a small `EngineDeps`
@@ -277,7 +280,20 @@ too through the main config (which needs the app up for the older specs).
 `src/shared/talk/scenes/laptop/`. There is no `talk-laptop-scene.test.ts` or replay suite --
 laptop was never given hand-written sample transcripts to convert into replays, so that half of
 the phone scene's test coverage (direct scene-mechanics specs and transcript replays) has no
-laptop equivalent yet. 140 specs total.
+laptop equivalent yet.
+
+**Service scene:** `spec/talk-service-{data,pool,sim,lines}.test.ts` (22 specs). `data` and `pool`
+promise the fault table's internal consistency and `runCheck`'s determinism, plus the pool's
+different shape (empty with no symptom, populated not narrowed by the symptom question, collapsed
+to one row by a confirmed fault). `sim` is 500 seeded NPC-vs-NPC runs with the same no-stuck/
+always-ends invariants as the other scenes, plus the scene's own point: a GATE test asserting
+every seed that reaches a destructive-fault outcome has `dataLossWarned: true`, read directly off
+engine state, and a dedicated mutation-check test that removes the gate and confirms both tests go
+red for the right reason before restoring it. `lines` is light (v1's wording is placeholder) and
+only checks structural facts: tone-to-face mapping, the warning line is unconditional, and outcome
+wording reads real cost/location off `data.ts` rather than inventing one.
+
+162 specs total across all three scenes.
 
 ## 9. The page (`poc/talk/`)
 
@@ -303,3 +319,61 @@ persisted or logged.
   memory/storage space (see `laptops-v2-notes.md`), and excludes the nano-texture display finish
   (no bank question distinguishes a finish; including it left two rows the engine could never
   resolve between -- see the laptop `data.ts` comment on `skusStandard`).
+- Service v1 is phone-only, 4 symptoms, no pricing beyond `[TK]` placeholder, and has no page or
+  replay suite. It has never been played by a human.
+
+## 11. The device-service scene: what a genuinely different pool shape actually needed
+
+Phone and laptop are both "narrow a catalogue" scenes: the pool is purchasable items, hard
+constraints eliminate rows, a customer ends by buying one or leaving. The core extraction (section
+1) was built and verified against exactly these two. `docs/conversation-model/
+service-scene-proposal.md` (phase 1, before any code) predicted the shared vocabulary in
+`core/types.ts` and `core/npc.ts`'s `staffMove` would turn out to be purchase-family-generic, not
+pool-shape-generic -- and building the scene confirmed it, with one correction found along the way:
+
+- **`core/engine.ts`'s fold (`derive`/`askable`/`gain`/etc., step 1) is genuinely pool-shape-generic,
+  reused wholesale.** It never assumed "purchasable" -- only "a pool narrowed by constraints,
+  ranked by signals" -- and `scenes/service/bank.ts` wires it the same way phone and laptop's
+  `bank.ts` do, no changes needed.
+- **`core/engine.ts`'s `validatePicks` and `hintText` (step 2) are also genuinely generic**, reused
+  as-is in `scenes/service/scene.ts`.
+- **`core/types.ts`'s `Pending`/`StaffAct`/`CustomerAction`/`Ended` and `core/npc.ts`'s `staffMove`
+  are NOT pool-shape-generic -- they are purchase-family vocabulary.** Service defines its own
+  small `Pending`/`StaffAct`/`CustomerAction`/`Outcome` in `scenes/service/types.ts` (no
+  `demo`/`pick`/`recommend`/`{how:"bought"}` at all -- this scene has `run_check`,
+  `warn_data_loss`, `present_outcome`, `cannot_diagnose` instead) and its own `staffMove` in
+  `scenes/service/npc.ts`, since `core/npc.ts`'s `staffMove` pattern-matches the purchase
+  `StaffAct` union by name and simply doesn't have cases for this scene's acts. This is not a
+  shortcoming of steps 1-3 -- the diff that produced `core/types.ts` was only ever run against two
+  purchase scenes, so it correctly found what *those two* shared, which was always going to be
+  narrower than "any two-party menu conversation."
+- **A new mechanism the core needed zero changes for, confirmed by building it rather than
+  guessed:** a staff-authored fact. `run_check` (`scenes/service/scene.ts`) reads the fault table
+  deterministically (`data.ts`'s `runCheck`, not a dice roll) and writes the result into
+  `sc.answers`/`sc.order` exactly the way a customer's pick would -- `core/engine.ts`'s `derive()`
+  folds it identically either way, since it only ever asked "is there an answer for this question
+  id", never "who gave it".
+- **A new mechanism that genuinely does not exist in the core, built scene-local:** a precondition
+  gate on reaching an *outcome*. `forced`/`owed` (phone/laptop) only ever constrain which
+  *question* is asked next; neither purchase scene has an ending with a real-world stake attached
+  to a specific line, so there was nothing to generalise from. Service's `dataLossWarned` boolean on
+  `Scene`, checked in `staffActs` before `present_outcome` is ever offered and re-checked in
+  `applyStaff`'s own legality list (so a malformed direct call can't bypass it either), is built
+  fresh. Verified failing-first: the check was deliberately removed, both `spec/
+  talk-service-sim.test.ts`'s GATE test and its own mutation-check test went red for the right
+  reason, then it was restored (CLAUDE.md's defect loop, applied to a new mechanism rather than a
+  regression).
+- **One real bug found while wiring the bank, not predicted by the proposal:** `symptom` had to be
+  a `"route"` question, not `"hard"` -- `core/engine.ts`'s `optionsFor` only offers a hard option
+  when it strictly narrows an *already non-empty* pool (true for phone/laptop, whose catalogue
+  starts full), but this scene's pool starts empty and `symptom` populates it rather than narrowing
+  it, same category as phone's own `opening_intent`/`known_model`. Found by a failing smoke run
+  (`staffActs` went empty after the model question), fixed, not guessed in advance.
+
+**Honest bottom line:** the question-bank fold is proven pool-shape-generic across a genuinely
+different pool (products vs. fault explanations). The turn-protocol/NPC-loop vocabulary in
+`core/types.ts`/`core/npc.ts` is proven purchase-family-generic, a real but smaller claim than "any
+conversation on this engine" -- and that is a correct, useful finding from building a third,
+different scene, not a failure of the first two scenes' extraction. A fourth scene closer in shape
+to service (another fault-diagnosis-style conversation) would be the next test of whether
+service's own vocabulary generalises past one example, the same way laptop tested phone's.

@@ -29,6 +29,10 @@ find every resource by reading this file, not by discovering it mid-task.
   never edited; a changed decision gets a new, numbered record that
   supersedes it and says why.
 - `docs/adr/0007-stack.md` — ADR 7 (draft): the stack as it stands (R3F, Hono + ws, SQLite on a Fly volume). Facts filled in, reasoning `[TK]` for Ritesh. Read before changing stack, storage or the real-time transport.
+- `docs/adr/0008-multi-floor.md` — ADR 8 (draft): how a second floor (option B,
+  "Atrium Stair") is represented in `Pose`, the protocol, persistence and
+  `clampToWalkable`. Options laid out, nothing picked yet — read before
+  touching `Pose`, `FLOOR`, `world.ts` or `presence.ts`'s move handling.
 - `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
   the database, menu conversations, employees online see customers' states. Facts
   filled in, reasoning `[TK]` for Ritesh. Read before touching `visitors`,
@@ -133,6 +137,6 @@ find every resource by reading this file, not by discovering it mid-task.
 - *(add further ADRs here as they're created — don't let this list go stale.)*
 - `docs/conversation-model/mockup-v0.html` — static mockup of the proposed phone-specialist conversation model (v0, for correction before any code).
 - `docs/conversation-model/` — conversation-model design: `decisions.md` (settled so far, including the 2026-10-18 laptop-scene overnight run), `devices.json` + `devices-v2-notes.md` (sourced phone attributes, 2026-10-17), `laptops.json` + `laptops-v2-notes.md` (sourced laptop attributes, 2026-10-18, preconfigured SKUs only), `transcripts/round-1/`.
-- `docs/conversation-model/README.md` — **start here** for the conversation model: status (phone and laptop scenes), where everything is, commands, what is not done. Siblings: `how-we-built-it.md` (the whole process, phone scene), `engine-reference.md` (now covers both scenes and names what's actually shared vs duplicated), `new-scene-playbook.md` (the honest post-laptop account of what's generic), `conversation-types.md` (every store conversation; G3/laptop marked built), `prompts.md` (reusable subagent prompts), `review/` (automated review reports, phone scene only), `replay-findings.md`.
+- `docs/conversation-model/README.md` — **start here** for the conversation model: status (phone, laptop and device-service scenes), where everything is, commands, what is not done. Siblings: `how-we-built-it.md` (the whole process, phone scene), `engine-reference.md` (covers all three scenes; section 11 is the device-service findings), `new-scene-playbook.md` (the real account of what's generic, post-extraction), `conversation-types.md` (every store conversation; G1/service and G3/laptop marked built), `prompts.md` (reusable subagent prompts), `review/` (automated review reports, phone scene only), `replay-findings.md`, `core-extraction-proposal.md` (the design doc behind the real `core/` extraction), `service-scene-proposal.md` (the design doc behind the device-service scene — the actual test of whether that extraction generalises).
 - `src/shared/talk/`, `spec/talk-*.test.ts`, `scripts/talk-transcripts.ts`, `poc/talk/` — the phone engine, its specs, the transcript tool and the playable page (`pnpm test:talk`, `pnpm poc`).
 - `src/shared/talk/core/`, `src/shared/talk/scenes/laptop/`, `scripts/talk-laptop-transcripts.ts` — the shared bits (`rng.ts`, `types.ts` only) and the laptop scene (duplicated, not shared, from the phone one — see engine-reference.md), its specs (`spec/talk-laptop-*.test.ts`) and its transcript tool. No page.

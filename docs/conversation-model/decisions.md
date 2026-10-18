@@ -185,3 +185,61 @@ products, with facts arriving from world state (a test result) rather than only 
 is the real test of whether `core/engine.ts` and `core/npc.ts`'s current shape holds, or needs a
 new hook neither purchase scene revealed a need for. That is the next decision for Ritesh, not
 assumed here.
+
+## Device-service scene (G1) built: the real test of the core extraction (Claude, 2026-10-18, under Ritesh's standing authorization)
+
+Ritesh reviewed and approved `service-scene-proposal.md` (phase 1, no code) before any of this was
+built, same checkpoint discipline as the core extraction -- read the full proposal first, let him
+review the design before writing a line, then build in checked-in steps rather than one
+unsupervised pass. Two steps: first, two small core-type changes needed to even attempt the scene
+(`Ended<Sku>` made generic over an outcome type), verified not to touch phone/laptop behaviour;
+second, re-verifying the proposal's predictions against the real post-step-1 code (found the core
+needed LESS change than the proposal guessed -- `core/engine.ts`'s fold never required a scene to
+use the purchase-shaped `Pending`/`StaffAct`/`CustomerAction`/`Ended` at all, so a scene can simply
+define its own instead of needing a core change); then the actual scene build.
+
+**What got built:** `src/shared/talk/scenes/service/` -- phone-only intake/diagnosis, v1 scope
+(approved): 4 symptoms, one deterministic `run_check` staff move, one mandatory data-loss gate
+built as a real blocking precondition (not a decorative line), outcomes fixed-now/booked/cannot-fix/
+declines/left. Explicitly deferred: the "replace the device" cross-scene handoff (needs the case
+object conversation-types.md section I names as separate shared work), G2's other device classes,
+any pricing beyond `[TK]`-labelled invented placeholder.
+
+**The answer to "did the core actually generalise" (engine-reference.md section 11 has the full
+account):** the question-bank fold (`core/engine.ts` step 1) is proven pool-shape-generic -- it held
+with zero changes against a pool of fault explanations, a genuinely different shape from a product
+catalogue. `core/types.ts`'s `Pending`/`StaffAct`/`CustomerAction`/`Ended` and `core/npc.ts`'s
+`staffMove` are NOT pool-shape-generic -- they are purchase-family vocabulary that happened to look
+shared when only two purchase scenes existed to diff. Service defines its own small versions rather
+than forcing a fit, which the proposal recommended and building it confirmed was the right call.
+
+**Two new mechanisms, one free, one genuinely new:** a staff-authored fact (the `run_check` move's
+test result) needed zero core changes -- it writes into `sc.answers` the same channel a customer
+answer uses, since `derive()` never asked who wrote an answer, only whether one exists. A
+precondition gate on reaching an *outcome* (not just the next question) is genuinely new: neither
+purchase scene has an ending with a real-world stake attached to a specific line, so `forced`/`owed`
+had nothing to generalise from. Built scene-local, verified failing-first (the gate was deliberately
+removed, the relevant specs went red for the right reason, then it was restored) -- the same defect-
+loop discipline CLAUDE.md asks for applied to a new mechanism, not a regression.
+
+**One real bug, not predicted by the proposal:** `symptom` needed to be a `"route"` question, not
+`"hard"` -- `core/engine.ts`'s `optionsFor` only offers a hard option when it strictly narrows an
+already non-empty pool, true for phone/laptop (catalogue starts full) but not for service, whose
+pool starts empty until a symptom is given. Found by a failing smoke run, fixed, not guessed.
+
+**Verified, not just claimed:** 22 new specs (162 total), including a 500-seed NPC-vs-NPC
+simulation with the gate checked directly against engine state for every seed, plus a dedicated
+mutation-check test proving that check would actually catch the gate broken. Full-repo typecheck
+clean. A 20-seed transcript spot-check read sensibly, with the gate firing exactly where expected.
+
+**Not done, by the playbook's own "Definition of done for a scene":** an automated reviewer pass,
+Ritesh playing either side, his review of the wording (heavier placeholder than phone/laptop's,
+since v1's point was the mechanism), the real-vs-invented policy split (data.ts keeps this explicit
+per field, but none of it has been reviewed by Ritesh yet).
+
+**What this means for the next scene:** the core's real boundary is now settled by evidence rather
+than guessed from two data points -- `core/engine.ts`'s fold is the genuinely shared part; the
+vocabulary in `core/types.ts`/`core/npc.ts` is purchase-family only, and a new scene outside that
+family (like this one) should expect to define its own `Pending`/`StaffAct`/`staffMove` rather than
+trying to fit the existing ones. Whether service's own vocabulary generalises to a second
+fault-diagnosis-style scene is the next open question, not assumed here.

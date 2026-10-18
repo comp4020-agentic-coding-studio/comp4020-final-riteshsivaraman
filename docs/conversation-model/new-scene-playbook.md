@@ -54,8 +54,11 @@ true of the code today, and should be read as settled, not provisional.
   check. Turning this into a hook now would mean inventing 5-6 more callbacks from only two data
   points, which is the same mistake ("a rule that fits the examples but not the data") the first
   attempt made at a larger scale. Left scene-owned on purpose, with the reasoning written down in
-  `core/engine.ts`'s comments, so a real third scene can settle whether this needs a hook or is
-  just always scene work.
+  `core/engine.ts`'s comments. **Settled by the device-service scene:** service has no
+  `confirm`/`reconfirm`-shaped moment at all -- there's no "resolved pool of one" to reconfirm the
+  way a purchase does -- so this cluster stays scene-owned by default rather than the third data
+  point revealing a missing hook, which is itself useful confirmation that phase 1's worry (forcing
+  a hook from only two examples) was the right thing to worry about rather than premature caution.
 - **Step 3 found the same shape of exception inside the NPC loop:** `compatible`, `consistent`,
   `answerQuestion` and `customerMove` each read a `Sku`/`Constraints`/tier field whose shape
   differs per scene (phone's `storage`/`screen`/`foldable` vs laptop's `memoryGb`/`storageGb`/
@@ -77,6 +80,24 @@ true of the code today, and should be read as settled, not provisional.
   which is exactly the part that is supposed to differ per scene. Verified behaviour-preserving at
   every step: all 140 specs plus an ad hoc 2000-seed simulation per scene, unchanged before and
   after.
+
+## The device-service scene: the real test of the extraction above
+
+Phone and laptop are both "narrow a catalogue" scenes, so the extraction above could only ever
+prove the core is purchase-family-generic, not pool-shape-generic -- `service-scene-proposal.md`
+said this plainly before any service code existed, and building it confirmed the prediction: the
+question-bank fold (`core/engine.ts` step 1) held with zero changes against a pool of fault
+explanations instead of products, but `core/types.ts`'s `Pending`/`StaffAct`/`CustomerAction`/
+`Ended` and `core/npc.ts`'s `staffMove` turned out to be purchase-shaped after all (`demo`, `pick`,
+`recommend`, `{how:"bought"}` baked in) -- service defines its own small versions instead of
+forcing a fit. Two new mechanisms came out of this, one needing zero core changes (a staff-authored
+fact -- `run_check` writes into `sc.answers` the same channel a customer answer uses) and one
+genuinely new (a precondition gate on an *outcome*, not just the next question -- `forced`/`owed`
+had nothing to generalise, since neither purchase scene has an ending with a real-world stake).
+Full account, with the exact functions and the one real bug found: `engine-reference.md` section
+11. The method that produced this -- a design doc before code, re-verifying the design's guesses
+against real code rather than trusting them -- is the same one steps 1-3 used, applied one level up
+(validating the *shared core*, not just building on it).
 
 ## Pitfalls already paid for (details: how-we-built-it.md section 7)
 - Two correct rules interacting (test pairs of features, not each alone).
