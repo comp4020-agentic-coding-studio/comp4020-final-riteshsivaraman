@@ -932,11 +932,14 @@ function startTillEscort(ctx: Ctx, row: ConvRow): Outgoing[] {
 
 // At the Genius Bar: whoever takes payment shows intent, and the customer
 // accepts (E) to pay. Nothing is offered if there is nothing to pay for.
-function startPayment(ctx: Ctx, customerId: string): Outgoing[] {
+function startPayment(ctx: Ctx, customerId: string, stand: { x: number; z: number }): Outgoing[] {
   if (!unpaidSale(ctx, customerId)) return [];
   const helper = pickHelper(ctx, "genius");
   if (!helper) return [notice(customerId, "There is nobody at the Genius Bar right now.")];
-  return showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "pay" });
+  // like any referral, they do not pounce: you wait at the till and they come
+  // over after a few seconds (a person taking payment just walks over)
+  const hold = helper.kind === "npc" ? { x: stand.x, z: stand.z, label: "the Genius Bar" } : undefined;
+  return showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "pay", ...(hold ? { hold } : {}) });
 }
 
 function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoing[] {
@@ -952,7 +955,7 @@ function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoi
     out.push({ to: "all", message: { type: "engaged", ...eng } });
   } else {
     out.push({ to: "all", message: { type: "released", npcId: e.staff_id } });
-    if (e.kind === "till" && why === "done") out.push(...startPayment(ctx, e.customer_id));
+    if (e.kind === "till" && why === "done") out.push(...startPayment(ctx, e.customer_id, { x: e.stand_x, z: e.stand_z }));
   }
   return out;
 }

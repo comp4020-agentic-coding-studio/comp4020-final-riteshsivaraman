@@ -754,17 +754,22 @@ describe("being walked to the till after a sale", () => {
     const arrived = settleIntents(ctx(NOW + 60_000));
     expect(last(arrived, "c1", "escort_end")).toBeDefined();
     expect(last(arrived, "all", "released")).toMatchObject({ npcId: "spec-phones" });
-    // at the bar, whoever takes payment shows intent and stays put behind the bar
-    const pay = last(arrived, "all", "intent")!;
-    expect(pay).toMatchObject({ toId: "c1", reason: "pay" });
-    expect(["Dev", "Ines"]).toContain(pay.fromName);
-    expect(last(arrived, "all", "engaged")!.lead).toBeDefined();
+    // at the bar you wait; after a few seconds whoever takes payment shows intent and stays put behind the bar
+    const held = last(arrived, "all", "intent")!;
+    expect(held).toMatchObject({ toId: "c1", reason: "pay", state: "held" });
+    expect(held.wait?.label).toBe("the Genius Bar");
+    expect(["Dev", "Ines"]).toContain(held.fromName);
+    settleIntents(ctx(NOW + 60_000)); // the wait starts: you are at the till
+    const came = settleIntents(ctx(NOW + 60_000 + 8100));
+    const pay = last(came, "all", "intent")!;
+    expect(pay).toMatchObject({ id: held.id, state: "open" });
+    expect(last(came, "all", "engaged")!.lead).toBeDefined();
     // the customer accepts and is asked to pay for that phone
-    const asked = acceptIntentById(ctx(NOW + 60_000), "c1", pay.id);
+    const asked = acceptIntentById(ctx(NOW + 70_000), "c1", pay.id);
     const turn = last(asked, "c1", "turn")!;
     expect(turn.say).toMatch(/iPhone 17 in Lavender, 256GB, A\$1,399/);
     expect(turn.choices.map((c) => c.id)).toEqual(["pay:card", "pay:phone", "cancel"]);
-    const paid = chooseTurn(ctx(NOW + 61_000), "c1", turn.conversationId, "pay:card");
+    const paid = chooseTurn(ctx(NOW + 71_000), "c1", turn.conversationId, "pay:card");
     expect(last(paid, "c1", "turn")).toMatchObject({ ended: true });
     expect(last(paid, "c1", "turn")!.say).toMatch(/gone through/);
     expect(eventTypes()).toContain("purchase_paid");
@@ -784,9 +789,11 @@ describe("being walked to the till after a sale", () => {
     db.prepare("UPDATE player_state SET state = 'browsing', with_id = NULL WHERE visitor_id = 'c1'").run(); // as finishing the conversation does
     const esc = last(closeTalk(ctx(), "c1"), "c1", "escort")!;
     positions.set("c1", esc.goal);
-    const pay = last(settleIntents(ctx(NOW + 60_000)), "all", "intent")!;
-    const turn = last(acceptIntentById(ctx(NOW + 60_000), "c1", pay.id), "c1", "turn")!;
-    const out = chooseTurn(ctx(NOW + 61_000), "c1", turn.conversationId, "cancel");
+    settleIntents(ctx(NOW + 60_000)); // arrives; told to wait at the till
+    settleIntents(ctx(NOW + 60_000)); // the wait starts
+    const pay = last(settleIntents(ctx(NOW + 70_000)), "all", "intent")!;
+    const turn = last(acceptIntentById(ctx(NOW + 70_000), "c1", pay.id), "c1", "turn")!;
+    const out = chooseTurn(ctx(NOW + 71_000), "c1", turn.conversationId, "cancel");
     expect(last(out, "c1", "turn")!.say).toMatch(/put it back/);
     expect(eventTypes()).toContain("purchase_cancelled");
     expect(eventTypes()).not.toContain("purchase_paid");

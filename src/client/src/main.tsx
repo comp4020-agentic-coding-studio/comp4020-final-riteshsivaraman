@@ -83,7 +83,7 @@ function Hud() {
       )}
       {live.waitingAt && !live.talking && (
         <div className="escort-banner">
-          Wait near {live.waitingAt.label}. {live.waitingAt.who} will come and find you.
+          Wait near {live.waitingAt.label}. {live.waitingAt.who} will {live.waitingAt.reason === "pay" ? "come over to take your payment" : "come and find you"}.
         </div>
       )}
       {live.escort && (
