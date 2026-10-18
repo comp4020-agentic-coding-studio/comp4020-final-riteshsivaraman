@@ -181,6 +181,7 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
 
         <section className="panel">
           <header>
+            <img className="entry-logo" src="/brand/logo.png" alt="" width={44} height={44} />
             <h1>Step inside</h1>
             <p>You're ready to go. Change anything you like first.</p>
           </header>

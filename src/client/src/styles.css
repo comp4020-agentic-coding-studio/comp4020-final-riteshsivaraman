@@ -431,6 +431,10 @@ kbd {
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
   z-index: 20;
 }
+.entry-logo {
+  display: block;
+  margin-bottom: 8px;
+}
 .talk-name {
   position: absolute;
   top: -15px;

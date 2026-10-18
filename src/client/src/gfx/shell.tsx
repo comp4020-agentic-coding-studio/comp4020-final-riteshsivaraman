@@ -285,38 +285,46 @@ export function Poster({
 }
 
 
-// An original service mark (a ring with teeth around a dot), not anyone's logo.
-export function ServiceMark({ position }: { position: [number, number, number] }) {
-  const map = useMemo(
-    () =>
-      canvasTexture(128, 128, (g) => {
-        g.fillStyle = "#101216";
-        g.fillRect(0, 0, 128, 128);
-        g.strokeStyle = "#ffffff";
-        g.fillStyle = "#ffffff";
-        g.lineWidth = 8;
-        g.beginPath();
-        g.arc(64, 64, 26, 0, Math.PI * 2);
-        g.stroke();
-        for (let i = 0; i < 8; i++) {
-          const a = (i * Math.PI) / 4;
-          g.save();
-          g.translate(64 + Math.cos(a) * 40, 64 + Math.sin(a) * 40);
-          g.rotate(a);
-          g.fillRect(-7, -5, 14, 10);
-          g.restore();
-        }
-        g.beginPath();
-        g.arc(64, 64, 9, 0, Math.PI * 2);
-        g.fill();
-      }),
-    [],
-  );
+// The store's mark (public/brand, made with the course image proxy, Ritesh
+// 2026-10-19): a transparent PNG in black or white, drawn flat on a panel.
+export function useLogo(white: boolean): Texture | null {
+  const [tex, setTex] = useState<Texture | null>(null);
+  useEffect(() => {
+    let dead = false;
+    new TextureLoader().load(white ? "/brand/logo-white.png" : "/brand/logo.png", (t) => {
+      if (dead) return;
+      t.colorSpace = SRGBColorSpace;
+      t.anisotropy = 4;
+      setTex(t);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [white]);
+  return tex;
+}
+
+export function Logo3D({ position, rotY = 0, size, white = false }: { position: [number, number, number]; rotY?: number; size: number; white?: boolean }) {
+  const map = useLogo(white);
+  if (!map) return null;
   return (
-    <mesh position={position} rotation={[0, Math.PI, 0]}>
-      <planeGeometry args={[0.9, 0.9]} />
-      <meshBasicMaterial map={map} toneMapped={false} />
+    <mesh position={position} rotation={[0, rotY, 0]}>
+      <planeGeometry args={[size, size]} />
+      <meshBasicMaterial map={map} transparent toneMapped={false} depthWrite={false} />
     </mesh>
+  );
+}
+
+// The mark on a dark plate, between the screens behind the service bar.
+export function ServiceMark({ position }: { position: [number, number, number] }) {
+  return (
+    <group>
+      <mesh position={position} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[0.9, 0.9]} />
+        <meshBasicMaterial color="#101216" toneMapped={false} />
+      </mesh>
+      <Logo3D position={[position[0], position[1], position[2] - 0.004]} rotY={Math.PI} size={0.62} white />
+    </group>
   );
 }
 
@@ -872,6 +880,8 @@ export function ShopShell() {
         <boxGeometry args={[w, 0.6, 0.1]} />
         <meshStandardMaterial color="#b9bec4" />
       </mesh>
+      {/* the store's mark over the entrance, facing in */}
+      <Logo3D position={[0, CEILING - 0.3, FLOOR.minZ - 0.5 + 0.056]} size={0.46} />
 
       {/* the bar's back wall: three screens and a service mark between them */}
       {BACK_WALL.screenX.map((x, i) => (
