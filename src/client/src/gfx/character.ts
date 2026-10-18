@@ -104,7 +104,9 @@ export interface Mood {
 // of the mouth and the teeth show.
 export const EXPRESSIONS: Array<Mood & { name: string }> = [
   { name: "neutral", browY: 0.003, browTilt: 0, lid: -0.3, curve: 0.45, open: 0, width: 1.1 },
-  { name: "smile", browY: 0.012, browTilt: 0.12, lid: 0.0, curve: 1.6, open: 0.5, width: 1.7 },
+  // lid -0.2, not 0: at 0 the toy eyes are squashed to about three quarters
+  // height and a smiling face read as eyes half shut (Ritesh, 2026-10-19)
+  { name: "smile", browY: 0.012, browTilt: 0.12, lid: -0.2, curve: 1.6, open: 0.5, width: 1.7 },
   { name: "curious", browY: 0.016, browTilt: 0.3, lid: -0.5, curve: 0.15, open: 0, width: 0.85 },
   { name: "focused", browY: -0.006, browTilt: -0.5, lid: 0.3, curve: -0.1, open: 0, width: 0.8 },
   { name: "surprised", browY: 0.024, browTilt: 0.15, lid: -0.9, curve: 0, open: 1.2, width: 0.6 },
