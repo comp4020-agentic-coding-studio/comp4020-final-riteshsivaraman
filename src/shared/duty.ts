@@ -37,6 +37,17 @@ export function scriptFor(designation: string): "greeter" | "phones" | null {
   return null;
 }
 
+// Every NPC is a named person, so "Theo will come and get you" is Theo and
+// nobody else (Ritesh, 2026-10-19). Names are drawn from the entry screen's
+// existing pool (names.ts), not invented; NPC_LABEL below stays the role
+// description used where a name would read oddly.
+const STAFF_NAMES = ["Maya", "Theo", "Priya", "Marcus", "Zoe", "Dev", "Ines", "Owen", "Felix", "Hana", "Jonah", "Ruby"];
+const CUSTOMER_NAMES = ["Ravi", "Amara", "Leo", "Freya", "Kofi", "Lena", "Mateo", "Noor", "Hugo", "Isla", "Arjun", "Mei", "Ben", "Sana"];
+export const NPC_NAME: Record<string, string> = {
+  ...Object.fromEntries(Object.keys(NPC_DESIGNATION).map((id, i) => [id, STAFF_NAMES[i]])),
+  ...Object.fromEntries(CUSTOMER_NAMES.map((n, i) => [`cust-${i + 1}`, n])),
+};
+
 export const NPC_LABEL: Record<string, string> = {
   "greeter-1": "the greeter",
   "spec-phones": "the phones specialist",

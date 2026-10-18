@@ -2,7 +2,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import type { Group } from "three";
 import { HAIR_COLOURS, SHIRT_COLOURS, SKIN_TONES, type LookChoice } from "../../shared/look.ts";
-import { GENDERS, randomName, type Gender } from "../../shared/names.ts";
+import { FIRST_NAMES, GENDERS, randomName, type Gender } from "../../shared/names.ts";
 import { EMPLOYEE_COLOUR, EMPLOYEE_KINDS, SPECIALTIES, STAFF_SHIRT, type EmployeeKind, type Kind, type Profile, type Specialty } from "../../shared/profile.ts";
 import { Actor } from "./gfx/Actor.tsx";
 import { readProfile } from "./net.ts";
@@ -28,12 +28,13 @@ const KIND_BLURB: Record<EmployeeKind, string> = {
 };
 const HAIR_FOR: Record<Gender, readonly NonNullable<LookChoice["hairStyle"]>[]> = {
   male: ["buzz", "short", "side", "curly", "long", "bald"],
-  female: ["short", "side", "long", "curly", "bun", "buzz"],
+  female: ["side", "long", "curly", "bun", "long", "side"], // no buzz/short/bald: they read as male
 };
 const BEARD_FOR_MALE = ["none", "stubble", "moustache", "goatee", "full"] as const;
 // which posts have a customer conversation so far
 const HAS_SCRIPT = (kind: EmployeeKind, specialty: Specialty): boolean => kind === "greeter" || (kind === "specialist" && specialty === "phones");
 
+const isPoolName = (n: string): boolean => [...FIRST_NAMES.male, ...FIRST_NAMES.female].includes(n as never);
 const pick = <T,>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)];
 const newSeed = (): string => Math.random().toString(36).slice(2, 10);
 const reduceMotion = (): boolean => {
@@ -123,7 +124,7 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
 
   const shuffle = (g: Gender = gender): void => {
     setLook(rollLook(g));
-    if (!typed) setName(randomName(g));
+    if (!typed || isPoolName(name)) setName(randomName(g)); // a name we generated follows the gender; one they typed stays
   };
   const chooseGender = (g: Gender): void => {
     setGender(g);

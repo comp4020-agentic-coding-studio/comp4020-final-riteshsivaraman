@@ -67,6 +67,11 @@ const FACES: Record<Exclude<FaceShape, "auto">, Omit<HeadShape, "nose">> = {
   pear: { width: 1.04, height: 0.97, square: 0.6, forehead: -0.2, jaw: 0.0, brow: 0.85, cheek: 0.95, chin: 1.0 },
 };
 const FACE_KEYS = Object.keys(FACES) as Array<Exclude<FaceShape, "auto">>;
+// A chosen gender narrows the "auto" face to shapes that read that way: a
+// square or long face on a character picked as female looked male.
+const FEMALE_FACES: Array<Exclude<FaceShape, "auto">> = ["oval", "round", "heart", "diamond"];
+const MALE_FACES: Array<Exclude<FaceShape, "auto">> = ["oval", "square", "long", "pear"];
+const faceKeysFor = (g: Appearance["gender"]): Array<Exclude<FaceShape, "auto">> => (g === "female" ? FEMALE_FACES : g === "male" ? MALE_FACES : FACE_KEYS);
 
 // head: size of the head against the figure-drawing canon (1 is about 8 heads
 // tall, 1.16 about 6.9, 1.34 about 6); girth: width of the frame; limb: arms.
@@ -275,7 +280,7 @@ export function buildCharacter(
   const toy = eyeStyle === "toy" || eyeStyle === "peg";
   // "auto" picks a shape from the person, so a crowd has all of them
   const faceKey: Exclude<FaceShape, "auto"> =
-    !opts.face || opts.face === "auto" ? FACE_KEYS[Math.floor(look.jaw * 997 + look.cheek * 131) % FACE_KEYS.length] : opts.face;
+    !opts.face || opts.face === "auto" ? faceKeysFor(look.gender)[Math.floor(look.jaw * 997 + look.cheek * 131) % faceKeysFor(look.gender).length] : opts.face;
   const fs = FACES[faceKey];
   const jit = 0.92 + 0.16 * ((look.jaw - 0.55) / 0.55); // 0.92 to 1.08, from the person
   const shape: HeadShape = {
@@ -528,16 +533,35 @@ export function buildCharacter(
   // an invented generic slab (Ritesh, 2026-10-12).
 
   // staff uniform: a cap in the role's colour, and a badge on the chest.
-  // The dome's radius was 0.128 against a head of half-width 0.081/half-height
-  // 0.108 (head-geo.ts): wider than the head itself, so it sat like a
-  // lampshade with a gap of empty space on both sides (Ritesh, played live).
-  // Scaled the whole cap down by the same ~0.69 factor (0.088/0.128) rather
-  // than re-tuning each dimension by eye, so the dome, its placement and the
-  // brim all shrink together and stay proportioned to each other.
+  // The cap is fitted to this person's actual head rather than a fixed size:
+  // a hand-tuned radius was too big for a narrow head and too small for a
+  // wide one (Ritesh, 2026-10-19: first "too big", then "too small"). We
+  // measure the head mesh in a thin slab at the hat line (x/z extents) and
+  // its top (y), then stretch a half-ellipsoid over exactly that, with a
+  // few mm of clearance so the skull never pokes through.
   if (opts.uniform?.cap) {
     const cap = new Color(opts.uniform.cap);
-    add(new SphereGeometry(0.088, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), head, cap, hm(0, 0.015, 0.004));
-    add(new BoxGeometry(0.103, 0.012, 0.058), head, cap, hm(0, 0.018, -0.074));
+    const lineY = 0.03 * Fy; // hat line: just above the brow
+    let topY = -Infinity;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let k = 0; k < headPos.count; k++) {
+      const vx = headPos.getX(k), vy = headPos.getY(k), vz = headPos.getZ(k);
+      if (vy > topY) topY = vy;
+      if (Math.abs(vy - lineY) <= 0.012) {
+        minX = Math.min(minX, vx); maxX = Math.max(maxX, vx);
+        minZ = Math.min(minZ, vz); maxZ = Math.max(maxZ, vz);
+      }
+    }
+    const clear = 1.05; // proportional clearance over the skull
+    const rx = ((maxX - minX) / 2) * clear + 0.003;
+    const rz = ((maxZ - minZ) / 2) * clear + 0.003;
+    const ry = (topY - lineY) * clear + 0.004;
+    const cz = (maxZ + minZ) / 2;
+    add(new SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), head, cap, hm(0, lineY - 0.004, cz, sc(rx, ry, rz)));
+    // brim: sits on the hat line, jutting out past the forehead
+    const brimW = rx * 1.5;
+    const brimD = rz * 0.5;
+    add(new BoxGeometry(brimW, 0.012, brimD), head, cap, hm(0, lineY - 0.002, minZ - clear * 0.003 - brimD / 2 + 0.006));
   }
   if (opts.uniform?.badge) {
     add(new BoxGeometry(0.075, 0.095, 0.012), spine, new Color(opts.uniform.badge), at(0.085, Y(1.25), -0.121));

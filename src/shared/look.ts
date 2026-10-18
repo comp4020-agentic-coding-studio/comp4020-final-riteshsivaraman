@@ -85,8 +85,21 @@ export function withLook(base: Appearance, look: LookChoice | undefined): Appear
     a.shoulderHip = 0.95 + (a.shoulderHip - 0.95) * 0.45; // 0.95 to 1.17
     a.height *= 0.97;
     a.beard = "none";
+    a.gender = "female";
+    // softer, finer face and frame: the shoulder/hip ratio alone read as male
+    a.jaw = Math.min(a.jaw, 0.9) * 0.8;
+    a.chin *= 0.85;
+    a.brow *= 0.75;
+    a.cheek = Math.max(a.cheek, 0.95) * 1.1;
+    a.eyeSize *= 1.08;
+    a.faceWidth *= 0.96;
+    a.noseSize *= 0.92;
+    a.build *= 0.92;
   } else if (look.gender === "male") {
     a.shoulderHip = 1.12 + (a.shoulderHip - 0.95) * 0.66; // 1.12 to 1.45
+    a.gender = "male";
+    a.brow *= 1.1;
+    a.chin *= 1.08;
   }
   return a;
 }

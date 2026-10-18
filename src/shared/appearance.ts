@@ -31,6 +31,7 @@ export interface Appearance {
   chin: number;
   brow: number;
   eyeSize: number;
+  gender?: "male" | "female"; // set from the visitor's choice; steers face shape and softness
   shoulderHip: number; // shoulders against hips: low is pear-shaped, high is broad-shouldered
 }
 
