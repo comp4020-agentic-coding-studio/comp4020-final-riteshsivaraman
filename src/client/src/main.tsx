@@ -4,7 +4,6 @@ import { Entry } from "./Entry.tsx";
 import { SHOT, Store } from "./Store.tsx";
 import { StaffPanel } from "./StaffPanel.tsx";
 import { Talk } from "./Talk.tsx";
-import { TalkPhone } from "./TalkPhone.tsx";
 import { CharacterStage } from "./gfx/CharacterStage.tsx";
 import { DeviceStage } from "./gfx/DeviceStage.tsx";
 import { net, useNet } from "./net.ts";
@@ -120,33 +119,11 @@ function App() {
         <>
           <Hud />
           <Talk />
-          <TalkPhoneTrigger />
           <StaffPanel />
         </>
       )}
     </>
   );
-}
-
-// Client-only trial of the new conversation-model engine (docs/conversation-model/),
-// side by side with the server-authoritative Talk above, not replacing it: press T
-// (a spare key, not E, so it never collides with the real talk_start flow) while the
-// phones specialist is the one in range, and the whole scene runs locally, never
-// touching the server or the events table. See src/client/src/TalkPhone.tsx.
-function TalkPhoneTrigger() {
-  const live = useNet();
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.code !== "KeyT" || e.repeat || open || net.turn) return;
-      if (net.hint?.id === "spec-phones") setOpen(true);
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [open]);
-  if (open) return <TalkPhone onClose={() => setOpen(false)} />;
-  if (live.hint?.id === "spec-phones" && !live.turn) return <div className="hint">Press <kbd>T</kbd> to try the new conversation model</div>;
-  return null;
 }
 
 createRoot(document.getElementById("root")!).render(
