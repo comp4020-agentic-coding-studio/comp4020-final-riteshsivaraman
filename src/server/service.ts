@@ -20,6 +20,8 @@ import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID } from "../shared/slots.ts";
 import { takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
+import { beginTalk, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
+import type { Scene } from "../shared/talk/types.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
 // colour — no storage picker exists yet (ADR 5) — so the server sells
@@ -180,11 +182,36 @@ interface ConvData {
   at?: { x: number; z: number };
 }
 
+// The new talk engine's state for a "phones" conversation held with an NPC
+// (coexisting with ConvData above — Ritesh, 2026-10-19: phone-only, coexist
+// not replace, docs/conversation-model/server-wiring-proposal.md axes 4/5).
+// Same conversations.data JSON column, a different shape inside it,
+// distinguished by `engine: "talk"` so a row from before this change (or a
+// human-staffed "phones" row, still on the old engine) is never misread as
+// one of these.
+interface TalkConvData {
+  engine: "talk";
+  scene: Scene;
+  at?: { x: number; z: number };
+}
+
+type AnyConvData = ConvData | TalkConvData;
+const isTalkData = (d: AnyConvData): d is TalkConvData => (d as TalkConvData).engine === "talk";
+
 const getConv = (db: Database.Database, id: string): ConvRow | undefined => db.prepare("SELECT * FROM conversations WHERE id = ?").get(id) as ConvRow | undefined;
 const dataOf = (row: ConvRow): ConvData => JSON.parse(row.data ?? "{}") as ConvData;
+const anyDataOf = (row: ConvRow): AnyConvData => JSON.parse(row.data ?? "{}") as AnyConvData;
 
 function saveConv(ctx: Ctx, row: ConvRow, data: ConvData, ended: boolean): void {
   ctx.db.prepare("UPDATE conversations SET node = ?, data = ?, ended_at = ? WHERE id = ?").run(data.conv.node, JSON.stringify(data), ended ? ctx.now : null, row.id);
+}
+
+// node stays "talk" for every row driven by the new engine — the column is
+// NOT NULL and the old engine's reads of it (choicesFor/step) never run for
+// these rows, so there is nothing meaningful to put there; the real state
+// lives in data.scene.
+function saveTalkConv(ctx: Ctx, row: ConvRow, data: TalkConvData, ended: boolean): void {
+  ctx.db.prepare("UPDATE conversations SET node = ?, data = ?, ended_at = ? WHERE id = ?").run("talk", JSON.stringify(data), ended ? ctx.now : null, row.id);
 }
 
 const nameOf = (ctx: Ctx, id: string): string => {
@@ -322,7 +349,7 @@ export function enter(ctx: Ctx, visitorId: string, profile: { kind: string; spec
 export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
   const out: Outgoing[] = [];
   const open = openConversationOf(ctx.db, visitorId);
-  if (open) out.push(...finish(ctx, open, `${nameOf(ctx, visitorId)} left`, "left"));
+  if (open) out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left"));
   out.push(...endInspect(ctx, visitorId, "left the store"));
   releaseReservationsOf(ctx, visitorId, "left the store");
   if (stateOf(ctx.db, visitorId)) {
@@ -375,10 +402,36 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
   return [...putDown, ...open(ctx, customerId, withId, withKind, script, here)];
 }
 
+// Script "phones" against an NPC uses the new talk engine; everything else
+// (including a human-staffed "phones" conversation, which would need the
+// richer staff-side UI noted in server-wiring-proposal.md axis 3 option B)
+// keeps the old engine. Ritesh, 2026-10-19: phone-only, coexist, smallest
+// real slice.
+const usesTalkEngine = (script: ScriptId, withKind: "npc" | "visitor"): boolean => script === "phones" && withKind === "npc";
+
 function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "visitor", script: ScriptId, at: { x: number; z: number }): Outgoing[] {
+  const id = randomUUID();
+  if (usesTalkEngine(script, withKind)) {
+    const { scene, turn } = beginTalk(id);
+    const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: "talk", data: null, started_at: ctx.now, ended_at: null };
+    const data: TalkConvData = { engine: "talk", scene, at };
+    ctx.db
+      .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(row.id, customerId, withId, withKind, script, row.node, JSON.stringify(data), ctx.now);
+    setState(ctx, customerId, { state: "in_conversation", with_id: withId });
+    log(ctx, customerId, "conversation_started", { conversationId: row.id, with: withId, kind: withKind, script });
+    const out: Outgoing[] = [{ to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, withId), turn.say, turn.choices, turn.ended, "customer") } }];
+    const sm = stateMessage(ctx, customerId);
+    if (sm) out.push(sm);
+    out.push({ to: "all", message: { type: "engaged", npcId: withId, visitorId: customerId, since: ctx.now, at } });
+    out.push(staffViewMessage(ctx));
+    if (turn.ended) return [...out, ...finishTalk(ctx, { ...row, data: JSON.stringify(data) }, scene)];
+    return out;
+  }
+
   const world = stockWorld(ctx.db);
   const first = begin(script, world);
-  const row: ConvRow = { id: randomUUID(), customer_id: customerId, with_id: withId, with_kind: withKind, script, node: first.state.node, data: null, started_at: ctx.now, ended_at: null };
+  const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: first.state.node, data: null, started_at: ctx.now, ended_at: null };
   const data: ConvData = { conv: first.state, awaiting: "customer", at };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -526,11 +579,60 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
   return out;
 }
 
+// One `events` row per turn, matching the old engine's own granularity at
+// `log(ctx, ..., "turn", ...)` above (CLAUDE.md: every state-changing action
+// writes an events row; server-wiring-proposal.md axis 2 chose to match this
+// existing precedent rather than a coarser milestone-only grain). The row's
+// `conversationId` field lets eventlog.ts's stdout formatter tag every line
+// of one conversation together, same as the old engine's rows already do.
+function logTalkTurn(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string, after: Scene): void {
+  log(ctx, row.customer_id, "talk_turn", { conversationId: row.id, scene: row.script, fromTurn: from.turn, choice: choiceId, say: after.log[after.log.length - 1]?.text ?? "" });
+}
+
+// Ends a talk-engine conversation the same way `finish()` ends an old-engine
+// one: releases the NPC, returns the customer to browsing, logs it, saves
+// the ended row. Also called from open() for the (currently unreachable, but
+// not impossible once a persona can end immediately) case of a scene ending
+// on its opening line.
+function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
+  const data: TalkConvData = { engine: "talk", scene };
+  saveTalkConv(ctx, row, data, true);
+  log(ctx, row.customer_id, "conversation_ended", { conversationId: row.id, why: scene.ended ? `talk:${scene.ended.how}` : "talk:unknown" });
+  const cur = stateOf(ctx.db, row.customer_id);
+  if (cur && cur.state === "in_conversation") setState(ctx, row.customer_id, { state: "browsing", with_id: null });
+  const out: Outgoing[] = [{ to: "all", message: { type: "released", npcId: row.with_id } }];
+  const sm = stateMessage(ctx, row.customer_id);
+  if (sm) out.push(sm);
+  out.push(staffViewMessage(ctx));
+  return out;
+}
+
+function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgoing[] {
+  const result = stepTalk(from, row.id, choiceId);
+  if ("error" in result) return [notice(row.customer_id, "That is not one of the options.")];
+  const { scene, turn } = result;
+  logTalkTurn(ctx, row, from, choiceId, scene);
+  const data: TalkConvData = { engine: "talk", scene };
+  saveTalkConv(ctx, row, data, turn.ended);
+  const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, turn.ended, "customer") } }];
+  if (turn.ended) return [...out, ...finishTalk(ctx, row, scene)];
+  const sm = stateMessage(ctx, row.customer_id);
+  if (sm) out.push(sm);
+  out.push(staffViewMessage(ctx));
+  return out;
+}
+
 export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string, choiceId: string): Outgoing[] {
   releaseExpired(ctx);
   const row = getConv(ctx.db, conversationId);
   if (!row || row.customer_id !== customerId || row.ended_at !== null) return [notice(customerId, "That conversation is over.")];
-  const data = dataOf(row);
+  const anyData = anyDataOf(row);
+  if (isTalkData(anyData)) {
+    if (talkEnded(anyData.scene)) return [notice(customerId, "That conversation is over.")];
+    if (!talkChoices(anyData.scene).some((c) => c.id === choiceId)) return [notice(customerId, "That is not one of the options.")];
+    return applyTalk(ctx, row, anyData.scene, choiceId);
+  }
+  const data = anyData;
   if (data.awaiting !== "customer") return [notice(customerId, `Waiting for ${nameOf(ctx, row.with_id)}.`)];
   const world = stockWorld(ctx.db);
   const result = step(data.conv, choiceId, world);
@@ -609,12 +711,30 @@ function finish(ctx: Ctx, row: ConvRow, say: string, why: string): Outgoing[] {
 // conversation without ending it" — Talk.tsx's own Escape only worked once a
 // conversation had already ended some other way). Reuses the same `finish()`
 // every other way of ending one already goes through.
+// Either engine's row can be force-ended this way: the customer walking away
+// (any engine) or a human staff member stepping away (old engine only — a
+// talk-engine row is always NPC-staffed, usesTalkEngine's own condition, so
+// there is no visitor-staff leave path for it). Routes to finishTalk/finish
+// so the two engines' own ending bookkeeping (player_state, the events row,
+// releasing the NPC) each run correctly rather than one trying to read the
+// other's data shape.
+function finishEither(ctx: Ctx, row: ConvRow, visitorId: string, say: string, why: string): Outgoing[] {
+  const anyData = anyDataOf(row);
+  if (isTalkData(anyData)) {
+    if (row.customer_id !== visitorId) return []; // no visitor-staff leave path for a talk-engine row
+    const scene: Scene = { ...anyData.scene, ended: anyData.scene.ended ?? { how: "left", why } };
+    const out: Outgoing[] = [{ to: visitorId, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } }];
+    return [...out, ...finishTalk(ctx, row, scene)];
+  }
+  return finish(ctx, row, say, why);
+}
+
 export function leaveConversation(ctx: Ctx, visitorId: string): Outgoing[] {
   const row = openConversationOf(ctx.db, visitorId);
   if (!row) return [];
-  if (row.customer_id === visitorId) return finish(ctx, row, "You stepped away.", "customer left");
+  if (row.customer_id === visitorId) return finishEither(ctx, row, visitorId, "You stepped away.", "customer left");
   if (row.with_kind === "visitor" && row.with_id === visitorId) {
-    return finish(ctx, row, `${nameOf(ctx, visitorId)} had to step away. Ask again if you need anything.`, "staff left");
+    return finishEither(ctx, row, visitorId, `${nameOf(ctx, visitorId)} had to step away. Ask again if you need anything.`, "staff left");
   }
   return [];
 }
