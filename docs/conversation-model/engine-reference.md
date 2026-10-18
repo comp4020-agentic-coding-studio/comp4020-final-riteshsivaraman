@@ -2,7 +2,7 @@
 status: working
 what: How the conversation engine in src/shared/talk works: layers, modules, the state, the turn protocol, how options and legal moves are computed, the rules the engine enforces, the NPCs, the wording system, the tests that guard it, and where to extend it. Covers both the phone scene and the laptop scene added 2026-10-18, and says plainly which parts are actually shared between them and which are duplicated.
 date: 2026-10-18
-source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/talk/scenes/laptop/*.ts and spec/talk-*.test.ts, updated through phase 2 step 2 of the core extraction (Claude, with Ritesh reviewing and approving each step in session; see decisions.md and core-extraction-proposal.md). Claude's account; the code is the source of truth.
+source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/talk/scenes/laptop/*.ts and spec/talk-*.test.ts, updated through phase 2 step 3 (the final step) of the core extraction (Claude, with Ritesh reviewing and approving each step in session; see decisions.md and core-extraction-proposal.md). Claude's account; the code is the source of truth.
 ---
 
 # Engine reference
@@ -10,9 +10,9 @@ source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/ta
 ## 1. Layers
 
 There are now two scenes on this engine, phone (`src/shared/talk/`) and laptop
-(`src/shared/talk/scenes/laptop/`). As of phase 2 step 2 of the core extraction
-(`docs/conversation-model/core-extraction-proposal.md`), `core/rng.ts`, `core/types.ts` and
-**`core/engine.ts`** are genuinely shared, in two layers:
+(`src/shared/talk/scenes/laptop/`). The three-step core extraction
+(`docs/conversation-model/core-extraction-proposal.md`) is complete: `core/rng.ts`,
+`core/types.ts`, **`core/engine.ts`** and **`core/npc.ts`** are genuinely shared, in three layers:
 
 - **The question-bank machinery (step 1):** `derive`, `withoutAnswer`, `rowsIf`, `optionsFor`,
   `askable`, `reopenable` and `gain` each have exactly one body, generic over a small `EngineDeps`
@@ -24,32 +24,48 @@ There are now two scenes on this engine, phone (`src/shared/talk/`) and laptop
   gate) each have exactly one body too. Each scene's `scene.ts` calls these instead of
   reimplementing them -- `demoCandidates(ctx)` and `relaxMoves(ctx)` in `scene.ts` are now
   one-line wrappers, not the algorithm itself.
+- **The NPC loop mechanics (step 3):** `staffMove`, `runConversation`, `randomStaff`, the `tone()`
+  helper and `pickN()` are byte-identical between the two scenes' `npc.ts` (re-diffed fresh at
+  step 3, not trusted from phase 1's pre-implementation guess) and now have exactly one body each
+  in `core/npc.ts`, parameterized with plain function arguments rather than one large dependency
+  object (the same conservative style `engine.ts`'s `relaxMoves`/`nearestModels` already used).
+  Each scene's `npc.ts` calls into these, passing its own `customerMove`/`questionById`/question-id
+  literals as closures/arguments.
 
-**What step 2 found was NOT as generalizable as phase 1's diff guessed, and was deliberately left
-duplicated rather than forced:** `staffActs`, `applyStaff`, `customerMenu` and `applyCustomer`
-themselves stay in each scene's `scene.ts`, because their `confirm`/`reconfirm`/`keepPreferences`
-branches turned out to depend on more than "which axes vary" -- a laptop has a memory axis a phone
-doesn't, so the actual *option ids* at confirm time differ (laptop offers a `memory` change phone
-never has), not just whether a check passes. Phase 1's proposed `confirmExtraOptions`/
-`parseStorageTier` hooks would have had to grow into a much larger, more speculative interface to
-cover this honestly, built from only two data points -- exactly the "a rule that fits the examples
-but not the data" mistake new-scene-playbook.md warns against. So this cluster (plus the pure-data
-`ASK_LABEL`/`KEY_TEXT` maps and item-noun wording) stays scene-owned, documented as a real
-exception rather than hidden. **`pool.ts`, the actual `QuestionDef`s, `npc.ts`'s NPC loop, and all
-of `lines.ts`'s wording are still fully duplicated** -- `npc.ts` is step 3 of this extraction, not
-yet done; `pool.ts` and `lines.ts` are correctly scene-specific and not part of the plan to share.
-Read new-scene-playbook.md's "Generic today vs phone-specific" for the full account.
+**What stayed duplicated, and why that is the honest answer, not an oversight:** `staffActs`,
+`applyStaff`, `customerMenu` and `applyCustomer` themselves stay in each scene's `scene.ts`,
+because their `confirm`/`reconfirm`/`keepPreferences` branches turned out to depend on more than
+"which axes vary" -- a laptop has a memory axis a phone doesn't, so the actual *option ids* at
+confirm time differ (laptop offers a `memory` change phone never has), not just whether a check
+passes. Phase 1's proposed `confirmExtraOptions`/`parseStorageTier` hooks would have had to grow
+into a much larger, more speculative interface to cover this honestly, built from only two data
+points -- exactly the "a rule that fits the examples but not the data" mistake
+new-scene-playbook.md warns against. So this cluster (plus the pure-data `ASK_LABEL`/`KEY_TEXT`
+maps and item-noun wording) stays scene-owned, documented as a real exception rather than hidden.
+
+Step 3 found the same shape of exception in `npc.ts`: `compatible`, `consistent`, `answerQuestion`
+and `customerMove` each read a `Sku`/`Constraints`/tier field whose *shape* differs per scene
+(phone's `r.storage`/`t.storage` vs laptop's `r.memoryGb`/`r.storageGb`/`t.storageGb`), tied to
+`Persona.target`'s differing shape -- the same restraint applied, rather than building a hook for
+the persona/goal-matching logic from two data points. `randomPersona` is entirely scene-specific
+content (signal lists, impossible-persona archetypes, want shapes), correctly left scene-owned, the
+same category `pool.ts`'s own content already falls into.
+
+**`pool.ts`, the actual `QuestionDef`s, and all of `lines.ts`'s wording stay fully duplicated by
+deliberate decision**, not because nobody got to them -- they are what makes a phone scene a phone
+scene and a laptop scene a laptop scene. Read new-scene-playbook.md's "Generic today vs
+phone-specific" for the full, final account of the split.
 
 ```
-                 core/rng.ts    core/types.ts         core/engine.ts
-                 (seeded RNG)   (Tone, Role, Option,  (derive..gain, AND
-                      │          Answer, Pending,      demoCandidates, relaxMoves,
-                      │          StaffAct, Customer-   hintText, validatePicks,
-                      │          Action/Reply, Line,   nearestModels,
-                      │          Snapshot, Ended<Sku>) eligibleRecommendations)
-                      │                │                      │
-        ┌─────────────┴────────────────┴──────────────────────┴─────────────┐
-        v                                                                    v
+          core/rng.ts     core/types.ts          core/engine.ts            core/npc.ts
+          (seeded RNG)    (Tone, Role, Option,    (derive..gain, AND        (staffMove,
+               │           Answer, Pending,        demoCandidates,          runConversation,
+               │           StaffAct, Customer-     relaxMoves, hintText,    randomStaff,
+               │           Action/Reply, Line,      validatePicks,          tone(), pickN())
+               │           Snapshot, Ended<Sku>)   nearestModels,                │
+               │                 │                 eligibleRecommendations)      │
+        ┌──────┴─────────────────┴──────────────────────┴────────────────────────┴─────┐
+        v                                                                               v
   PHONE SCENE (src/shared/talk/)                        LAPTOP SCENE (src/shared/talk/scenes/laptop/)
   devices.json ─> data.ts ─> pool.ts                    laptops.json ─> data.ts ─> pool.ts
                      │                                                     │
@@ -68,8 +84,18 @@ Read new-scene-playbook.md's "Generic today vs phone-specific" for the full acco
           └──────────┬──────────┘                             └──────────┬──────────┘
                       v                                                   v
                    npc.ts                                              npc.ts
-          (still duplicated; same shape both scenes -- step 3 of the extraction, not yet done)
+    (thin calls into core/npc.ts for staffMove/              (thin calls into core/npc.ts, same
+     runConversation/randomStaff/tone/pickN;                  shape; compatible/consistent/
+     compatible/consistent/answerQuestion/                    answerQuestion/customerMove/
+     customerMove/randomPersona stay here --                  randomPersona stay here, same
+     see above)                                                reasons)
 ```
+
+Net effect of the three steps: `core/` is 698 lines (`engine.ts` 408, `npc.ts` 156, `types.ts` 105,
+`rng.ts` 29). The phone scene's own files total 1,915 lines, the laptop scene's 1,783 -- each
+scene's files shrank as their thin wrappers replaced full duplicated bodies, while `pool.ts`,
+`lines.ts`, the bank's actual questions, and the persona/goal-matching NPC logic remain
+scene-specific in full, by evidenced decision.
 
 Within one scene, `types.ts` holds the scene's own vocabulary (re-exporting `core/types.ts`'s
 pieces alongside `Scene`, `Pending`, `StaffAct`, which do depend on that scene's pool shape).
@@ -212,17 +238,25 @@ Every line is built from state and data; nothing is free text. Pieces:
 **Tone and face:** `TONE_EXPRESSION` in `types.ts` maps friendly/neutral/impatient/unsure to the character's own
 `smile`/`neutral`/`focused`/`worried`; every `Line` carries `expression`.
 
-## 7. NPCs (`npc.ts`)
+## 7. NPCs (`npc.ts`, mechanics shared from `core/npc.ts`)
 
 - `Persona`: opening style, optional target SKU, hard `wants`, `signals`, `unsure`, `patience`, `relax` (what it
-  would give up), `resistance`, optional `looseFirstCeiling`, `throwbackRate`, `tones`.
+  would give up), `resistance`, optional `looseFirstCeiling`, `throwbackRate`, `tones`. Scene-owned content.
 - `customerMove(sc, persona, rng, memory)`: leaves if patience is spent; otherwise picks for the pending menu.
   An answer is consistent if it contradicts no want and leaves the target in the pool (`consistent`,
-  `compatible`). Memory (`conceded`) stops it insisting on a want it gave up.
-- `staffMove(sc, traits, rng)`: weights over `staffActs`; forced moves and single options are taken.
-- `randomPersona`, `randomStaff`, `runConversation(persona, staff, rng, scene)` returns the final scene and
-  `stuck` if either side ever had no legal move.
-- `rng.ts`: `makeRng(seed)` (mulberry32), `chance`, `pickOne`, `weighted`.
+  `compatible`). Memory (`conceded`) stops it insisting on a want it gave up. Stays scene-owned (step 3 found
+  each of `compatible`/`consistent`/`answerQuestion` reads a field whose shape differs per scene -- see
+  section 1).
+- `staffMove(sc, traits, rng)`: each scene's version is now a thin wrapper deriving the pool/ranking and the
+  scene's own question-id literals, then calling `core/npc.ts`'s `staffMove`, which does the actual weighting
+  over `staffActs`; forced moves and single options are taken.
+- `randomPersona`: scene-owned (signal lists, impossible-persona archetypes, want shapes are scene content).
+- `randomStaff`, `runConversation(persona, staff, rng, scene)`: re-exports/thin wrappers over `core/npc.ts`,
+  byte-identical mechanics in both scenes. `runConversation` returns the final scene and `stuck` if either
+  side ever had no legal move.
+- `pickN`: moved to `core/npc.ts`, used by each scene's `randomPersona` to sample signals.
+- `rng.ts`: `makeRng(seed)` (mulberry32), `chance`, `pickOne`, `weighted` -- shared from `core/rng.ts` since
+  before step 1, confirmed untouched by step 3.
 
 ## 8. Tests (what each file promises)
 
@@ -256,7 +290,9 @@ persisted or logged.
 ## 10. Known limits
 
 - One scene's questions and facts are hard-wired (see the playbook for what is generic -- as of
-  2026-10-18, almost nothing: see section 1 above).
+  2026-10-18, the turn protocol, question-bank machinery and NPC loop mechanics are genuinely
+  shared; what's left hard-wired per scene is the pool, the actual questions, the wording, and the
+  persona/goal-matching half of the NPC loop -- see section 1 above for the full account).
 - `devices.json`/`laptops.json` are imported from `docs/`; a deployed build would need them copied.
 - No persistence and no `events` rows (the CLAUDE.md invariant applies the moment this is wired).
 - Customers sometimes give a looser first budget than their limit (intended: it exercises the reopen).

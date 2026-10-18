@@ -110,3 +110,78 @@ phone scene's matching telephoto/battery questions), and one wording bug ("a M5 
 **Not done, by the playbook's own "Definition of done for a scene":** an automated reviewer pass
 on fresh seeds (only hand spot-checks were done), Ritesh playing either side, his review of the
 wording, and the real core extraction above. These are named, not silently skipped.
+
+## Prior-art check before continuing the core extraction (Ritesh and Claude, 2026-10-18)
+
+Before committing more build time to the generic core, Ritesh asked (half-joking, comparing the
+engine to Akinator) whether an existing tool or framework already does what this engine does, so a
+subagent researched it rather than assuming either "obviously nothing exists" or "we're
+reinventing something standard". Full report in `LEARNINGS.md`'s matching entry; summary here
+because it bears on whether the extraction (and the engine design generally) is worth continuing
+as designed.
+
+**Finding:** no single existing library combines hard-constraint elimination over a typed
+candidate pool, soft-signal reranking, a precondition/effect question bank, and turn-based
+menu-driven dialogue with weighted-random NPC move selection on both sides. Akinator itself is a
+weaker analogue than its reputation suggests -- publicly-documented reverse-engineering
+(Vié-Guerra et al., arXiv:2301.08718) argues it is Bayesian soft-scoring over a crowd-sourced
+answer database with no real hard-elimination step, so it only overlaps with this engine's
+soft-signal half, not the hard-constraint half. Each half of this design does map to a named,
+citable technique: question-ordering-by-narrowing-power is expected-information-gain /
+minimum-entropy question selection from 20-questions theory (Jedynak-style sequential Bayesian
+search, arXiv:1306.1922), and hard elimination over a typed pool is standard CSP-based
+product-configurator design (arXiv:1108.5586 and the configurator-CSP literature). The specific
+combination -- adaptively narrowing a candidate pool conversationally -- is a named research area,
+constraint-based conversational recommender systems, surveyed in arXiv:2101.09459. Rasa's
+slot-filling plus tracker-as-event-log is the closest shipped framework to the turn/state
+structure, but its policy is ML-learned from training stories, not an authored precondition/effect
+bank, so it is a point of comparison, not something that should have been used instead.
+
+**Decision:** continue the engine and the core extraction as designed. This is not "nothing
+compares, so anything goes" -- it is specific evidence that both halves of the design are
+individually the textbook-correct technique for what they do, and that the gap (nobody has
+packaged this particular combination as a reusable two-party, menu-driven, NPC-playable
+conversation engine) is a real gap, not a sign of having missed an obvious existing tool. Citable
+in PROCESS.md's stack-case section if a "why build this instead of using X" question comes up at a
+crit.
+
+## Core extraction closed out: all three steps landed (Claude, 2026-10-18, under Ritesh's standing authorization)
+
+Ritesh approved step 3 (`npc.ts`) after reviewing steps 1 and 2 directly in VS Code. This closes
+the three-step plan from `core-extraction-proposal.md`.
+
+**What step 3 found, re-diffing fresh rather than trusting the phase-1 sketch:** `staffMove`,
+`runConversation`, `randomStaff`, the `tone()` helper and `pickN()` were byte-identical between the
+phone and laptop scenes' `npc.ts` and now have exactly one body each in `core/npc.ts`. `compatible`,
+`consistent`, `answerQuestion` and `customerMove` were NOT moved -- each reads a `Sku`/
+`Constraints`/tier field whose shape differs per scene (phone's `storage`/`screen`/`foldable` vs
+laptop's `memoryGb`/`storageGb`/`family`/`maxWeightG`), tied to `Persona.target`'s differing shape.
+This is the same restraint applied in step 2 to `confirm`/`reconfirm`/`keepPreferences`: the right
+call was to leave it scene-owned, documented, rather than invent a hook from two data points.
+`randomPersona` is entirely scene content and was never a candidate for extraction.
+
+**The honest answer to the original question ("did the framework actually generalise"):** yes, for
+the turn protocol (`core/engine.ts`'s step-2 functions and `staffActs`/`applyStaff`/`customerMenu`/
+`applyCustomer`'s shared majority), the question-bank machinery (`core/engine.ts`'s step-1
+functions), and the NPC loop mechanics (`core/npc.ts`) -- together the large majority of each
+scene's engine code by line count. No, for the pool/catalogue content, the actual questions, the
+wording, and the persona/goal-matching half of the NPC loop -- which is exactly the part that is
+*supposed* to differ per scene, not a gap in the extraction. `core/` now totals 698 lines
+(`engine.ts` 408, `npc.ts` 156, `types.ts` 105, `rng.ts` 29); the phone scene's own files total
+1,915 lines and the laptop scene's 1,783, each shrunk by its thin wrappers replacing full
+duplicated bodies.
+
+**Verified behaviour-preserving at every step, not just claimed:** all 140 specs pass unchanged
+after each of the three steps; full-repo `pnpm typecheck` clean; both transcript generators
+(`scripts/talk-transcripts.ts`, `scripts/talk-laptop-transcripts.ts`) still run; an ad hoc 2000-seed
+NPC-vs-NPC simulation on each scene after step 3 shows 0 stuck conversations and the same ~80% sell
+rate as before the extraction began.
+
+**What remains for a real third test of genericity:** both scenes diffed here are purchase scenes
+(catalogue + pool narrowing), so the hooks and the "what stays scene-owned" boundary above were
+found from exactly two data points, both shaped the same way. A genuinely different scene --
+device-service (G1 in conversation-types.md): a pool of candidate fault *explanations*, not
+products, with facts arriving from world state (a test result) rather than only customer answers --
+is the real test of whether `core/engine.ts` and `core/npc.ts`'s current shape holds, or needs a
+new hook neither purchase scene revealed a need for. That is the next decision for Ritesh, not
+assumed here.

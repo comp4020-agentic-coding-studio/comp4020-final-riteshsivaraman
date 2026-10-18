@@ -40,6 +40,38 @@ wording, and the real core extraction. Commits: `1a14475` (core extraction, part
 `a7ce856` (laptop scene), `6d368a8` (specs + 2 engine bugs fixed), `a219bd6` (lines.ts rewrite +
 wording specs), `112de3a` (transcript generator), `6422af6` (an/a grammar fix).
 
+## Conversation model: the real core extraction, all three steps landed (2026-10-18)
+
+The generic-core gap flagged just above got fixed properly, in three checked-in steps, each
+reviewed by Ritesh before the next began (see `docs/conversation-model/core-extraction-proposal.md`
+for the phase-1 design doc, and `decisions.md` for the closing entry). Step 1 (`9f7fd78`): the
+question-bank fold (`derive`, `withoutAnswer`, `rowsIf`, `optionsFor`, `askable`, `reopenable`,
+`gain`) moved into `core/engine.ts`, one body each. Step 2 (`8cb4e3c`): the turn-protocol's pure
+pieces (`demoCandidates`, `relaxMoves`, `hintText`, `validatePicks`, `nearestModels`,
+`eligibleRecommendations`) plus the shared types (`Pending`, `StaffAct`, `CustomerAction`,
+`CustomerReply`, `Snapshot`, `Line`) moved too; `confirm`/`reconfirm`/`keepPreferences` were found to
+need more than a simple hook (a laptop's memory axis means different option ids at confirm time,
+not just a different check) and were deliberately left scene-owned rather than forced. Step 3
+(`8869e98`): the NPC loop mechanics (`staffMove`, `runConversation`, `randomStaff`, `tone()`,
+`pickN()`) moved into a new `core/npc.ts`; the persona/goal-matching half (`compatible`,
+`consistent`, `answerQuestion`, `customerMove`, `randomPersona`) stayed scene-owned for the same
+reason as step 2's exception.
+
+Verified at every step, not just claimed: all 140 specs pass unchanged, full-repo `pnpm typecheck`
+clean, both transcript generators still run, and an ad hoc 2000-seed simulation per scene (0 stuck,
+~80% sell rate, matching pre-extraction numbers). `core/` now totals 698 lines; the phone and laptop
+scene files shrank to 1,915 and 1,783 lines respectively as duplicated bodies were replaced by thin
+wrappers.
+
+**Honest answer to "did the framework generalise":** yes, for the turn protocol, the question-bank
+machinery and the NPC loop mechanics (the majority of each scene's engine code). No, for the
+pool/catalogue, the actual questions, the wording, and the persona/goal-matching logic — which is
+exactly the content that's supposed to differ per scene, not a shortfall. Both scenes diffed here
+are purchase scenes, so this is evidence from two data points shaped the same way; a genuinely
+different third scene (device-service, G1 — a pool of fault explanations, not products) is the real
+test of whether `core/engine.ts`/`core/npc.ts`'s current shape holds, and is Ritesh's next call, not
+assumed here.
+
 ## Crit 10 prep: stdout log and the authorisation note (2026-10-18)
 
 Crit 10 narrates "who did what" from `flyctl logs`; until now only "listening on" reached stdout. `a60962b`: `src/server/eventlog.ts` turns every events row into one line (`<iso time> [tag] type user=<id> k=v`), called beside both INSERTs (`service.ts` `log()`, `presence.ts` `logEvent()`). Conversation lines share a tag; tokens and typed notes are kept out. `spec/eventlog.test.ts` pins the format. D18's server clamp was already there (`clampToWalkable` in `presence.ts`, tested in `presence.test.ts`); added a `staff_area_refused` event for the first refusal per approach, and join now logs name, kind and role. ADR 3 has a new addendum (what each action checks, the self-chosen-role gap). `reflections/crit-10.md` is a skeleton only.

@@ -2,7 +2,7 @@
 status: draft
 what: Recipe for building the next conversation scene on this system, what is phone-specific versus generic today, and the pitfalls already paid for. Compact first version.
 date: 2026-10-18
-source: the phone-scene build (see how-we-built-it.md); the laptop port that first tested the generalisation claim and found it hadn't landed; then a real core extraction, done in two checked-in steps with Ritesh reviewing each before the next began (phase 2 steps 1 and 2 -- docs/conversation-model/core-extraction-proposal.md). Claude's account.
+source: the phone-scene build (see how-we-built-it.md); the laptop port that first tested the generalisation claim and found it hadn't landed; then a real core extraction, done in three checked-in steps with Ritesh reviewing each before the next began (phase 2 steps 1 to 3, all landed -- docs/conversation-model/core-extraction-proposal.md). Claude's account.
 ---
 
 # Playbook: building the next scene
@@ -19,16 +19,17 @@ source: the phone-scene build (see how-we-built-it.md); the laptop port that fir
 9. **Replays** of the transcripts (prompt D), **seeded simulation** with the invariants in `spec/talk-sim.test.ts`, **wording specs** like `spec/talk-lines.test.ts`.
 10. **Play it, paste transcripts, fix with a spec each.** Then the **review loop** (`scripts/talk-transcripts.ts` plus prompt E on fresh seeds, spot-check before acting).
 
-## Generic today vs phone-specific (updated through phase 2 step 2)
+## Generic today vs phone-specific (final account, phase 2 steps 1 to 3 complete)
 
 The first attempt did the scene-definition refactor *while* porting laptop in one unsupervised
 overnight pass; the extraction didn't happen (only `core/rng.ts` and `core/types.ts`'s original
 contents were genuinely pulled out, and laptop was ported by near-verbatim copy-paste). The fix
 was process, not more code: a short, reviewed design doc first
 (`core-extraction-proposal.md`, phase 1 -- no code, a real line-by-line diff of what the two
-scenes actually shared), then the extraction itself in small steps, each checked in with Ritesh
-before the next began. Two steps have landed this way; what follows is what's actually true of
-the code today.
+scenes actually shared), then the extraction itself in three small steps, each checked in with
+Ritesh before the next began, each re-diffing the real code fresh rather than trusting the
+proposal's pre-implementation guesses. All three have landed; what follows is what's actually
+true of the code today, and should be read as settled, not provisional.
 
 - **Actually extracted into `core/` and reused by both scenes:**
   - `core/rng.ts` (seeded generator), `core/types.ts` (`Tone`, `Role`, `Option`, `Answer`, the
@@ -41,6 +42,10 @@ the code today.
     `nearestModels`, `eligibleRecommendations` -- the turn-protocol pieces that turned out to be
     pure rules with no scene-specific branch inside them. Each scene's `scene.ts` now calls these
     instead of reimplementing them.
+  - `core/npc.ts`, step 3: `staffMove`, `runConversation`, `randomStaff`, the `tone()` helper and
+    `pickN()` -- byte-identical between the two scenes' NPC loops, re-diffed fresh rather than
+    trusted from phase 1's sketch. Each scene's `npc.ts` is now a thin wrapper passing its own
+    `customerMove`, `questionById` and question-id literals in as arguments.
 - **Deliberately left duplicated, as a real exception, not a shortcut:** `staffActs`,
   `applyStaff`, `customerMenu`, `applyCustomer` themselves, because their `confirm`/`reconfirm`/
   `keepPreferences` branches depend on more than phase 1's guessed "which axes vary" hook could
@@ -51,15 +56,27 @@ the code today.
   attempt made at a larger scale. Left scene-owned on purpose, with the reasoning written down in
   `core/engine.ts`'s comments, so a real third scene can settle whether this needs a hook or is
   just always scene work.
-- **Still fully duplicated, not yet attempted:** the NPC loop shape (`npc.ts`'s `customerMove`/
-  `staffMove`/`runConversation`) -- step 3, not yet done.
+- **Step 3 found the same shape of exception inside the NPC loop:** `compatible`, `consistent`,
+  `answerQuestion` and `customerMove` each read a `Sku`/`Constraints`/tier field whose shape
+  differs per scene (phone's `storage`/`screen`/`foldable` vs laptop's `memoryGb`/`storageGb`/
+  `family`/`maxWeightG`), tied to `Persona.target`'s differing shape -- this is almost entirely
+  persona/goal-matching, which is scene content, not loop mechanics, so it stayed scene-owned for
+  the same reason as the confirm cluster above. `randomPersona` is entirely scene-specific content
+  (signal lists, impossible-persona archetypes, want shapes), also correctly scene-owned.
 - **Genuinely scene-specific, as expected, not part of the plan to share:** `data.ts` (the sourced
-  catalogue and its schema), the attributes in `pool.ts`, every question in `bank.ts`, the facts
-  and phrasing in `lines.ts`.
-- **What made step 2 land differently from the first attempt:** stopping to design before coding
-  (phase 1), then stopping again mid-step-2 when the confirm/reconfirm cluster turned out deeper
-  than planned, to ask whether to force a hook or leave it scene-owned, rather than guessing
-  silently and writing it up afterwards as if it had been the plan all along.
+  catalogue and its schema), the attributes and ranking logic in `pool.ts`, every question in
+  `bank.ts`, the facts and phrasing in `lines.ts`, and the persona/goal-matching half of `npc.ts`
+  described above.
+- **What made all three steps land differently from the first attempt:** stopping to design before
+  coding (phase 1), then stopping again mid-step whenever a cluster turned out deeper than planned
+  (confirm/reconfirm in step 2, persona/goal-matching in step 3), to ask whether to force a hook or
+  leave it scene-owned, rather than guessing silently and writing it up afterwards as if it had
+  been the plan all along. The honest answer to "did the framework generalise": yes, for the turn
+  protocol, the question-bank machinery and the NPC loop mechanics -- roughly the majority of each
+  scene's engine code by line count -- and no, for the pool/catalogue/wording/persona content,
+  which is exactly the part that is supposed to differ per scene. Verified behaviour-preserving at
+  every step: all 140 specs plus an ad hoc 2000-seed simulation per scene, unchanged before and
+  after.
 
 ## Pitfalls already paid for (details: how-we-built-it.md section 7)
 - Two correct rules interacting (test pairs of features, not each alone).
