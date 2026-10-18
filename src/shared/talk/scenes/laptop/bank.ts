@@ -1,3 +1,4 @@
+import * as engine from "../../core/engine.ts";
 import { MODELS, modelById } from "./data.ts";
 import { mergeConstraints, mergeSignals, modelIds, poolOf, priceBands, rank, type Constraints, type Signals } from "./pool.ts";
 import type { Ctx, Option, Scene } from "./types.ts";
@@ -6,12 +7,12 @@ import type { Ctx, Option, Scene } from "./types.ts";
 // (phones): a question says when it is worth asking (pre), what the customer
 // can answer (options, generated from the pool), and what an answer does to
 // the constraints and signals (apply). derive(), withoutAnswer(), rowsIf(),
-// optionsFor(), askable(), reopenable() and gain() below are copied from the
-// phone bank nearly unchanged -- they only touch Ctx/Scene/QuestionDef, never
-// a phone-specific field, which is the clearest evidence yet for
-// new-scene-playbook.md's claim that this machinery is generic. See
-// new-scene-playbook.md's updated "Generic today vs phone-specific" for what
-// this means for the next refactor pass.
+// optionsFor(), askable(), reopenable() and gain() below now call into
+// core/engine.ts, which holds the one real body shared with the phone bank
+// (phase 2 step 1 of the core extraction:
+// docs/conversation-model/core-extraction-proposal.md) -- confirming
+// new-scene-playbook.md's claim that this machinery never touches a
+// phone- or laptop-specific field.
 
 export interface Contribution {
   c?: Constraints;
@@ -383,63 +384,33 @@ export const questionById = (id: string): QuestionDef => {
 };
 
 // ---- the scene as a fold over its answers ----
+//
+// Thin wrappers over core/engine.ts -- see the note above.
 
-export function derive(sc: Scene): Ctx {
-  let c: Constraints = {};
-  let s: Signals = {};
-  for (const qid of sc.order) {
-    const a = sc.answers[qid];
-    if (!a) continue;
-    const k = questionById(qid).apply(a.picks);
-    if (k.c) c = mergeConstraints(c, k.c);
-    if (k.s) s = mergeSignals(s, k.s);
-  }
-  if (sc.excluded.length) c = mergeConstraints(c, { excluded: sc.excluded });
-  if (sc.fixed) c = { ...c, model: sc.fixed };
-  const pool = poolOf(c);
-  const ids = modelIds(pool);
-  return { sc, c, s, pool, ranked: rank(pool, s), model: sc.fixed ?? (ids.length === 1 ? ids[0]! : null) };
-}
+const deps: engine.EngineDeps<Constraints, Signals, ReturnType<typeof poolOf>[number], ReturnType<typeof rank>[number], Scene, Option, QuestionDef> = {
+  bank: BANK,
+  questionById,
+  mergeConstraints,
+  mergeSignals,
+  poolOf,
+  modelIds,
+  rank,
+  emptyConstraints: {},
+  emptySignals: {},
+  withAnswer: (sc, qid, picks) => {
+    if (picks === null) {
+      const next: Scene = { ...sc, answers: { ...sc.answers }, order: sc.order.filter((q) => q !== qid) };
+      delete next.answers[qid];
+      return next;
+    }
+    return { ...sc, answers: { ...sc.answers, [qid]: { picks, turn: sc.turn } }, order: sc.order.includes(qid) ? sc.order : [...sc.order, qid] };
+  },
+};
 
-export function withoutAnswer(ctx: Ctx, qid: string): Ctx {
-  const sc: Scene = { ...ctx.sc, answers: { ...ctx.sc.answers }, order: ctx.sc.order.filter((q) => q !== qid) };
-  delete sc.answers[qid];
-  return { ...derive(sc), sc: ctx.sc };
-}
-
-export function rowsIf(ctx: Ctx, qid: string, picks: string[]): number {
-  const sc: Scene = { ...ctx.sc, answers: { ...ctx.sc.answers, [qid]: { picks, turn: ctx.sc.turn } }, order: ctx.sc.order.includes(qid) ? ctx.sc.order : [...ctx.sc.order, qid] };
-  return derive(sc).pool.length;
-}
-
-export function optionsFor(ctx: Ctx, q: QuestionDef): Option[] {
-  const all = q.options(ctx);
-  if (q.kind !== "hard") return all;
-  return all.filter((o) => o.neutral || o.param || rowsIf(ctx, q.id, [o.id]) < ctx.pool.length || (o.id.startsWith("ceiling:") && o.id === `ceiling:${ctx.c.maxPrice}`));
-}
-
-export function askable(ctx: Ctx): QuestionDef[] {
-  return BANK.filter((q) => {
-    const a = ctx.sc.answers[q.id];
-    if (a && !(q.kind === "resolve" && a.picks.includes("notsure"))) return false;
-    if (!q.pre(ctx)) return false;
-    const opts = optionsFor(ctx, q);
-    if (q.kind === "hard" || q.kind === "resolve") return opts.some((o) => !o.neutral);
-    return opts.length > 1;
-  });
-}
-
-export const reopenable = (ctx: Ctx): QuestionDef[] =>
-  ctx.sc.order
-    .map(questionById)
-    .filter((q) => q.kind !== "route" && (ctx.sc.answers[q.id]?.picks.length ?? 0) > 0)
-    .filter((q) => ctx.pool.length > 0 || withoutAnswer(ctx, q.id).pool.length > 0);
-
-export function gain(ctx: Ctx, q: QuestionDef): number {
-  if (q.kind === "soft") return 0.25;
-  if (q.kind === "route") return 0.1;
-  const opts = optionsFor(ctx, q).filter((o) => !o.neutral && !o.param);
-  if (opts.length === 0) return 0;
-  const left = opts.map((o) => rowsIf(ctx, q.id, [o.id]) / ctx.pool.length);
-  return 1 - left.reduce((a, b) => a + b, 0) / left.length;
-}
+export const derive = (sc: Scene): Ctx => engine.derive(deps, sc);
+export const withoutAnswer = (ctx: Ctx, qid: string): Ctx => engine.withoutAnswer(deps, ctx, qid);
+export const rowsIf = (ctx: Ctx, qid: string, picks: string[]): number => engine.rowsIf(deps, ctx, qid, picks);
+export const optionsFor = (ctx: Ctx, q: QuestionDef): Option[] => engine.optionsFor(deps, ctx, q);
+export const askable = (ctx: Ctx): QuestionDef[] => engine.askable(deps, ctx, (q, c) => q.pre(c));
+export const reopenable = (ctx: Ctx): QuestionDef[] => engine.reopenable(deps, ctx);
+export const gain = (ctx: Ctx, q: QuestionDef): number => engine.gain(deps, ctx, q);

@@ -10,32 +10,41 @@ source: read from src/shared/talk/*.ts, src/shared/talk/core/*.ts, src/shared/ta
 ## 1. Layers
 
 There are now two scenes on this engine, phone (`src/shared/talk/`) and laptop
-(`src/shared/talk/scenes/laptop/`). **Only `core/rng.ts` and `core/types.ts` are actually shared
-between them** -- everything else below exists once per scene, duplicated, not imported from a
-common place. This was meant to be a real shared core (new-scene-playbook.md's "Proposed
-refactor"); porting laptop confirmed the shapes match but did not extract them. Read
-new-scene-playbook.md's "Generic today vs phone-specific" for the full account.
+(`src/shared/talk/scenes/laptop/`). As of phase 2 step 1 of the core extraction
+(`docs/conversation-model/core-extraction-proposal.md`), `core/rng.ts`, `core/types.ts` and now
+**`core/engine.ts`** are genuinely shared: `derive`, `withoutAnswer`, `rowsIf`, `optionsFor`,
+`askable`, `reopenable` and `gain` each have exactly one body, in `core/engine.ts`, generic over
+a small `EngineDeps` interface (pool functions, the bank array, a `withAnswer` scene-copy helper).
+Each scene's `bank.ts` is now a thin wrapper re-exporting these under its own concrete types, so
+every existing import of `bank.ts` keeps working unchanged. **Everything else below `bank.ts`'s
+question content -- the pool logic in `pool.ts`, the actual `QuestionDef`s, `scene.ts`'s turn
+protocol, `npc.ts`'s NPC loop, and all of `lines.ts`'s wording -- is still duplicated, not shared.**
+That's steps 2 and 3 of the same extraction, not yet done. Read new-scene-playbook.md's "Generic
+today vs phone-specific" for the full account of what's proven generic vs still duplicated.
 
 ```
-                 core/rng.ts    core/types.ts
-                 (seeded RNG)   (Tone, Role, Option, Answer,
-                      │          tone→expression)
-                      │                │
-        ┌─────────────┴────────────────┴─────────────┐
-        v                                             v
-  PHONE SCENE (src/shared/talk/)             LAPTOP SCENE (src/shared/talk/scenes/laptop/)
-  devices.json ─> data.ts ─> pool.ts         laptops.json ─> data.ts ─> pool.ts
-                     │                                          │
-                   bank.ts                                    bank.ts
-                     │                                          │
-          ┌──────────┴──────────┐                    ┌──────────┴──────────┐
-          v                     v                     v                     v
-       scene.ts              lines.ts              scene.ts              lines.ts
-          │                     │                     │                     │
-          └──────────┬──────────┘                     └──────────┬──────────┘
-                      v                                           v
-                   npc.ts                                      npc.ts
-          (customer persona + staff weights + runConversation, same shape both scenes)
+                 core/rng.ts    core/types.ts    core/engine.ts
+                 (seeded RNG)   (Tone, Role,     (derive, withoutAnswer, rowsIf,
+                      │          Option, Answer,  optionsFor, askable, reopenable,
+                      │          tone→expression) gain -- genuinely shared now)
+                      │                │                │
+        ┌─────────────┴────────────────┴────────────────┴─────────────┐
+        v                                                              v
+  PHONE SCENE (src/shared/talk/)                      LAPTOP SCENE (src/shared/talk/scenes/laptop/)
+  devices.json ─> data.ts ─> pool.ts                  laptops.json ─> data.ts ─> pool.ts
+                     │                                                   │
+              bank.ts (thin wrapper over core/engine.ts,          bank.ts (thin wrapper,
+              plus this scene's own QuestionDef[])                same shape)
+                     │                                                   │
+          ┌──────────┴──────────┐                           ┌──────────┴──────────┐
+          v                     v                            v                     v
+       scene.ts              lines.ts                     scene.ts              lines.ts
+       (still duplicated)   (scene-specific,               (still duplicated)   (scene-specific,
+          │                  correctly so)                    │                  correctly so)
+          └──────────┬──────────┘                           └──────────┬──────────┘
+                      v                                                 v
+                   npc.ts                                            npc.ts
+          (still duplicated; same shape both scenes -- the next step of the extraction)
 ```
 
 Within one scene, `types.ts` holds the scene's own vocabulary (re-exporting `core/types.ts`'s
@@ -72,11 +81,13 @@ each scene's `data.ts` imports its own JSON (`docs/conversation-model/devices.js
 | `ended` | `bought` (with the SKU) or `left` (with why) |
 | `log` | every line: who, tone, expression, move, question id, picks, throw-back, the spoken text, and a snapshot of the pool after |
 
-`derive(scene)` (in `bank.ts`) is the heart: it **folds** the answers into `Constraints` and `Signals`,
+`derive(scene)` is the heart: it **folds** the answers into `Constraints` and `Signals`,
 applies `fixed` and `excluded`, computes the pool and the ranking, and returns a `Ctx`
 `{ sc, c, s, pool, ranked, model }` where `model` is the one phone it is down to (or the fixed one).
 Because it is recomputed every time, reopening a question is replacing its answer; conceding a want is
-deleting the answers that set it (`forget` in `scene.ts`); nothing needs undoing.
+deleting the answers that set it (`forget` in `scene.ts`); nothing needs undoing. The body now lives
+once in `core/engine.ts`; `bank.ts` exports `derive` as a one-line call into it with this scene's
+`EngineDeps` (see section 1).
 
 ## 3. The pool (`pool.ts`)
 
