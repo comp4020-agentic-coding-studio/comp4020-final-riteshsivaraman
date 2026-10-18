@@ -71,7 +71,11 @@ isn't built" into a design doc, grep the whole subsystem the claim is
 about (here: `grep -n handOn\|note src/server/service.ts`), not just the
 one file the current line of reasoning happened to have open — a confident
 negative claim is exactly the kind of thing `[TK]`/don't-invent should have
-caught before it got documented, not after.
+caught before it got documented, not after. Written into CLAUDE.md's
+"Don't invent, don't guess through ambiguity" section
+([`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff))
+during a later pass auditing which LEARNINGS entries had actually changed the
+harness versus stayed a one-off narrated lesson.
 
 ## Hono sub-app routes don't match a trailing slash on the mount path
 
@@ -219,7 +223,10 @@ camera offset, "I reasoned through the trig and it should point the right
 way" is not evidence. The only acceptable check is rendering it and looking,
 and for the kind of thing a human will eyeball live anyway (device tilt, NPC
 facing), a quick screenshot before calling it done would have caught two of
-these three before Ritesh had to.
+these three before Ritesh had to. Written into CLAUDE.md's "Known gotchas"
+([`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff))
+once the same shape (same bug, three times in one session) made it worth a
+standing line rather than three separate memories.
 
 ## Confident, multi-source web coverage about a physical design detail can still be flat wrong
 
@@ -262,7 +269,10 @@ cause was a probe footprint tall enough to reach the nose's lower slope, so
 the mouth was seated against the nose tip. Lesson: for "X pokes through Y"
 ask for the opposite failure too (X floats off Y) and for a render the agent
 actually looked at, not a green number; a metric for only one direction of a
-defect passes the other.
+defect passes the other. Written into CLAUDE.md's "Known gotchas"
+([`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff))
+as a general rule for any future poke-through/overlap check, not just this
+one detector.
 
 ## Dictating the model first and getting a mockup plus numbered defaults back caught two wrong assumptions before any code
 
@@ -358,6 +368,28 @@ checked): the reviewer is cheap and finds what the writer cannot see, but it
 is noisy, so every claim gets a spot-check and every fix gets re-reviewed on
 seeds it has not seen. The review reports and the specs that pin each
 finding are in the repo.
+
+## Asking "does this already exist" mid-build, not just before the stack choice
+
+[`9f7fd78`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9f7fd78)
+
+Partway through extracting the talk engine's generic core (phone and laptop scenes had just been
+confirmed to share the same shape), I half-joked that the whole thing was starting to sound like
+Akinator and asked for a prior-art check before sinking more build time into the extraction.
+The research found that Akinator itself is a weak analogue (Bayesian soft-scoring over a
+crowd-sourced database, no real hard-elimination step), but that each half of the engine's design
+-- weighting a question by how much it narrows the pool, and eliminating candidates with hard
+constraints -- is independently a named, citable technique (expected-information-gain question
+selection from 20-questions theory; CSP-based product-configurator design), and that the specific
+combination is a named research area (constraint-based conversational recommender systems) with no
+single existing library doing it end to end. Lesson (week 8: lay out options and write a decision
+record before a choice that is expensive to reverse, not only at the stack-selection point): the
+lecture's framing is usually applied once, at the start of a subsystem, but a build worth multiple
+sessions is worth re-checking against prior art partway through too, once its actual shape has
+become clear enough to search for -- it is cheaper to ask after two scenes exist than after a third
+is built on an unexamined assumption. The finding is recorded in
+`docs/conversation-model/decisions.md` so it can be cited in PROCESS.md if a "why not use X"
+question comes up at a crit.
 
 ## The events table recorded everything, and `flyctl logs` still showed nothing
 
