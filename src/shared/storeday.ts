@@ -131,14 +131,28 @@ export interface Seat {
   face: Pt; // what they face
 }
 const SERVICE_TABLES = TABLES.filter((t) => t.service);
+// Two people discussing something at a service table sit on the SAME side of it,
+// on the two stools along that side, each turned a little towards the other
+// (Ritesh, 2026-10-19: "always sit on the same side of a table and sort of face
+// each other slightly"), not across it.
+const TURN_IN = 0.1; // how far towards the other person the gaze is pulled, from the table's centre
 export const TABLE_SEATS: Array<{ id: string; guest: Seat; host: Seat }> = SERVICE_TABLES.flatMap((t) => {
-  // the stools along this table's own two sides, not a neighbour's
+  // the stools along this table's own sides, not a neighbour's
   const near = TABLE_STOOLS.filter((s) => Math.abs(s.z - t.z) < t.d / 2 + 0.3 && Math.abs(s.x - t.x) < t.w / 2 + 0.6);
-  const left = near.filter((s) => s.x < t.x).sort((a, b) => a.z - b.z)[0];
-  const right = near.filter((s) => s.x > t.x).sort((a, b) => a.z - b.z)[0];
-  if (!left || !right) return [];
+  const left = near.filter((s) => s.x < t.x).sort((a, b) => a.z - b.z);
+  const right = near.filter((s) => s.x > t.x).sort((a, b) => a.z - b.z);
+  const side = left.length >= 2 ? left : right.length >= 2 ? right : null;
+  if (!side) return [];
+  const [a, b] = side;
   const centre: Pt = { x: t.x, z: t.z };
-  return [{ id: t.id, guest: { id: left.id, at: { x: left.x, z: left.z }, face: centre }, host: { id: right.id, at: { x: right.x, z: right.z }, face: centre } }];
+  const gaze = (me: Pt, other: Pt): Pt => ({ x: centre.x + (other.x - centre.x) * TURN_IN, z: centre.z + (other.z - centre.z) * TURN_IN });
+  return [
+    {
+      id: t.id,
+      guest: { id: a.id, at: { x: a.x, z: a.z }, face: gaze(a, b) },
+      host: { id: b.id, at: { x: b.x, z: b.z }, face: gaze(b, a) },
+    },
+  ];
 });
 export const BAR_SEATS: Seat[] = BAR_STOOLS.filter((s) => Math.abs(s.x) < COUNTER.w / 2 - 0.4).map((s) => ({
   id: s.id,

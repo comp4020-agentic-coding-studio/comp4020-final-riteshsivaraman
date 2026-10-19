@@ -274,7 +274,10 @@ describe("interactions are mutual", () => {
         const d = Math.hypot(a.x - b.x, a.z - b.z);
         expect(d, `${c.id} with ${s.with} at ${mid.toFixed(1)}: ${d.toFixed(2)} m apart`).toBeLessThan(2.4);
         const toward = Math.abs(wrap(headingTo(a.x, a.z, b.x, b.z) - a.ry));
-        expect(toward, `${c.id} facing ${s.with}`).toBeLessThan(0.6);
+        // side by side at a table they only turn slightly towards each other
+        // (Ritesh, 2026-10-19), so the bound is looser when both are seated
+        const bound = a.seated && b.seated ? 1.35 : 0.6;
+        expect(toward, `${c.id} facing ${s.with}`).toBeLessThan(bound);
       }
     }
   });
@@ -327,10 +330,18 @@ describe("sitting", () => {
     }
   });
 
-  it("sits two people opposite each other at a table", () => {
+  it("sits two people on the same side of a table, a little turned towards each other", () => {
     for (const t of SEATS_AT_TABLES) {
-      expect(Math.hypot(t.guest.at.x - t.host.at.x, t.guest.at.z - t.host.at.z), t.id).toBeLessThan(2.3);
-      expect(t.guest.at.x).toBeLessThan(t.host.at.x);
+      // the same side: one x, two stools a stool's width apart
+      expect(Math.abs(t.guest.at.x - t.host.at.x), t.id).toBeLessThan(0.05);
+      const apart = Math.hypot(t.guest.at.x - t.host.at.x, t.guest.at.z - t.host.at.z);
+      expect(apart, t.id).toBeGreaterThan(0.6);
+      expect(apart, t.id).toBeLessThan(1.3);
+      // each looks at the table but is pulled round towards the other: the
+      // gaze leans to the partner's side of the table's middle
+      const lean = (me: typeof t.guest, other: typeof t.host): number => Math.sign(other.at.z - me.at.z) * (me.face.z - TABLES.find((x) => x.id === t.id)!.z);
+      expect(lean(t.guest, t.host), `${t.id} guest`).toBeGreaterThan(0);
+      expect(lean(t.host, t.guest), `${t.id} host`).toBeGreaterThan(0);
     }
   });
 });
