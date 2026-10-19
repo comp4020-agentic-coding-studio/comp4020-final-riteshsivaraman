@@ -521,7 +521,15 @@ export function buildCharacter(
   }
   const hair = new Color(look.hairColour);
   if (look.hairStyle === "long") {
-    add(new IcosahedronGeometry(1, 1), head, hair, hm(0, -0.09, 0.07, sc(0.088, 0.15, 0.042)));
+    // a woman's long hair hangs fuller, past the shoulders at the back, so it
+    // reads from the front and the side
+    const full = look.gender === "female";
+    add(new IcosahedronGeometry(1, 1), head, hair, hm(0, full ? -0.13 : -0.09, 0.07, full ? sc(0.1, 0.22, 0.055) : sc(0.088, 0.15, 0.042)));
+    if (full) for (const s of SIDES) add(new IcosahedronGeometry(1, 1), head, hair, hm(s * 0.085 * fw, -0.07, 0.025, sc(0.022, 0.12, 0.05)));
+  }
+  if (look.gender === "female") {
+    // small bright earrings: a clear cue at any distance
+    for (const s of SIDES) add(new IcosahedronGeometry(0.011, 1), head, new Color("#f2d27a"), hm(s * 0.092 * fw, -0.04 * Fy, 0.006));
   }
   if (look.hairStyle === "bun") {
     add(new IcosahedronGeometry(1, 1), head, hair, hm(0, 0.095, 0.075, sc(0.04)));

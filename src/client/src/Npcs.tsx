@@ -10,6 +10,7 @@ import { Actor, type ActorState } from "./gfx/Actor.tsx";
 import { net } from "./net.ts";
 import { NameFloat } from "./NameFloat.tsx";
 import { NPC_NAME } from "../../shared/duty.ts";
+import { npcLook } from "../../shared/look.ts";
 
 // Staff and customers, drawn from the shared clock (see shared/npcs.ts and
 // shared/storeday.ts), so everyone sees the same people in the same places,
@@ -75,13 +76,15 @@ export function Npcs() {
     if (LABELS && ++frames.current % 20 === 0) bump((n) => n + 1);
   });
 
+  // a person called Priya is drawn as a woman, one called Theo as a man
+  const looks = useMemo(() => NPCS.map((n) => npcLook(n.id, NPC_NAME[n.id])), []);
   const uniforms = useMemo(() => NPCS.map((n) => (isStaff(n) && n.cap ? { cap: n.cap, badge: n.cap } : undefined)), []);
 
   return (
     <group ref={root}>
       {NPCS.map((n, i) => (
         <group key={n.id} visible={false}>
-          <Actor id={n.id} shirt={n.colour} uniform={uniforms[i]} getState={() => states.current[i]} />
+          <Actor id={n.id} shirt={n.colour} uniform={uniforms[i]} look={looks[i]} getState={() => states.current[i]} />
           <NameFloat id={n.id} name={NPC_NAME[n.id] ?? n.id} npc y={2.05} />
           {LABELS && (
             <Html position={[0, 2.35, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>

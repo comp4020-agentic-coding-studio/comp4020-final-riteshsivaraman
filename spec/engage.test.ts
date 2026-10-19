@@ -131,3 +131,31 @@ describe("walking over to a visitor never goes through furniture", () => {
     expect(checked).toBeGreaterThan(200);
   });
 });
+
+describe("people read as the gender they are", () => {
+  // Ritesh, 2026-10-19: "some female name employees look like male employees"
+  it("draws every named NPC as the gender their name says, with hair to match", async () => {
+    const { NPC_NAME } = await import("../src/shared/duty.ts");
+    const { npcLook } = await import("../src/shared/look.ts");
+    const { genderOfName } = await import("../src/shared/names.ts");
+    let women = 0;
+    for (const [id, name] of Object.entries(NPC_NAME)) {
+      const look = npcLook(id, name);
+      expect(look?.gender, `${id} (${name})`).toBe(genderOfName(name));
+      const a = lookFor(id, look);
+      if (look?.gender === "female") {
+        women++;
+        expect(["long", "bun"], `${name}'s hair`).toContain(a.hairStyle);
+        expect(a.beard).toBe("none");
+      } else {
+        expect(["long", "bun"], `${name}'s hair`).not.toContain(a.hairStyle);
+      }
+    }
+    expect(women).toBeGreaterThan(5);
+  });
+
+  it("overrides a saved short cut on a woman and a long one on a man", () => {
+    expect(withLook(appearanceFor("x"), { gender: "female", hairStyle: "buzz" }).hairStyle).toBe("long");
+    expect(withLook(appearanceFor("x"), { gender: "male", hairStyle: "long" }).hairStyle).toBe("short");
+  });
+});

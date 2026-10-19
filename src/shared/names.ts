@@ -13,3 +13,11 @@ export const randomName = (gender: Gender, r: number = Math.random()): string =>
   const list = FIRST_NAMES[gender];
   return list[Math.floor(r * list.length)];
 };
+
+// Which list a first name came from, so a person called Priya is drawn as a woman
+// and one called Theo as a man. Names outside the lists say nothing.
+export const genderOfName = (name: string | undefined): Gender | undefined => {
+  if (!name) return undefined;
+  for (const g of GENDERS) if ((FIRST_NAMES[g] as readonly string[]).includes(name)) return g;
+  return undefined;
+};

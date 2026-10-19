@@ -1,5 +1,5 @@
 import type { Gender } from "./names.ts";
-import { GENDERS } from "./names.ts";
+import { GENDERS, genderOfName } from "./names.ts";
 import { appearanceFor, HAIR_COLOURS, SKIN_TONES, type Appearance, type BeardStyle, type HairStyle } from "./appearance.ts";
 
 // What a visitor may choose about how their character looks. These lists are
@@ -81,6 +81,9 @@ export function withLook(base: Appearance, look: LookChoice | undefined): Appear
   }
   if (look.skin) a.skin = look.skin;
   if (look.beard) a.beard = look.beard;
+  // whatever hair was chosen or saved, the gender decides what reads right
+  if (look.gender === "female" && a.hairStyle !== "long" && a.hairStyle !== "bun") a.hairStyle = "long";
+  if (look.gender === "male" && (a.hairStyle === "long" || a.hairStyle === "bun")) a.hairStyle = "short";
   if (look.gender === "female") {
     a.shoulderHip = 0.95 + (a.shoulderHip - 0.95) * 0.45; // 0.95 to 1.17
     a.height *= 0.97;
@@ -102,4 +105,29 @@ export function withLook(base: Appearance, look: LookChoice | undefined): Appear
     a.chin *= 1.08;
   }
   return a;
+}
+
+// Hair on offer by gender (Ritesh, 2026-10-19: "sometimes generated females look
+// like males"): a woman is always drawn with long hair or a bun, since a short
+// painted-on cut read as male whatever else was soft about the face, and a man
+// is never drawn with long hair.
+export const HAIR_FOR: Record<Gender, readonly HairStyle[]> = {
+  male: ["buzz", "short", "side", "curly", "short", "bald"],
+  female: ["long", "bun", "long", "bun", "long"],
+};
+
+const hashOf = (s: string): number => Array.from(s).reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7) >>> 0;
+
+// How a named NPC looks: the gender their name says, a hairstyle to match, and
+// a beard only for some men. Everything else stays what their id generates.
+export function npcLook(id: string, name: string | undefined): LookChoice | undefined {
+  const gender = genderOfName(name);
+  if (!gender) return undefined;
+  const h = hashOf(id);
+  const hair = HAIR_FOR[gender];
+  return {
+    gender,
+    hairStyle: hair[h % hair.length],
+    beard: gender === "male" && h % 5 === 0 ? "stubble" : "none",
+  };
 }

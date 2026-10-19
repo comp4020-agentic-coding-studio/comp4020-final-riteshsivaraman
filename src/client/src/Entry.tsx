@@ -1,7 +1,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import type { Group } from "three";
-import { HAIR_COLOURS, SHIRT_COLOURS, SKIN_TONES, type LookChoice } from "../../shared/look.ts";
+import { HAIR_COLOURS, HAIR_FOR, SHIRT_COLOURS, SKIN_TONES, type LookChoice } from "../../shared/look.ts";
 import { FIRST_NAMES, GENDERS, randomName, type Gender } from "../../shared/names.ts";
 import { EMPLOYEE_COLOUR, EMPLOYEE_KINDS, SPECIALTIES, STAFF_SHIRT, type EmployeeKind, type Kind, type Profile, type Specialty } from "../../shared/profile.ts";
 import { Actor } from "./gfx/Actor.tsx";
@@ -25,10 +25,6 @@ const KIND_BLURB: Record<EmployeeKind, string> = {
   genius: "Serve the bar: payments, repairs and pick-ups.",
   stock: "Fetch what the bar and the floor need from the back.",
   technician: "Repair devices at the bench.",
-};
-const HAIR_FOR: Record<Gender, readonly NonNullable<LookChoice["hairStyle"]>[]> = {
-  male: ["buzz", "short", "side", "curly", "long", "bald"],
-  female: ["side", "long", "curly", "bun", "long", "side"], // no buzz/short/bald: they read as male
 };
 const BEARD_FOR_MALE = ["none", "stubble", "moustache", "goatee", "full"] as const;
 // which posts have a customer conversation so far
