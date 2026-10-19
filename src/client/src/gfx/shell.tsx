@@ -470,7 +470,10 @@ export function LightBox({
       <group {...group}>
         <mesh position={[0, 0, 0.002]}>
           <planeGeometry args={[w, h]} />
-          <meshBasicMaterial map={shot} color={shot ? "#ffffff" : "#222222"} toneMapped={false} />
+          {/* a material that starts with no map never grows one (three only
+              compiles the map in if it was there at the start), so it always
+              has one, and is made afresh when the picture arrives */}
+          <meshBasicMaterial key={shot ? "photo" : "pending"} map={map} toneMapped={false} />
         </mesh>
       </group>
     );
