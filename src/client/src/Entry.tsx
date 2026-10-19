@@ -67,7 +67,7 @@ function Preview({ look, kind }: { look: LookChoice; kind: Kind }) {
   const uniform = kind !== "customer" ? { cap: EMPLOYEE_COLOUR[kind], badge: EMPLOYEE_COLOUR[kind] } : undefined;
   const state = useMemo(() => ({ walking: false, mode: "idle" as const, mood: "smile" }), []);
   return (
-    <Canvas camera={{ position: [0, 0.95, 4.2], fov: 30 }} onCreated={({ camera }) => camera.lookAt(0, 0.7, 0)} dpr={[1, 1.5]} gl={{ antialias: true }}>
+    <Canvas camera={{ position: [0, 1.0, 4.9], fov: 30 }} onCreated={({ camera }) => camera.lookAt(0, 0.82, 0)} dpr={[1, 1.5]} gl={{ antialias: true }}>
       <hemisphereLight args={["#ffffff", "#a7adb5", 1.3]} />
       <directionalLight position={[-2, 4, -3]} intensity={1.4} />
       <directionalLight position={[2, 2, 3]} intensity={0.7} />
@@ -111,7 +111,10 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
   const saved = useMemo(() => readProfile(), []);
   const [kind, setKind] = useState<Kind>(saved?.kind === "specialist" ? "specialist" : "customer"); // only a specialist can be joined as
   const [specialty] = useState<Specialty>("phones"); // phones is the only post with customer conversations
-  const [gender, setGender] = useState<Gender>(saved?.look?.gender ?? pick(GENDERS));
+  // ?gender=female and ?tune=1 preset the screen, for screenshots
+  const preset = new URLSearchParams(location.search);
+  const presetGender = (["male", "female"] as const).find((g) => g === preset.get("gender"));
+  const [gender, setGender] = useState<Gender>(presetGender ?? saved?.look?.gender ?? pick(GENDERS));
   const [look, setLook] = useState<LookChoice>(() => (saved?.look?.seed ? { ...saved.look } : rollLook(saved?.look?.gender ?? gender)));
   const [name, setName] = useState(saved?.name ?? randomName(look.gender ?? gender));
   const [typed, setTyped] = useState(Boolean(saved?.name)); // once they type, we stop re-rolling it
@@ -200,12 +203,12 @@ export function Entry({ onEnter }: { onEnter: (p: Profile) => void }) {
                 Shuffle
               </button>
             </div>
-            <details className="fine">
+            <details className="fine" open={preset.has("tune")}>
               <summary>Fine-tune</summary>
               <div className="opt">
                 <div className="opt-label">Hair</div>
                 <div className="chips">
-                  {HAIR_FOR[gender].map((h) => (
+                  {[...new Set(HAIR_FOR[gender])].map((h) => (
                     <button key={h} type="button" className={look.hairStyle === h ? "chip on" : "chip"} aria-pressed={look.hairStyle === h} onClick={() => set("hairStyle", h)}>
                       {h}
                     </button>
