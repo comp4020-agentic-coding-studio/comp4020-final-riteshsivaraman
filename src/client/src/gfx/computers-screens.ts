@@ -17,7 +17,9 @@ const FORMATS: Record<ScreenFormat, { w: number; h: number; side: number; top: n
   aio: { w: 256, h: 148, side: 6, top: 7, bottom: 6, bezel: "#eceeef", cam: true },
 };
 
-export const SCREEN_DESIGNS = 10;
+export const SCREEN_DESIGNS = 11;
+// the store's own wallpaper: its mark on a deep gradient, for the wall monitors
+export const LOGO_DESIGN = 10;
 
 function rng(seed: number): () => number {
   let a = seed >>> 0;
@@ -554,6 +556,20 @@ const DESIGNS: Array<(g: G, w: number, h: number, f: ScreenFormat) => void> = [
     g.shadowBlur = 0;
     g.fillStyle = "#9aa1a8";
     g.fillRect(14, 11, w * 0.24, 2);
+  },
+  // 10: the store's mark, centred on a deep blue-to-teal gradient
+  (g, w, h) => {
+    const bg = g.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, "#0e1b2e");
+    bg.addColorStop(1, "#0f4c5c");
+    g.fillStyle = bg;
+    g.fillRect(0, 0, w, h);
+    const halo = g.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, h * 0.7);
+    halo.addColorStop(0, "rgba(255,255,255,0.14)");
+    halo.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = halo;
+    g.fillRect(0, 0, w, h);
+    drawLogo(g, w / 2, h / 2, h * 0.42, "#ffffff");
   },
 ];
 

@@ -72,7 +72,7 @@ import {
   tabletKbGeo,
   type DeviceGeo,
 } from "./computers-geo.ts";
-import { screenMaterial } from "./computers-screens.ts";
+import { LOGO_DESIGN, screenMaterial } from "./computers-screens.ts";
 
 // Which screen design a modelled device shows: `home` is a device in use (a
 // desktop, a call, a spreadsheet...), `lock` is a marketing-shot wallpaper
@@ -93,7 +93,7 @@ function ModelMeshes({ geo, colour, model, screenMode }: { geo: DeviceGeo; colou
   return (
     <>
       <mesh geometry={geo.body} material={bodyMaterial(colour)} />
-      {geo.screen && <mesh geometry={geo.screen} material={screenMaterial(screenDesign(colour + model, screenMode), geo.format)} />}
+      {geo.screen && <mesh geometry={geo.screen} material={screenMaterial(geo.format === "monitor" ? LOGO_DESIGN : screenDesign(colour + model, screenMode), geo.format)} />}
       {/* a tablet's keyboard: its own white or black, never the tablet's colour */}
       {geo.accessory && <mesh geometry={geo.accessory.geo} material={keyboardMaterial(geo.accessory.finish)} />}
     </>
