@@ -21,7 +21,7 @@ import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
 import { TABLE_ASSIGNMENTS } from "../shared/assignments.ts";
 import { clampToWalkable, COUNTER } from "../shared/world.ts";
-import { nearestStaffSpot } from "../shared/storeday.ts";
+import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
 import { takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
@@ -201,6 +201,10 @@ interface TalkConvData {
   scene: Scene;
   at?: { x: number; z: number };
   eng?: Engagement;
+  // sitting down to talk it through (Ritesh, 2026-10-19)
+  stage?: "seat_offer"; // the opening question: shall we sit down?
+  seat?: { tableId: string }; // seated at this table now
+  sat?: boolean; // has sat once already, so "sit back down" is offered after a demo
 }
 
 type AnyConvData = ConvData | TalkConvData;
@@ -247,7 +251,10 @@ const offDuty = (ctx: Ctx): string[] => npcsOffDuty(ctx.employees.map(designatio
 
 export function engagements(db: Database.Database): Engagement[] {
   const rows = db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'npc'").all() as ConvRow[];
-  const live = rows.map((r) => ({ npcId: r.with_id, visitorId: r.customer_id, since: r.started_at, at: dataOf(r).at ?? { x: 0, z: 0 } }));
+  const live = rows.map((r): Engagement => {
+    const d = anyDataOf(r);
+    return d.eng ?? { npcId: r.with_id, visitorId: r.customer_id, since: r.started_at, at: d.at ?? { x: 0, z: 0 } };
+  });
   // an NPC that has walked over to show intent (not yet accepted) stands there too
   const pending = (db.prepare("SELECT * FROM intents WHERE status = 'open' AND staff_kind = 'npc'").all() as IntentRow[]).map(
     intentEngagement,
@@ -452,9 +459,13 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   // as a staff member's claim, still clears it so nothing is left dangling)
   const cleared = endLiveIntents(ctx, (r) => r.customer_id === customerId && r.staff_id === withId, "accepted");
   if (usesTalkEngine(script, withKind)) {
-    const { scene, turn } = beginTalk(id);
+    const begun = beginTalk(id);
+    const scene = begun.scene;
     const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: "talk", data: null, started_at: ctx.now, ended_at: null };
-    const data: TalkConvData = { engine: "talk", scene, at, ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at } } : {}) };
+    // the specialist's first question is whether to sit down, if a table is free
+    const offerSeat = !begun.turn.ended && freeTableFor(ctx, customerId) !== null;
+    const data: TalkConvData = { engine: "talk", scene, at, ...(offerSeat ? { stage: "seat_offer" as const } : {}), ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at } } : {}) };
+    const turn = seatChoices(ctx, row, data, begun.turn);
     ctx.db
       .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(row.id, customerId, withId, withKind, script, row.node, JSON.stringify(data), ctx.now);
@@ -815,6 +826,160 @@ export function assignHelper(ctx: Ctx, customerId: string, post: string): { out:
   return { out, helperName: nameOf(ctx, helper.id), waitLabel: spot?.label ?? null };
 }
 
+// ---- sitting down together (Ritesh, 2026-10-19) ----
+//
+// The specialist offers to sit at a table to talk a phone through (only if one
+// is free), both walk there, sit on the same side, and stay until they get up
+// for a demo, after which they may sit back down. A table is free when no one
+// is sitting at it now or about to (an NPC's own timetable counts), and no one
+// else from this server is seated there.
+
+const SEAT_LOOKAHEAD = 60; // seconds of the timetable that must also be clear
+
+type TableSeat = (typeof TABLE_SEATS)[number];
+
+function tableTakenByTimetable(ctx: Ctx, t: TableSeat): boolean {
+  const tau = (((ctx.now / 1000) % 480) + 480) % 480;
+  const spots = [t.guest.at, t.host.at];
+  for (const c of CAST) {
+    for (const seg of timelineOf(c.id)) {
+      if (!seg.seated || seg.kind === "walk" || seg.t1 < tau || seg.t0 > tau + SEAT_LOOKAHEAD) continue;
+      const p = seg.at;
+      if (p && spots.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < 0.9)) return true;
+    }
+    // someone walking to those stools now is about to sit
+    const m = momentOf(c.id, ctx.now);
+    if (m.present && m.seated && spots.some((s) => Math.hypot(s.x - m.x, s.z - m.z) < 0.9)) return true;
+  }
+  return false;
+}
+
+function freeTableFor(ctx: Ctx, customerId: string): TableSeat | null {
+  const taken = new Set<string>();
+  for (const r of ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'npc'").all() as ConvRow[]) {
+    const d = anyDataOf(r);
+    if (isTalkData(d) && d.seat) taken.add(d.seat.tableId);
+  }
+  // a seat walk in progress holds its table too
+  for (const e of ctx.db.prepare("SELECT * FROM escorts WHERE kind = 'seat' AND status = 'walking'").all() as EscortRow[]) {
+    const t = TABLE_SEATS.find((x) => Math.hypot(x.host.at.x - e.goal_x, x.host.at.z - e.goal_z) < 0.5);
+    if (t) taken.add(t.id);
+  }
+  const here = ctx.position(customerId) ?? { x: 0, z: 0 };
+  return (
+    TABLE_SEATS.filter((t) => !taken.has(t.id) && !tableTakenByTimetable(ctx, t)).sort((a, b) => dist(here, a.guest.at) - dist(here, b.guest.at))[0] ?? null
+  );
+}
+
+const seatedMessage = (customerId: string, t: TableSeat): Outgoing => ({ to: "all", message: { type: "seated", visitorId: customerId, at: t.guest.at, face: t.guest.face } });
+
+export function seatedList(db: Database.Database): Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }> {
+  const out: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }> = [];
+  for (const r of db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'npc'").all() as ConvRow[]) {
+    const d = anyDataOf(r);
+    const t = isTalkData(d) && d.seat ? TABLE_SEATS.find((x) => x.id === d.seat!.tableId) : undefined;
+    if (t) out.push({ visitorId: r.customer_id, at: t.guest.at, face: t.guest.face });
+  }
+  return out;
+}
+
+// The menu to show now, with what belongs to sitting: before the scene's own
+// menu, the opening question; after a demo, a way to sit back down.
+function seatChoices(ctx: Ctx, row: ConvRow, d: TalkConvData, base: TalkTurn): TalkTurn {
+  if (d.stage === "seat_offer") {
+    return {
+      say: `${base.say} Would you like to sit down at one of the tables and talk it through?`,
+      choices: [
+        { id: "seat:sit", label: "Yes, let's sit down" },
+        { id: "seat:stand", label: "No thanks, I'm happy standing" },
+      ],
+      ended: false,
+    };
+  }
+  if (!d.seat && d.sat && !base.ended && freeTableFor(ctx, row.customer_id)) {
+    return { ...base, choices: [...base.choices, { id: "seat:sit", label: "Let's sit back down at a table" }] };
+  }
+  return base;
+}
+
+function showTurn(ctx: Ctx, row: ConvRow, d: TalkConvData, sayOverride?: string): Outgoing {
+  const t = seatChoices(ctx, row, d, currentTurn(d.scene));
+  return { to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sayOverride ?? t.say, t.choices, false, "customer") } };
+}
+
+function saveTalkData(ctx: Ctx, row: ConvRow, d: TalkConvData): void {
+  ctx.db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify(d), row.id);
+}
+
+function handleSeatChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId: string): Outgoing[] {
+  if (choiceId === "seat:stand") {
+    if (d.stage !== "seat_offer") return [notice(row.customer_id, "That is not one of the options.")];
+    const next: TalkConvData = { ...d, stage: undefined };
+    saveTalkData(ctx, row, next);
+    log(ctx, row.customer_id, "seat_declined", { conversationId: row.id });
+    return [showTurn(ctx, row, next)];
+  }
+  if (choiceId !== "seat:sit") return [notice(row.customer_id, "That is not one of the options.")];
+  const next: TalkConvData = { ...d, stage: undefined };
+  saveTalkData(ctx, row, next);
+  const table = d.seat ? null : freeTableFor(ctx, row.customer_id);
+  if (!table) return [notice(row.customer_id, "Every table is taken right now."), showTurn(ctx, row, next)];
+  log(ctx, row.customer_id, "seat_accepted", { conversationId: row.id, tableId: table.id });
+  const from = npcPlace(ctx, next.eng, row.with_id);
+  return beginEscort(ctx, {
+    customerId: row.customer_id,
+    staffId: row.with_id,
+    kind: "seat",
+    conversationId: row.id,
+    from,
+    goal: table.host.at,
+    face: table.host.face,
+    stand: table.guest.at,
+    text: `Follow ${nameOf(ctx, row.with_id)} to a table`,
+  });
+}
+
+// Both have reached the table: they sit, on the same side, and talk goes on.
+function sitDown(ctx: Ctx, e: EscortRow): Outgoing[] {
+  const conv = e.conversation_id ? getConv(ctx.db, e.conversation_id) : undefined;
+  const t = TABLE_SEATS.find((x) => Math.hypot(x.host.at.x - e.goal_x, x.host.at.z - e.goal_z) < 0.5);
+  if (!conv || conv.ended_at !== null || !t) return [];
+  const d = anyDataOf(conv);
+  if (!isTalkData(d)) return [];
+  const eng: Engagement = {
+    npcId: e.staff_id,
+    visitorId: e.customer_id,
+    since: ctx.now,
+    at: t.guest.at,
+    from: t.host.at,
+    lead: { x: t.host.at.x, z: t.host.at.z, fx: t.host.face.x, fz: t.host.face.z },
+    seated: true,
+  };
+  const next: TalkConvData = { ...d, seat: { tableId: t.id }, sat: true, eng };
+  saveTalkData(ctx, conv, next);
+  log(ctx, e.customer_id, "seated", { conversationId: conv.id, tableId: t.id });
+  return [{ to: "all", message: { type: "engaged", ...eng } }, seatedMessage(e.customer_id, t), showTurn(ctx, conv, next)];
+}
+
+// Up from the table (for a demo, or because the conversation is over): the
+// NPC stands and comes back to the customer where they are.
+function standUp(ctx: Ctx, row: ConvRow): Outgoing[] {
+  const d = anyDataOf(row);
+  if (!isTalkData(d) || !d.seat) return [];
+  const t = TABLE_SEATS.find((x) => x.id === d.seat!.tableId);
+  const cpos = ctx.position(row.customer_id) ?? t?.guest.at;
+  const next: TalkConvData = { ...d, seat: undefined };
+  const out: Outgoing[] = [{ to: "all", message: { type: "unseated", visitorId: row.customer_id } }];
+  if (t && cpos) {
+    const eng: Engagement = { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: cpos, from: t.host.at };
+    next.eng = eng;
+    out.push({ to: "all", message: { type: "engaged", ...eng } });
+  }
+  saveTalkData(ctx, row, next);
+  log(ctx, row.customer_id, "stood_up", { conversationId: row.id });
+  return out;
+}
+
 // ---- walking a customer somewhere (Ritesh, 2026-10-19) ----
 //
 // "Yes, show me the 17" is not a line of text: the staff member walks to a
@@ -833,7 +998,7 @@ interface EscortRow {
   id: string;
   customer_id: string;
   staff_id: string;
-  kind: "demo" | "till";
+  kind: "demo" | "till" | "seat";
   slot_id: string | null;
   conversation_id: string | null;
   status: "walking" | "inspecting" | "done" | "cancelled";
@@ -881,7 +1046,7 @@ function setEng(ctx: Ctx, convId: string, eng: Engagement): void {
   ctx.db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify({ ...d, eng }), convId);
 }
 
-function beginEscort(ctx: Ctx, p: { customerId: string; staffId: string; kind: "demo" | "till"; slotId?: string; conversationId?: string; from: { x: number; z: number }; goal: { x: number; z: number }; face: { x: number; z: number }; stand: { x: number; z: number }; text: string }): Outgoing[] {
+function beginEscort(ctx: Ctx, p: { customerId: string; staffId: string; kind: "demo" | "till" | "seat"; slotId?: string; conversationId?: string; from: { x: number; z: number }; goal: { x: number; z: number }; face: { x: number; z: number }; stand: { x: number; z: number }; text: string }): Outgoing[] {
   const at = ctx.position(p.customerId) ?? p.stand;
   const id = randomUUID();
   ctx.db
@@ -930,9 +1095,11 @@ function startDemoEscort(ctx: Ctx, row: ConvRow, talkModelId: string): Outgoing[
     if (base) out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), reworded(base.say, `I can't show you one right now, but here's the ${modelName}.`), base.choices, false, "customer") } });
     return out;
   }
-  const eng = (anyDataOf(row) as AnyConvData).eng;
+  // up from the table first, if they are sitting
+  const upFrom = standUp(ctx, row);
+  const eng = (anyDataOf(getConv(ctx.db, row.id) ?? row) as AnyConvData).eng;
   const from = npcPlace(ctx, eng, row.with_id);
-  return beginEscort(ctx, { customerId: row.customer_id, staffId: row.with_id, kind: "demo", slotId: spot.slotId, conversationId: row.id, from, goal: spot.goal, face: spot.face, stand: spot.stand, text: `Follow ${nameOf(ctx, row.with_id)} to the ${modelName}` });
+  return [...upFrom, ...beginEscort(ctx, { customerId: row.customer_id, staffId: row.with_id, kind: "demo", slotId: spot.slotId, conversationId: row.id, from, goal: spot.goal, face: spot.face, stand: spot.stand, text: `Follow ${nameOf(ctx, row.with_id)} to the ${modelName}` })];
 }
 
 // The customer's last sale that has not been paid for or called off: the talk
@@ -994,6 +1161,20 @@ function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoi
   const out: Outgoing[] = [{ to: e.customer_id, message: { type: "escort_end", id: e.id } }];
   const cpos = ctx.position(e.customer_id);
   const conv = e.conversation_id ? getConv(ctx.db, e.conversation_id) : undefined;
+  if (e.kind === "seat" && conv && conv.ended_at === null) {
+    // arrived: sit down (or, if they never came, carry on standing)
+    if (why === "done") {
+      out.push(...sitDown(ctx, e));
+    } else {
+      const d = anyDataOf(conv);
+      if (isTalkData(d)) {
+        const eng: Engagement = { npcId: e.staff_id, visitorId: e.customer_id, since: ctx.now, at: cpos ?? { x: e.stand_x, z: e.stand_z }, from: { x: e.goal_x, z: e.goal_z } };
+        saveTalkData(ctx, conv, { ...d, eng });
+        out.push({ to: "all", message: { type: "engaged", ...eng } }, showTurn(ctx, conv, { ...d, eng }));
+      }
+    }
+    return out;
+  }
   if (e.kind === "demo" && conv && conv.ended_at === null && cpos) {
     // back to the customer to carry on talking: walks over from where it waited
     const eng: Engagement = { npcId: e.staff_id, visitorId: e.customer_id, since: ctx.now, at: cpos, from: { x: e.goal_x, z: e.goal_z } };
@@ -1003,7 +1184,7 @@ function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoi
     const d = anyDataOf(conv);
     if (isTalkData(d)) {
       const t = currentTurn(d.scene);
-      out.push({ to: e.customer_id, message: { type: "turn", ...turnView(conv, nameOf(ctx, conv.with_id), reworded(t.say, "So, that's the one."), t.choices, false, "customer") } });
+      out.push(showTurn(ctx, conv, { ...d, eng }, reworded(t.say, "So, that's the one.")));
     }
   } else {
     out.push({ to: "all", message: { type: "released", npcId: e.staff_id } });
@@ -1029,6 +1210,10 @@ function settleEscorts(ctx: Ctx): Outgoing[] {
     if (engagedMoment(e.staff_id, escortEngagement(e), ctx.now).walking) continue; // still leading the way
     if (e.kind === "till") {
       if (dist(cpos, { x: e.stand_x, z: e.stand_z }) <= 1.8) out.push(...finishEscort(ctx, e, "done"));
+      continue;
+    }
+    if (e.kind === "seat") {
+      if (dist(cpos, { x: e.stand_x, z: e.stand_z }) <= 1.0) out.push(...finishEscort(ctx, e, "done"));
       continue;
     }
     const slot = e.slot_id ? DEVICE_SLOT_BY_ID.get(e.slot_id) : undefined;
@@ -1218,13 +1403,15 @@ function logTalkTurn(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string, afte
 // not impossible once a persona can end immediately) case of a scene ending
 // on its opening line.
 function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
+  const up = standUp(ctx, row);
+  row = getConv(ctx.db, row.id) ?? row;
   const prior = anyDataOf(row);
   const data: TalkConvData = { ...(isTalkData(prior) ? prior : {}), engine: "talk", scene };
   saveTalkConv(ctx, row, data, true);
   log(ctx, row.customer_id, "conversation_ended", { conversationId: row.id, why: scene.ended ? `talk:${scene.ended.how}` : "talk:unknown" });
   const cur = stateOf(ctx.db, row.customer_id);
   if (cur && cur.state === "in_conversation") setState(ctx, row.customer_id, { state: "browsing", with_id: null });
-  const out: Outgoing[] = [];
+  const out: Outgoing[] = [...up];
   const sm = stateMessage(ctx, row.customer_id);
   if (sm) out.push(sm);
   out.push(staffViewMessage(ctx));
@@ -1291,6 +1478,8 @@ export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string,
   const anyData = anyDataOf(row);
   if (isTalkData(anyData)) {
     if (talkEnded(anyData.scene)) return [notice(customerId, "That conversation is over.")];
+    if (choiceId.startsWith("seat:")) return handleSeatChoice(ctx, row, anyData, choiceId);
+    if (anyData.stage === "seat_offer") return [notice(customerId, "Sit down or stay standing first.")];
     if (!talkChoices(anyData.scene).some((c) => c.id === choiceId)) return [notice(customerId, "That is not one of the options.")];
     return applyTalk(ctx, row, anyData.scene, choiceId);
   }

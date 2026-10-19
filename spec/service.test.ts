@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { beforeEach, describe, expect, it } from "vitest";
 import { defaultStorage, productById, START_STOCK } from "../src/shared/catalogue.ts";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
+import { TABLE_SEATS } from "../src/shared/storeday.ts";
 import type { ServerMessage } from "../src/shared/protocol.ts";
 import { migrate } from "../src/server/migrate.ts";
 import {
@@ -53,6 +54,12 @@ const npc = (id: string): { x: number; z: number } => {
 const messagesTo = (out: Outgoing[], to: string, type: ServerMessage["type"]): ServerMessage[] => out.filter((o) => o.to === to && o.message.type === type).map((o) => o.message);
 const last = <T extends ServerMessage["type"]>(out: Outgoing[], to: string, type: T): Extract<ServerMessage, { type: T }> | undefined =>
   messagesTo(out, to, type).at(-1) as Extract<ServerMessage, { type: T }> | undefined;
+// The specialist opens by asking whether to sit down; most tests carry on standing.
+const talkAt = (out: Outgoing[]): Extract<ServerMessage, { type: "turn" }> => {
+  const t = last(out, "c1", "turn")!;
+  if (!t.choices.some((c) => c.id === "seat:stand")) return t;
+  return last(chooseTurn(ctx(), "c1", t.conversationId, "seat:stand"), "c1", "turn")!;
+};
 const eventCount = (): number => (db.prepare("SELECT COUNT(*) AS n FROM events").get() as { n: number }).n;
 const eventTypes = (): string[] => (db.prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((r) => r.type);
 
@@ -289,7 +296,7 @@ describe("the phones specialist, the new talk engine (NPC only)", () => {
   it("writes a talk_turn event per turn, tagged with the conversation id", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     atSpecPhones("c1");
-    const opened = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const opened = talkAt(startTalk(ctx(), "c1", "spec-phones"));
     const id = opened.conversationId;
     const firstChoiceId = opened.choices[0]!.id;
     const out = chooseTurn(ctx(), "c1", id, firstChoiceId);
@@ -302,7 +309,7 @@ describe("the phones specialist, the new talk engine (NPC only)", () => {
   it("ends the conversation, logs it and releases the NPC, the same as the old engine does", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     atSpecPhones("c1");
-    const opened = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const opened = talkAt(startTalk(ctx(), "c1", "spec-phones"));
     const id = opened.conversationId;
     // "Leave" is always a standing action on the customer's menu (scene.ts's
     // customerMenu), whatever question happens to be pending — the stable
@@ -710,7 +717,7 @@ describe("being walked to a demo device (Ritesh, 2026-10-19)", () => {
     const p = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
     const opened = startTalk(ctx(), "c1", "spec-phones");
-    const hello = last(opened, "c1", "turn")!;
+    const hello = talkAt(opened);
     const demo = hello.choices.find((c) => /^Ask for a demo of the (iPhone 17|iPhone 16|iPhone Air)$/.test(c.label));
     expect(demo, hello.choices.map((c) => c.label).join(" | ")).toBeDefined();
     const out = chooseTurn(ctx(), "c1", hello.conversationId, demo!.id);
@@ -744,7 +751,7 @@ describe("being walked to a demo device (Ritesh, 2026-10-19)", () => {
   it("gives up if the customer never follows", () => {
     const p = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
-    const hello = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const hello = talkAt(startTalk(ctx(), "c1", "spec-phones"));
     const demo = hello.choices.find((c) => /^Ask for a demo of the/.test(c.label))!;
     chooseTurn(ctx(), "c1", hello.conversationId, demo.id);
     const out = settleIntents(ctx(NOW + 130_000));
@@ -756,7 +763,7 @@ describe("being walked to the till after a sale", () => {
   it("the specialist walks you to the Genius Bar when you dismiss the sale, and says who takes payment", () => {
     const p = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
-    const hello = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const hello = talkAt(startTalk(ctx(), "c1", "spec-phones"));
     // the sale: the scene ends as 'bought' (the conversation row is finished as the engine would)
     const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(hello.conversationId) as { data: string };
     const data = JSON.parse(row.data);
@@ -798,7 +805,7 @@ describe("being walked to the till after a sale", () => {
   it("lets you call the sale off at the till", () => {
     const p = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
-    const hello = last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+    const hello = talkAt(startTalk(ctx(), "c1", "spec-phones"));
     const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(hello.conversationId) as { data: string };
     const data = JSON.parse(row.data);
     data.scene.ended = { how: "bought", sku: { model: "17", storage: "256GB", gb: 256, colour: "Lavender", price: 1399 } };
@@ -814,5 +821,77 @@ describe("being walked to the till after a sale", () => {
     expect(last(out, "c1", "turn")!.say).toMatch(/put it back/);
     expect(eventTypes()).toContain("purchase_cancelled");
     expect(eventTypes()).not.toContain("purchase_paid");
+  });
+});
+
+describe("sitting down to talk it through (Ritesh, 2026-10-19)", () => {
+  const T = NOW + 60_000;
+  const open = () => {
+    const p = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: p.x + 1, z: p.z });
+    return last(startTalk(ctx(), "c1", "spec-phones"), "c1", "turn")!;
+  };
+
+  it("opens by offering to sit at a free table", () => {
+    const hello = open();
+    expect(hello.choices.map((c) => c.id)).toEqual(["seat:sit", "seat:stand"]);
+    expect(hello.say).toMatch(/sit down at one of the tables/);
+  });
+
+  it("walks you to the table and sits you both on the same side, then the talk goes on", () => {
+    const hello = open();
+    const out = chooseTurn(ctx(), "c1", hello.conversationId, "seat:sit");
+    const esc = last(out, "c1", "escort")!;
+    expect(esc).toMatchObject({ kind: "seat", npcId: "spec-phones" });
+    const lead = last(out, "all", "engaged")!;
+    expect(lead.lead).toBeDefined();
+    // the menu waits until they are sitting
+    expect(last(chooseTurn(ctx(), "c1", hello.conversationId, "anything"), "c1", "notice")?.text).toMatch(/Follow Theo first/);
+    // not there yet: nobody sits
+    positions.set("c1", { x: 4, z: 0 });
+    expect(last(settleIntents(ctx(T)), "all", "seated")).toBeUndefined();
+    positions.set("c1", esc.goal);
+    const sat = settleIntents(ctx(T));
+    const seated = last(sat, "all", "seated")!;
+    expect(seated).toMatchObject({ visitorId: "c1" });
+    const npcEng = last(sat, "all", "engaged")!;
+    expect(npcEng.seated).toBe(true);
+    // the same side of the table: the same x, two stools along it
+    expect(Math.abs(npcEng.lead!.x - seated.at.x)).toBeLessThan(0.05);
+    expect(Math.hypot(npcEng.lead!.z - seated.at.z, 0)).toBeGreaterThan(0.6);
+    // the conversation carries on with the scene's own menu
+    const menu = last(sat, "c1", "turn")!;
+    expect(menu.choices.some((c) => /^Ask for a demo of the/.test(c.label))).toBe(true);
+    expect(menu.choices.some((c) => c.id === "seat:sit")).toBe(false); // already sitting
+    expect(eventTypes()).toEqual(expect.arrayContaining(["seat_accepted", "seated"]));
+  });
+
+  it("stands up for a demo and offers to sit back down after", () => {
+    const hello = open();
+    const esc = last(chooseTurn(ctx(), "c1", hello.conversationId, "seat:sit"), "c1", "escort")!;
+    positions.set("c1", esc.goal);
+    const menu = last(settleIntents(ctx(T)), "c1", "turn")!;
+    const demo = menu.choices.find((c) => /^Ask for a demo of the (iPhone 17|iPhone 16|iPhone Air)$/.test(c.label))!;
+    const out = chooseTurn(ctx(T + 1000), "c1", hello.conversationId, demo.id);
+    expect(last(out, "all", "unseated")).toMatchObject({ visitorId: "c1" });
+    const walk = last(out, "c1", "escort")!;
+    expect(walk.kind).toBe("demo");
+    positions.set("c1", walk.goal);
+    settleIntents(ctx(T + 40_000)); // the specialist has got there too: the device opens
+    const back = last(endInspect(ctx(T + 50_000), "c1", "stopped inspecting"), "c1", "turn")!;
+    expect(back.choices.some((c) => c.id === "seat:sit")).toBe(true);
+    expect(back.choices.find((c) => c.id === "seat:sit")!.label).toMatch(/sit back down/);
+  });
+
+  it("does not offer a table when every table is taken", () => {
+    // three conversations, one at each table
+    const tables = TABLE_SEATS.map((t) => t.id);
+    tables.forEach((id, i) => {
+      db.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES (?, ?, ?, '#fff', 0, 0)").run(`z${i}`, `tz${i}`, `Z${i}`);
+      db.prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, 'npc', 'phones', 'talk', ?, 0)").run(`zc${i}`, `z${i}`, `spec-x${i}`, JSON.stringify({ engine: "talk", scene: {}, seat: { tableId: id } }));
+    });
+    const hello = open();
+    expect(hello.choices.some((c) => c.id === "seat:sit")).toBe(false);
+    expect(hello.say).not.toMatch(/sit down at one of the tables/);
   });
 });

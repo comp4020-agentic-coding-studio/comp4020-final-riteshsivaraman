@@ -222,7 +222,7 @@ function Player() {
         talkExiting.current = false;
         talkStandPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
       }
-      TALK_TARGET.set(at.x, STORE_Y + TALK_HEAD_Y, at.z);
+      TALK_TARGET.set(at.x, STORE_Y + (eng?.seated ? 1.2 : TALK_HEAD_Y), at.z); // a seated head is lower
       // stand off on the near side, between where you are now and their face,
       // so the pan reads as leaning toward them rather than swinging around
       const dx = camera.position.x - TALK_TARGET.x;
@@ -338,7 +338,7 @@ function Remotes() {
       const prev = speeds.current.get(r.info.id);
       // smooth the estimate, otherwise the legs flicker on and off
       const smooth = prev ? (prev.speed ?? 0) + (speed - (prev.speed ?? 0)) * 0.2 : speed;
-      speeds.current.set(r.info.id, { walking: smooth > 0.25, mode: "idle", mood: "neutral", speed: smooth });
+      speeds.current.set(r.info.id, { walking: smooth > 0.25 && !net.seats.has(r.info.id), mode: "idle", mood: "neutral", speed: smooth, seated: net.seats.has(r.info.id) });
     }
     root.current?.children.forEach((child) => {
       const r = net.remotes.get(child.name);

@@ -78,6 +78,8 @@ export interface Engagement {
   // (not its timetable) and stops at `lead`, facing (fx, fz)
   from?: { x: number; z: number };
   lead?: { x: number; z: number; fx: number; fz: number };
+  // with `lead`: sitting on that spot (a stool) rather than standing
+  seated?: boolean;
 }
 
 // Intent to talk (Ritesh, 2026-10-19): a conversation starts with one side
@@ -163,6 +165,7 @@ export type ServerMessage =
       engaged: Engagement[];
       inspecting: Inspection[];
       intents: IntentView[];
+      seated: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }>;
     }
   | { type: "joined"; visitor: Present }
   | { type: "moved"; id: string; x: number; z: number; ry: number }
@@ -177,7 +180,9 @@ export type ServerMessage =
   | ({ type: "intent" } & IntentView)
   | { type: "intent_end"; id: string; why: "accepted" | "expired" | "cancelled" }
   // a member of staff is walking you somewhere: follow them; `goal` is where you should stand
-  | { type: "escort"; id: string; kind: "demo" | "till"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } }
+  | { type: "seated"; visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }
+  | { type: "unseated"; visitorId: string }
+  | { type: "escort"; id: string; kind: "demo" | "till" | "seat"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } }
   | { type: "escort_end"; id: string }
   | { type: "released"; npcId: string }
   | ({ type: "inspecting" } & Inspection)

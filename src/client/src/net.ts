@@ -102,13 +102,15 @@ class Net {
   hint: { id: string; name: string; intentId?: string; show?: boolean } | null = null;
   // intent to talk (server-authoritative): who has shown intent to whom
   intents = new Map<string, IntentView>();
+  // who is sitting at a table with someone (by visitor id), and where
+  seats = new Map<string, { x: number; z: number; fx: number; fz: number }>();
   // told to wait somewhere for someone to fetch you, if you are
   get waitingAt(): { x: number; z: number; label: string; who: string; reason: string } | null {
     for (const i of this.intents.values()) if ((i.state === "held" || (i.state === "open" && i.human)) && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName, reason: i.reason };
     return null;
   }
   // a member of staff is walking you somewhere (to a demo device, to the till)
-  escort: { id: string; kind: "demo" | "till"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } } | null = null;
+  escort: { id: string; kind: "demo" | "till" | "seat"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } } | null = null;
   // the conversation as the scene should treat it: while you are being walked
   // somewhere it is on hold, so you can move and the camera is free
   get talking(): TurnView | null {
@@ -204,6 +206,7 @@ class Net {
         this.released.clear();
         this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
         this.intents = new Map(message.intents.map((i) => [i.id, i]));
+        this.seats = new Map(message.seated.map((s) => [s.visitorId, { x: s.at.x, z: s.at.z, fx: s.face.x, fz: s.face.z }]));
         this.pollIntents();
         this.myInspectSlot = message.inspecting.find((i) => i.visitorId === message.you.id)?.slotId ?? null;
         this.remotes.clear();
@@ -257,6 +260,18 @@ class Net {
         this.pollIntents();
         return true;
       }
+      case "seated":
+        this.seats.set(message.visitorId, { x: message.at.x, z: message.at.z, fx: message.face.x, fz: message.face.z });
+        if (message.visitorId === this.you?.id) {
+          // they have walked to the stool: you are on it now
+          this.me.x = message.at.x;
+          this.me.z = message.at.z;
+          this.send({ type: "move", x: message.at.x, z: message.at.z, ry: Math.atan2(message.at.x - message.face.x, message.at.z - message.face.z) });
+        }
+        return true;
+      case "unseated":
+        this.seats.delete(message.visitorId);
+        return true;
       case "escort": {
         const { type: _t, ...e } = message;
         this.escort = e;

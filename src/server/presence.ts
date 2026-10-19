@@ -30,6 +30,7 @@ import {
   settleIntents,
   cancelEscort,
   intentViews,
+  seatedList,
   leaveStore,
   startInspect,
   startTalk,
@@ -242,6 +243,7 @@ export function handleConnection(socket: WebSocket): void {
         engaged: engagements(db),
         inspecting: inspections(db),
         intents: intentViews(ctx),
+        seated: seatedList(db),
       });
       broadcast({ type: "joined", visitor: present(me) }, me.id);
       // someone has come in: the posts held, and the customers employees see

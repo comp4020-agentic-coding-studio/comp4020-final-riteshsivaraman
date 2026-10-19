@@ -79,6 +79,10 @@ export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Mome
   if (e.lead) {
     // led the customer here: waiting at the spot, facing what they came to see
     const ry = headingTo(goal.x, goal.z, e.lead.fx, e.lead.fz);
+    if (e.seated) {
+      // sitting at the table with the customer, turned a little towards them
+      return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "talk", "smile", "sitting down with a customer"), seated: true, gaze: { x: e.at.x, y: 1.2, z: e.at.z } };
+    }
     return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "idle", "smile", "showing a customer the way"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };
   }
   if (e.pending) {
