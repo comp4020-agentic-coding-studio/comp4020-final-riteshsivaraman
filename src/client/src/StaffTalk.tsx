@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNet } from "./net.ts";
 
 // A real specialist's conversation (Ritesh, 2026-10-20), laid out like the
@@ -9,6 +9,11 @@ export function StaffTalk() {
   const net = useNet();
   const conv = net.staffTalking;
   const [tone, setTone] = useState("neutral");
+  const logEl = useRef<HTMLDivElement>(null);
+  // the newest line is always in view
+  useEffect(() => {
+    if (logEl.current) logEl.current.scrollTop = logEl.current.scrollHeight;
+  }, [net.staffConv?.log.length, net.staffConv?.conversationId]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.code === "Escape" && net.staffTalking) {
@@ -28,7 +33,7 @@ export function StaffTalk() {
         <div className="talk-leave-hint">
           <kbd>Esc</kbd> to step away
         </div>
-        <div className="staff-log">
+        <div className="staff-log" ref={logEl}>
           {conv.log.length === 0 && <p className="staff-empty">You are on. Start with a greeting.</p>}
           {conv.log.map((l, i) => (
             <p key={i} className={l.who === "staff" ? "you" : "them"}>
@@ -50,7 +55,7 @@ export function StaffTalk() {
               {conv.acts.map((a) => (
                 <button key={a.id} type="button" className="talk-card" onClick={() => net.staffMove(a.id, tone)}>
                   {a.label}
-                  {a.hint && <small>{a.hint}</small>}
+                  {a.hint && <small>narrows the phones: {a.hint}</small>}
                 </button>
               ))}
             </div>
