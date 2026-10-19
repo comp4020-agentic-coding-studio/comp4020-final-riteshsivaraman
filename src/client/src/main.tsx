@@ -79,6 +79,13 @@ function Hud() {
           {live.myInspectSlot ? "" : " · Esc to stop following"}
         </div>
       )}
+      {live.staffConv?.collect && (
+        <div className="escort-banner">
+          {live.stockNear
+            ? <>Press <kbd>E</kbd> to take the {live.staffConv.collect.what} from {live.staffConv.collect.stockName}</>
+            : <>{live.staffConv.collect.stockName} is bringing the {live.staffConv.collect.what}: go and meet them. {live.staffConv.customerName} will wait.</>}
+        </div>
+      )}
       {live.hint && !live.locked && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
       {!live.hint && live.deviceHint && !live.locked && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect {live.deviceHint.name}</div>}
       {live.notice && Date.now() - live.notice.at < 4000 && <div className="toast">{live.notice.text}</div>}

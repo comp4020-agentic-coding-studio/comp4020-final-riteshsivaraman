@@ -7,6 +7,8 @@ import type { ServerMessage } from "../src/shared/protocol.ts";
 import { migrate } from "../src/server/migrate.ts";
 import {
   beginSale,
+  chatPairs,
+  collectStock,
   chooseTurn,
   customersView,
   enter,
@@ -346,6 +348,40 @@ describe("employees", () => {
     expect(menu.tones.map((t) => t.id)).toEqual(["friendly", "neutral", "impatient", "unsure"]);
     expect(menu.stats.candidates.length).toBeGreaterThan(3); // every phone is still in play
     expect(menu.status).toBe("Your move.");
+  });
+
+  it("tells everyone who is talking to whom, so two real people are drawn talking and listening", () => {
+    const { id } = serving();
+    expect(chatPairs(db)).toEqual([{ customerId: "c1", staffId: "e1", speaker: "e1" }]);
+    const first = staffMove(ctx(), "e1", id, "m0", "friendly");
+    expect(last(first, "c1", "turn")).toBeDefined();
+    expect(chatPairs(db)[0]).toMatchObject({ speaker: "c1" });
+  });
+
+  it("a real specialist breaks off to take the phone from the stock person, then takes payment", () => {
+    const { id } = serving();
+    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(id) as { data: string };
+    const data = JSON.parse(row.data);
+    data.scene.pending = { kind: "confirm" };
+    data.scene.toMove = "customer";
+    db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify(data), id);
+    const out = chooseTurn(ctx(), "c1", id, "opt:yes");
+    const menu = last(out, "e1", "staff_menu")!;
+    expect(menu.collect).toMatchObject({ stockName: expect.any(String) });
+    expect(chatPairs(db)[0]!.speaker).toBeUndefined(); // nobody is talking while it is fetched
+    // not yet: still on the way
+    expect(last(collectStock(ctx(NOW + 500), "e1"), "e1", "notice")?.text).toMatch(/still on the way/);
+    // arrived, but the specialist has wandered off
+    const at = menu.collect!.at;
+    positions.set("e1", { x: at.x + 8, z: at.z });
+    expect(last(collectStock(ctx(NOW + 120_000), "e1"), "e1", "notice")?.text).toMatch(/Go over to/);
+    // beside the stock person: they take it, the customer is asked to pay
+    positions.set("e1", { x: at.x + 0.8, z: at.z });
+    const took = collectStock(ctx(NOW + 120_000), "e1");
+    expect(last(took, "c1", "turn")!.choices.map((c) => c.id)).toEqual(["pay:card", "pay:phone", "pay:cancel"]);
+    expect(last(took, "all", "released")?.npcId).toMatch(/^stock-/);
+    expect(last(took, "e1", "staff_menu")!.collect).toBeUndefined();
+    expect(eventTypes()).toEqual(expect.arrayContaining(["stock_collected", "stock_handed_over"]));
   });
 
   it("takes turns: the specialist moves, the customer answers, and what they said shows beside the chat", () => {

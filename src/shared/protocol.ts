@@ -122,6 +122,17 @@ export interface StaffMenuView {
     candidates: Array<{ name: string; screen: string; from: string; battery: string; note: string }>;
   };
   status: string; // what is happening when it is not your move
+  // the phone is being brought out: the specialist is free to step away from the
+  // chat, meet the stock person and take it (a break in the middle of the talk)
+  collect?: { stockId: string; stockName: string; at: { x: number; z: number }; what: string };
+}
+
+// Two real people in a conversation, so everyone else sees them talk and
+// listen. `speaker` is whose turn it is to talk, if either's.
+export interface ChatPair {
+  customerId: string;
+  staffId: string;
+  speaker?: string;
 }
 
 export type Role = "customer" | "staff";
@@ -153,6 +164,8 @@ export type ClientMessage =
   // off, or starting anything else
   | { type: "inspect_start"; slotId: string }
   | { type: "inspect_end" }
+  // the specialist takes the phone from the stock person
+  | { type: "stock_collect" }
   // Sent as an ordinary message just before closing. A clean WebSocket close
   // takes about 5 s to reach the server through Fly's proxy (measured), while
   // a message arrives at once, so this is what makes a departure prompt.
@@ -175,6 +188,7 @@ export type ServerMessage =
       offDuty: string[];
       engaged: Engagement[];
       inspecting: Inspection[];
+      chats: ChatPair[];
       intents: IntentView[];
       seated: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }>;
     }
@@ -187,6 +201,7 @@ export type ServerMessage =
   | ({ type: "staff_menu" } & StaffMenuView)
   | { type: "staff_menu_end"; conversationId: string; note: string }
   | { type: "staff_view"; customers: CustomerView[] }
+  | { type: "chats"; pairs: ChatPair[] }
   | { type: "duty"; offDuty: string[] }
   | ({ type: "engaged" } & Engagement)
   | ({ type: "intent" } & IntentView)

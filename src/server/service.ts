@@ -14,7 +14,7 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { NPCS, npcPose } from "../shared/npcs.ts";
-import type { CustomerView, Engagement, Inspection, IntentView, ServerMessage, StaffMenuView, TurnView } from "../shared/protocol.ts";
+import type { ChatPair, CustomerView, Engagement, Inspection, IntentView, ServerMessage, StaffMenuView, TurnView } from "../shared/protocol.ts";
 import { engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
@@ -858,10 +858,21 @@ export function assignHelper(ctx: Ctx, customerId: string, post: string): { out:
 
 const isHuman = (ctx: Ctx, id: string): boolean => ctx.employees.some((e) => e.id === id);
 
+// Every conversation between two real people, for the scene: both are drawn
+// talking and listening. Whoever has the move is the one talking.
+export function chatPairs(db: Database.Database): ChatPair[] {
+  const rows = db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' ORDER BY started_at").all() as ConvRow[];
+  return rows.map((r) => {
+    const d = anyDataOf(r);
+    const toMove = isTalkData(d) && !d.scene.ended && !d.checkout ? d.scene.toMove : null;
+    return { customerId: r.customer_id, staffId: r.with_id, ...(toMove ? { speaker: toMove === "staff" ? r.with_id : r.customer_id } : {}) };
+  });
+}
+
 // What is going on when it is not the specialist's move.
 function staffStatus(ctx: Ctx, row: ConvRow, d: TalkConvData): string {
   const name = nameOf(ctx, row.customer_id);
-  if (d.checkout) return d.checkout.stage === "fetching" ? "You checked stock on your phone and ordered it: it is being brought out to you…" : `Taking payment from ${name}…`;
+  if (d.checkout) return d.checkout.stage === "fetching" ? `The ${d.checkout.sale.name} is being brought out. Step over to the stock person and take it (E); ${name} will wait.` : `Taking payment from ${name}…`;
   if (d.stage === "seat_offer") return `Waiting for ${name} to say whether to sit down…`;
   if (liveEscortOf(ctx.db, row.customer_id)) return `Walking with ${name}…`;
   return d.scene.ended ? "That is over." : d.scene.toMove === "staff" ? "Your move." : `Waiting for ${name}…`;
@@ -883,6 +894,9 @@ function staffMenu(ctx: Ctx, row: ConvRow, d: TalkConvData): Outgoing {
     tones: STAFF_TONES,
     stats: staffStats(d.scene),
     status: staffStatus(ctx, row, d),
+    ...(d.checkout?.stage === "fetching"
+      ? { collect: { stockId: d.checkout.stockId, stockName: nameOf(ctx, d.checkout.stockId), at: { x: d.checkout.stockEng.at.x, z: d.checkout.stockEng.at.z }, what: `${d.checkout.sale.colour} ${d.checkout.sale.name}` } }
+      : {}),
   };
   return { to: row.with_id, message: { type: "staff_menu", ...view } };
 }
@@ -1163,18 +1177,39 @@ function settleCheckouts(ctx: Ctx): Outgoing[] {
       continue;
     }
     if (ctx.now - c.arrivedAt < CHECKOUT_BEAT_MS) continue;
-    // handed over: the stock person heads back, the specialist is ready to take payment
-    const { doing: _doing, ...eng } = d.eng ?? ({} as Engagement);
-    const next: TalkConvData = { ...d, eng: d.eng ? eng : undefined, checkout: { ...c, stage: "pay" } };
-    saveTalkData(ctx, row, next);
-    log(ctx, row.customer_id, "stock_handed_over", { conversationId: row.id, stockId: c.stockId });
-    out.push({ to: "all", message: { type: "released", npcId: c.stockId } });
-    if (d.eng) out.push({ to: "all", message: { type: "engaged", ...eng } });
-    const t = payTurn(next.checkout!);
-    out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), t.say, t.choices, false, "customer") } });
-    if (row.with_kind === "visitor") out.push(staffMenu(ctx, row, next));
+    out.push(...handOver(ctx, row, d));
   }
   return out;
+}
+
+// Handed over: the stock person heads back and the specialist is ready to take payment.
+function handOver(ctx: Ctx, row: ConvRow, d: TalkConvData): Outgoing[] {
+  const c = d.checkout!;
+  const out: Outgoing[] = [];
+  const { doing: _doing, ...eng } = d.eng ?? ({} as Engagement);
+  const next: TalkConvData = { ...d, eng: d.eng ? eng : undefined, checkout: { ...c, stage: "pay" } };
+  saveTalkData(ctx, row, next);
+  log(ctx, row.customer_id, "stock_handed_over", { conversationId: row.id, stockId: c.stockId });
+  out.push({ to: "all", message: { type: "released", npcId: c.stockId } });
+  if (d.eng) out.push({ to: "all", message: { type: "engaged", ...eng } });
+  const t = payTurn(next.checkout!);
+  out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), t.say, t.choices, false, "customer") } });
+  if (row.with_kind === "visitor") out.push(staffMenu(ctx, row, next));
+  return out;
+}
+
+// A real specialist steps out of the chat to the stock person and takes the
+// phone (the chat is on hold for them meanwhile; the customer waits).
+export function collectStock(ctx: Ctx, staffId: string): Outgoing[] {
+  const row = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND with_id = ?").get(staffId) as ConvRow | undefined;
+  const d = row ? anyDataOf(row) : null;
+  if (!row || !d || !isTalkData(d) || d.checkout?.stage !== "fetching") return [notice(staffId, "There is nothing to collect right now.")];
+  const c = d.checkout;
+  if (engagedMoment(c.stockId, c.stockEng, ctx.now).walking) return [notice(staffId, `${nameOf(ctx, c.stockId)} is still on the way out with it.`)];
+  const spos = ctx.position(staffId);
+  if (!spos || dist(spos, c.stockEng.at) > TALK_RANGE + 0.6) return [notice(staffId, `Go over to ${nameOf(ctx, c.stockId)} first.`)];
+  log(ctx, row.customer_id, "stock_collected", { conversationId: row.id, by: staffId, stockId: c.stockId });
+  return [...handOver(ctx, row, d), staffViewMessage(ctx)];
 }
 
 function handleCheckoutChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId: string): Outgoing[] {

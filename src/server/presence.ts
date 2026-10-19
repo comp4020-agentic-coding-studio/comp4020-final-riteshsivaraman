@@ -20,6 +20,8 @@ import {
   engagements,
   enter,
   inspections,
+  chatPairs,
+  collectStock,
   leaveConversation,
   closeTalk,
   staffMove,
@@ -132,7 +134,19 @@ function serviceCtx(): Ctx {
 
 const staffViewFor = (ctx: Ctx): Outgoing[] => [{ to: "staff", message: { type: "staff_view", customers: customersView(ctx) } }];
 
+// who is talking with whom, as last told to everyone: sent again only when it changes
+let lastChats = "[]";
+
 function deliver(out: Outgoing[]): void {
+  deliverAll(out);
+  const pairs = JSON.stringify(chatPairs(db));
+  if (pairs !== lastChats) {
+    lastChats = pairs;
+    deliverAll([{ to: "all", message: { type: "chats", pairs: JSON.parse(pairs) } }]);
+  }
+}
+
+function deliverAll(out: Outgoing[]): void {
   for (const o of out) {
     if (o.to === "all") {
       for (const s of sessions.values()) send(s.socket, o.message);
@@ -240,6 +254,7 @@ export function handleConnection(socket: WebSocket): void {
         offDuty: (dutyMessage(ctx).message as { offDuty: string[] }).offDuty,
         engaged: engagements(db),
         inspecting: inspections(db),
+        chats: chatPairs(db),
         intents: intentViews(ctx),
         seated: seatedList(db),
       });
@@ -294,6 +309,10 @@ export function handleConnection(socket: WebSocket): void {
     }
     if (me && message.type === "inspect_start" && typeof message.slotId === "string") {
       deliver(startInspect(serviceCtx(), me.id, message.slotId));
+      return;
+    }
+    if (me && message.type === "stock_collect") {
+      deliver(collectStock(serviceCtx(), me.id));
       return;
     }
     if (me && message.type === "inspect_end") {

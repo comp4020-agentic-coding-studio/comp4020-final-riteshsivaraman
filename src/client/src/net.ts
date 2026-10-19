@@ -8,6 +8,7 @@ import type {
   CustomerView,
   Engagement,
   Identity,
+  ChatPair,
   Inspection,
   IntentView,
   Present,
@@ -109,6 +110,10 @@ class Net {
   intents = new Map<string, IntentView>();
   // who is sitting at a table with someone (by visitor id), and where
   seats = new Map<string, { x: number; z: number; fx: number; fz: number }>();
+  // real people in a conversation: who each is talking with, and whose turn it is to talk
+  chats = new Map<string, { with: string; speaking: boolean }>();
+  // the stock person is close enough for the specialist to take the phone (set by the scene)
+  stockNear = false;
   // told to wait somewhere for someone to fetch you, if you are
   get waitingAt(): { x: number; z: number; label: string; who: string; reason: string } | null {
     for (const i of this.intents.values()) if ((i.state === "held" || (i.state === "open" && i.human)) && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName, reason: i.reason };
@@ -128,7 +133,8 @@ class Net {
   }
   // a specialist in a conversation (the same hold while walking applies)
   get staffTalking(): StaffMenuView | null {
-    return this.escort ? null : this.staffConv;
+    // while the phone is brought out the chat is on hold: they can walk over and take it
+    return this.escort || this.staffConv?.collect ? null : this.staffConv;
   }
   // locked into a conversation, as either side: no walking, the camera on the other
   get locked(): boolean {
@@ -224,6 +230,7 @@ class Net {
         this.released.clear();
         this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
         this.intents = new Map(message.intents.map((i) => [i.id, i]));
+        this.setChats(message.chats);
         this.seats = new Map(message.seated.map((s) => [s.visitorId, { x: s.at.x, z: s.at.z, fx: s.face.x, fz: s.face.z }]));
         this.pollIntents();
         this.myInspectSlot = message.inspecting.find((i) => i.visitorId === message.you.id)?.slotId ?? null;
@@ -266,6 +273,9 @@ class Net {
       case "staff_menu_end":
         if (this.staffConv?.conversationId === message.conversationId) this.staffConv = null;
         this.pushUpdate(message.note);
+        return true;
+      case "chats":
+        this.setChats(message.pairs);
         return true;
       case "staff_view":
         this.customers = message.customers;
@@ -419,6 +429,19 @@ class Net {
   // a specialist steps away from the conversation (Esc)
   staffLeave(): void {
     if (this.staffConv) this.send({ type: "talk_leave" });
+  }
+
+  private setChats(pairs: ChatPair[]): void {
+    this.chats = new Map();
+    for (const p of pairs) {
+      this.chats.set(p.customerId, { with: p.staffId, speaking: p.speaker === p.customerId });
+      this.chats.set(p.staffId, { with: p.customerId, speaking: p.speaker === p.staffId });
+    }
+  }
+
+  // the specialist takes the phone from the stock person
+  stockCollect(): void {
+    this.send({ type: "stock_collect" });
   }
 
   private pushUpdate(text: string): void {

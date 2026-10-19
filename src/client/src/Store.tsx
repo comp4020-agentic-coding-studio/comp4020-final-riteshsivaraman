@@ -153,6 +153,20 @@ function Player() {
     };
   }, [camera, gl]);
 
+  // turn the body (not just the camera) so everyone else sees which way you face
+  const faceToward = (tx: number, tz: number): void => {
+    const dx = tx - net.me.x;
+    const dz = tz - net.me.z;
+    if (Math.hypot(dx, dz) < 0.05) return;
+    const ry = Math.atan2(-dx, -dz);
+    const now = performance.now();
+    if (poseChanged(sent.current, { x: net.me.x, z: net.me.z, ry }) && now - lastSent.current >= SEND_EVERY_MS) {
+      lastSent.current = now;
+      sent.current = { x: net.me.x, z: net.me.z, ry };
+      net.send({ type: "move", x: net.me.x, z: net.me.z, ry });
+    }
+  };
+
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
 
@@ -175,6 +189,7 @@ function Player() {
       camera.position.y += (INSPECT_TARGET.y + INSPECT_OFFSET.y - camera.position.y) * ease;
       camera.position.z += (INSPECT_TARGET.z + INSPECT_OFFSET.z - camera.position.z) * ease;
       camera.lookAt(INSPECT_TARGET);
+      faceToward(slot.x, slot.z); // others see you turned to the device, leaning over it
       return;
     }
     if (wasInspecting.current) {
@@ -234,6 +249,24 @@ function Player() {
       camera.position.y += (TALK_TARGET.y - camera.position.y) * ease;
       camera.position.z += (TALK_TARGET.z + TALK_OFFSET.z - camera.position.z) * ease;
       camera.lookAt(TALK_TARGET);
+      // the body turns to the other person too, so both are seen face to face; the
+      // specialist steps in close if the customer was left some way off (after a demo)
+      const me = net.you?.id;
+      if (net.staffTalking && me && !net.seats.has(me) && !net.seats.has(talkWithId)) {
+        const gx = net.me.x - at.x;
+        const gz = net.me.z - at.z;
+        const gd = Math.hypot(gx, gz);
+        if (gd > 1.9) {
+          const step = Math.min(gd - 1.4, 1.6 * dt);
+          let nx = net.me.x - (gx / gd) * step;
+          let nz = net.me.z - (gz / gd) * step;
+          ({ x: nx, z: nz } = clampToWalkable(net.role, nx, nz));
+          ({ x: nx, z: nz } = resolveCollisions(nx, nz, net.role));
+          net.me.x = nx;
+          net.me.z = nz;
+        }
+      }
+      faceToward(at.x, at.z);
       return; // the position sent to others (net.me) is untouched: only the local view moves
     }
     if (wasTalkingWith.current) {
@@ -333,12 +366,24 @@ function Remotes() {
       const pz = r.z;
       r.x += (r.tx - r.x) * ease;
       r.z += (r.tz - r.z) * ease;
-      r.ry += (r.try - r.ry) * ease;
+      r.ry += wrap(r.try - r.ry) * ease;
       const speed = dt > 0 ? Math.hypot(r.x - px, r.z - pz) / dt : 0;
       const prev = speeds.current.get(r.info.id);
       // smooth the estimate, otherwise the legs flicker on and off
       const smooth = prev ? (prev.speed ?? 0) + (speed - (prev.speed ?? 0)) * 0.2 : speed;
-      speeds.current.set(r.info.id, { walking: smooth > 0.25 && !net.seats.has(r.info.id), mode: "idle", mood: "neutral", speed: smooth, seated: net.seats.has(r.info.id) });
+      const walking = smooth > 0.25 && !net.seats.has(r.info.id);
+      let state: ActorState = { walking, mode: "idle", mood: "neutral", speed: smooth, seated: net.seats.has(r.info.id) };
+      // what they are doing, so everyone sees it: leaning over the device they
+      // are inspecting, or talking and listening in a conversation
+      const looking = [...net.inspections.values()].find((i) => i.visitorId === r.info.id);
+      const slot = looking ? DEVICE_SLOT_BY_ID.get(looking.slotId) : undefined;
+      const chat = net.chats.get(r.info.id);
+      if (slot && !walking) state = { ...state, mode: "observe", mood: "curious", gaze: { x: slot.x, y: TABLE_H + 0.05, z: slot.z } };
+      else if (chat && !walking) {
+        const other = chat.with === net.you?.id ? net.me : net.remotes.get(chat.with);
+        state = { ...state, mode: chat.speaking ? "talk" : "listen", mood: chat.speaking ? "smile" : "neutral", ...(other ? { gaze: { x: other.x, y: 1.55, z: other.z } } : {}) };
+      }
+      speeds.current.set(r.info.id, state);
     }
     root.current?.children.forEach((child) => {
       const r = net.remotes.get(child.name);
@@ -403,6 +448,10 @@ function Interact() {
   useEffect(() => {
     const press = (e: KeyboardEvent) => {
       if (e.code !== "KeyE" || e.repeat || net.locked) return;
+      if (net.staffConv?.collect) {
+        if (net.stockNear) net.stockCollect();
+        return;
+      }
       if (net.hint?.intentId) (net.hint.show ? net.intentShow(net.hint.intentId) : net.intentAccept(net.hint.intentId));
       else if (net.hint) net.talkStart(net.hint.id);
       else if (net.deviceHint && !net.myInspectSlot) net.inspectStart(net.deviceHint.slotId);
@@ -412,6 +461,12 @@ function Interact() {
   }, []);
 
   useFrame(() => {
+    const coll = net.staffConv?.collect;
+    const near = !!coll && Math.hypot(net.me.x - coll.at.x, net.me.z - coll.at.z) < 2.4;
+    if (near !== net.stockNear) {
+      net.stockNear = near;
+      net.changed();
+    }
     const yaw = camera.rotation.y;
     const fx = -Math.sin(yaw);
     const fz = -Math.cos(yaw);
@@ -578,6 +633,9 @@ function GuideMarkers() {
   // where you were told to wait to be fetched: green
   const w = live.waitingAt;
   if (w) out.push({ key: "wait", x: w.x, z: w.z, colour: "#8cf0b4" });
+  // a specialist waiting for the phone: the stock person: purple
+  const coll = live.staffConv?.collect;
+  if (coll) out.push({ key: "collect", x: coll.at.x, z: coll.at.z, colour: "#c79bff" });
   // a specialist: where to meet each customer you have been sent for: blue
   if (live.isEmployee && live.you) {
     for (const i of live.intents.values()) {
