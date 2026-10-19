@@ -1,3 +1,4 @@
+import { drawLogo } from "./logo.ts";
 import { CanvasTexture, RepeatWrapping } from "three";
 import { canvasTexture } from "./common.tsx";
 
@@ -31,19 +32,9 @@ export interface BoxDesign {
   block?: boolean;
 }
 
-// The brand mark: a ring with an off-centre dot. Invented.
+// The brand mark (logo.ts): the store's bracket-and-square, `r` is its half height.
 export function brandMark(g: G, x: number, y: number, r: number, colour: string): void {
-  g.save();
-  g.strokeStyle = colour;
-  g.fillStyle = colour;
-  g.lineWidth = Math.max(1, r * 0.28);
-  g.beginPath();
-  g.arc(x, y, r, 0, Math.PI * 2);
-  g.stroke();
-  g.beginPath();
-  g.arc(x + r * 0.22, y - r * 0.12, r * 0.38, 0, Math.PI * 2);
-  g.fill();
-  g.restore();
+  drawLogo(g, x, y, r * 2, colour);
 }
 
 function rr(g: G, x: number, y: number, w: number, h: number, r: number): void {

@@ -408,43 +408,6 @@ function panelGlowTexture(): CanvasTexture {
   return panelGlow;
 }
 
-// The same original service mark, hung from the ceiling so it reads from both
-// sides (outside the glass and inside).
-export function HangingMark({ size }: { size: number }) {
-  const map = useMemo(
-    () =>
-      canvasTexture(128, 128, (g) => {
-        g.fillStyle = "#ffffff";
-        g.fillRect(0, 0, 128, 128);
-        g.strokeStyle = "#1f2430";
-        g.fillStyle = "#1f2430";
-        g.lineWidth = 8;
-        g.beginPath();
-        g.arc(64, 64, 26, 0, Math.PI * 2);
-        g.stroke();
-        for (let i = 0; i < 8; i++) {
-          const a = (i * Math.PI) / 4;
-          g.save();
-          g.translate(64 + Math.cos(a) * 40, 64 + Math.sin(a) * 40);
-          g.rotate(a);
-          g.fillRect(-7, -5, 14, 10);
-          g.restore();
-        }
-        g.beginPath();
-        g.arc(64, 64, 9, 0, Math.PI * 2);
-        g.fill();
-      }),
-    [],
-  );
-  return (
-    <mesh>
-      <planeGeometry args={[size, size]} />
-      <meshBasicMaterial map={map} toneMapped={false} side={DoubleSide} />
-    </mesh>
-  );
-}
-
-
 export function lightboxTexture(kind: "phones" | "laptops" | "card"): CanvasTexture {
   return canvasTexture(512, 256, (g) => {
     g.fillStyle = "#ffffff";
@@ -825,14 +788,6 @@ export function ShopShell() {
           })}
         </group>
       ))}
-      <group position={[CEILING_SPEC.hangingMark.x, CEILING_SPEC.hangingMark.y, CEILING_SPEC.hangingMark.z]}>
-        <mesh position={[0, (CEILING - CEILING_SPEC.hangingMark.y) / 2 + CEILING_SPEC.hangingMark.size / 2, 0]}>
-          <boxGeometry args={[0.02, CEILING - CEILING_SPEC.hangingMark.y, 0.02]} />
-          <meshStandardMaterial color="#23262b" />
-        </mesh>
-        <HangingMark size={CEILING_SPEC.hangingMark.size} />
-      </group>
-
       {/* back wall, with the flush staff door set into it */}
       <mesh position={[(-fullW / 2 + DOOR.minX) / 2, CEILING / 2, FLOOR.maxZ + 0.5]}>
         <boxGeometry args={[DOOR.minX + fullW / 2, CEILING, 0.2]} />

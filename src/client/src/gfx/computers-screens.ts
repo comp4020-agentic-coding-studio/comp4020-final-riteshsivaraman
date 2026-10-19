@@ -2,6 +2,7 @@
 // original designs drawn in canvas, each framed for a device format with its
 // bezel (and camera dot) baked into the same texture, so a screen is a single
 // mesh. Drawn once per (design, format) and shared by every device.
+import { drawLogo } from "./logo.ts";
 import { CanvasTexture, Color, MeshStandardMaterial, SRGBColorSpace } from "three";
 
 export type ScreenFormat = "laptop" | "tablet" | "monitor" | "aio";
@@ -36,16 +37,8 @@ function rr(g: G, x: number, y: number, w: number, h: number, r: number) {
 }
 
 function mark(g: G, cx: number, cy: number, r: number, colour: string) {
-  // the store's invented ring-and-dot mark (same as the phones use)
-  g.strokeStyle = colour;
-  g.lineWidth = Math.max(1, r * 0.32);
-  g.beginPath();
-  g.arc(cx, cy, r, 0, Math.PI * 2);
-  g.stroke();
-  g.fillStyle = colour;
-  g.beginPath();
-  g.arc(cx + r * 0.15, cy - r * 0.1, r * 0.36, 0, Math.PI * 2);
-  g.fill();
+  // the store's mark (logo.ts), as on the phones
+  drawLogo(g, cx, cy, r * 2, colour);
 }
 
 function textLine(g: G, text: string, x: number, y: number, px: number, colour: string, weight = 600) {

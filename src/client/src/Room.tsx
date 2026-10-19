@@ -1,6 +1,6 @@
 import { BENCHES, TABLES, TABLE_STOOLS } from "../../shared/world.ts";
 import { BackRoom, ShopShell } from "./gfx/shell.tsx";
-import { BayLedges, ServiceBar, Table, TableStool, WallBench } from "./gfx/furniture.tsx";
+import { ServiceBar, Table, TableStool, WallBench } from "./gfx/furniture.tsx";
 
 // The store's scenery, composed from the graphics modules in gfx/:
 //   shell.tsx       walls, glass front, ceiling and lights, floor, posters,
@@ -23,7 +23,6 @@ export function Room() {
       ))}
       <WallBench box={BENCHES[0]} side={-1} />
       <WallBench box={BENCHES[1]} side={1} />
-      <BayLedges />
       <ServiceBar />
       <BackRoom />
     </group>

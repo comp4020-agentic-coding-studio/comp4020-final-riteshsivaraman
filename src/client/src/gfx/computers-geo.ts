@@ -14,6 +14,7 @@
 // checked against a photo. Display bezels are DERIVED, not guessed: the
 // active display is resolution / ppi (both sourced), centred in the sourced
 // body, so the bezel is whatever is left over.
+import { drawLogo } from "./logo.ts";
 import {
   BufferAttribute,
   type BufferGeometry,
@@ -185,15 +186,7 @@ function drawAtlas(g: G) {
     const [x, y, w] = R_MARK;
     const cx = x + w / 2;
     const cy = y + w / 2;
-    g.strokeStyle = "#9c9c9c";
-    g.lineWidth = 6;
-    g.beginPath();
-    g.arc(cx, cy, w * 0.32, 0, PI * 2);
-    g.stroke();
-    g.fillStyle = "#9c9c9c";
-    g.beginPath();
-    g.arc(cx + 3, cy - 2, w * 0.12, 0, PI * 2);
-    g.fill();
+    drawLogo(g, cx, cy, w * 0.6, "#9c9c9c"); // the store's mark (logo.ts)
   }
 }
 

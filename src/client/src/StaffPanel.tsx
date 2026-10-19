@@ -2,6 +2,7 @@ import { useState } from "react";
 import { designationOf } from "../../shared/profile.ts";
 import { NPC_DESIGNATION } from "../../shared/duty.ts";
 import type { CustomerView } from "../../shared/protocol.ts";
+import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { useNet } from "./net.ts";
 
 const POSTS = [...new Set(Object.values(NPC_DESIGNATION))];
@@ -22,6 +23,11 @@ const mmss = (ms: number): string => `${Math.floor(ms / 60000)}:${String(Math.fl
 // coordinate; and the replies waiting on you when you are serving someone.
 export function StaffPanel() {
   const net = useNet();
+  // customers who are in the store but not asking for anyone (the list below is
+  // only people who need staff), so "no customers in the store" is never said
+  // over a shop full of browsers
+  const now = net.serverNow();
+  const inStore = NPCS.filter((n) => n.role === "customer" && npcPose(n, now).present).length + [...net.remotes.values()].filter((r) => r.identity.kind === "customer").length;
   const [open, setOpen] = useState(true);
   const [handing, setHanding] = useState<string | null>(null);
   const [to, setTo] = useState(POSTS[0]);
@@ -107,7 +113,7 @@ export function StaffPanel() {
               </div>
             </div>
           ))}
-          <ul className="cust-list">{net.customers.length === 0 ? <li className="cust empty">No customers in the store.</li> : net.customers.map(row)}</ul>
+          <ul className="cust-list">{net.customers.length === 0 ? <li className="cust empty">{inStore > 0 ? `No one is waiting for you. ${inStore} ${inStore === 1 ? "customer is" : "customers are"} browsing the store.` : "No customers in the store."}</li> : net.customers.map(row)}</ul>
         </>
       )}
     </aside>
