@@ -216,6 +216,77 @@ export const ROUTES: Route[] = [
   },
 ];
 
+// More people, so the concourse is never empty (Ritesh, 2026-10-19: "a bit more
+// lively and realistic"): singles, couples who walk and stop together, and a
+// few who stand a while. Made once from fixed seeds, so every client has the
+// same crowd.
+const SHIRTS = ["#c0392b", "#2e86ab", "#7d8f3a", "#d98e04", "#6c4f9c", "#2f9e8f", "#b8587a", "#44546a", "#a0522d", "#5b8c5a"];
+const prand = (n: number): number => {
+  let t = (n + 0x6d2b79f5) | 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+const crowd: Route[] = [];
+for (let i = 0; i < 12; i++) {
+  // ground-floor concourse strollers, in lanes between the existing ones
+  const lane = 2 + prand(i * 7 + 1) * 9;
+  const east = prand(i * 7 + 2) < 0.5;
+  const stop = -22 + prand(i * 7 + 3) * 44;
+  const a = east ? -30 : 30;
+  const b = east ? 30 : -30;
+  const speed = 0.95 + prand(i * 7 + 4) * 0.55;
+  const phase = Math.floor(prand(i * 7 + 5) * 90000);
+  const route = (id: string, dx: number, colour: string, ph: number): Route =>
+    passer(id, colour, speed, ph, [
+      { x: a, z: G(lane) + dx },
+      { x: stop, z: G(lane) + dx, pause: i % 3 === 0 ? 6000 + prand(i) * 5000 : 0 },
+      { x: b, z: G(lane) + dx },
+      { x: b, z: G(lane + 1.4) + dx },
+      { x: a, z: G(lane + 1.4) + dx },
+    ]);
+  crowd.push(route(`stroll-${i}`, 0, SHIRTS[i % SHIRTS.length], phase));
+  // every third one has company: someone beside them, a step behind
+  if (i % 3 === 1) crowd.push(route(`stroll-${i}b`, 0.7, SHIRTS[(i + 4) % SHIRTS.length], phase + 700));
+}
+for (let i = 0; i < 4; i++) {
+  // more window shoppers on the walkway (a couple, away from where the others
+  // stop, since the walkway is shared with customers going in), and more
+  // across the way
+  if (i < 2)
+    crowd.push(
+    passer(
+      `window-${i + 3}`,
+      SHIRTS[(i * 3 + 2) % SHIRTS.length],
+      0.95 + prand(i + 40) * 0.3,
+      Math.floor(prand(i + 50) * 80000),
+      [
+        { x: i % 2 ? 30 : -30, z: W_NEAR },
+        { x: i ? 17 : -17, z: W_NEAR, pause: 5000 + prand(i + 60) * 5000 },
+        { x: i % 2 ? -30 : 30, z: W_NEAR },
+        { x: i % 2 ? -30 : 30, z: W_RAIL },
+        { x: i % 2 ? 30 : -30, z: W_RAIL },
+      ],
+      FIRST,
+    ),
+  );
+  if (i < 2)
+    crowd.push({
+    id: `upper-${i + 4}`,
+    kind: "upper",
+    y: FIRST,
+    speed: 0.95 + prand(i + 70) * 0.35,
+    phase: Math.floor(prand(i + 80) * 90000),
+    colour: SHIRTS[(i * 2 + 5) % SHIRTS.length],
+    points: [
+      { x: i % 2 ? 26 : -26, z: MALL.upperWalkZ[i % 2] },
+      { x: -8 + i * 6, z: D - 20.2, pause: 4000 + prand(i + 90) * 6000 },
+      { x: i % 2 ? -26 : 26, z: MALL.upperWalkZ[(i + 1) % 2] },
+    ],
+  });
+}
+ROUTES.push(...crowd);
+
 interface Timing {
   segMs: number[]; // time to walk each segment (point i to point i+1)
   pauseMs: number[]; // pause on arrival at point i+1

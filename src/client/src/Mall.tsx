@@ -1,6 +1,6 @@
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from "three";
+import { CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace } from "three";
 import type { Group } from "three";
 import { CEILING, FLOOR, STORE_Y } from "../../shared/protocol.ts";
 import { MALL, ROUTES, routePose } from "../../shared/mall.ts";
@@ -96,6 +96,26 @@ function Shopfront({
   facing: 1 | -1; // 1 faces +z (into the concourse from the far row), -1 faces -z
 }) {
   const map = useMemo(() => signTexture(label, colour), [label, colour]);
+  const window = useMemo(() => {
+    let h = 7;
+    for (const ch of label) h = (h * 31 + ch.charCodeAt(0)) | 0;
+    const r = (k: number): number => {
+      const t = Math.sin((h + k * 97) * 12.9898) * 43758.5453;
+      return t - Math.floor(t);
+    };
+    const tones = ["#e9d7c3", "#d3e1ea", "#e5d0dc", "#d9e5cf", "#f0e2b8", "#cfd6e8"];
+    const picks = ["#c0392b", "#2e86ab", "#d98e04", "#6c4f9c", "#2f9e8f", "#444b55", "#e8e1d4"];
+    const mannequin = r(1) < 0.5;
+    const n = Math.max(2, Math.min(5, Math.floor((width - 2) / 1.6)));
+    const items = Array.from({ length: n }, (_, k) => ({
+      x: ((k + 0.5) / n - 0.5) * (width - 2.6),
+      mannequin: mannequin && k % 2 === 0,
+      colour: picks[Math.floor(r(k + 3) * picks.length)],
+      w: 0.25 + r(k + 9) * 0.35,
+      h: 0.25 + r(k + 15) * 0.5,
+    }));
+    return { back: tones[Math.floor(r(2) * tones.length)], items };
+  }, [label, width]);
   const rot = facing === 1 ? 0 : Math.PI;
   return (
     <group position={[x, y, z]} rotation={[0, rot, 0]}>
@@ -103,20 +123,98 @@ function Shopfront({
         <boxGeometry args={[width, height, 0.3]} />
         <meshStandardMaterial color="#d3d6da" />
       </mesh>
-      {/* window onto a dim interior */}
+      {/* window onto a lit interior: a tinted back wall, a warm light strip,
+          frame bars, and a few things on display (different in every shop) */}
       <mesh position={[0, height * 0.4, 0.17]}>
         <planeGeometry args={[width - 1.2, height * 0.55]} />
         <meshBasicMaterial color="#f3ead6" toneMapped={false} />
       </mesh>
       <mesh position={[0, height * 0.4, 0.18]}>
         <planeGeometry args={[width - 1.8, height * 0.45]} />
-        <meshBasicMaterial color="#c9b995" toneMapped={false} />
+        <meshBasicMaterial color={window.back} toneMapped={false} />
       </mesh>
+      <mesh position={[0, height * 0.4 + height * 0.2, 0.19]}>
+        <planeGeometry args={[width - 2.2, 0.08]} />
+        <meshBasicMaterial color="#fff6dc" toneMapped={false} />
+      </mesh>
+      {[-1, 1].map((sd) => (
+        <mesh key={sd} position={[sd * (width - 1.2) / 2, height * 0.4, 0.2]}>
+          <boxGeometry args={[0.08, height * 0.55, 0.06]} />
+          <meshStandardMaterial color="#8d9399" metalness={0.4} roughness={0.5} />
+        </mesh>
+      ))}
+      {window.items.map((it, k) => (
+        <group key={k} position={[it.x, height * 0.4 - height * 0.2, 0.3]}>
+          <mesh position={[0, 0.12, 0]}>
+            <boxGeometry args={[0.7, 0.24, 0.5]} />
+            <meshStandardMaterial color="#e9e4da" roughness={0.7} />
+          </mesh>
+          {it.mannequin ? (
+            <>
+              <mesh position={[0, 0.8, 0]}>
+                <cylinderGeometry args={[0.2, 0.26, 0.9, 10]} />
+                <meshStandardMaterial color={it.colour} roughness={0.8} />
+              </mesh>
+              <mesh position={[0, 1.4, 0]}>
+                <sphereGeometry args={[0.13, 10, 8]} />
+                <meshStandardMaterial color="#d8d2c8" roughness={0.6} />
+              </mesh>
+            </>
+          ) : (
+            <mesh position={[0, 0.24 + it.h / 2, 0]}>
+              <boxGeometry args={[it.w, it.h, 0.3]} />
+              <meshStandardMaterial color={it.colour} roughness={0.5} />
+            </mesh>
+          )}
+        </group>
+      ))}
       {/* sign band */}
       <mesh position={[0, height * 0.86, 0.17]}>
         <planeGeometry args={[Math.min(5, width - 1), 1.1]} />
         <meshBasicMaterial map={map} toneMapped={false} />
       </mesh>
+    </group>
+  );
+}
+
+// A round fountain: a stone basin, still blue water, and a short jet.
+function Fountain({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0.25, 0]}>
+        <cylinderGeometry args={[1.6, 1.7, 0.5, 28]} />
+        <meshStandardMaterial color="#b9bdc2" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 0.46, 0]}>
+        <cylinderGeometry args={[1.45, 1.45, 0.06, 28]} />
+        <meshStandardMaterial color="#5aa7c7" roughness={0.1} metalness={0.2} />
+      </mesh>
+      <mesh position={[0, 0.9, 0]}>
+        <cylinderGeometry args={[0.04, 0.09, 0.9, 8]} />
+        <meshStandardMaterial color="#cfe9f5" transparent opacity={0.7} />
+      </mesh>
+    </group>
+  );
+}
+
+// A potted palm: a ribbed trunk and a crown of long leaves.
+function Palm({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.55, 0.45, 0.6, 12]} />
+        <meshStandardMaterial color="#8d9399" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 1.7, 0]}>
+        <cylinderGeometry args={[0.08, 0.14, 2.8, 8]} />
+        <meshStandardMaterial color="#7a5a3a" roughness={0.9} />
+      </mesh>
+      {Array.from({ length: 7 }, (_, k) => (
+        <mesh key={k} position={[Math.cos((k / 7) * Math.PI * 2) * 0.5, 3.1, Math.sin((k / 7) * Math.PI * 2) * 0.5]} rotation={[Math.sin((k / 7) * Math.PI * 2) * 0.9, 0, -Math.cos((k / 7) * Math.PI * 2) * 0.9]}>
+          <coneGeometry args={[0.18, 1.5, 5]} />
+          <meshStandardMaterial color="#4f8a4c" roughness={0.9} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -374,6 +472,18 @@ export function Mall() {
       ))}
       {[-26, -13, 13, 26].map((x) => (
         <Planter key={`q${x}`} x={x} z={MALL.walkwayZ - 11.5} />
+      ))}
+      {/* hanging banners down the atrium, and a fountain at its heart */}
+      {Array.from({ length: 6 }, (_, k) => -22.5 + k * 9).map((x, k) => (
+        <mesh key={`banner${x}`} position={[x, MALL.ceilingY - 3.4, zGround + 1.5]} rotation={[0, 0, 0]}>
+          <planeGeometry args={[1.1, 3.2]} />
+          <meshBasicMaterial color={["#2e86ab", "#d98e04", "#6c4f9c", "#2f9e8f", "#c0392b", "#44546a"][k % 6]} side={DoubleSide} toneMapped={false} />
+        </mesh>
+      ))}
+      <Fountain x={-9} z={MALL.walkwayZ - 14} />
+      <Fountain x={9} z={MALL.walkwayZ - 14} />
+      {[-30, -20, 20, 30].map((x) => (
+        <Palm key={`palm${x}`} x={x} z={MALL.walkwayZ - 9} />
       ))}
       {Array.from({ length: 7 }, (_, k) => -27 + k * 9).map((x) => (
         <group key={`lamp${x}`} position={[x, MALL.ceilingY - 1.6, zGround + 4]}>
