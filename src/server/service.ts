@@ -186,7 +186,6 @@ interface ConvData {
   pending?: { choiceId: string; label: string }; // what the customer picked, waiting for the employee
   at?: { x: number; z: number };
   eng?: Engagement; // how the NPC is currently drawn, so a walk can start from where it stands
-  saleOf?: string; // a till conversation: the sale conversation being paid for
 }
 
 // The new talk engine's state for a "phones" conversation held with an NPC
@@ -205,6 +204,20 @@ interface TalkConvData {
   stage?: "seat_offer"; // the opening question: shall we sit down?
   seat?: { tableId: string }; // seated at this table now
   sat?: boolean; // has sat once already, so "sit back down" is offered after a demo
+  checkout?: Checkout; // the sale is made: stock is being fetched, then they pay here
+}
+
+// Paying on the spot (Ritesh, 2026-10-19): once they have decided, the
+// specialist checks stock on their phone and orders it internally; a stock
+// person is sent from the back room to hand the device to the specialist; then
+// the customer pays with the specialist, whose phone has a case that takes
+// payments. Nobody walks to a till.
+interface Checkout {
+  stage: "fetching" | "pay";
+  stockId: string;
+  stockEng: Engagement; // the stock person's walk out from the back room
+  arrivedAt?: number; // when they reached the specialist (the hand-over beat runs from here)
+  sale: { name: string; colour: string; storage: string; price: number };
 }
 
 type AnyConvData = ConvData | TalkConvData;
@@ -374,7 +387,7 @@ export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
   const out: Outgoing[] = [];
   const open = openConversationOf(ctx.db, visitorId);
   if (open) out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left"));
-  out.push(...closeTalk(ctx, visitorId, false));
+  out.push(...closeTalk(ctx, visitorId));
   out.push(...cancelIntentsOf(ctx, visitorId));
   const leaving = liveEscortOf(ctx.db, visitorId);
   if (leaving) out.push(...finishEscort(ctx, leaving, "cancelled"));
@@ -481,11 +494,10 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   }
 
   const world = stockWorld(ctx.db);
-  const unpaid = script === "till" ? unpaidSale(ctx, customerId) : null;
-  const first = begin(script, world, unpaid?.sale);
+  const first = begin(script, world);
   const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: first.state.node, data: null, started_at: ctx.now, ended_at: null };
-  const eng: Engagement = tillEng(ctx, script, withId, customerId, engagedSince, at);
-  const data: ConvData = { conv: first.state, awaiting: "customer", at, ...(withKind === "npc" ? { eng } : {}), ...(unpaid ? { saleOf: unpaid.convId } : {}) };
+  const eng: Engagement = { npcId: withId, visitorId: customerId, since: engagedSince, at };
+  const data: ConvData = { conv: first.state, awaiting: "customer", at, ...(withKind === "npc" ? { eng } : {}) };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
     .run(row.id, customerId, withId, withKind, script, row.node, JSON.stringify(data), ctx.now);
@@ -499,14 +511,6 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   return out;
 }
 
-// How an NPC is drawn while it talks. At the till it does not leave the bar.
-function tillEng(ctx: Ctx, script: ScriptId, npcId: string, customerId: string, since: number, at: { x: number; z: number }): Engagement {
-  const e: Engagement = { npcId, visitorId: customerId, since, at };
-  if (script !== "till") return e;
-  const def = NPCS.find((n) => n.id === npcId);
-  const p = def ? npcPose(def, since) : at;
-  return { ...e, from: { x: p.x, z: p.z }, lead: { x: p.x, z: p.z, fx: at.x, fz: at.z } };
-}
 
 // ---- intent to talk (Ritesh, 2026-10-19) ----
 //
@@ -633,10 +637,7 @@ function intentEngagement(r: IntentRow): Engagement {
   const since = r.opened_at ?? r.created_at;
   const at = { x: r.at_x ?? 0, z: r.at_z ?? 0 };
   const base: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since, at, pending: true };
-  if (r.reason !== "pay") return base;
-  const def = NPCS.find((n) => n.id === r.staff_id);
-  const p = def ? npcPose(def, since) : at;
-  return { ...base, from: { x: p.x, z: p.z }, lead: { x: p.x, z: p.z, fx: at.x, fz: at.z } };
+  return base;
 }
 
 const beginApproach = (r: IntentRow): Outgoing[] => (r.staff_kind === "npc" ? [{ to: "all", message: { type: "engaged", ...intentEngagement(r) } }] : []);
@@ -654,7 +655,7 @@ function staffEnd(ctx: Ctx, r: IntentRow, cpos: { x: number; z: number }): { arr
 function acceptIntent(ctx: Ctx, r: IntentRow): Outgoing[] {
   const emp = ctx.employees.find((e) => e.id === r.staff_id);
   const designation = r.staff_kind === "npc" ? NPC_DESIGNATION[r.staff_id] : emp ? designationOfEmployee(emp) : undefined;
-  const script: ScriptId | null = r.reason === "pay" ? "till" : designation ? scriptFor(designation) : null;
+  const script: ScriptId | null = designation ? scriptFor(designation) : null;
   const cpos = ctx.position(r.customer_id);
   if (!script || !cpos) return endIntent(ctx, r, "cancelled", "no conversation to have");
   const out = endIntent(ctx, r, "accepted", "accepted");
@@ -718,7 +719,7 @@ export function settleIntents(ctx: Ctx): Outgoing[] {
       out.push(...endIntent(ctx, r, "expired", "ignored"));
     }
   }
-  return [...out, ...settleEscorts(ctx)];
+  return [...out, ...settleEscorts(ctx), ...settleCheckouts(ctx)];
 }
 
 // A customer presses E at someone: shows intent (or accepts theirs).
@@ -980,6 +981,84 @@ function standUp(ctx: Ctx, row: ConvRow): Outgoing[] {
   return out;
 }
 
+// ---- paying on the spot ----
+
+const CHECKOUT_BEAT_MS = 1500; // the hand-over, once the stock person is there
+const STOCK_STAFF = ["stock-runner", "stock-1", "stock-2"];
+
+const payTurn = (c: Checkout): TalkTurn => ({
+  say: `Here it is: the ${c.sale.name} in ${c.sale.colour}, ${c.sale.storage}. That's A$${c.sale.price.toLocaleString("en-AU")}. How would you like to pay?`,
+  choices: [
+    { id: "pay:card", label: "Pay by card" },
+    { id: "pay:phone", label: "Tap with my phone" },
+    { id: "pay:cancel", label: "I've changed my mind" },
+  ],
+  ended: false,
+});
+
+function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: string; storage: string; colour: string; price: number }, line: string): Outgoing[] {
+  const sale = { name: modelById(sku.model).name, colour: sku.colour, storage: sku.storage, price: sku.price };
+  // the stock person who is free (the runner first), sent from wherever they are in the back
+  const stockId = STOCK_STAFF.find((id) => !npcBusy(ctx, id)) ?? STOCK_STAFF[0];
+  const spec = npcPlace(ctx, d.eng, row.with_id);
+  const spot = nearestStaffSpot({ x: spec.x + 0.9, z: spec.z });
+  const stockEng: Engagement = { npcId: stockId, visitorId: row.customer_id, since: ctx.now, at: spot, lead: { x: spot.x, z: spot.z, fx: spec.x, fz: spec.z } };
+  // the specialist stands (or sits) checking stock on their phone
+  const eng: Engagement = { ...(d.eng ?? { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: spot }), doing: "phone" };
+  const next: TalkConvData = { ...d, eng, checkout: { stage: "fetching", stockId, stockEng, sale } };
+  saveTalkConv(ctx, row, next, false);
+  log(ctx, row.customer_id, "stock_checked", { conversationId: row.id, by: row.with_id, sale });
+  log(ctx, row.customer_id, "stock_ordered", { conversationId: row.id, stockId, sale });
+  // the engine's closing line sent them to a till: it now says what really happens
+  const say = line.replace(/I'll take you across to the till.*$/s, "Let me check we have it and get it brought out to you.");
+  return [
+    { to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], false, "staff") } },
+    { to: "all", message: { type: "engaged", ...eng } },
+    { to: "all", message: { type: "engaged", ...stockEng } },
+    staffViewMessage(ctx),
+  ];
+}
+
+// The stock person has walked out and handed it over: the specialist takes
+// payment. Runs on whatever request arrives next.
+function settleCheckouts(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  for (const row of ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'npc'").all() as ConvRow[]) {
+    const d = anyDataOf(row);
+    if (!isTalkData(d) || d.checkout?.stage !== "fetching") continue;
+    const c = d.checkout;
+    if (engagedMoment(c.stockId, c.stockEng, ctx.now).walking) continue;
+    if (c.arrivedAt === undefined) {
+      saveTalkData(ctx, row, { ...d, checkout: { ...c, arrivedAt: ctx.now } });
+      continue;
+    }
+    if (ctx.now - c.arrivedAt < CHECKOUT_BEAT_MS) continue;
+    // handed over: the stock person heads back, the specialist is ready to take payment
+    const { doing: _doing, ...eng } = d.eng ?? ({} as Engagement);
+    const next: TalkConvData = { ...d, eng: d.eng ? eng : undefined, checkout: { ...c, stage: "pay" } };
+    saveTalkData(ctx, row, next);
+    log(ctx, row.customer_id, "stock_handed_over", { conversationId: row.id, stockId: c.stockId });
+    out.push({ to: "all", message: { type: "released", npcId: c.stockId } });
+    if (d.eng) out.push({ to: "all", message: { type: "engaged", ...eng } });
+    const t = payTurn(next.checkout!);
+    out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), t.say, t.choices, false, "customer") } });
+  }
+  return out;
+}
+
+function handleCheckoutChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId: string): Outgoing[] {
+  const c = d.checkout!;
+  if (c.stage === "fetching") return [notice(row.customer_id, `${nameOf(ctx, row.with_id)} is still getting it brought out.`)];
+  if (!["pay:card", "pay:phone", "pay:cancel"].includes(choiceId)) return [notice(row.customer_id, "That is not one of the options.")];
+  const paid = choiceId !== "pay:cancel";
+  log(ctx, row.customer_id, paid ? "purchase_paid" : "purchase_cancelled", { conversationId: row.id, by: row.with_id, method: paid ? choiceId.slice(4) : null, sale: c.sale });
+  const scene: Scene = paid ? d.scene : { ...d.scene, ended: { how: "left", why: "changed their mind at the payment" } };
+  const say = paid ? "That's gone through. Thanks, enjoy your new phone." : "No problem, I'll put it back. Have a look around if you like.";
+  const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } }];
+  saveTalkData(ctx, row, { ...d, checkout: undefined, scene });
+  return [...out, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
+}
+
 // ---- walking a customer somewhere (Ritesh, 2026-10-19) ----
 //
 // "Yes, show me the 17" is not a line of text: the staff member walks to a
@@ -992,13 +1071,12 @@ function standUp(ctx: Ctx, row: ConvRow): Outgoing[] {
 
 const ESCORT_GIVE_UP_MS = 120_000; // the customer never followed
 const STAND_OFF_DEVICE = 0.85; // metres in front of a device the customer stands
-const TILL_STAND = { x: 0, z: COUNTER.z - COUNTER.d / 2 - 1.0 };
 
 interface EscortRow {
   id: string;
   customer_id: string;
   staff_id: string;
-  kind: "demo" | "till" | "seat";
+  kind: "demo" | "seat";
   slot_id: string | null;
   conversation_id: string | null;
   status: "walking" | "inspecting" | "done" | "cancelled";
@@ -1046,7 +1124,7 @@ function setEng(ctx: Ctx, convId: string, eng: Engagement): void {
   ctx.db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify({ ...d, eng }), convId);
 }
 
-function beginEscort(ctx: Ctx, p: { customerId: string; staffId: string; kind: "demo" | "till" | "seat"; slotId?: string; conversationId?: string; from: { x: number; z: number }; goal: { x: number; z: number }; face: { x: number; z: number }; stand: { x: number; z: number }; text: string }): Outgoing[] {
+function beginEscort(ctx: Ctx, p: { customerId: string; staffId: string; kind: "demo" | "seat"; slotId?: string; conversationId?: string; from: { x: number; z: number }; goal: { x: number; z: number }; face: { x: number; z: number }; stand: { x: number; z: number }; text: string }): Outgoing[] {
   const at = ctx.position(p.customerId) ?? p.stand;
   const id = randomUUID();
   ctx.db
@@ -1102,59 +1180,6 @@ function startDemoEscort(ctx: Ctx, row: ConvRow, talkModelId: string): Outgoing[
   return [...upFrom, ...beginEscort(ctx, { customerId: row.customer_id, staffId: row.with_id, kind: "demo", slotId: spot.slotId, conversationId: row.id, from, goal: spot.goal, face: spot.face, stand: spot.stand, text: `Follow ${nameOf(ctx, row.with_id)} to the ${modelName}` })];
 }
 
-// The customer's last sale that has not been paid for or called off: the talk
-// engine ends a conversation as 'bought' with the chosen phone, and the till
-// picks it up from there. Stock is not touched here: the talk engine's phones
-// are not yet tied to the shop's stock table [TK].
-function unpaidSale(ctx: Ctx, customerId: string): { convId: string; sale: NonNullable<ConvState["sale"]> } | null {
-  const rows = ctx.db
-    .prepare("SELECT * FROM conversations WHERE customer_id = ? AND with_kind = 'npc' AND ended_at IS NOT NULL ORDER BY ended_at DESC, rowid DESC LIMIT 5")
-    .all(customerId) as ConvRow[];
-  for (const r of rows) {
-    const d = anyDataOf(r);
-    if (!isTalkData(d) || d.scene.ended?.how !== "bought") continue;
-    const settled = ctx.db
-      .prepare("SELECT 1 FROM events WHERE visitor_id = ? AND type IN ('purchase_paid','purchase_cancelled') AND data LIKE ? LIMIT 1")
-      .get(customerId, `%"saleOf":"${r.id}"%`);
-    if (settled) continue;
-    const sku = d.scene.ended.sku;
-    return { convId: r.id, sale: { name: modelById(sku.model).name, colour: sku.colour, storage: sku.storage, price: sku.price } };
-  }
-  return null;
-}
-
-function startTillEscort(ctx: Ctx, row: ConvRow): Outgoing[] {
-  const eng = (anyDataOf(row) as AnyConvData).eng;
-  const from = npcPlace(ctx, eng, row.with_id);
-  const helper = pickHelper(ctx, "genius");
-  const genius = nameOf(ctx, helper?.id ?? "genius-1");
-  // stand at the till in front of whoever will take payment
-  const def = helper?.kind === "npc" ? NPCS.find((n) => n.id === helper.id) : undefined;
-  const stand = { x: def ? npcPose(def, ctx.now).x : TILL_STAND.x, z: TILL_STAND.z };
-  return beginEscort(ctx, {
-    customerId: row.customer_id,
-    staffId: row.with_id,
-    kind: "till",
-    from,
-    goal: nearestStaffSpot({ x: stand.x - 1.0, z: stand.z }),
-    face: stand,
-    stand,
-    text: `Follow ${nameOf(ctx, row.with_id)} to the Genius Bar, where ${genius} will take your payment`,
-  });
-}
-
-// At the Genius Bar: whoever takes payment shows intent, and the customer
-// accepts (E) to pay. Nothing is offered if there is nothing to pay for.
-function startPayment(ctx: Ctx, customerId: string, stand: { x: number; z: number }): Outgoing[] {
-  if (!unpaidSale(ctx, customerId)) return [];
-  const helper = pickHelper(ctx, "genius");
-  if (!helper) return [notice(customerId, "There is nobody at the Genius Bar right now.")];
-  // like any referral, they do not pounce: you wait at the till and they come
-  // over after a few seconds (a person taking payment just walks over)
-  const hold = helper.kind === "npc" ? { x: stand.x, z: stand.z, label: "the Genius Bar" } : undefined;
-  return showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "pay", ...(hold ? { hold } : {}) });
-}
-
 function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoing[] {
   ctx.db.prepare("UPDATE escorts SET status = ?, ended_at = ? WHERE id = ?").run(why, ctx.now, e.id);
   log(ctx, e.customer_id, "escort_ended", { escortId: e.id, kind: e.kind, why });
@@ -1188,7 +1213,6 @@ function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoi
     }
   } else {
     out.push({ to: "all", message: { type: "released", npcId: e.staff_id } });
-    if (e.kind === "till" && why === "done") out.push(...startPayment(ctx, e.customer_id, { x: e.stand_x, z: e.stand_z }));
   }
   return out;
 }
@@ -1208,10 +1232,6 @@ function settleEscorts(ctx: Ctx): Outgoing[] {
       continue;
     }
     if (engagedMoment(e.staff_id, escortEngagement(e), ctx.now).walking) continue; // still leading the way
-    if (e.kind === "till") {
-      if (dist(cpos, { x: e.stand_x, z: e.stand_z }) <= 1.8) out.push(...finishEscort(ctx, e, "done"));
-      continue;
-    }
     if (e.kind === "seat") {
       if (dist(cpos, { x: e.stand_x, z: e.stand_z }) <= 1.0) out.push(...finishEscort(ctx, e, "done"));
       continue;
@@ -1351,15 +1371,6 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
         with_id: r.turn.ended ? null : row.with_id,
       });
       log(ctx, row.customer_id, "state", { state: to, want: e.want ?? null, needs: e.needs ?? null });
-    } else if (e.type === "paid" || e.type === "payment_cancelled") {
-      // the sale at the till: recorded, so it is never offered for payment twice
-      log(ctx, row.customer_id, e.type === "paid" ? "purchase_paid" : "purchase_cancelled", {
-        conversationId: row.id,
-        saleOf: data.saleOf ?? null,
-        by: row.with_id,
-        method: e.type === "paid" ? e.method : null,
-        sale: from.sale ?? null,
-      });
     } else if (e.type === "request_help") {
       log(ctx, row.customer_id, "help_requested", { needs: e.needs });
       const a = assignHelper(ctx, row.customer_id, e.needs);
@@ -1406,7 +1417,9 @@ function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
   const up = standUp(ctx, row);
   row = getConv(ctx.db, row.id) ?? row;
   const prior = anyDataOf(row);
-  const data: TalkConvData = { ...(isTalkData(prior) ? prior : {}), engine: "talk", scene };
+  // leaving mid-checkout: a stock person still on the way goes back
+  if (isTalkData(prior) && prior.checkout?.stage === "fetching") up.push({ to: "all", message: { type: "released", npcId: prior.checkout.stockId } });
+  const data: TalkConvData = { ...(isTalkData(prior) ? prior : {}), engine: "talk", scene, checkout: undefined };
   saveTalkConv(ctx, row, data, true);
   log(ctx, row.customer_id, "conversation_ended", { conversationId: row.id, why: scene.ended ? `talk:${scene.ended.how}` : "talk:unknown" });
   const cur = stateOf(ctx.db, row.customer_id);
@@ -1438,14 +1451,11 @@ function pendingCloseWhere(ctx: Ctx, column: "customer_id" | "with_id", id: stri
 // the customer's last NPC conversation, ended but not yet dismissed
 const pendingCloseRow = (ctx: Ctx, customerId: string): ConvRow | undefined => pendingCloseWhere(ctx, "customer_id", customerId);
 
-export function closeTalk(ctx: Ctx, customerId: string, walkToTill = true): Outgoing[] {
+export function closeTalk(ctx: Ctx, customerId: string): Outgoing[] {
   const row = pendingCloseRow(ctx, customerId);
   if (!row) return [];
   log(ctx, customerId, "conversation_closed", { conversationId: row.id });
-  const data = anyDataOf(row);
-  // after a sale the staff member walks you to the till; otherwise the NPC is
-  // free again and whoever was waiting for it can come now
-  if (walkToTill && isTalkData(data) && data.scene.ended?.how === "bought") return startTillEscort(ctx, row);
+  // the NPC is free again and whoever was waiting for it can come now
   return [{ to: "all", message: { type: "released", npcId: row.with_id } }, ...settleIntents(ctx)];
 }
 
@@ -1457,9 +1467,10 @@ function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgo
   const prior = anyDataOf(row);
   const data: TalkConvData = { ...(isTalkData(prior) ? prior : {}), engine: "talk", scene };
   saveTalkConv(ctx, row, data, turn.ended);
-  // "someone there can sort the payment" names the person at the Genius Bar
-  const say = scene.ended?.how === "bought" ? turn.say.replace(/someone there/, nameOf(ctx, pickHelperId(ctx, "genius") ?? "genius-1")) : turn.say;
-  const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, turn.choices, turn.ended, "customer") } }];
+  // they have decided: no trip to the till. The specialist checks stock on
+  // their phone, a stock person brings the device out, and they pay right here.
+  if (scene.ended?.how === "bought") return startCheckout(ctx, row, data, scene.ended.sku, turn.say);
+  const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, turn.ended, "customer") } }];
   if (turn.ended) return [...out, ...finishTalk(ctx, row, scene)];
   const sm = stateMessage(ctx, row.customer_id);
   if (sm) out.push(sm);
@@ -1477,6 +1488,7 @@ export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string,
   if (walking) return [notice(customerId, `Follow ${nameOf(ctx, walking.staff_id)} first.`)];
   const anyData = anyDataOf(row);
   if (isTalkData(anyData)) {
+    if (anyData.checkout) return handleCheckoutChoice(ctx, row, anyData, choiceId);
     if (talkEnded(anyData.scene)) return [notice(customerId, "That conversation is over.")];
     if (choiceId.startsWith("seat:")) return handleSeatChoice(ctx, row, anyData, choiceId);
     if (anyData.stage === "seat_offer") return [notice(customerId, "Sit down or stay standing first.")];
@@ -1572,7 +1584,8 @@ function finishEither(ctx: Ctx, row: ConvRow, visitorId: string, say: string, wh
   const anyData = anyDataOf(row);
   if (isTalkData(anyData)) {
     if (row.customer_id !== visitorId) return []; // no visitor-staff leave path for a talk-engine row
-    const scene: Scene = { ...anyData.scene, ended: anyData.scene.ended ?? { how: "left", why } };
+    // leaving before paying is leaving, not buying: the engine already marked the sale
+    const scene: Scene = { ...anyData.scene, ended: anyData.checkout ? { how: "left", why } : (anyData.scene.ended ?? { how: "left", why }) };
     const out: Outgoing[] = [{ to: visitorId, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } }];
     return [...out, ...finishTalk(ctx, row, scene)];
   }

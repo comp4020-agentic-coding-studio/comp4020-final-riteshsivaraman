@@ -110,7 +110,7 @@ class Net {
     return null;
   }
   // a member of staff is walking you somewhere (to a demo device, to the till)
-  escort: { id: string; kind: "demo" | "till" | "seat"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } } | null = null;
+  escort: { id: string; kind: "demo" | "seat"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } } | null = null;
   // the conversation as the scene should treat it: while you are being walked
   // somewhere it is on hold, so you can move and the camera is free
   get talking(): TurnView | null {

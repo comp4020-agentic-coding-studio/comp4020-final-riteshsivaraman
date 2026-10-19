@@ -80,6 +80,9 @@ export interface Engagement {
   lead?: { x: number; z: number; fx: number; fz: number };
   // with `lead`: sitting on that spot (a stool) rather than standing
   seated?: boolean;
+  // what it is doing while it stands there instead of just talking (checking
+  // stock on its phone)
+  doing?: "phone";
 }
 
 // Intent to talk (Ritesh, 2026-10-19): a conversation starts with one side
@@ -91,7 +94,7 @@ export interface IntentView {
   fromName: string;
   toId: string;
   toName: string;
-  reason: "greet" | "help" | "ask" | "pay";
+  reason: "greet" | "help" | "ask";
   // held: told to wait near `wait` and not yet being fetched
   state: "queued" | "open" | "held";
   wait?: { x: number; z: number; label: string };
@@ -182,7 +185,7 @@ export type ServerMessage =
   // a member of staff is walking you somewhere: follow them; `goal` is where you should stand
   | { type: "seated"; visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }
   | { type: "unseated"; visitorId: string }
-  | { type: "escort"; id: string; kind: "demo" | "till" | "seat"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } }
+  | { type: "escort"; id: string; kind: "demo" | "seat"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } }
   | { type: "escort_end"; id: string }
   | { type: "released"; npcId: string }
   | ({ type: "inspecting" } & Inspection)
