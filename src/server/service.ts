@@ -397,6 +397,8 @@ export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
     setState(ctx, visitorId, { state: "leaving", with_id: null });
     log(ctx, visitorId, "state", { state: "leaving" });
   }
+  // someone who was being sent for has gone: whoever that freed can take the next waiting customer
+  out.push(...assignWaiting(ctx));
   out.push(staffViewMessage(ctx), dutyMessage(ctx));
   return out;
 }
@@ -666,7 +668,7 @@ function acceptIntent(ctx: Ctx, r: IntentRow): Outgoing[] {
 // start, an NPC accepts a customer one beat after arriving, staff who were
 // ignored for long enough give up, and anyone who has left cancels theirs.
 export function settleIntents(ctx: Ctx): Outgoing[] {
-  const out: Outgoing[] = [];
+  const out: Outgoing[] = [...assignWaiting(ctx)];
   const rows = ctx.db.prepare("SELECT * FROM intents WHERE status IN ('held','queued','open') ORDER BY created_at, rowid").all() as IntentRow[];
   for (const r0 of rows) {
     let r = r0;
@@ -779,12 +781,19 @@ function cancelIntentsOf(ctx: Ctx, visitorId: string): Outgoing[] {
   return endLiveIntents(ctx, (r) => r.customer_id === visitorId || r.staff_id === visitorId, "cancelled");
 }
 
-// The staff member best placed to come and get a customer who needs `post`:
-// a person holding that post first (they get a mission), a free one before a
-// busy one, the lightest load; an NPC of the post when no one holds it.
+// Who can take a new customer right now: not in a conversation, not already
+// sent for one, not walking someone somewhere.
+function staffAvailable(ctx: Ctx, id: string, kind: "npc" | "visitor"): boolean {
+  if (staffBusy(ctx, id, kind)) return false;
+  const live = ctx.db.prepare("SELECT COUNT(*) AS n FROM intents WHERE staff_id = ? AND status IN ('held','queued','open')").get(id) as { n: number };
+  return live.n === 0;
+}
+
+// The staff member to send for a customer who needs `post` (Ritesh, 2026-10-19):
+// a real user who is free first, else a free NPC. When everyone is taken it is
+// null, and the customer joins the shared queue: whoever is free first comes.
 function pickHelper(ctx: Ctx, post: string): { id: string; kind: "npc" | "visitor" } | null {
   const off = offDuty(ctx);
-  const load = (id: string): number => (ctx.db.prepare("SELECT COUNT(*) AS n FROM intents WHERE staff_id = ? AND status IN ('held','queued','open')").get(id) as { n: number }).n;
   const humans = ctx.employees.filter((e) => designationOfEmployee(e) === post).map((e) => ({ id: e.id, kind: "visitor" as const }));
   const npcs = Object.keys(NPC_DESIGNATION)
     .filter((id) => NPC_DESIGNATION[id] === post && !off.includes(id))
@@ -793,33 +802,41 @@ function pickHelper(ctx: Ctx, post: string): { id: string; kind: "npc" | "visito
       return !!n && npcPose(n, ctx.now).present;
     })
     .map((id) => ({ id, kind: "npc" as const }));
-  // real users first, even a busy one (they take the next customer when free);
-  // only a person already holding two waiting customers is passed over for a
-  // free NPC (Ritesh, 2026-10-19: "a priority to be assigned to real user staff")
-  const overloaded = (c: { id: string; kind: "npc" | "visitor" }): number => (c.kind === "visitor" && load(c.id) >= 2 ? 1 : 0);
-  const ranked = [...humans, ...npcs].sort(
-    (a, b) =>
-      overloaded(a) - overloaded(b) ||
-      Number(a.kind === "npc") - Number(b.kind === "npc") ||
-      Number(staffBusy(ctx, a.id, a.kind)) - Number(staffBusy(ctx, b.id, b.kind)) ||
-      load(a.id) - load(b.id),
-  );
-  return ranked[0] ?? null;
+  return humans.find((h) => staffAvailable(ctx, h.id, h.kind)) ?? npcs.find((n) => staffAvailable(ctx, n.id, n.kind)) ?? null;
 }
 
-const pickHelperId = (ctx: Ctx, post: string): string | null => pickHelper(ctx, post)?.id ?? null;
+// Whoever is free now takes the customers who have been waiting longest.
+// Runs on whatever request arrives next: a conversation ending, a poll.
+function assignWaiting(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  const rows = ctx.db
+    .prepare("SELECT visitor_id, needs FROM player_state WHERE state = 'waiting_for_help' AND needs IS NOT NULL ORDER BY since, rowid")
+    .all() as Array<{ visitor_id: string; needs: string }>;
+  for (const r of rows) {
+    if (!ctx.present.includes(r.visitor_id) || !scriptFor(r.needs)) continue;
+    if (openConversationOf(ctx.db, r.visitor_id)) continue; // still with someone (the greeter's last turn counts)
+    if (ctx.db.prepare("SELECT 1 FROM intents WHERE customer_id = ? AND reason = 'help' AND status IN ('held','queued','open') LIMIT 1").get(r.visitor_id)) continue;
+    const a = assignHelper(ctx, r.visitor_id, r.needs);
+    out.push(...a.out);
+  }
+  return out;
+}
 
 // The customer needs `post`: a particular person is sent for them, who walks
-// over and shows intent (a human gets it as a mission).
-export function assignHelper(ctx: Ctx, customerId: string, post: string): { out: Outgoing[]; helperName: string | null; waitLabel?: string | null } {
+// over and shows intent (a human gets it as a mission). If everyone is taken,
+// nobody is named: they wait in the shared queue.
+export function assignHelper(ctx: Ctx, customerId: string, post: string): { out: Outgoing[]; helperName: string | null; waitLabel?: string | null; queued?: boolean } {
   if (!scriptFor(post)) return { out: [], helperName: null };
+  const spot = waitSpotFor(post);
   const existing = ctx.db.prepare("SELECT staff_id FROM intents WHERE customer_id = ? AND reason = 'help' AND status IN ('held','queued','open') LIMIT 1").get(customerId) as { staff_id: string } | undefined;
-  if (existing) return { out: [], helperName: nameOf(ctx, existing.staff_id) };
+  if (existing) return { out: [], helperName: nameOf(ctx, existing.staff_id), waitLabel: spot?.label ?? null };
   const helper = pickHelper(ctx, post);
-  if (!helper) return { out: [], helperName: null };
+  if (!helper) {
+    log(ctx, customerId, "help_queued", { post });
+    return { out: [], helperName: null, waitLabel: spot?.label ?? null, queued: true };
+  }
   // an NPC sent for you does not appear at once: you are told to wait near the
   // area, and they come when you are there. A person walks themselves (a mission).
-  const spot = waitSpotFor(post);
   const hold = helper.kind === "npc" ? spot : null;
   const out = showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "help", ...(hold ? { hold } : {}), ...(!hold && spot ? { hint: spot } : {}) });
   // a real user is told straight away: this is their customer
@@ -1375,7 +1392,7 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
       log(ctx, row.customer_id, "help_requested", { needs: e.needs });
       const a = assignHelper(ctx, row.customer_id, e.needs);
       out.push(...a.out);
-      if (a.helperName) helper = a.waitLabel ? `${a.helperName}|${a.waitLabel}` : a.helperName;
+      if (a.helperName || a.queued) helper = `${a.helperName ?? ""}|${a.waitLabel ?? ""}`;
     }
   }
   log(ctx, row.customer_id, "turn", { conversationId: row.id, from: from.node, choice: choiceId, to: r.state.node });
@@ -1383,10 +1400,15 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
   const next: ConvData = { ...data, conv: r.state, awaiting: "customer", pending: undefined };
   saveConv(ctx, row, next, r.turn.ended);
   const [helperName, waitLabel] = (helper ?? "").split("|");
-  const say = helper
-    ? waitLabel
-      ? `Of course. Wait near ${waitLabel} and ${helperName} will come and find you.`
-      : `Of course. ${helperName} will come and find you. Have a look around while you wait.`
+  // nobody named when everyone is taken: whoever is free first will come
+  const say = helper !== null
+    ? helperName
+      ? waitLabel
+        ? `Of course. Wait near ${waitLabel} and ${helperName} will come and find you.`
+        : `Of course. ${helperName} will come and find you. Have a look around while you wait.`
+      : waitLabel
+        ? `Of course. Wait near ${waitLabel} and someone will come and get you as soon as they're free.`
+        : "Of course. Someone will come and get you as soon as they're free. Have a look around while you wait."
     : r.turn.say;
   out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, r.turn.choices, r.turn.ended, "customer") } });
   if (r.turn.ended) {

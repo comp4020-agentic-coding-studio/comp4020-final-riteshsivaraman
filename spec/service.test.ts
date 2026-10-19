@@ -682,6 +682,50 @@ describe("intent to talk (Ritesh, 2026-10-19)", () => {
     expect(last(a.out, "all", "intent")).toMatchObject({ fromId: "e1" });
   });
 
+  it("a real user who is busy is passed over for a free NPC", () => {
+    addVisitor("e1", "Victor", { x: 0.6, z: 0 }, "specialist", "phones");
+    addVisitor("c0", "Busy", { x: 0, z: 0 });
+    // Victor is already sent for a customer, so he is not free
+    expect(last(assignHelper(ctx(), "c0", "specialist:phones").out, "all", "intent")).toMatchObject({ fromId: "e1" });
+    addVisitor("c1", "Stacy", { x: 5, z: 5 });
+    expect(last(assignHelper(ctx(), "c1", "specialist:phones").out, "all", "intent")).toMatchObject({ fromId: "spec-phones" });
+  });
+
+  it("when everyone is taken the customer joins a shared queue, and whoever is free first comes", () => {
+    addVisitor("c1", "One", { x: 0, z: 0 });
+    addVisitor("c2", "Two", { x: 1, z: 0 });
+    addVisitor("c3", "Three", { x: 2, z: 0 });
+    for (const id of ["c1", "c2", "c3"]) db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones', since = ? WHERE visitor_id = ?").run(NOW + Number(id.slice(1)), id);
+    // the two NPC specialists take two customers
+    const a1 = assignHelper(ctx(), "c1", "specialist:phones");
+    const a2 = assignHelper(ctx(), "c2", "specialist:phones");
+    expect(new Set([a1.helperName, a2.helperName]).size).toBe(2);
+    // a third: nobody is free, nobody is named
+    const a3 = assignHelper(ctx(), "c3", "specialist:phones");
+    expect(a3.queued).toBe(true);
+    expect(a3.helperName).toBeNull();
+    expect(a3.out).toEqual([]);
+    expect(settleIntents(ctx(NOW + 100)).filter((o) => o.message.type === "intent")).toEqual([]);
+    // the first customer leaves: that specialist is free, and takes the one who waited
+    const freed = leaveStore(ctx(NOW + 200), "c1");
+    expect(last(freed, "all", "intent")).toMatchObject({ toId: "c3", state: "held" });
+    expect(eventTypes()).toContain("help_queued");
+  });
+
+  it("tells a queued customer that someone will come, without a name", () => {
+    const g = npc("greeter-1");
+    addVisitor("a", "A", { x: 0, z: 0 });
+    addVisitor("b", "B", { x: 1, z: 0 });
+    for (const id of ["a", "b"]) assignHelper(ctx(), id, "specialist:phones"); // both NPCs now taken
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    startTalk(ctx(), "c1", "greeter-1");
+    const id = (db.prepare("SELECT id FROM conversations WHERE customer_id = 'c1'").get() as { id: string }).id;
+    chooseTurn(ctx(), "c1", id, "phone");
+    const done = chooseTurn(ctx(), "c1", id, "help");
+    expect(last(done, "c1", "turn")?.say).toMatch(/Wait near the phones area and someone will come and get you as soon as they're free/);
+    expect(last(done, "all", "intent")).toBeUndefined();
+  });
+
   it("gives the mission to a person holding the post, not the NPC", () => {
     addVisitor("e1", "Victor", { x: 5, z: 5 }, "specialist", "phones");
     const g = npc("greeter-1");

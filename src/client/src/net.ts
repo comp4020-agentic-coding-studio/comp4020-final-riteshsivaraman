@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { PlayerStateName } from "../../shared/conversation.ts";
+import { waitSpotFor } from "../../shared/duty.ts";
 import { engagedMoment, type Release } from "../../shared/engage.ts";
 import type { Profile } from "../../shared/profile.ts";
 import type {
@@ -107,6 +108,11 @@ class Net {
   // told to wait somewhere for someone to fetch you, if you are
   get waitingAt(): { x: number; z: number; label: string; who: string; reason: string } | null {
     for (const i of this.intents.values()) if ((i.state === "held" || (i.state === "open" && i.human)) && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName, reason: i.reason };
+    // nobody sent for you yet (everyone is taken): wait at the spot, and whoever is free first comes
+    if (this.state === "waiting_for_help" && !this.escort && ![...this.intents.values()].some((i) => i.toId === this.you?.id)) {
+      const spot = this.needs ? waitSpotFor(this.needs) : null;
+      if (spot) return { ...spot, who: "", reason: "help" };
+    }
     return null;
   }
   // a member of staff is walking you somewhere (to a demo device, to the till)
@@ -316,6 +322,7 @@ class Net {
     this.state = state;
     this.want = want;
     this.needs = needs;
+    this.pollIntents();
   }
 
   private addRemote(v: Present): void {
@@ -328,7 +335,8 @@ class Net {
   // the server decides when a beat has passed or someone gave up, but it has
   // no timer: while an intent involving you is open, ask it to catch up
   private pollIntents(): void {
-    const mine = (this.you ? [...this.intents.values()].some((i) => i.fromId === this.you!.id || i.toId === this.you!.id) : false) || this.escort !== null;
+    // also while waiting for help: the server hands you to whoever is free next
+    const mine = (this.you ? [...this.intents.values()].some((i) => i.fromId === this.you!.id || i.toId === this.you!.id) : false) || this.escort !== null || this.state === "waiting_for_help";
     if (mine && !this.intentPoller) this.intentPoller = setInterval(() => this.send({ type: "intent_poll" }), 500);
     else if (!mine && this.intentPoller) {
       clearInterval(this.intentPoller);
