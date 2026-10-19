@@ -403,7 +403,7 @@ function Interact() {
   useEffect(() => {
     const press = (e: KeyboardEvent) => {
       if (e.code !== "KeyE" || e.repeat || net.talking) return;
-      if (net.hint?.intentId) net.intentAccept(net.hint.intentId);
+      if (net.hint?.intentId) (net.hint.show ? net.intentShow(net.hint.intentId) : net.intentAccept(net.hint.intentId));
       else if (net.hint) net.talkStart(net.hint.id);
       else if (net.deviceHint && !net.myInspectSlot) net.inspectStart(net.deviceHint.slotId);
     };
@@ -444,7 +444,7 @@ function Interact() {
       net.changed();
     }
 
-    let best: { id: string; name: string; d: number; intentId?: string } | null = null;
+    let best: { id: string; name: string; d: number; intentId?: string; show?: boolean } | null = null;
     const free = net.state === "arriving" || net.state === "browsing" || net.state === "waiting_for_help";
     // someone has shown intent to talk to you and is close enough: E accepts it
     // (customers and staff alike). Your own outstanding intents are not offered again.
@@ -453,6 +453,7 @@ function Interact() {
       const now = net.serverNow();
       for (const it of net.intents.values()) {
         if (it.toId !== myId || it.state !== "open") continue;
+        if (it.human && !it.ready) continue; // a real user has not shown intent yet
         const e = net.engaged.get(it.fromId);
         const rem = net.remotes.get(it.fromId);
         const pos = e ? engagedMoment(it.fromId, e, now) : rem;
@@ -460,6 +461,16 @@ function Interact() {
         const d = Math.hypot(pos.x - net.me.x, pos.z - net.me.z);
         if (d > TALK_HINT_RANGE) continue;
         if (!best || d < best.d) best = { id: it.fromId, name: it.fromName, d, intentId: it.id };
+      }
+    }
+    // a specialist standing by their customer: E shows intent to talk
+    if (myId && !best && !net.talking && net.status === "open" && net.identity.kind !== "customer") {
+      for (const it of net.intents.values()) {
+        if (it.fromId !== myId || !it.human || it.ready || it.state !== "open") continue;
+        const r = net.remotes.get(it.toId);
+        if (!r) continue;
+        const d = Math.hypot(r.x - net.me.x, r.z - net.me.z);
+        if (d <= TALK_HINT_RANGE && (!best || d < (best as { d: number }).d)) best = { id: it.toId, name: it.toName, d, intentId: it.id, show: true } as unknown as typeof best;
       }
     }
     const waitingOn = new Set([...net.intents.values()].filter((i) => i.fromId === myId).map((i) => i.toId));
@@ -487,9 +498,9 @@ function Interact() {
         if (post && scriptFor(post)) consider(r.info.id, r.info.name, r.x, r.z);
       }
     }
-    const b = best as { id: string; name: string; intentId?: string } | null;
-    const next = b ? { id: b.id, name: b.name, intentId: b.intentId } : null;
-    if (next?.id !== net.hint?.id || next?.intentId !== net.hint?.intentId) {
+    const b = best as { id: string; name: string; intentId?: string; show?: boolean } | null;
+    const next = b ? { id: b.id, name: b.name, intentId: b.intentId, show: b.show } : null;
+    if (next?.id !== net.hint?.id || next?.intentId !== net.hint?.intentId || next?.show !== net.hint?.show) {
       net.hint = next;
       net.changed();
     }

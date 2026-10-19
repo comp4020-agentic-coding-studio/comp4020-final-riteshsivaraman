@@ -99,7 +99,7 @@ class Net {
   customers: CustomerView[] = [];
   notice: { text: string; at: number } | null = null;
   // who is close enough to talk to, set by the scene
-  hint: { id: string; name: string; intentId?: string } | null = null;
+  hint: { id: string; name: string; intentId?: string; show?: boolean } | null = null;
   // intent to talk (server-authoritative): who has shown intent to whom
   intents = new Map<string, IntentView>();
   // told to wait somewhere for someone to fetch you, if you are
@@ -323,6 +323,10 @@ class Net {
 
   escortCancel(): void {
     if (this.escort && !this.myInspectSlot) this.send({ type: "escort_cancel" });
+  }
+
+  intentShow(intentId: string): void {
+    this.send({ type: "intent_show", intentId });
   }
 
   intentAccept(intentId: string): void {

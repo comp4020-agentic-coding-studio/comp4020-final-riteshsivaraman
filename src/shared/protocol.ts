@@ -94,6 +94,7 @@ export interface IntentView {
   state: "queued" | "open" | "held";
   wait?: { x: number; z: number; label: string };
   human?: boolean; // the person coming is a real user (they walk themselves)
+  ready?: boolean; // a real user has shown intent in person: the customer can now accept
   since: number; // server time
 }
 
@@ -127,6 +128,8 @@ export type ClientMessage =
   // "let the server catch up": sent while an intent involving you is open, so
   // the one-second beat and the give-up are checked without a server timer
   | { type: "intent_poll" }
+  // a specialist, standing by their customer, shows intent to talk (E)
+  | { type: "intent_show"; intentId: string }
   // give up following a member of staff (Esc while being walked somewhere)
   | { type: "escort_cancel" }
   // an employee's side

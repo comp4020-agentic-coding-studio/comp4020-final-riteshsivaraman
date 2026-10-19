@@ -533,6 +533,7 @@ interface IntentRow {
   wait_label: string | null;
   delay_ms: number | null;
   wait_since: number | null;
+  shown_at: number | null;
 }
 
 const liveIntentOf = (db: Database.Database, customerId: string, staffId: string): IntentRow | undefined =>
@@ -548,7 +549,7 @@ function intentView(ctx: Ctx, r: IntentRow): IntentView {
     reason: r.reason,
     state: r.status === "held" ? "held" : r.status === "queued" ? "queued" : "open",
     ...(r.wait_x !== null && r.wait_z !== null ? { wait: { x: r.wait_x, z: r.wait_z, label: r.wait_label ?? "there" } } : {}),
-    ...(r.staff_kind === "visitor" ? { human: true } : {}),
+    ...(r.staff_kind === "visitor" ? { human: true, ready: r.shown_at !== null } : {}),
     since: r.opened_at ?? r.created_at,
   };
 }
@@ -731,11 +732,28 @@ function acceptIncoming(ctx: Ctx, acceptorId: string, r: IntentRow): Outgoing[] 
   const cpos = ctx.position(r.customer_id);
   if (!cpos) return [];
   if (!staffEnd(ctx, r, cpos).arrived) return [notice(acceptorId, `${nameOf(ctx, r.from_id)} is still on the way.`)];
+  // a real user coming to you has to show intent in person first (E)
+  if (r.staff_kind === "visitor" && r.from_id === r.staff_id && r.shown_at === null) return [notice(acceptorId, `${nameOf(ctx, r.from_id)} is on their way over.`)];
   if (!customerFree(ctx, r.customer_id)) return [notice(acceptorId, "Finish what you are doing first.")];
   if (r.staff_kind === "visitor" && openConversationOf(ctx.db, r.staff_id)) return [notice(acceptorId, "Finish your current conversation first.")];
   const closed = closeTalk(ctx, r.customer_id);
   const still = ctx.db.prepare("SELECT * FROM intents WHERE id = ? AND status = 'open'").get(r.id) as IntentRow | undefined;
   return still ? [...closed, ...acceptIntent(ctx, still)] : closed;
+}
+
+// A specialist who has got to their customer shows intent (E). From then on
+// the customer is prompted and can accept.
+export function showIntentById(ctx: Ctx, staffId: string, intentId: string): Outgoing[] {
+  const r = ctx.db.prepare("SELECT * FROM intents WHERE id = ? AND status = 'open'").get(intentId) as IntentRow | undefined;
+  if (!r || r.staff_id !== staffId || r.staff_kind !== "visitor" || r.from_id !== staffId) return [notice(staffId, "They are not waiting for you any more.")];
+  const cpos = ctx.position(r.customer_id);
+  const spos = ctx.position(staffId);
+  if (!cpos || !spos || dist(cpos, spos) > TALK_RANGE) return [notice(staffId, "Walk a little closer first.")];
+  if (r.shown_at !== null) return [];
+  ctx.db.prepare("UPDATE intents SET shown_at = ? WHERE id = ?").run(ctx.now, r.id);
+  log(ctx, r.customer_id, "intent_shown_in_person", { intentId: r.id, by: staffId });
+  const row = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(r.id) as IntentRow;
+  return [intentMessage(ctx, row), notice(staffId, `${nameOf(ctx, r.customer_id)} can see you now. Waiting for them to accept.`)];
 }
 
 export function acceptIntentById(ctx: Ctx, acceptorId: string, intentId: string): Outgoing[] {

@@ -202,6 +202,11 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE intents ADD COLUMN delay_ms INTEGER;
   ALTER TABLE intents ADD COLUMN wait_since INTEGER;
   `,
+  // 10: a real user coming to a customer shows intent themselves (E), once they
+  // are standing there; until then the customer is not prompted.
+  `
+  ALTER TABLE intents ADD COLUMN shown_at INTEGER;
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

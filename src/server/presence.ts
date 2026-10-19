@@ -26,6 +26,7 @@ import {
   closeTalk,
   requestTalk,
   acceptIntentById,
+  showIntentById,
   settleIntents,
   cancelEscort,
   intentViews,
@@ -269,6 +270,10 @@ export function handleConnection(socket: WebSocket): void {
     }
     if (me && message.type === "escort_cancel") {
       deliver(cancelEscort(serviceCtx(), me.id));
+      return;
+    }
+    if (me && message.type === "intent_show" && typeof message.intentId === "string") {
+      deliver(showIntentById(serviceCtx(), me.id, message.intentId));
       return;
     }
     if (me && message.type === "intent_poll") {

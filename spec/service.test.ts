@@ -15,6 +15,7 @@ import {
   closeTalk,
   endInspect,
   acceptIntentById,
+  showIntentById,
   requestTalk,
   settleIntents,
   assignHelper,
@@ -686,7 +687,19 @@ describe("intent to talk (Ritesh, 2026-10-19)", () => {
     expect(last(done, "all", "engaged")).toBeUndefined(); // a person walks themselves
     expect(last(done, "c1", "turn")?.say).toMatch(/Wait near the phones area and Victor will come and find you/);
     // both ends are shown the spot: the customer waits there, the specialist is guided to it
-    expect(last(done, "all", "intent")).toMatchObject({ state: "open", human: true, wait: { label: "the phones area" } });
+    const intent = last(done, "all", "intent")!;
+    expect(intent).toMatchObject({ state: "open", human: true, ready: false, wait: { label: "the phones area" } });
+    // Victor walks to Stacy and presses E; until then she cannot accept, and he cannot from afar
+    closeTalk(ctx(), "c1");
+    positions.set("c1", { x: 0, z: 0 });
+    expect(last(acceptIntentById(ctx(NOW + 5000), "c1", intent.id), "c1", "notice")?.text).toMatch(/still on the way/);
+    expect(last(showIntentById(ctx(NOW + 5000), "e1", intent.id), "e1", "notice")?.text).toMatch(/closer/);
+    positions.set("e1", { x: 1, z: 0 });
+    const shown = showIntentById(ctx(NOW + 6000), "e1", intent.id);
+    expect(last(shown, "all", "intent")).toMatchObject({ ready: true });
+    // now she can accept, and the conversation opens with Victor
+    expect(last(acceptIntentById(ctx(NOW + 7000), "c1", intent.id), "c1", "turn")).toMatchObject({ withId: "e1" });
+    expect(eventTypes()).toContain("intent_shown_in_person");
   });
 });
 
