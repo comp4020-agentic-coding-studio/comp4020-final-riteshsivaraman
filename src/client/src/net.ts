@@ -13,7 +13,7 @@ import type {
   Present,
   Role,
   ServerMessage,
-  StaffTurnView,
+  StaffMenuView,
   TurnView,
   VisitorInfo,
 } from "../../shared/protocol.ts";
@@ -96,7 +96,11 @@ class Net {
   // the conversation you are in, the replies waiting on you if you are an
   // employee, and the customers you can see
   turn: TurnView | null = null;
-  staffTurns = new Map<string, StaffTurnView>();
+  // a real specialist's side of a conversation: the chat, the moves allowed now,
+  // and the customer's facts; null when they are not in one
+  staffConv: StaffMenuView | null = null;
+  // the corner's feed of updates for a specialist (newest last)
+  updates: Array<{ text: string; at: number }> = [];
   customers: CustomerView[] = [];
   notice: { text: string; at: number } | null = null;
   // who is close enough to talk to, set by the scene
@@ -121,6 +125,14 @@ class Net {
   // somewhere it is on hold, so you can move and the camera is free
   get talking(): TurnView | null {
     return this.escort ? null : this.turn;
+  }
+  // a specialist in a conversation (the same hold while walking applies)
+  get staffTalking(): StaffMenuView | null {
+    return this.escort ? null : this.staffConv;
+  }
+  // locked into a conversation, as either side: no walking, the camera on the other
+  get locked(): boolean {
+    return this.talking !== null || this.staffTalking !== null;
   }
   private intentPoller: ReturnType<typeof setInterval> | null = null;
   // devices being inspected right now, by slot id (D39) — server-authoritative,
@@ -246,8 +258,14 @@ class Net {
       case "turn":
         this.turn = message;
         return true;
-      case "staff_turn":
-        this.staffTurns.set(message.conversationId, message);
+      case "staff_menu": {
+        const { type: _t, ...view } = message;
+        this.staffConv = view;
+        return true;
+      }
+      case "staff_menu_end":
+        if (this.staffConv?.conversationId === message.conversationId) this.staffConv = null;
+        this.pushUpdate(message.note);
         return true;
       case "staff_view":
         this.customers = message.customers;
@@ -305,6 +323,7 @@ class Net {
       }
       case "notice":
         this.notice = { text: message.text, at: Date.now() };
+        this.pushUpdate(message.text);
         return true;
       case "inspecting":
         this.inspections.set(message.slotId, message);
@@ -391,18 +410,19 @@ class Net {
     }
   }
 
-  staffRespond(conversationId: string, action: "reply" | "hand_to_genius" | "end"): void {
-    this.send({ type: "staff_respond", conversationId, action });
-    this.staffTurns.delete(conversationId);
-    this.changed();
+  // a specialist's move: one of the offered ones, in a tone
+  staffMove(actId: string, tone: string): void {
+    if (!this.staffConv || this.staffConv.awaiting !== "staff") return;
+    this.send({ type: "staff_move", conversationId: this.staffConv.conversationId, actId, tone });
   }
 
-  claim(customerId: string): void {
-    this.send({ type: "claim", customerId });
+  // a specialist steps away from the conversation (Esc)
+  staffLeave(): void {
+    if (this.staffConv) this.send({ type: "talk_leave" });
   }
 
-  handOn(customerId: string, to: string, note: string): void {
-    this.send({ type: "hand_on", customerId, to, note });
+  private pushUpdate(text: string): void {
+    this.updates = [...this.updates, { text, at: Date.now() }].slice(-6);
   }
 
   // Dev switch between customer and staff, for walking (`?dev=1`).

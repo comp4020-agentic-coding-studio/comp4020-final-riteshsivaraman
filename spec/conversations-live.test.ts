@@ -83,38 +83,47 @@ it("ignores a profile that is not valid, rather than trusting it", async () => {
   expect(welcome.identity.look).toBeUndefined();
 });
 
-it("takes a customer to the phones team, and lets an employee claim and serve them", async () => {
+it("sends a real specialist for a customer, who shows intent, is accepted, and serves them through the engine", async () => {
+  // the specialist is in the store first, so they are who is sent for the customer
+  const { v: employee, welcome } = await join({ kind: "specialist", specialty: "phones", name: "Sam" });
+  expect(welcome.offDuty).not.toContain("spec-phones"); // an extra pair of hands, not a replacement
+  employee.send({ type: "move", x: 2.6, z: 0, ry: 0 });
+
   const { v: customer } = await join({ kind: "customer", name: "Cust Live" });
   await walkTo(customer, "greeter-1");
   customer.send({ type: "talk_start", withId: "greeter-1" });
   const hello = (await customer.next((m) => m.type === "turn")) as Extract<ServerMessage, { type: "turn" }>;
   expect(hello.choices.map((c) => c.id)).toContain("phone");
-
   customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "phone" });
   await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id === "help"));
   customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "help" });
-  const waiting = await customer.next((m) => m.type === "state" && m.state === "waiting_for_help");
-  expect(waiting).toMatchObject({ needs: "specialist:phones", want: "phone" });
+  const told = (await customer.next((m) => m.type === "turn" && m.ended)) as Extract<ServerMessage, { type: "turn" }>;
+  expect(told.say).toMatch(/Sam will come and find you/);
 
-  // an employee comes in and is shown the customer
-  const { v: employee, welcome } = await join({ kind: "specialist", specialty: "phones", name: "Sam" });
-  expect(welcome.offDuty).not.toContain("spec-phones"); // an extra pair of hands, not a replacement
-  const view = (await employee.next((m) => m.type === "staff_view" && m.customers.some((c) => c.id === customer.id))) as Extract<ServerMessage, { type: "staff_view" }>;
-  expect(view.customers.find((c) => c.id === customer.id)).toMatchObject({ state: "waiting_for_help", needs: "specialist:phones" });
+  // Sam is given the customer as a task, goes to them and shows intent in person
+  const task = (await employee.next((m) => m.type === "intent" && m.fromId === employee.id)) as Extract<ServerMessage, { type: "intent" }>;
+  expect(task).toMatchObject({ toId: customer.id, reason: "help" });
+  customer.send({ type: "talk_close" });
+  customer.send({ type: "move", x: 2, z: 0, ry: 0 });
+  await pause(150);
+  employee.send({ type: "intent_show", intentId: task.id });
+  await customer.next((m) => m.type === "intent" && m.id === task.id && m.ready === true);
 
-  // claim, then serve through menus on both sides
+  // the customer accepts: both are in the conversation, Sam given the engine's moves
+  const mark = employee.mark();
+  customer.send({ type: "intent_accept", intentId: task.id });
+  const waiting = (await customer.next((m) => m.type === "turn" && m.withId === employee.id)) as Extract<ServerMessage, { type: "turn" }>;
+  expect(waiting.awaiting).toBe("staff");
+  const menu = (await employee.next((m) => m.type === "staff_menu", 2500, mark)) as Extract<ServerMessage, { type: "staff_menu" }>;
+  expect(menu.acts.length).toBeGreaterThan(0);
+
+  // Sam makes a move; the customer is given their menu
   const cMark = customer.mark();
-  employee.send({ type: "claim", customerId: customer.id });
-  const opened = (await customer.next((m) => m.type === "turn" && m.withId === employee.id, 2500, cMark)) as Extract<ServerMessage, { type: "turn" }>;
-  customer.send({ type: "talk_choose", conversationId: opened.conversationId, choice: "show" });
-  const ask = (await employee.next((m) => m.type === "staff_turn")) as Extract<ServerMessage, { type: "staff_turn" }>;
-  expect(ask.customerPicked).toBe("Show me what you have");
-  const mark = customer.mark();
-  employee.send({ type: "staff_respond", conversationId: ask.conversationId, action: "reply" });
-  const models = (await customer.next((m) => m.type === "turn" && m.awaiting === "customer" && m.choices.some((c) => c.id.startsWith("product:")), 2500, mark)) as Extract<ServerMessage, { type: "turn" }>;
-  expect(models.choices.length).toBeGreaterThan(1);
+  employee.send({ type: "staff_move", conversationId: menu.conversationId, actId: menu.acts[0]!.id, tone: "friendly" });
+  const turn = (await customer.next((m) => m.type === "turn" && m.awaiting === "customer" && m.choices.length > 0, 2500, cMark)) as Extract<ServerMessage, { type: "turn" }>;
+  expect(turn.choices.length).toBeGreaterThan(0);
 
-  // when the employee leaves, the customer is let go
+  // when the specialist leaves, the customer is let go
   const m2 = customer.mark();
   employee.socket.close();
   await customer.next((m) => m.type === "turn" && m.ended, 3000, m2);
@@ -129,27 +138,3 @@ it("will not let a visitor talk to a character from across the store", async () 
   expect(n.text).toMatch(/closer|not on|someone/);
 });
 
-it("has stock on the shelves in the running app (the shop is not all sold out)", async () => {
-  // the phones specialist's colour menu shows how many are left, from the real database
-  const { v: customer } = await join({ kind: "customer", name: "Stock Check" });
-  const { v: employee } = await join({ kind: "specialist", specialty: "phones", name: "Stock Sam" });
-  customer.send({ type: "move", x: 0, z: 0, ry: 0 });
-  employee.send({ type: "move", x: 0.6, z: 0, ry: 0 });
-  await pause(150);
-  customer.send({ type: "talk_start", withId: employee.id });
-  // a person has to accept (E on the prompt); the conversation does not open by itself
-  const intent = (await employee.next((m) => m.type === "intent" && m.fromId === customer.id)) as Extract<ServerMessage, { type: "intent" }>;
-  employee.send({ type: "intent_accept", intentId: intent.id });
-  const hello = (await customer.next((m) => m.type === "turn")) as Extract<ServerMessage, { type: "turn" }>;
-  customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "show" });
-  const ask = (await employee.next((m) => m.type === "staff_turn")) as Extract<ServerMessage, { type: "staff_turn" }>;
-  employee.send({ type: "staff_respond", conversationId: ask.conversationId, action: "reply" });
-  await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id === "product:iphone-18-pro"));
-  const mark = customer.mark();
-  customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "product:iphone-18-pro" });
-  const asked = (await employee.next((m) => m.type === "staff_turn" && m.customerPicked === "iPhone 18 Pro")) as Extract<ServerMessage, { type: "staff_turn" }>;
-  employee.send({ type: "staff_respond", conversationId: asked.conversationId, action: "reply" });
-  const colours = (await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id.startsWith("colour:")), 2500, mark)) as Extract<ServerMessage, { type: "turn" }>;
-  // at least one colour is in stock (a stocked shop lists "(n left)")
-  expect(colours.choices.some((c) => /\(\d+ left\)/.test(c.label))).toBe(true);
-});

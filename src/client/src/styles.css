@@ -767,3 +767,184 @@ kbd {
   font-weight: 600;
   margin: 2px 0 6px;
 }
+
+/* a specialist's conversation: chat and moves on the left, the facts on the right */
+.staff-corner {
+  position: fixed;
+  left: 12px;
+  top: 64px;
+  max-width: 280px;
+  padding: 8px 12px;
+  background: rgba(20, 22, 26, 0.85);
+  color: #fff;
+  border-radius: 8px;
+  font: 13px/1.4 system-ui, sans-serif;
+  z-index: 15;
+}
+.staff-corner.idle {
+  opacity: 0.7;
+}
+.staff-corner b {
+  display: block;
+  color: #ffd23f;
+  margin-bottom: 2px;
+}
+.staff-corner .task,
+.staff-corner .updates div {
+  margin-bottom: 2px;
+}
+.staff-corner .updates {
+  margin-top: 6px;
+}
+.staff-talk {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  width: min(430px, calc(100vw - 36px));
+  box-sizing: border-box;
+  padding: 16px 18px 16px;
+  background: rgba(250, 251, 252, 0.97);
+  border: 3px solid #1d1f23;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  z-index: 20;
+}
+.staff-log {
+  max-height: 210px;
+  overflow-y: auto;
+  margin: 8px 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.staff-log p {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1.35;
+  max-width: 88%;
+}
+.staff-log p span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.staff-log p.you {
+  align-self: flex-end;
+  background: #1d1f23;
+  color: #fff;
+}
+.staff-log p.them {
+  align-self: flex-start;
+  background: #e8ebef;
+}
+.staff-empty {
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+}
+.staff-status {
+  font-size: 13px;
+  color: #555;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+.staff-tones {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.staff-tones button {
+  font: inherit;
+  font-size: 13px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 2px solid #b8bec6;
+  background: #fff;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+.staff-tones button.on {
+  background: #1d1f23;
+  color: #fff;
+  border-color: #1d1f23;
+}
+.staff-acts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+  max-height: 34vh;
+  overflow-y: auto;
+}
+.staff-acts button {
+  font: inherit;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid #b8bec6;
+  background: #fff;
+  cursor: pointer;
+}
+.staff-acts button:hover {
+  background: #1d1f23;
+  color: #fff;
+  border-color: #1d1f23;
+}
+.staff-acts button small {
+  display: block;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.staff-facts {
+  position: fixed;
+  right: 18px;
+  top: 70px;
+  width: min(340px, calc(100vw - 36px));
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 12px 16px 14px;
+  background: rgba(250, 251, 252, 0.95);
+  border: 2px solid #1d1f23;
+  border-radius: 12px;
+  font-size: 13px;
+  z-index: 20;
+}
+.staff-facts h3 {
+  margin: 6px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+}
+.staff-facts ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.staff-facts li span {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.staff-facts table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.staff-facts td {
+  padding: 4px 4px 4px 0;
+  vertical-align: top;
+  border-bottom: 1px solid #e3e6ea;
+}
+.staff-facts td small {
+  display: block;
+  color: #777;
+}
+@media (max-width: 760px) {
+  .staff-facts {
+    display: none;
+  }
+}

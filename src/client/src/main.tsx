@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Entry } from "./Entry.tsx";
 import { SHOT, Store } from "./Store.tsx";
 import { StaffPanel } from "./StaffPanel.tsx";
+import { StaffTalk } from "./StaffTalk.tsx";
 import { Talk } from "./Talk.tsx";
 import { CharacterStage } from "./gfx/CharacterStage.tsx";
 import { DeviceStage } from "./gfx/DeviceStage.tsx";
@@ -67,22 +68,7 @@ function Hud() {
           DEV: walking as {live.role === "staff" ? "staff" : "a customer"} (click to switch)
         </button>
       )}
-      {live.isEmployee && live.you && [...live.intents.values()].some((i) => i.fromId === live.you!.id) && (
-        <div className="missions">
-          <b>Missions</b>
-          {[...live.intents.values()]
-            .filter((i) => i.fromId === live.you!.id)
-            .map((i) => (
-              <div key={i.id}>
-                {i.state === "queued" ? "Next: " : ""}
-                {i.reason === "help" ? "Meet" : "Go to"} {i.toName}
-                {i.wait ? ` near ${i.wait.label}` : ""}
-                {i.reason === "help" ? ", who is waiting for help" : ""}
-              </div>
-            ))}
-        </div>
-      )}
-      {live.waitingAt && !live.talking && (
+      {live.waitingAt && !live.locked && (
         <div className="escort-banner">
           Wait near {live.waitingAt.label}. {live.waitingAt.who ? `${live.waitingAt.who} will come and find you.` : "Someone will come and get you as soon as they're free."}
         </div>
@@ -93,8 +79,8 @@ function Hud() {
           {live.myInspectSlot ? "" : " · Esc to stop following"}
         </div>
       )}
-      {live.hint && !live.talking && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
-      {!live.hint && live.deviceHint && !live.talking && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect {live.deviceHint.name}</div>}
+      {live.hint && !live.locked && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
+      {!live.hint && live.deviceHint && !live.locked && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect {live.deviceHint.name}</div>}
       {live.notice && Date.now() - live.notice.at < 4000 && <div className="toast">{live.notice.text}</div>}
     </div>
   );
@@ -145,6 +131,7 @@ function App() {
         <>
           <Hud />
           <Talk />
+          <StaffTalk />
           <StaffPanel />
         </>
       )}

@@ -127,7 +127,7 @@ function Player() {
       }
       // a conversation holds the camera on the other person's face: dragging
       // doesn't fight that (same as it already doesn't move you while talking)
-      if (net.talking !== null) return;
+      if (net.locked) return;
       camera.rotation.y -= e.movementX * 0.003;
       camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x - e.movementY * 0.003));
     };
@@ -211,7 +211,7 @@ function Player() {
     // route — mid-walkover it hasn't arrived yet, so there is nothing to aim
     // at besides where it already stands), or another visitor's own reported
     // position if a human is staffing the desk.
-    const talkWithId = net.talking?.withId ?? null;
+    const talkWithId = net.talking?.withId ?? net.staffTalking?.customerId ?? null;
     if (talkWithId) {
       const eng = net.engaged.get(talkWithId);
       const remote = net.remotes.get(talkWithId);
@@ -222,7 +222,7 @@ function Player() {
         talkExiting.current = false;
         talkStandPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
       }
-      TALK_TARGET.set(at.x, STORE_Y + (eng?.seated ? 1.2 : TALK_HEAD_Y), at.z); // a seated head is lower
+      TALK_TARGET.set(at.x, STORE_Y + (eng?.seated || net.seats.has(talkWithId) ? 1.2 : TALK_HEAD_Y), at.z); // a seated head is lower
       // stand off on the near side, between where you are now and their face,
       // so the pan reads as leaning toward them rather than swinging around
       const dx = camera.position.x - TALK_TARGET.x;
@@ -263,7 +263,7 @@ function Player() {
     }
 
     // in a conversation you stand and read; the keys pick from the menu
-    const talking = net.talking !== null;
+    const talking = net.locked;
     const forward = talking ? 0 : (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const strafe = talking ? 0 : (keys.has("KeyD") ? 1 : 0) - (keys.has("KeyA") ? 1 : 0);
 
@@ -402,7 +402,7 @@ function Interact() {
   const { camera } = useThree();
   useEffect(() => {
     const press = (e: KeyboardEvent) => {
-      if (e.code !== "KeyE" || e.repeat || net.talking) return;
+      if (e.code !== "KeyE" || e.repeat || net.locked) return;
       if (net.hint?.intentId) (net.hint.show ? net.intentShow(net.hint.intentId) : net.intentAccept(net.hint.intentId));
       else if (net.hint) net.talkStart(net.hint.id);
       else if (net.deviceHint && !net.myInspectSlot) net.inspectStart(net.deviceHint.slotId);
@@ -422,7 +422,7 @@ function Interact() {
     // the same table re-picks it, the way aiming a reticle would, rather than
     // always locking onto whichever is nearest in the world.
     let bestDevice: { slot: DeviceSlot; sd: number } | null = null;
-    if (!net.talking && !net.myInspectSlot && net.status === "open") {
+    if (!net.locked && !net.myInspectSlot && net.status === "open") {
       for (const s of DEVICE_SLOTS) {
         if (net.inspections.has(s.id)) continue;
         const dx = s.x - net.me.x;
@@ -449,7 +449,7 @@ function Interact() {
     // someone has shown intent to talk to you and is close enough: E accepts it
     // (customers and staff alike). Your own outstanding intents are not offered again.
     const myId = net.you?.id;
-    if (myId && !net.talking && net.status === "open" && (free || net.identity.kind !== "customer")) {
+    if (myId && !net.locked && net.status === "open" && (free || net.identity.kind !== "customer")) {
       const now = net.serverNow();
       for (const it of net.intents.values()) {
         if (it.toId !== myId || it.state !== "open") continue;
@@ -464,7 +464,7 @@ function Interact() {
       }
     }
     // a specialist standing by their customer: E shows intent to talk
-    if (myId && !best && !net.talking && net.status === "open" && net.identity.kind !== "customer") {
+    if (myId && !best && !net.locked && net.status === "open" && net.identity.kind !== "customer") {
       for (const it of net.intents.values()) {
         if (it.fromId !== myId || !it.human || it.ready || it.state !== "open") continue;
         const r = net.remotes.get(it.toId);
@@ -474,7 +474,7 @@ function Interact() {
       }
     }
     const waitingOn = new Set([...net.intents.values()].filter((i) => i.fromId === myId).map((i) => i.toId));
-    if (!best && net.identity.kind === "customer" && free && !net.talking && net.status === "open") {
+    if (!best && net.identity.kind === "customer" && free && !net.locked && net.status === "open") {
       const consider = (id: string, name: string, x: number, z: number) => {
         if (waitingOn.has(id)) return;
         const dx = x - net.me.x;

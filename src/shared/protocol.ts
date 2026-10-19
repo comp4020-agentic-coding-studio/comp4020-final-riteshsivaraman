@@ -55,16 +55,6 @@ export interface TurnView {
   awaiting: "customer" | "staff"; // whose turn: a customer waits on staff, shown no menu
 }
 
-// The employee's side of a menu conversation: what the customer picked, and
-// the reply the script would give, to send or change.
-export interface StaffTurnView {
-  conversationId: string;
-  customerId: string;
-  customerName: string;
-  customerPicked: string;
-  scripted: string; // the scripted reply, if they just reply
-  actions: Array<{ id: "reply" | "hand_to_genius" | "end"; label: string }>;
-}
 
 export interface Engagement {
   npcId: string;
@@ -115,6 +105,25 @@ export interface Inspection {
 // Who a visitor is acting as. Customers stay on the shop floor; staff may also
 // go behind the bar and into the back room. For now a dev button switches
 // between them (the server trusts the claim); real roles come later.
+// What a real specialist sees while serving a customer (Ritesh, 2026-10-20):
+// the chat so far, the moves the engine allows now (each with its own hint about
+// how far it narrows the phones), and beside it what the customer has said and
+// which phones are still in play.
+export interface StaffMenuView {
+  conversationId: string;
+  customerId: string;
+  customerName: string;
+  log: Array<{ who: "staff" | "customer"; text: string }>;
+  awaiting: "staff" | "customer";
+  acts: Array<{ id: string; label: string; hint: string }>;
+  tones: Array<{ id: string; label: string }>;
+  stats: {
+    answers: Array<{ label: string; value: string }>;
+    candidates: Array<{ name: string; screen: string; from: string; battery: string; note: string }>;
+  };
+  status: string; // what is happening when it is not your move
+}
+
 export type Role = "customer" | "staff";
 
 export type ClientMessage =
@@ -128,6 +137,8 @@ export type ClientMessage =
   | { type: "talk_leave" }
   // dismissed the final turn: the NPC is let go only now
   | { type: "talk_close" }
+  // a specialist's move in a conversation: one of the moves offered, in a tone
+  | { type: "staff_move"; conversationId: string; actId: string; tone: string }
   // accept someone's intent to talk to you (E on the prompt)
   | { type: "intent_accept"; intentId: string }
   // "let the server catch up": sent while an intent involving you is open, so
@@ -138,9 +149,6 @@ export type ClientMessage =
   // give up following a member of staff (Esc while being walked somewhere)
   | { type: "escort_cancel" }
   // an employee's side
-  | { type: "staff_respond"; conversationId: string; action: "reply" | "hand_to_genius" | "end" }
-  | { type: "claim"; customerId: string }
-  | { type: "hand_on"; customerId: string; to: string; note?: string }
   // look at a device on a table (E near it); ends on Esc, tap-away, walking
   // off, or starting anything else
   | { type: "inspect_start"; slotId: string }
@@ -176,7 +184,8 @@ export type ServerMessage =
   | { type: "left"; id: string }
   | { type: "state"; state: PlayerStateName; want: string | null; needs: string | null }
   | ({ type: "turn" } & TurnView)
-  | ({ type: "staff_turn" } & StaffTurnView)
+  | ({ type: "staff_menu" } & StaffMenuView)
+  | { type: "staff_menu_end"; conversationId: string; note: string }
   | { type: "staff_view"; customers: CustomerView[] }
   | { type: "duty"; offDuty: string[] }
   | ({ type: "engaged" } & Engagement)

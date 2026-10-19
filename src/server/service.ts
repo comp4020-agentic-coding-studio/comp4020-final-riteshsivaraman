@@ -14,7 +14,7 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { NPCS, npcPose } from "../shared/npcs.ts";
-import type { CustomerView, Engagement, Inspection, IntentView, ServerMessage, StaffTurnView, TurnView } from "../shared/protocol.ts";
+import type { CustomerView, Engagement, Inspection, IntentView, ServerMessage, StaffMenuView, TurnView } from "../shared/protocol.ts";
 import { engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
@@ -25,7 +25,7 @@ import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../sh
 import { modelById } from "../shared/talk/data.ts";
 import { takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
-import { beginTalk, currentTurn, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
+import { beginHumanTalk, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import type { Scene } from "../shared/talk/types.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
@@ -466,7 +466,7 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
 // richer staff-side UI noted in server-wiring-proposal.md axis 3 option B)
 // keeps the old engine. Ritesh, 2026-10-19: phone-only, coexist, smallest
 // real slice.
-const usesTalkEngine = (script: ScriptId, withKind: "npc" | "visitor"): boolean => script === "phones" && withKind === "npc";
+const usesTalkEngine = (script: ScriptId, _withKind: "npc" | "visitor"): boolean => script === "phones";
 
 function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "visitor", script: ScriptId, at: { x: number; z: number }, engagedSince: number = ctx.now): Outgoing[] {
   const id = randomUUID();
@@ -474,11 +474,13 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   // as a staff member's claim, still clears it so nothing is left dangling)
   const cleared = endLiveIntents(ctx, (r) => r.customer_id === customerId && r.staff_id === withId, "accepted");
   if (usesTalkEngine(script, withKind)) {
-    const begun = beginTalk(id);
+    const humanStaff = withKind === "visitor";
+    // a real specialist moves first: the customer waits for them
+    const begun = humanStaff ? { scene: beginHumanTalk(), turn: { say: `${nameOf(ctx, withId)} is with you now.`, choices: [], ended: false } as TalkTurn } : beginTalk(id);
     const scene = begun.scene;
     const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: "talk", data: null, started_at: ctx.now, ended_at: null };
     // the specialist's first question is whether to sit down, if a table is free
-    const offerSeat = !begun.turn.ended && freeTableFor(ctx, customerId) !== null;
+    const offerSeat = !humanStaff && !begun.turn.ended && freeTableFor(ctx, customerId) !== null;
     const data: TalkConvData = { engine: "talk", scene, at, ...(offerSeat ? { stage: "seat_offer" as const } : {}), ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at } } : {}) };
     const turn = seatChoices(ctx, row, data, begun.turn);
     ctx.db
@@ -486,10 +488,11 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
       .run(row.id, customerId, withId, withKind, script, row.node, JSON.stringify(data), ctx.now);
     setState(ctx, customerId, { state: "in_conversation", with_id: withId });
     log(ctx, customerId, "conversation_started", { conversationId: row.id, with: withId, kind: withKind, script });
-    const out: Outgoing[] = [...cleared, { to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, withId), turn.say, turn.choices, turn.ended, "customer") } }];
+    const out: Outgoing[] = [...cleared, { to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, withId), turn.say, turn.choices, turn.ended, humanStaff ? "staff" : "customer") } }];
     const sm = stateMessage(ctx, customerId);
     if (sm) out.push(sm);
-    out.push({ to: "all", message: { type: "engaged", npcId: withId, visitorId: customerId, since: engagedSince, at } });
+    if (withKind === "npc") out.push({ to: "all", message: { type: "engaged", npcId: withId, visitorId: customerId, since: engagedSince, at } });
+    else out.push(staffMenu(ctx, row, data));
     out.push(staffViewMessage(ctx));
     if (turn.ended) return [...out, ...finishTalk(ctx, { ...row, data: JSON.stringify(data) }, scene)];
     return out;
@@ -844,6 +847,78 @@ export function assignHelper(ctx: Ctx, customerId: string, post: string): { out:
   return { out, helperName: nameOf(ctx, helper.id), waitLabel: spot?.label ?? null };
 }
 
+// ---- a real specialist serving a customer (Ritesh, 2026-10-20) ----
+//
+// The same conversation model as the NPCs use: the engine lists the moves that
+// are legal now, the specialist picks one (in a tone), the customer answers
+// from their own menu, and so on. The specialist is shown the chat, those
+// moves, and beside them what the customer has said and which phones are
+// still in play. Both are locked into the conversation (the client freezes
+// movement and zooms in) except while walking to a table or a device.
+
+const isHuman = (ctx: Ctx, id: string): boolean => ctx.employees.some((e) => e.id === id);
+
+// What is going on when it is not the specialist's move.
+function staffStatus(ctx: Ctx, row: ConvRow, d: TalkConvData): string {
+  const name = nameOf(ctx, row.customer_id);
+  if (d.checkout) return d.checkout.stage === "fetching" ? "You checked stock on your phone and ordered it: it is being brought out to you…" : `Taking payment from ${name}…`;
+  if (d.stage === "seat_offer") return `Waiting for ${name} to say whether to sit down…`;
+  if (liveEscortOf(ctx.db, row.customer_id)) return `Walking with ${name}…`;
+  return d.scene.ended ? "That is over." : d.scene.toMove === "staff" ? "Your move." : `Waiting for ${name}…`;
+}
+
+// What the specialist sees now, as a message to them.
+function staffMenu(ctx: Ctx, row: ConvRow, d: TalkConvData): Outgoing {
+  const blocked = !!d.checkout || d.stage === "seat_offer" || !!liveEscortOf(ctx.db, row.customer_id) || !!d.scene.ended;
+  const myMove = d.scene.toMove === "staff" && !blocked;
+  const acts = myMove ? staffActList(d.scene) : [];
+  if (myMove && !d.scene.forced && !d.seat && freeTableFor(ctx, row.customer_id)) acts.push({ id: "seat", label: "Offer to sit down at a table", hint: "talk it through seated" });
+  const view: StaffMenuView = {
+    conversationId: row.id,
+    customerId: row.customer_id,
+    customerName: nameOf(ctx, row.customer_id),
+    log: staffLog(d.scene),
+    awaiting: myMove ? "staff" : "customer",
+    acts,
+    tones: STAFF_TONES,
+    stats: staffStats(d.scene),
+    status: staffStatus(ctx, row, d),
+  };
+  return { to: row.with_id, message: { type: "staff_menu", ...view } };
+}
+
+const waitingTurn = (ctx: Ctx, row: ConvRow, say?: string): Outgoing => ({
+  to: row.customer_id,
+  message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say ?? `${nameOf(ctx, row.with_id)} is thinking…`, [], false, "staff") },
+});
+
+// The specialist makes a move: one of the engine's, or offering a table.
+export function staffMove(ctx: Ctx, staffId: string, conversationId: string, actId: string, toneId: string): Outgoing[] {
+  const row = getConv(ctx.db, conversationId);
+  if (!row || row.with_id !== staffId || row.with_kind !== "visitor" || row.ended_at !== null) return [notice(staffId, "That conversation is over.")];
+  const d0 = anyDataOf(row);
+  if (!isTalkData(d0)) return [notice(staffId, "That conversation is over.")];
+  if (d0.checkout || d0.stage === "seat_offer" || liveEscortOf(ctx.db, row.customer_id)) return [notice(staffId, "Not yet: wait for this to finish.")];
+  if (actId === "seat") {
+    if (d0.seat || d0.scene.toMove !== "staff") return [notice(staffId, "Not now.")];
+    if (!freeTableFor(ctx, row.customer_id)) return [notice(staffId, "Every table is taken right now."), staffMenu(ctx, row, d0)];
+    const next: TalkConvData = { ...d0, stage: "seat_offer" };
+    saveTalkData(ctx, row, next);
+    log(ctx, row.customer_id, "seat_offered", { conversationId: row.id, by: staffId });
+    return [showTurn(ctx, row, next, `${nameOf(ctx, staffId)}: would you like to sit down at one of the tables and talk it through?`), staffMenu(ctx, row, next)];
+  }
+  const r = stepStaffMove(d0.scene, actId, toneId);
+  if ("error" in r) return [notice(staffId, "That is not one of the moves.")];
+  log(ctx, row.customer_id, "talk_staff_move", { conversationId: row.id, by: staffId, move: r.label, tone: toneId });
+  const next: TalkConvData = { ...d0, scene: r.scene };
+  saveTalkConv(ctx, row, next, false);
+  const out: Outgoing[] = [];
+  // a demo: the two of them walk to a real device of that model
+  if (r.scene.demoed.length > d0.scene.demoed.length) return [...out, ...startDemoEscort(ctx, row, r.scene.demoed[r.scene.demoed.length - 1]!), staffMenu(ctx, row, next)];
+  out.push(showTurn(ctx, row, next), staffMenu(ctx, row, next));
+  return out;
+}
+
 // ---- sitting down together (Ritesh, 2026-10-19) ----
 //
 // The specialist offers to sit at a table to talk a phone through (only if one
@@ -922,7 +997,7 @@ function seatChoices(ctx: Ctx, row: ConvRow, d: TalkConvData, base: TalkTurn): T
 
 function showTurn(ctx: Ctx, row: ConvRow, d: TalkConvData, sayOverride?: string): Outgoing {
   const t = seatChoices(ctx, row, d, currentTurn(d.scene));
-  return { to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sayOverride ?? t.say, t.choices, false, "customer") } };
+  return { to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sayOverride ?? t.say, t.choices, false, t.choices.length === 0 ? "staff" : "customer") } };
 }
 
 function saveTalkData(ctx: Ctx, row: ConvRow, d: TalkConvData): void {
@@ -935,15 +1010,15 @@ function handleSeatChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId: str
     const next: TalkConvData = { ...d, stage: undefined };
     saveTalkData(ctx, row, next);
     log(ctx, row.customer_id, "seat_declined", { conversationId: row.id });
-    return [showTurn(ctx, row, next)];
+    return [showTurn(ctx, row, next), ...(row.with_kind === "visitor" ? [staffMenu(ctx, row, next)] : [])];
   }
   if (choiceId !== "seat:sit") return [notice(row.customer_id, "That is not one of the options.")];
   const next: TalkConvData = { ...d, stage: undefined };
   saveTalkData(ctx, row, next);
   const table = d.seat ? null : freeTableFor(ctx, row.customer_id);
-  if (!table) return [notice(row.customer_id, "Every table is taken right now."), showTurn(ctx, row, next)];
+  if (!table) return [notice(row.customer_id, "Every table is taken right now."), showTurn(ctx, row, next), ...(row.with_kind === "visitor" ? [staffMenu(ctx, row, next)] : [])];
   log(ctx, row.customer_id, "seat_accepted", { conversationId: row.id, tableId: table.id });
-  const from = npcPlace(ctx, next.eng, row.with_id);
+  const from = row.with_kind === "visitor" ? (ctx.position(row.with_id) ?? table.host.at) : npcPlace(ctx, next.eng, row.with_id);
   return beginEscort(ctx, {
     customerId: row.customer_id,
     staffId: row.with_id,
@@ -953,7 +1028,8 @@ function handleSeatChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId: str
     goal: table.host.at,
     face: table.host.face,
     stand: table.guest.at,
-    text: `Follow ${nameOf(ctx, row.with_id)} to a table`,
+    text: row.with_kind === "visitor" ? "Go to your seat at the table" : `Follow ${nameOf(ctx, row.with_id)} to a table`,
+    staffText: `Go to your seat at the table with ${nameOf(ctx, row.customer_id)}`,
   });
 }
 
@@ -964,6 +1040,18 @@ function sitDown(ctx: Ctx, e: EscortRow): Outgoing[] {
   if (!conv || conv.ended_at !== null || !t) return [];
   const d = anyDataOf(conv);
   if (!isTalkData(d)) return [];
+  if (isHuman(ctx, e.staff_id)) {
+    // two real people on the two stools of one side, each turned a little to the other
+    const next: TalkConvData = { ...d, seat: { tableId: t.id }, sat: true };
+    saveTalkData(ctx, conv, next);
+    log(ctx, e.customer_id, "seated", { conversationId: conv.id, tableId: t.id });
+    return [
+      seatedMessage(e.customer_id, t),
+      { to: "all", message: { type: "seated", visitorId: e.staff_id, at: t.host.at, face: t.host.face } },
+      showTurn(ctx, conv, next),
+      staffMenu(ctx, conv, next),
+    ];
+  }
   const eng: Engagement = {
     npcId: e.staff_id,
     visitorId: e.customer_id,
@@ -988,6 +1076,12 @@ function standUp(ctx: Ctx, row: ConvRow): Outgoing[] {
   const cpos = ctx.position(row.customer_id) ?? t?.guest.at;
   const next: TalkConvData = { ...d, seat: undefined };
   const out: Outgoing[] = [{ to: "all", message: { type: "unseated", visitorId: row.customer_id } }];
+  if (row.with_kind === "visitor") {
+    out.push({ to: "all", message: { type: "unseated", visitorId: row.with_id } });
+    saveTalkData(ctx, row, next);
+    log(ctx, row.customer_id, "stood_up", { conversationId: row.id });
+    return out;
+  }
   if (t && cpos) {
     const eng: Engagement = { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: cpos, from: t.host.at };
     next.eng = eng;
@@ -1015,14 +1109,33 @@ const payTurn = (c: Checkout): TalkTurn => ({
 
 function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: string; storage: string; colour: string; price: number }, line: string): Outgoing[] {
   const sale = { name: modelById(sku.model).name, colour: sku.colour, storage: sku.storage, price: sku.price };
+  // checking stock is real: a unit the shop tracks is taken off the shelf and
+  // held for them (one customer wins the last unit, S11); a phone the stock
+  // table does not list is not tracked yet [TK], so it is simply available
+  const product = `iphone-${sku.model}`;
+  const tracked = ctx.db.prepare("SELECT 1 FROM stock WHERE product = ? AND colour = ? AND storage = ?").get(product, sku.colour, sku.storage);
+  if (tracked) {
+    if (!takeOne(ctx.db, product, sku.colour, sku.storage)) {
+      log(ctx, row.customer_id, "reserve_lost", { product, colour: sku.colour });
+      const scene: Scene = { ...d.scene, ended: { how: "left", why: "sold out" } };
+      saveTalkData(ctx, row, { ...d, scene });
+      const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
+      return [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sorry, [], true, "customer") } }, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
+    }
+    ctx.db
+      .prepare("INSERT INTO reservations (id, visitor_id, product, colour, storage, status, created_at, expires_at) VALUES (?, ?, ?, ?, ?, 'held', ?, ?)")
+      .run(randomUUID(), row.customer_id, product, sku.colour, sku.storage, ctx.now, ctx.now + HOLD_MS);
+    log(ctx, row.customer_id, "reserved", { product, colour: sku.colour, expiresAt: ctx.now + HOLD_MS });
+  }
   // the stock person who is free (the runner first), sent from wherever they are in the back
   const stockId = STOCK_STAFF.find((id) => !npcBusy(ctx, id)) ?? STOCK_STAFF[0];
-  const spec = npcPlace(ctx, d.eng, row.with_id);
+  const human = row.with_kind === "visitor";
+  const spec = human ? (ctx.position(row.with_id) ?? { x: 0, z: 0 }) : npcPlace(ctx, d.eng, row.with_id);
   const spot = nearestStaffSpot({ x: spec.x + 0.9, z: spec.z });
   const stockEng: Engagement = { npcId: stockId, visitorId: row.customer_id, since: ctx.now, at: spot, lead: { x: spot.x, z: spot.z, fx: spec.x, fz: spec.z } };
   // the specialist stands (or sits) checking stock on their phone
-  const eng: Engagement = { ...(d.eng ?? { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: spot }), doing: "phone" };
-  const next: TalkConvData = { ...d, eng, checkout: { stage: "fetching", stockId, stockEng, sale } };
+  const eng: Engagement | undefined = human ? undefined : { ...(d.eng ?? { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: spot }), doing: "phone" };
+  const next: TalkConvData = { ...d, ...(eng ? { eng } : {}), checkout: { stage: "fetching", stockId, stockEng, sale } };
   saveTalkConv(ctx, row, next, false);
   log(ctx, row.customer_id, "stock_checked", { conversationId: row.id, by: row.with_id, sale });
   log(ctx, row.customer_id, "stock_ordered", { conversationId: row.id, stockId, sale });
@@ -1030,7 +1143,7 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
   const say = line.replace(/I'll take you across to the till.*$/s, "Let me check we have it and get it brought out to you.");
   return [
     { to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], false, "staff") } },
-    { to: "all", message: { type: "engaged", ...eng } },
+    ...(eng ? [{ to: "all", message: { type: "engaged", ...eng } } as Outgoing] : [staffMenu(ctx, row, next)]),
     { to: "all", message: { type: "engaged", ...stockEng } },
     staffViewMessage(ctx),
   ];
@@ -1059,6 +1172,7 @@ function settleCheckouts(ctx: Ctx): Outgoing[] {
     if (d.eng) out.push({ to: "all", message: { type: "engaged", ...eng } });
     const t = payTurn(next.checkout!);
     out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), t.say, t.choices, false, "customer") } });
+    if (row.with_kind === "visitor") out.push(staffMenu(ctx, row, next));
   }
   return out;
 }
@@ -1069,6 +1183,9 @@ function handleCheckoutChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId:
   if (!["pay:card", "pay:phone", "pay:cancel"].includes(choiceId)) return [notice(row.customer_id, "That is not one of the options.")];
   const paid = choiceId !== "pay:cancel";
   log(ctx, row.customer_id, paid ? "purchase_paid" : "purchase_cancelled", { conversationId: row.id, by: row.with_id, method: paid ? choiceId.slice(4) : null, sale: c.sale });
+  // paid: the held unit is sold; called off: it goes back on the shelf
+  if (paid) ctx.db.prepare("UPDATE reservations SET status = 'sold' WHERE visitor_id = ? AND status = 'held'").run(row.customer_id);
+  else releaseReservationsOf(ctx, row.customer_id, "changed their mind at the payment");
   const scene: Scene = paid ? d.scene : { ...d.scene, ended: { how: "left", why: "changed their mind at the payment" } };
   const say = paid ? "That's gone through. Thanks, enjoy your new phone." : "No problem, I'll put it back. Have a look around if you like.";
   const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } }];
@@ -1141,7 +1258,7 @@ function setEng(ctx: Ctx, convId: string, eng: Engagement): void {
   ctx.db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify({ ...d, eng }), convId);
 }
 
-function beginEscort(ctx: Ctx, p: { customerId: string; staffId: string; kind: "demo" | "seat"; slotId?: string; conversationId?: string; from: { x: number; z: number }; goal: { x: number; z: number }; face: { x: number; z: number }; stand: { x: number; z: number }; text: string }): Outgoing[] {
+function beginEscort(ctx: Ctx, p: { customerId: string; staffId: string; kind: "demo" | "seat"; slotId?: string; conversationId?: string; from: { x: number; z: number }; goal: { x: number; z: number }; face: { x: number; z: number }; stand: { x: number; z: number }; text: string; staffText?: string }): Outgoing[] {
   const at = ctx.position(p.customerId) ?? p.stand;
   const id = randomUUID();
   ctx.db
@@ -1151,6 +1268,13 @@ function beginEscort(ctx: Ctx, p: { customerId: string; staffId: string; kind: "
     .run(id, p.customerId, p.staffId, p.kind, p.slotId ?? null, p.conversationId ?? null, ctx.now, at.x, at.z, p.from.x, p.from.z, p.goal.x, p.goal.z, p.face.x, p.face.z, p.stand.x, p.stand.z);
   const row = ctx.db.prepare("SELECT * FROM escorts WHERE id = ?").get(id) as EscortRow;
   log(ctx, p.customerId, "escort_started", { escortId: id, kind: p.kind, staff: p.staffId, slotId: p.slotId ?? null });
+  // two real people: nobody can lead the other, so each is given where to go
+  if (isHuman(ctx, p.staffId)) {
+    return [
+      { to: p.customerId, message: { type: "escort", id, kind: p.kind, npcId: p.staffId, npcName: nameOf(ctx, p.staffId), text: p.text, goal: p.stand } },
+      { to: p.staffId, message: { type: "escort", id, kind: p.kind, npcId: p.customerId, npcName: nameOf(ctx, p.customerId), text: p.staffText ?? `Walk with ${nameOf(ctx, p.customerId)}`, goal: p.goal } },
+    ];
+  }
   const eng = escortEngagement(row);
   if (p.conversationId) setEng(ctx, p.conversationId, eng);
   return [
@@ -1193,14 +1317,32 @@ function startDemoEscort(ctx: Ctx, row: ConvRow, talkModelId: string): Outgoing[
   // up from the table first, if they are sitting
   const upFrom = standUp(ctx, row);
   const eng = (anyDataOf(getConv(ctx.db, row.id) ?? row) as AnyConvData).eng;
-  const from = npcPlace(ctx, eng, row.with_id);
-  return [...upFrom, ...beginEscort(ctx, { customerId: row.customer_id, staffId: row.with_id, kind: "demo", slotId: spot.slotId, conversationId: row.id, from, goal: spot.goal, face: spot.face, stand: spot.stand, text: `Follow ${nameOf(ctx, row.with_id)} to the ${modelName}` })];
+  const human = row.with_kind === "visitor";
+  const from = human ? (ctx.position(row.with_id) ?? spot.goal) : npcPlace(ctx, eng, row.with_id);
+  return [
+    ...upFrom,
+    ...beginEscort(ctx, {
+      customerId: row.customer_id,
+      staffId: row.with_id,
+      kind: "demo",
+      slotId: spot.slotId,
+      conversationId: row.id,
+      from,
+      goal: spot.goal,
+      face: spot.face,
+      stand: spot.stand,
+      text: human ? `Go to the ${modelName}` : `Follow ${nameOf(ctx, row.with_id)} to the ${modelName}`,
+      staffText: `Take ${nameOf(ctx, row.customer_id)} to the ${modelName}`,
+    }),
+  ];
 }
 
 function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoing[] {
   ctx.db.prepare("UPDATE escorts SET status = ?, ended_at = ? WHERE id = ?").run(why, ctx.now, e.id);
   log(ctx, e.customer_id, "escort_ended", { escortId: e.id, kind: e.kind, why });
   const out: Outgoing[] = [{ to: e.customer_id, message: { type: "escort_end", id: e.id } }];
+  const human = isHuman(ctx, e.staff_id);
+  if (human) out.push({ to: e.staff_id, message: { type: "escort_end", id: e.id } });
   const cpos = ctx.position(e.customer_id);
   const conv = e.conversation_id ? getConv(ctx.db, e.conversation_id) : undefined;
   if (e.kind === "seat" && conv && conv.ended_at === null) {
@@ -1210,25 +1352,37 @@ function finishEscort(ctx: Ctx, e: EscortRow, why: "done" | "cancelled"): Outgoi
     } else {
       const d = anyDataOf(conv);
       if (isTalkData(d)) {
-        const eng: Engagement = { npcId: e.staff_id, visitorId: e.customer_id, since: ctx.now, at: cpos ?? { x: e.stand_x, z: e.stand_z }, from: { x: e.goal_x, z: e.goal_z } };
-        saveTalkData(ctx, conv, { ...d, eng });
-        out.push({ to: "all", message: { type: "engaged", ...eng } }, showTurn(ctx, conv, { ...d, eng }));
+        if (human) {
+          out.push(showTurn(ctx, conv, d), staffMenu(ctx, conv, d));
+        } else {
+          const eng: Engagement = { npcId: e.staff_id, visitorId: e.customer_id, since: ctx.now, at: cpos ?? { x: e.stand_x, z: e.stand_z }, from: { x: e.goal_x, z: e.goal_z } };
+          saveTalkData(ctx, conv, { ...d, eng });
+          out.push({ to: "all", message: { type: "engaged", ...eng } }, showTurn(ctx, conv, { ...d, eng }));
+        }
       }
     }
     return out;
   }
   if (e.kind === "demo" && conv && conv.ended_at === null && cpos) {
-    // back to the customer to carry on talking: walks over from where it waited
-    const eng: Engagement = { npcId: e.staff_id, visitorId: e.customer_id, since: ctx.now, at: cpos, from: { x: e.goal_x, z: e.goal_z } };
-    setEng(ctx, conv.id, eng);
-    out.push({ to: "all", message: { type: "engaged", ...eng } });
-    // back from the device: the line about it no longer says "here it is"
     const d = anyDataOf(conv);
-    if (isTalkData(d)) {
-      const t = currentTurn(d.scene);
-      out.push(showTurn(ctx, conv, { ...d, eng }, reworded(t.say, "So, that's the one.")));
+    if (human) {
+      // back from the device: both are in the conversation again
+      if (isTalkData(d)) {
+        const t = currentTurn(d.scene);
+        out.push(showTurn(ctx, conv, d, reworded(t.say, "So, that's the one.")), staffMenu(ctx, conv, d));
+      }
+    } else {
+      // back to the customer to carry on talking: walks over from where it waited
+      const eng: Engagement = { npcId: e.staff_id, visitorId: e.customer_id, since: ctx.now, at: cpos, from: { x: e.goal_x, z: e.goal_z } };
+      setEng(ctx, conv.id, eng);
+      out.push({ to: "all", message: { type: "engaged", ...eng } });
+      // back from the device: the line about it no longer says "here it is"
+      if (isTalkData(d)) {
+        const t = currentTurn(d.scene);
+        out.push(showTurn(ctx, conv, { ...d, eng }, reworded(t.say, "So, that's the one.")));
+      }
     }
-  } else {
+  } else if (!human) {
     out.push({ to: "all", message: { type: "released", npcId: e.staff_id } });
   }
   return out;
@@ -1248,11 +1402,21 @@ function settleEscorts(ctx: Ctx): Outgoing[] {
       out.push(...finishEscort(ctx, e, "cancelled"));
       continue;
     }
-    if (engagedMoment(e.staff_id, escortEngagement(e), ctx.now).walking) continue; // still leading the way
-    if (e.kind === "seat") {
-      if (dist(cpos, { x: e.stand_x, z: e.stand_z }) <= 1.0) out.push(...finishEscort(ctx, e, "done"));
+    const human = isHuman(ctx, e.staff_id);
+    const spos = human ? ctx.position(e.staff_id) : undefined;
+    if (human && (!spos || !ctx.present.includes(e.staff_id))) {
+      out.push(...finishEscort(ctx, e, "cancelled")); // the specialist has gone
       continue;
     }
+    if (!human && engagedMoment(e.staff_id, escortEngagement(e), ctx.now).walking) continue; // still leading the way
+    if (e.kind === "seat") {
+      // each on their own stool, whoever is leading
+      const specialistThere = !human || (spos !== undefined && dist(spos, { x: e.goal_x, z: e.goal_z }) <= 1.0);
+      if (specialistThere && dist(cpos, { x: e.stand_x, z: e.stand_z }) <= 1.0) out.push(...finishEscort(ctx, e, "done"));
+      continue;
+    }
+    // a real specialist goes to the device with the customer: close by when it opens
+    if (human && spos && dist(spos, cpos) > TALK_RANGE + 0.5) continue;
     const slot = e.slot_id ? DEVICE_SLOT_BY_ID.get(e.slot_id) : undefined;
     if (!slot || dist(cpos, slot) > INSPECT_RANGE - 0.1) continue;
     // arrived: the device opens by itself, as if they had pressed E
@@ -1441,6 +1605,7 @@ function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
   const prior = anyDataOf(row);
   // leaving mid-checkout: a stock person still on the way goes back
   if (isTalkData(prior) && prior.checkout?.stage === "fetching") up.push({ to: "all", message: { type: "released", npcId: prior.checkout.stockId } });
+  if (isTalkData(prior) && prior.checkout) releaseReservationsOf(ctx, row.customer_id, "left before paying");
   const data: TalkConvData = { ...(isTalkData(prior) ? prior : {}), engine: "talk", scene, checkout: undefined };
   saveTalkConv(ctx, row, data, true);
   log(ctx, row.customer_id, "conversation_ended", { conversationId: row.id, why: scene.ended ? `talk:${scene.ended.how}` : "talk:unknown" });
@@ -1449,6 +1614,11 @@ function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
   const out: Outgoing[] = [...up];
   const sm = stateMessage(ctx, row.customer_id);
   if (sm) out.push(sm);
+  if (row.with_kind === "visitor") {
+    // a real specialist is free again: told, and the longest-waiting customer is theirs
+    out.push({ to: row.with_id, message: { type: "staff_menu_end", conversationId: row.id, note: scene.ended?.how === "bought" ? "Sale complete." : "That conversation is over." } });
+    out.push(...assignWaiting(ctx));
+  }
   out.push(staffViewMessage(ctx));
   return out;
 }
@@ -1482,7 +1652,8 @@ export function closeTalk(ctx: Ctx, customerId: string): Outgoing[] {
 }
 
 function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgoing[] {
-  const result = stepTalk(from, row.id, choiceId);
+  const humanStaff = row.with_kind === "visitor";
+  const result = stepTalk(from, row.id, choiceId, humanStaff);
   if ("error" in result) return [notice(row.customer_id, "That is not one of the options.")];
   const { scene, turn } = result;
   logTalkTurn(ctx, row, from, choiceId, scene);
@@ -1492,6 +1663,8 @@ function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgo
   // they have decided: no trip to the till. The specialist checks stock on
   // their phone, a stock person brings the device out, and they pay right here.
   if (scene.ended?.how === "bought") return startCheckout(ctx, row, data, scene.ended.sku, turn.say);
+  // a real specialist: the customer waits and the specialist is shown what they chose
+  if (humanStaff && !turn.ended) return [waitingTurn(ctx, row), staffMenu(ctx, row, data)];
   const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, turn.ended, "customer") } }];
   if (turn.ended) return [...out, ...finishTalk(ctx, row, scene)];
   const sm = stateMessage(ctx, row.customer_id);
@@ -1500,6 +1673,17 @@ function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgo
   // a demo: the staff member walks you to a real device of that model
   if (scene.demoed.length > from.demoed.length) out.push(...startDemoEscort(ctx, row, scene.demoed[scene.demoed.length - 1]!));
   return out;
+}
+
+// Makes a sale in a conversation: the stock check, the hold on the unit and the
+// stock person sent out. What the engine does when the customer says yes, for
+// specs that need a particular phone rather than whatever the pool gives.
+export function beginSale(ctx: Ctx, conversationId: string, sku: { model: string; storage: string; colour: string; price: number }): Outgoing[] {
+  const row = getConv(ctx.db, conversationId);
+  if (!row) return [];
+  const d = anyDataOf(row);
+  if (!isTalkData(d)) return [];
+  return startCheckout(ctx, row, d, sku, "Great choice. I'll take you across to the till so someone there can sort the payment.");
 }
 
 export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string, choiceId: string): Outgoing[] {
@@ -1522,58 +1706,7 @@ export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string,
   const world = stockWorld(ctx.db);
   const result = step(data.conv, choiceId, world);
   if ("error" in result) return [notice(customerId, "That is not one of the options.")];
-  if (row.with_kind === "npc") return apply(ctx, row, data, data.conv, choiceId, result, world);
-
-  // a person is serving: the reply waits for them (menus on both sides)
-  const label = choicesFor(data.conv, world).find((c) => c.id === choiceId)?.label ?? choiceId;
-  const next: ConvData = { ...data, awaiting: "staff", pending: { choiceId, label } };
-  saveConv(ctx, row, next, false);
-  log(ctx, customerId, "turn_waiting_for_staff", { conversationId, choice: choiceId });
-  const staffTurn: StaffTurnView = {
-    conversationId,
-    customerId,
-    customerName: nameOf(ctx, customerId),
-    customerPicked: label,
-    scripted: result.turn.say,
-    actions: [
-      { id: "reply", label: "Reply as the script goes" },
-      { id: "hand_to_genius", label: "Send them to the Genius Bar" },
-      { id: "end", label: "End politely" },
-    ],
-  };
-  return [
-    { to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), `${nameOf(ctx, row.with_id)} will be right with you.`, [], false, "staff") } },
-    { to: row.with_id, message: { type: "staff_turn", ...staffTurn } },
-    staffViewMessage(ctx),
-  ];
-}
-
-export function staffRespond(ctx: Ctx, staffId: string, conversationId: string, action: "reply" | "hand_to_genius" | "end"): Outgoing[] {
-  releaseExpired(ctx);
-  const row = getConv(ctx.db, conversationId);
-  if (!row || row.with_id !== staffId || row.with_kind !== "visitor" || row.ended_at !== null) return [notice(staffId, "That conversation is over.")];
-  const data = dataOf(row);
-  if (data.awaiting !== "staff" || !data.pending) return [notice(staffId, "It is not your turn.")];
-  const world = stockWorld(ctx.db);
-  if (action === "reply") {
-    // taken again from the stored state, so the stock is checked now, not when
-    // the customer picked
-    const from = data.conv;
-    const result = step(from, data.pending.choiceId, world);
-    if ("error" in result) return [notice(staffId, "That choice is no longer available.")];
-    log(ctx, staffId, "staff_replied", { conversationId, action });
-    return apply(ctx, row, data, from, data.pending.choiceId, result, world);
-  }
-  if (action === "hand_to_genius") {
-    log(ctx, staffId, "staff_handed_to_genius", { conversationId });
-    setState(ctx, row.customer_id, { state: "waiting_for_help", needs: "genius", want: stateOf(ctx.db, row.customer_id)?.want ?? null, with_id: null });
-    // a no-op today (no genius script yet, D34), but takes effect the moment
-    // one exists without this call site needing to change
-    return [...finish(ctx, row, `${nameOf(ctx, staffId)} has sent you to the Genius Bar.`, "handed to genius"), ...tryNpcAutoClaim(ctx, row.customer_id)];
-  }
-  log(ctx, staffId, "staff_ended", { conversationId });
-  setState(ctx, row.customer_id, { state: "browsing", with_id: null });
-  return finish(ctx, row, `${nameOf(ctx, staffId)} had to step away. Ask again if you need anything.`, "ended by staff");
+  return apply(ctx, row, data, data.conv, choiceId, result, world);
 }
 
 // Ends a conversation and tells the customer why.
@@ -1605,10 +1738,11 @@ function finish(ctx: Ctx, row: ConvRow, say: string, why: string): Outgoing[] {
 function finishEither(ctx: Ctx, row: ConvRow, visitorId: string, say: string, why: string): Outgoing[] {
   const anyData = anyDataOf(row);
   if (isTalkData(anyData)) {
-    if (row.customer_id !== visitorId) return []; // no visitor-staff leave path for a talk-engine row
+    if (row.customer_id !== visitorId && row.with_id !== visitorId) return [];
     // leaving before paying is leaving, not buying: the engine already marked the sale
     const scene: Scene = { ...anyData.scene, ended: anyData.checkout ? { how: "left", why } : (anyData.scene.ended ?? { how: "left", why }) };
-    const out: Outgoing[] = [{ to: visitorId, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } }];
+    // the customer is told it is over whichever of them left
+    const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } }];
     return [...out, ...finishTalk(ctx, row, scene)];
   }
   return finish(ctx, row, say, why);
@@ -1624,37 +1758,3 @@ export function leaveConversation(ctx: Ctx, visitorId: string): Outgoing[] {
   return [];
 }
 
-// ---- employees coordinating ----
-
-export function claim(ctx: Ctx, staffId: string, customerId: string): Outgoing[] {
-  releaseExpired(ctx);
-  const e = ctx.employees.find((x) => x.id === staffId);
-  if (!e) return [notice(staffId, "Only employees can do that.")];
-  const st = stateOf(ctx.db, customerId);
-  if (!st || st.state !== "waiting_for_help") return [notice(staffId, "They are not waiting for help.")];
-  const mine = designationOfEmployee(e);
-  if (st.needs !== mine) return [notice(staffId, `They are waiting for ${st.needs}; you are ${mine}.`)];
-  const script = scriptFor(mine);
-  if (!script) return [notice(staffId, "There is no conversation for your post yet.")];
-  if (openConversationOf(ctx.db, staffId)) return [notice(staffId, "Finish your current conversation first.")];
-  const at = ctx.position(customerId) ?? { x: 0, z: 0 };
-  log(ctx, staffId, "claimed", { customerId, designation: mine });
-  return open(ctx, customerId, staffId, "visitor", script, at);
-}
-
-export function handOn(ctx: Ctx, staffId: string, customerId: string, to: string, note?: string): Outgoing[] {
-  const e = ctx.employees.find((x) => x.id === staffId);
-  if (!e) return [notice(staffId, "Only employees can do that.")];
-  const st = stateOf(ctx.db, customerId);
-  if (!st || st.state !== "waiting_for_help") return [notice(staffId, "They are not waiting for help.")];
-  const valid = new Set(Object.values(NPC_DESIGNATION));
-  if (!valid.has(to)) return [notice(staffId, "There is no such post.")];
-  const text = typeof note === "string" ? note.replace(/[\u0000-\u001f\u007f<>]/g, "").trim().slice(0, 140) : "";
-  setState(ctx, customerId, { needs: to, note: text.length > 0 ? `${e.name}: ${text}` : null });
-  log(ctx, staffId, "handed_on", { customerId, to, note: text || null });
-  const sm = stateMessage(ctx, customerId);
-  // not auto-claimed here even for a no-op-today post: `to` is any post a
-  // human can type, including "specialist:phones" (see the note above
-  // tryNpcAutoClaim) — unlike hand_to_genius this isn't safely hardcoded
-  return [...(sm ? [sm] : []), staffViewMessage(ctx)];
-}

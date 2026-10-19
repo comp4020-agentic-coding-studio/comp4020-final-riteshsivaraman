@@ -14,16 +14,15 @@ import { validateProfile, type Kind, type Specialty } from "../shared/profile.ts
 import type { LookChoice } from "../shared/look.ts";
 import {
   chooseTurn,
-  claim,
   customersView,
   dutyMessage,
   endInspect,
   engagements,
   enter,
-  handOn,
   inspections,
   leaveConversation,
   closeTalk,
+  staffMove,
   requestTalk,
   acceptIntentById,
   showIntentById,
@@ -34,7 +33,6 @@ import {
   leaveStore,
   startInspect,
   startTalk,
-  staffRespond,
   stateOf,
   tryGreeterApproach,
   type Ctx,
@@ -282,26 +280,16 @@ export function handleConnection(socket: WebSocket): void {
       deliver(settleIntents(serviceCtx()));
       return;
     }
+    if (me && message.type === "staff_move" && typeof message.conversationId === "string" && typeof message.actId === "string") {
+      deliver(staffMove(serviceCtx(), me.id, message.conversationId, message.actId, typeof message.tone === "string" ? message.tone : "neutral"));
+      return;
+    }
     if (me && message.type === "talk_close") {
       deliver(closeTalk(serviceCtx(), me.id));
       return;
     }
     if (me && message.type === "talk_leave") {
       deliver(leaveConversation(serviceCtx(), me.id));
-      return;
-    }
-    if (me && message.type === "staff_respond" && typeof message.conversationId === "string") {
-      if (message.action === "reply" || message.action === "hand_to_genius" || message.action === "end") {
-        deliver(staffRespond(serviceCtx(), me.id, message.conversationId, message.action));
-      }
-      return;
-    }
-    if (me && message.type === "claim" && typeof message.customerId === "string") {
-      deliver(claim(serviceCtx(), me.id, message.customerId));
-      return;
-    }
-    if (me && message.type === "hand_on" && typeof message.customerId === "string" && typeof message.to === "string") {
-      deliver(handOn(serviceCtx(), me.id, message.customerId, message.to, typeof message.note === "string" ? message.note : undefined));
       return;
     }
     if (me && message.type === "inspect_start" && typeof message.slotId === "string") {

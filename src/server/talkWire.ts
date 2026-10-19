@@ -7,6 +7,9 @@ import {
   type CustomerMenu,
 } from "../shared/talk/scene.ts";
 import { randomStaff, staffMove, type StaffTraits } from "../shared/talk/npc.ts";
+import { derive } from "../shared/talk/scene.ts";
+import { modelById } from "../shared/talk/data.ts";
+import { TONES, type StaffAct } from "../shared/talk/types.ts";
 import { makeRng, type Rng } from "../shared/talk/rng.ts";
 import type { CustomerReply, Scene, Tone } from "../shared/talk/types.ts";
 
@@ -147,14 +150,15 @@ export function talkChoices(sc: Scene): Array<{ id: string; label: string }> {
 // Returns an error the same shape as the old engine's step() on an
 // off-menu or out-of-turn pick, so service.ts's call sites don't need to
 // branch on which engine produced the error.
-export function stepTalk(sc: Scene, conversationId: string, choiceId: string): { scene: Scene; turn: TalkTurn } | { error: string } {
+export function stepTalk(sc: Scene, conversationId: string, choiceId: string, humanStaff = false): { scene: Scene; turn: TalkTurn } | { error: string } {
   const menu = customerMenu(sc);
   if (!menu) return { error: "it is not the customer's turn" };
   const reply = replyFor(menu, choiceId);
   if (!reply) return { error: `"${choiceId}" is not an option here` };
   const applied = applyCustomer(sc, reply.reply);
   if ("error" in applied) return applied;
-  const after = advanceStaff(applied, conversationId);
+  // an NPC specialist answers at once; a real one is waited for
+  const after = humanStaff ? applied : advanceStaff(applied, conversationId);
   const nextMenu = customerMenu(after);
   const turn = nextMenu ? menuToTurn(nextMenu) : { say: lastLine(after), choices: [], ended: !!after.ended };
   return { scene: after, turn };
@@ -184,4 +188,66 @@ function replyFor(menu: CustomerMenu, choiceId: string): { reply: CustomerReply 
 
 export function talkEnded(sc: Scene): boolean {
   return !!sc.ended;
+}
+
+// ---- a real specialist at the other end (Ritesh, 2026-10-20) ----
+//
+// The same scene, the same rules: instead of `staffMove` choosing, the person
+// picks from `staffActs` (each move the engine says is legal now, with its own
+// hint about how far it narrows the phones) and a tone.
+
+export function beginHumanTalk(): Scene {
+  return newScene();
+}
+
+export interface StaffActOut {
+  id: string;
+  label: string;
+  hint: string;
+}
+
+const actIdOf = (i: number): string => `m${i}`;
+
+export function staffActList(sc: Scene): StaffActOut[] {
+  return staffActs(sc).map((v, i) => ({ id: actIdOf(i), label: v.label, hint: v.hint }));
+}
+
+export const STAFF_TONES = TONES.map((t) => ({ id: t, label: t === "unsure" ? "unsure" : t }));
+
+export function stepStaffMove(sc: Scene, actId: string, toneId: string): { scene: Scene; label: string } | { error: string } {
+  if (sc.toMove !== "staff" || sc.ended) return { error: "it is not the specialist's turn" };
+  const views = staffActs(sc);
+  const i = views.findIndex((_, k) => actIdOf(k) === actId);
+  if (i < 0) return { error: `"${actId}" is not a move here` };
+  const tone = (TONES as string[]).includes(toneId) ? (toneId as Tone) : "neutral";
+  const act: StaffAct = views[i]!.act;
+  const next = applyStaff(sc, act, tone);
+  if ("error" in next) return next;
+  return { scene: next, label: views[i]!.label };
+}
+
+export function staffLog(sc: Scene, limit = 14): Array<{ who: "staff" | "customer"; text: string }> {
+  return sc.log.slice(-limit).map((l) => ({ who: l.who, text: l.text }));
+}
+
+const ANSWER_LABEL = (qid: string): string => qid.replace(/_/g, " ");
+
+// What the specialist sees beside the chat: what the customer has told them,
+// and the phones still in play, with the facts that matter.
+export function staffStats(sc: Scene): { answers: Array<{ label: string; value: string }>; candidates: Array<{ name: string; screen: string; from: string; battery: string; note: string }> } {
+  const ctx = derive(sc);
+  const answers = sc.order.map((qid) => ({ label: ANSWER_LABEL(qid), value: (sc.answers[qid]?.picks ?? []).join(", ").replace(/_/g, " ") }));
+  const candidates = ctx.ranked.slice(0, 6).map((m) => {
+    const prices = ctx.pool.filter((s) => s.model === m.id).map((s) => s.price);
+    const from = prices.length ? Math.min(...prices) : (m.tiers[0]?.price ?? 0);
+    return {
+      name: m.name,
+      screen: `${m.screenIn}"`,
+      from: `A$${from.toLocaleString("en-AU")}`,
+      battery: m.batteryHours ? `${m.batteryHours} h video` : "",
+      note: [m.foldable ? "foldable" : "", m.frame ?? ""].filter(Boolean).join(", "),
+    };
+  });
+  void modelById;
+  return { answers, candidates };
 }

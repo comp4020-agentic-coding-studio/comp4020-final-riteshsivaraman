@@ -6,11 +6,10 @@ import { TABLE_SEATS } from "../src/shared/storeday.ts";
 import type { ServerMessage } from "../src/shared/protocol.ts";
 import { migrate } from "../src/server/migrate.ts";
 import {
+  beginSale,
   chooseTurn,
-  claim,
   customersView,
   enter,
-  handOn,
   HOLD_MS,
   leaveConversation,
   closeTalk,
@@ -27,7 +26,7 @@ import {
   tryNpcAutoClaim,
   releaseExpired,
   startTalk,
-  staffRespond,
+  staffMove,
   stateOf,
   type Ctx,
   type Employee,
@@ -55,10 +54,10 @@ const messagesTo = (out: Outgoing[], to: string, type: ServerMessage["type"]): S
 const last = <T extends ServerMessage["type"]>(out: Outgoing[], to: string, type: T): Extract<ServerMessage, { type: T }> | undefined =>
   messagesTo(out, to, type).at(-1) as Extract<ServerMessage, { type: T }> | undefined;
 // The specialist opens by asking whether to sit down; most tests carry on standing.
-const talkAt = (out: Outgoing[]): Extract<ServerMessage, { type: "turn" }> => {
-  const t = last(out, "c1", "turn")!;
+const talkAt = (out: Outgoing[], customer = "c1"): Extract<ServerMessage, { type: "turn" }> => {
+  const t = last(out, customer, "turn")!;
   if (!t.choices.some((c) => c.id === "seat:stand")) return t;
-  return last(chooseTurn(ctx(), "c1", t.conversationId, "seat:stand"), "c1", "turn")!;
+  return last(chooseTurn(ctx(), customer, t.conversationId, "seat:stand"), customer, "turn")!;
 };
 const eventCount = (): number => (db.prepare("SELECT COUNT(*) AS n FROM events").get() as { n: number }).n;
 const eventTypes = (): string[] => (db.prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((r) => r.type);
@@ -163,66 +162,61 @@ describe("the greeter, end to end", () => {
   });
 });
 
-describe("the phones specialist and stock", () => {
+describe("stock at the moment of sale", () => {
   const storageOf18Pro = defaultStorage(productById("iphone-18-pro")!);
   const storageOf17 = defaultStorage(productById("iphone-17")!);
+  const glacier = { model: "18-pro", storage: storageOf18Pro, colour: "Glacier", price: 1999 };
 
-  // A human-staffed "phones" conversation, not the NPC one: stock reservation
-  // is still the old engine's job (shared/conversation.ts). The new talk
-  // engine (2026-10-19, service-scene/server-wiring work) only ever drives an
-  // NPC-staffed "phones" conversation (usesTalkEngine in service.ts) and its
-  // own "bought" ending does not yet reserve real stock — the two product
-  // catalogues (src/shared/talk/data.ts, sourced from devices.json, vs
-  // src/shared/catalogue.ts's PRODUCTS/stock table) use different ids and
-  // were never reconciled by the wiring proposal, so this is a named,
-  // deliberate gap (docs/conversation-model/server-wiring-proposal.md), not
-  // a silent one. These specs move to a human specialist so the race/holding
-  // behaviour they test keeps running on the engine that actually has it.
-  function employeeAtColours(employeeId: string, customer: string, product = "iphone-18-pro"): string {
-    if (!employees.some((e) => e.id === employeeId)) addVisitor(employeeId, "Sam", { x: 0, z: 0 }, "specialist", "phones");
-    positions.set(customer, { x: 1, z: 0 });
-    const id = last(startTalk(ctx(), customer, employeeId), customer, "turn")!.conversationId;
-    chooseTurn(ctx(), customer, id, "show");
-    staffRespond(ctx(), employeeId, id, "reply");
-    chooseTurn(ctx(), customer, id, `product:${product}`);
-    staffRespond(ctx(), employeeId, id, "reply");
-    return id;
+  // an NPC specialist (as the engine drives it) and the sale the customer made
+  function selling(customer: string, npcId: string, sku: { model: string; storage: string; colour: string; price: number }): { id: string; out: Outgoing[] } {
+    const p = npc(npcId);
+    if (!present.includes(customer)) addVisitor(customer, customer, { x: p.x + 1, z: p.z });
+    const hello = talkAt(startTalk(ctx(), customer, npcId), customer);
+    return { id: hello.conversationId, out: beginSale(ctx(), hello.conversationId, sku) };
   }
 
-  function colourTurn(employeeId: string, customer: string, id: string, choice: string): Outgoing[] {
-    chooseTurn(ctx(), customer, id, choice);
-    return staffRespond(ctx(), employeeId, id, "reply");
-  }
-
-  it("takes a unit off the shelf when you choose one that is in stock, and holds it", () => {
-    addVisitor("c1", "Pebble", { x: 0, z: 0 });
+  it("takes a unit off the shelf when the specialist checks stock, and holds it", () => {
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const id = employeeAtColours("e1", "c1");
-    const out = colourTurn("e1", "c1", id, "colour:Glacier");
-    expect(last(out, "c1", "turn")?.ended).toBe(true);
+    const { out } = selling("c1", "spec-phones", glacier);
+    expect(last(out, "c1", "turn")).toMatchObject({ ended: false, awaiting: "staff" });
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
-    expect(stateOf(db, "c1")?.state).toBe("in_purchase");
     const r = db.prepare("SELECT status, expires_at FROM reservations WHERE visitor_id = 'c1'").get() as { status: string; expires_at: number };
     expect(r).toEqual({ status: "held", expires_at: NOW + HOLD_MS });
-    expect(eventTypes()).toContain("reserved");
+    expect(eventTypes()).toEqual(expect.arrayContaining(["reserved", "stock_checked"]));
+  });
+
+  it("sells the unit when they pay, and it stays gone", () => {
+    const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
+    const { id } = selling("c1", "spec-phones", glacier);
+    settleIntents(ctx(NOW + 120_000));
+    settleIntents(ctx(NOW + 121_500));
+    chooseTurn(ctx(NOW + 122_000), "c1", id, "pay:card");
+    expect(db.prepare("SELECT status FROM reservations WHERE visitor_id = 'c1'").get()).toEqual({ status: "sold" });
+    expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
+  });
+
+  it("gives it back if they call it off at the payment", () => {
+    const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
+    const { id } = selling("c1", "spec-phones", glacier);
+    settleIntents(ctx(NOW + 120_000));
+    settleIntents(ctx(NOW + 121_500));
+    chooseTurn(ctx(NOW + 122_000), "c1", id, "pay:cancel");
+    expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before);
+    expect(eventTypes()).toContain("reservation_released");
   });
 
   it("will not sell what is out of stock, and says so", () => {
-    addVisitor("c1", "Pebble", { x: 0, z: 0 });
     db.prepare("UPDATE stock SET qty = 0 WHERE product = 'iphone-18-pro' AND colour = 'Silver' AND storage = ?").run(storageOf18Pro);
-    const id = employeeAtColours("e1", "c1");
-    const out = colourTurn("e1", "c1", id, "colour:Silver");
-    expect(last(out, "c1", "turn")?.say).toMatch(/out of stock/);
-    expect(last(out, "c1", "turn")?.ended).toBe(false);
+    const { out } = selling("c1", "spec-phones", { ...glacier, colour: "Silver" });
+    expect(last(out, "c1", "turn")?.say).toMatch(/has gone/);
+    expect(last(out, "c1", "turn")?.ended).toBe(true);
     expect(db.prepare("SELECT COUNT(*) AS n FROM reservations").get()).toEqual({ n: 0 });
     expect(stockOf(db, "iphone-18-pro", "Silver", storageOf18Pro)).toBe(0);
   });
 
   it("gives a held unit back when the time is up, with no timer (the next call catches up)", () => {
-    addVisitor("c1", "Pebble", { x: 0, z: 0 });
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const id = employeeAtColours("e1", "c1");
-    colourTurn("e1", "c1", id, "colour:Glacier");
+    selling("c1", "spec-phones", glacier);
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
     expect(releaseExpired(ctx(NOW + HOLD_MS - 1))).toBe(0);
     expect(releaseExpired(ctx(NOW + HOLD_MS))).toBe(1);
@@ -232,10 +226,8 @@ describe("the phones specialist and stock", () => {
   });
 
   it("gives it back at once when the visitor leaves", () => {
-    addVisitor("c1", "Pebble", { x: 0, z: 0 });
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const id = employeeAtColours("e1", "c1");
-    colourTurn("e1", "c1", id, "colour:Glacier");
+    selling("c1", "spec-phones", glacier);
     leaveStore(ctx(), "c1");
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before);
     expect(stateOf(db, "c1")?.state).toBe("leaving");
@@ -243,17 +235,14 @@ describe("the phones specialist and stock", () => {
   });
 
   it("lets only one of two visitors have the last unit", () => {
-    addVisitor("c1", "Pebble", { x: 0, z: 0 });
-    addVisitor("c2", "Biscuit", { x: 0, z: 0 });
     expect(START_STOCK["iphone-17"].Black[storageOf17]).toBe(1);
-    // c1 first
-    const a = employeeAtColours("e1", "c1", "iphone-17");
-    colourTurn("e1", "c1", a, "colour:Black");
+    const black = { model: "17", storage: storageOf17, colour: "Black", price: 1399 };
+    selling("c1", "spec-phones", black);
     expect(stockOf(db, "iphone-17", "Black", storageOf17)).toBe(0);
-    // the specialist is free again for c2, and the last unit is gone
-    const b = employeeAtColours("e1", "c2", "iphone-17");
-    const out = colourTurn("e1", "c2", b, "colour:Black");
-    expect(last(out, "c2", "turn")?.say).toMatch(/out of stock/);
+    // a second customer, with the other specialist: the last unit is gone
+    const { out } = selling("c2", "spec-phones-2", black);
+    expect(last(out, "c2", "turn")?.say).toMatch(/has gone/);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM reservations WHERE visitor_id = 'c2'").get()).toEqual({ n: 0 });
   });
 });
 
@@ -336,78 +325,73 @@ describe("employees", () => {
     expect(last(out, "c1", "turn")).toMatchObject({ withId: "spec-phones" });
   });
 
-  it("serve a customer through menus on both sides", () => {
+  // a real specialist and a customer by them, already in conversation
+  const serving = () => {
     const e = { x: -4, z: -3 };
     addVisitor("c1", "Pebble", { x: e.x + 1, z: e.z });
     addVisitor("e1", "Sam", e, "specialist", "phones");
     const open = startTalk(ctx(), "c1", "e1");
-    const id = last(open, "c1", "turn")!.conversationId;
+    return { open, id: last(open, "c1", "turn")!.conversationId };
+  };
+
+  it("a real specialist is given the engine's own moves, and the customer waits", () => {
+    const { open } = serving();
     expect(last(open, "all", "engaged")).toBeUndefined(); // only NPCs are "engaged"
-    // the customer picks; the employee is asked, the customer waits
-    const picked = chooseTurn(ctx(), "c1", id, "show");
-    expect(last(picked, "c1", "turn")).toMatchObject({ awaiting: "staff", choices: [] });
-    const asked = last(picked, "e1", "staff_turn")!;
-    expect(asked.customerPicked).toBe("Show me what you have");
-    expect(asked.actions.map((a) => a.id)).toEqual(["reply", "hand_to_genius", "end"]);
-    // the customer cannot jump the queue
-    expect(last(chooseTurn(ctx(), "c1", id, "leave"), "c1", "notice")?.text).toMatch(/Waiting for Sam/);
-    // the employee replies
-    const reply = staffRespond(ctx(), "e1", id, "reply");
-    expect(last(reply, "c1", "turn")).toMatchObject({ awaiting: "customer" });
-    expect(last(reply, "c1", "turn")!.choices.some((c) => c.id.startsWith("product:"))).toBe(true);
-    expect(eventTypes()).toEqual(expect.arrayContaining(["turn_waiting_for_staff", "staff_replied"]));
+    expect(last(open, "c1", "turn")).toMatchObject({ awaiting: "staff", choices: [] });
+    const menu = last(open, "e1", "staff_menu")!;
+    expect(menu.awaiting).toBe("staff");
+    // every conversation opens with a greeting and an introduction
+    expect(menu.acts.length).toBeGreaterThan(0);
+    expect(menu.acts.length).toBeLessThanOrEqual(3);
+    expect(menu.tones.map((t) => t.id)).toEqual(["friendly", "neutral", "impatient", "unsure"]);
+    expect(menu.stats.candidates.length).toBeGreaterThan(3); // every phone is still in play
+    expect(menu.status).toBe("Your move.");
   });
 
-  it("see customers waiting, and claim the one waiting for their post", () => {
-    const g = npc("greeter-1");
-    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
-    const id = last(startTalk(ctx(), "c1", "greeter-1"), "c1", "turn")!.conversationId;
-    chooseTurn(ctx(), "c1", id, "phone");
-    chooseTurn(ctx(), "c1", id, "help");
-    addVisitor("e1", "Sam", { x: 0, z: 0 }, "specialist", "phones");
-    addVisitor("e2", "Alex", { x: 0, z: 0 }, "genius");
-    const view = customersView(ctx());
-    expect(view.map((c) => c.id)).toEqual(["c1"]); // customers only, never employees
-    expect(view[0]).toMatchObject({ state: "waiting_for_help", needs: "specialist:phones", want: "phone" });
-    // the wrong post cannot claim them
-    expect(last(claim(ctx(), "e2", "c1"), "e2", "notice")?.text).toMatch(/waiting for specialist:phones/);
-    const out = claim(ctx(), "e1", "c1");
-    expect(last(out, "c1", "turn")).toBeDefined();
-    expect(stateOf(db, "c1")?.state).toBe("in_conversation");
-    expect(stateOf(db, "c1")?.with_id).toBe("e1");
-    expect(eventTypes()).toContain("claimed");
+  it("takes turns: the specialist moves, the customer answers, and what they said shows beside the chat", () => {
+    const { id } = serving();
+    // the customer cannot jump the queue, nor the specialist
+    expect(last(chooseTurn(ctx(), "c1", id, "opt:anything"), "c1", "notice")?.text).toMatch(/not one of the options/);
+    const first = staffMove(ctx(), "e1", id, "m0", "friendly");
+    const turn = last(first, "c1", "turn")!;
+    expect(turn.awaiting).toBe("customer");
+    expect(turn.choices.length).toBeGreaterThan(0);
+    const after = last(first, "e1", "staff_menu")!;
+    expect(after.awaiting).toBe("customer");
+    expect(after.log.map((l) => l.who)).toEqual(["staff"]);
+    expect(last(staffMove(ctx(), "e1", id, "m0", "friendly"), "e1", "notice")?.text).toMatch(/not one of the moves/);
+    // the customer answers with their first option; it is the specialist's move again, with the answer on show
+    const answered = chooseTurn(ctx(), "c1", id, turn.choices[0]!.id);
+    expect(last(answered, "c1", "turn")).toMatchObject({ awaiting: "staff", choices: [] });
+    const menu = last(answered, "e1", "staff_menu")!;
+    expect(menu.awaiting).toBe("staff");
+    expect(menu.log.map((l) => l.who)).toEqual(["staff", "customer"]);
+    expect(menu.stats.answers.length).toBeGreaterThan(0);
+    expect(menu.acts.length).toBeGreaterThan(0);
+    expect(eventTypes()).toEqual(expect.arrayContaining(["talk_staff_move", "talk_turn"]));
   });
 
-  it("hand a waiting customer on with a note the next person can read", () => {
-    const g = npc("greeter-1");
-    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
-    const id = last(startTalk(ctx(), "c1", "greeter-1"), "c1", "turn")!.conversationId;
-    chooseTurn(ctx(), "c1", id, "phone");
-    chooseTurn(ctx(), "c1", id, "help");
-    addVisitor("e1", "Sam", { x: 0, z: 0 }, "greeter");
-    handOn(ctx(), "e1", "c1", "genius", "Wants a trade-in quote");
-    const v = customersView(ctx())[0];
-    expect(v.needs).toBe("genius");
-    expect(v.note).toBe("Sam: Wants a trade-in quote");
-    expect(eventTypes()).toContain("handed_on");
-    // and a post that does not exist is refused
-    expect(last(handOn(ctx(), "e1", "c1", "the-moon"), "e1", "notice")?.text).toMatch(/no such post/);
-  });
-
-  it("can send a customer on to the Genius Bar, or end politely", () => {
-    const e = { x: -4, z: -3 };
-    addVisitor("c1", "Pebble", { x: e.x + 1, z: e.z });
-    addVisitor("e1", "Sam", e, "specialist", "phones");
-    let id = last(startTalk(ctx(), "c1", "e1"), "c1", "turn")!.conversationId;
-    chooseTurn(ctx(), "c1", id, "show");
-    const out = staffRespond(ctx(), "e1", id, "hand_to_genius");
-    expect(last(out, "c1", "turn")?.ended).toBe(true);
-    expect(stateOf(db, "c1")).toMatchObject({ state: "waiting_for_help", needs: "genius" });
-    // a fresh start, then end
-    id = last(startTalk(ctx(), "c1", "e1"), "c1", "turn")!.conversationId;
-    chooseTurn(ctx(), "c1", id, "show");
-    staffRespond(ctx(), "e1", id, "end");
-    expect(stateOf(db, "c1")?.state).toBe("browsing");
+  it("the specialist can offer a table, and both walk to their stools and sit on the same side", () => {
+    const { open, id } = serving();
+    expect(last(open, "e1", "staff_menu")!.acts.some((a) => a.id === "seat")).toBe(true);
+    const offer = staffMove(ctx(), "e1", id, "seat", "friendly");
+    expect(last(offer, "c1", "turn")!.choices.map((c) => c.id)).toEqual(["seat:sit", "seat:stand"]);
+    expect(last(offer, "e1", "staff_menu")!.acts).toEqual([]); // waiting on the customer
+    const go = chooseTurn(ctx(), "c1", id, "seat:sit");
+    const mine = last(go, "c1", "escort")!;
+    const theirs = last(go, "e1", "escort")!;
+    expect(mine).toMatchObject({ kind: "seat" });
+    expect(mine.goal).not.toEqual(theirs.goal); // each is given their own stool
+    // only one of them there: nobody sits
+    positions.set("c1", mine.goal);
+    expect(messagesTo(settleIntents(ctx(NOW + 5000)), "all", "seated")).toEqual([]);
+    // both on their stools: both are seated, on the same side of the table
+    positions.set("e1", theirs.goal);
+    const sat = settleIntents(ctx(NOW + 6000));
+    const seated = messagesTo(sat, "all", "seated") as Array<Extract<ServerMessage, { type: "seated" }>>;
+    expect(seated.map((m) => m.visitorId).sort()).toEqual(["c1", "e1"]);
+    expect(Math.abs(seated[0]!.at.x - seated[1]!.at.x)).toBeLessThan(0.05);
+    expect(last(sat, "e1", "staff_menu")!.awaiting).toBe("staff");
   });
 
   it("free their customer when they leave mid-conversation", () => {
@@ -415,8 +399,8 @@ describe("employees", () => {
     addVisitor("c1", "Pebble", { x: e.x + 1, z: e.z });
     addVisitor("e1", "Sam", e, "specialist", "phones");
     const id = last(startTalk(ctx(), "c1", "e1"), "c1", "turn")!.conversationId;
-    chooseTurn(ctx(), "c1", id, "show");
     const out = leaveStore(ctx(), "e1");
+    expect(last(out, "e1", "staff_menu_end")).toBeDefined();
     expect(db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id)).not.toEqual({ ended_at: null });
     expect(last(out, "c1", "turn")?.ended).toBe(true);
     expect(stateOf(db, "c1")?.state).toBe("browsing");
