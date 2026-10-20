@@ -351,3 +351,19 @@ describe("sitting", () => {
     }
   });
 });
+
+describe("a handshake names who it is with (so it can be dropped when they are not there)", () => {
+  it("has the greeter and the customer each name the other while they shake hands", () => {
+    const greeter = NPCS.find((n) => n.id === "greeter-1")!;
+    let seen = 0;
+    for (let t = 0; t < 480; t += 0.5) {
+      const g = npcPose(greeter, t * 1000);
+      if (g.mode !== "handshake" || !g.with) continue;
+      const partner = NPCS.find((n) => n.id === g.with)!;
+      expect(partner.role).toBe("customer");
+      expect(npcPose(partner, t * 1000).with).toBe("greeter-1");
+      seen++;
+    }
+    expect(seen).toBeGreaterThan(5);
+  });
+});

@@ -54,11 +54,12 @@ export interface NpcPose extends Pose {
   device: boolean; // a phone or tablet is out
   intent: string; // what they are up to, in words
   gaze?: { x: number; y: number; z: number }; // what the head is on, if anything
+  with?: string; // who they are acting with on the timetable, if anyone
 }
 
 // Where an NPC is, which way it faces, what it is doing and whether it is
 // mid-stride, at server time `nowMs`.
 export function npcPose(def: NpcDef, nowMs: number): NpcPose {
   const m = momentOf(def.id, nowMs);
-  return { x: m.x, z: m.z, ry: m.ry, walking: m.walking, present: m.present, mode: m.mode, mood: m.mood, seated: m.seated, device: m.device, intent: m.intent, gaze: m.gaze };
+  return { x: m.x, z: m.z, ry: m.ry, walking: m.walking, present: m.present, mode: m.mode, mood: m.mood, seated: m.seated, device: m.device, intent: m.intent, gaze: m.gaze, with: m.with };
 }

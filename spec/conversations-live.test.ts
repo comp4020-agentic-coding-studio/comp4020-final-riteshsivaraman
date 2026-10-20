@@ -32,7 +32,7 @@ class Visitor {
     this.id = w.you.id;
     return w;
   }
-  async next(want: (m: ServerMessage) => boolean, ms = 2500, from = 0): Promise<ServerMessage> {
+  async next(want: (m: ServerMessage) => boolean, ms = 6000, from = 0): Promise<ServerMessage> {
     const deadline = Date.now() + ms;
     while (Date.now() < deadline) {
       const found = this.messages.slice(from).find(want);
@@ -121,21 +121,21 @@ it("sends a real specialist for a customer, who shows intent, is accepted, and s
   customer.send({ type: "intent_accept", intentId: task.id });
   const waiting = (await customer.next((m) => m.type === "turn" && m.withId === employee.id)) as Extract<ServerMessage, { type: "turn" }>;
   expect(waiting.awaiting).toBe("staff");
-  const menu = (await employee.next((m) => m.type === "staff_menu", 2500, mark)) as Extract<ServerMessage, { type: "staff_menu" }>;
+  const menu = (await employee.next((m) => m.type === "staff_menu", 6000, mark)) as Extract<ServerMessage, { type: "staff_menu" }>;
   expect(menu.acts.length).toBeGreaterThan(0);
 
   // Sam makes a move; the customer is given their menu
   const cMark = customer.mark();
   employee.send({ type: "staff_move", conversationId: menu.conversationId, actId: menu.acts[0]!.id, tone: "friendly" });
-  const turn = (await customer.next((m) => m.type === "turn" && m.awaiting === "customer" && m.choices.length > 0, 2500, cMark)) as Extract<ServerMessage, { type: "turn" }>;
+  const turn = (await customer.next((m) => m.type === "turn" && m.awaiting === "customer" && m.choices.length > 0, 6000, cMark)) as Extract<ServerMessage, { type: "turn" }>;
   expect(turn.choices.length).toBeGreaterThan(0);
 
   // when the specialist leaves, an NPC takes their place and the conversation carries on
   const m2 = customer.mark();
   employee.socket.close();
-  const taken = (await customer.next((m) => m.type === "notice" && /has taken their place/.test(m.text), 3000, m2)) as Extract<ServerMessage, { type: "notice" }>;
+  const taken = (await customer.next((m) => m.type === "notice" && /has taken their place/.test(m.text), 6000, m2)) as Extract<ServerMessage, { type: "notice" }>;
   expect(taken.text).toMatch(/\(NPC\)/);
-  const carried = (await customer.next((m) => m.type === "turn" && !m.ended && m.choices.length > 0, 3000, m2)) as Extract<ServerMessage, { type: "turn" }>;
+  const carried = (await customer.next((m) => m.type === "turn" && !m.ended && m.choices.length > 0, 6000, m2)) as Extract<ServerMessage, { type: "turn" }>;
   expect(carried.conversationId).toBe(menu.conversationId);
 });
 

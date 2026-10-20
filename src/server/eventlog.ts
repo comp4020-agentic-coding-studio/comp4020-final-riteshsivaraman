@@ -16,6 +16,17 @@ const scalar = (v: unknown): string => {
   return JSON.stringify(v);
 };
 
+// A visitor's or character's name, so a line can say "Pebble" and not only a
+// short id. Set once by the server; without it lines carry ids alone. Names are
+// public (everyone sees them over heads), never a token.
+let nameLookup: (id: string) => string | undefined = () => undefined;
+export function setNameLookup(fn: (id: string) => string | undefined): void {
+  nameLookup = fn;
+}
+
+// the keys whose value is a person or character
+const ID_KEYS = new Set(["customerId", "with", "to", "from", "by", "npcId", "spec", "stockId", "staffId"]);
+
 export function formatEvent(ts: number, visitorId: string | null, type: string, data?: unknown): string {
   const fields: string[] = [];
   let tag = visitorId ? short(visitorId) : "-";
@@ -30,11 +41,14 @@ export function formatEvent(ts: number, visitorId: string | null, type: string, 
         fields.push("note=yes"); // free text a visitor typed: kept in the table, not in the log
         continue;
       }
-      const isId = k === "customerId" || k === "with" || k === "to" || k === "npcId";
+      const isId = ID_KEYS.has(k);
       fields.push(`${k}=${isId ? short(v) : scalar(v)}`);
+      const who = isId ? nameLookup(String(v)) : undefined;
+      if (who) fields.push(`${k}Name=${scalar(who)}`);
     }
   }
-  const user = visitorId ? ` user=${short(visitorId)}` : "";
+  const me = visitorId && !(data && typeof data === "object" && "name" in (data as object)) ? nameLookup(visitorId) : undefined;
+  const user = visitorId ? ` user=${short(visitorId)}${me ? ` who=${scalar(me)}` : ""}` : "";
   return `${new Date(ts).toISOString()} [${tag}] ${type}${user}${fields.length ? " " + fields.join(" ") : ""}`;
 }
 

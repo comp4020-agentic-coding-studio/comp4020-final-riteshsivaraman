@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm typecheck && pnpm test",
     "check:evidence": "node scripts/check-evidence.ts",
+    "narrate": "node scripts/narrate.ts",
     "test": "vitest run",
     "test:talk": "vitest run --config vitest.talk.config.ts",
     "poc": "vite --config poc/talk/vite.config.ts",

@@ -36,7 +36,7 @@ export function Npcs() {
     const settled = settledPeople(now, visitors).npc;
     root.current?.children.forEach((child, i) => {
       const def = NPCS[i];
-      let raw: { x: number; z: number; ry: number; walking: boolean; present: boolean; mode: ActorState["mode"]; mood: string; seated: boolean; device: boolean; intent: string; gaze?: { x: number; y: number; z: number } } = npcPose(def, now);
+      let raw: { x: number; z: number; ry: number; walking: boolean; present: boolean; mode: ActorState["mode"]; mood: string; seated: boolean; device: boolean; intent: string; with?: string; gaze?: { x: number; y: number; z: number } } = npcPose(def, now);
       // a person holds this post today: the NPC is not on
       if (net.offDuty.has(def.id)) raw = { ...raw, present: false };
       // with a visitor (they walk over and talk), or walking back to the day
@@ -78,6 +78,11 @@ export function Npcs() {
       if (raw.present && !direct && raw.seated) {
         const taken = [...net.seats.values(), ...[...net.engaged.values()].filter((e) => e.seated && e.lead).map((e) => ({ x: e.lead!.x, z: e.lead!.z }))];
         if (taken.some((t) => Math.hypot(t.x - raw.x, t.z - raw.z) < 0.9)) raw = { ...raw, present: false };
+      }
+      // an act that needs two (a handshake, a chat) is with someone who is no longer where the timetable
+      // has them, because they are with a real visitor or walking back: do it with nobody, don't shake an empty hand
+      if (raw.present && !direct && raw.with && (net.engaged.has(raw.with) || net.released.has(raw.with) || net.offDuty.has(raw.with))) {
+        raw = { ...raw, mode: "idle", mood: "smile", gaze: undefined };
       }
       child.visible = raw.present;
       if (!raw.present) {

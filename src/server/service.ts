@@ -376,6 +376,15 @@ const stateMessage = (ctx: Ctx, id: string): Outgoing | null => {
 
 // ---- entering and leaving ----
 
+// Someone joins (or comes back, or reloads, or the server restarted under them): whatever
+// they left half done is cleaned up first, so they are never stuck behind "finish what you
+// are doing first" for a chat nobody can see any more, then their visit begins afresh.
+export function rejoin(ctx: Ctx, visitorId: string, profile: { kind: string; specialty?: string; look?: unknown }, name?: string): Outgoing[] {
+  const out = [...retireStandIn(ctx, visitorId), ...leaveStore(ctx, visitorId)];
+  enter(ctx, visitorId, profile, name);
+  return out;
+}
+
 export function enter(ctx: Ctx, visitorId: string, profile: { kind: string; specialty?: string; look?: unknown }, name?: string): void {
   ctx.db.prepare("UPDATE visitors SET role = ?, specialty = ?, look = ? WHERE id = ?").run(profile.kind, profile.specialty ?? null, profile.look ? JSON.stringify(profile.look) : null, visitorId);
   if (name) ctx.db.prepare("UPDATE visitors SET name = ? WHERE id = ?").run(name, visitorId);

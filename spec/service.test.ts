@@ -15,6 +15,7 @@ import {
   chooseTurn,
   customersView,
   enter,
+  rejoin,
   HOLD_MS,
   ORDER_MS,
   takeOrder,
@@ -631,6 +632,22 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     const g = npc("greeter-1");
     addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
     expect(last(tryGreeterApproach(ctx(), "c1"), "all", "engaged")).toMatchObject({ npcId: "greeter-1", pending: true, waving: true });
+  });
+
+  it("a visitor who comes back after a reload or restart is not stuck behind a chat nobody can see", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    // a conversation with the greeter was open (and its last line never dismissed) when the server restarted
+    const first = talkAt(startTalk(ctx(), "c1", "greeter-1"), "c1");
+    expect(first.conversationId).toBeDefined();
+    expect(last(startTalk(ctx(), "c1", "greeter-1"), "c1", "notice")?.text).toMatch(/Finish what you are doing|someone else/);
+    // they load the page again: a fresh visit
+    rejoin(ctx(NOW + 5000), "c1", { kind: "customer" });
+    expect(stateOf(db, "c1")?.state).toBe("arriving");
+    expect(db.prepare("SELECT COUNT(*) AS n FROM conversations WHERE customer_id = 'c1' AND ended_at IS NULL").get()).toEqual({ n: 0 });
+    const again = startTalk(ctx(NOW + 6000), "c1", "greeter-1");
+    expect(last(again, "c1", "notice")?.text).toBeUndefined();
+    expect(last(again, "c1", "turn")).toMatchObject({ withId: "greeter-1" });
   });
 
   it("greets someone again on a later visit, not just the first time they ever came", () => {

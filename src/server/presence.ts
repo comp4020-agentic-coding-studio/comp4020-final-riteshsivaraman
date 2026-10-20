@@ -19,12 +19,11 @@ import {
   dutyMessage,
   endInspect,
   engagements,
-  enter,
   inspections,
   chatPairs,
   handOverCustomer,
   handOverPost,
-  retireStandIn,
+  rejoin,
   takeOrder,
   orderViews,
   leaveConversation,
@@ -49,7 +48,8 @@ import {
 import { avoidPeople, engagedPlaces } from "../shared/people.ts";
 import { clampToWalkable, zoneOf, type Zone } from "../shared/world.ts";
 import { db } from "./db.ts";
-import { emitEvent } from "./eventlog.ts";
+import { emitEvent, setNameLookup } from "./eventlog.ts";
+import { NPC_NAME } from "../shared/duty.ts";
 
 // Presence: who is in the store right now, where they stand and which role
 // they are acting as. Held in memory on purpose. Positions change ten times a
@@ -99,6 +99,10 @@ function broadcast(message: ServerMessage, exceptId: string): void {
     if (id !== exceptId) send(session.socket, message);
   }
 }
+
+const nameOfVisitor = db.prepare("SELECT name FROM visitors WHERE id = ?");
+// every log line can say who by name: a visitor from the table, a character from the cast
+setNameLookup((id) => (nameOfVisitor.get(id) as { name: string } | undefined)?.name ?? NPC_NAME[id]);
 
 function logEvent(visitorId: string | null, type: string, data?: unknown): void {
   const ts = Date.now();
@@ -271,8 +275,7 @@ export function handleConnection(socket: WebSocket): void {
       touchVisitor.run(Date.now(), me.id);
       logEvent(me.id, "join", { name: me.name, kind: me.kind, role: me.role, specialty: me.specialty, zone: me.zone, x: me.x, z: me.z });
       const ctx = serviceCtx();
-      enter(ctx, me.id, profile, profile.name);
-      deliver(retireStandIn(ctx, me.id)); // if an NPC was standing in for them, it steps aside
+      deliver(rejoin(ctx, me.id, profile, profile.name)); // what they left half done is cleaned up, then their visit starts
 
       send(socket, {
         type: "welcome",
