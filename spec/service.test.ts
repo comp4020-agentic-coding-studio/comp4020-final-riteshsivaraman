@@ -639,6 +639,16 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     expect(last(tryGreeterApproach(ctx(), "c1"), "all", "engaged")).toMatchObject({ npcId: "greeter-1", pending: true, waving: true });
   });
 
+  it("greets someone again on a later visit, not just the first time they ever came", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    expect(last(tryGreeterApproach(ctx(), "c1"), "all", "intent")).toBeDefined();
+    expect(tryGreeterApproach(ctx(), "c1")).toEqual([]); // once per visit
+    // they leave, and come back later: a new visit
+    leaveStore(ctx(), "c1");
+    enter(ctx(NOW + 600_000), "c1", { kind: "customer" });
+    expect(last(tryGreeterApproach(ctx(NOW + 600_000), "c1"), "all", "intent")).toMatchObject({ fromId: "greeter-1", toId: "c1" });
+  });
+
   it("does not approach while a human holds the greeter post", () => {
     const g = npc("greeter-1");
     addVisitor("e1", "Sam", g, "greeter");

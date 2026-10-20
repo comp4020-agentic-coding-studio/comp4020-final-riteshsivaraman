@@ -1670,9 +1670,11 @@ export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
 export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
   if (!st || (st.state !== "arriving" && st.state !== "browsing") || st.with_id) return [];
+  // greeted already on THIS visit (the same person coming back another day is greeted again)
+  const visitStart = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { t: number | null }).t ?? 0;
   const greeted =
-    ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1'").get(customerId) ||
-    ctx.db.prepare("SELECT 1 FROM intents WHERE customer_id = ? AND staff_id = 'greeter-1'").get(customerId);
+    ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1' AND started_at >= ?").get(customerId, visitStart) ||
+    ctx.db.prepare("SELECT 1 FROM intents WHERE customer_id = ? AND staff_id = 'greeter-1' AND created_at >= ?").get(customerId, visitStart);
   if (greeted) return []; // asked or approached before: up to the customer now
   if (offDuty(ctx).includes("greeter-1")) return [];
   const greeter = NPCS.find((n) => n.id === "greeter-1");
