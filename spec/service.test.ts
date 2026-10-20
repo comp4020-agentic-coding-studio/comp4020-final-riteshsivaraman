@@ -8,6 +8,8 @@ import { migrate } from "../src/server/migrate.ts";
 import {
   beginSale,
   chatPairs,
+  handOverPost,
+  seatedList,
   collectStock,
   chooseTurn,
   customersView,
@@ -352,10 +354,10 @@ describe("employees", () => {
 
   it("tells everyone who is talking to whom, so two real people are drawn talking and listening", () => {
     const { id } = serving();
-    expect(chatPairs(db)).toEqual([{ customerId: "c1", staffId: "e1", speaker: "e1" }]);
+    expect(chatPairs(db)).toEqual([{ customerId: "c1", staffId: "e1", lines: 0 }]); // nobody has spoken yet
     const first = staffMove(ctx(), "e1", id, "m0", "friendly");
     expect(last(first, "c1", "turn")).toBeDefined();
-    expect(chatPairs(db)[0]).toMatchObject({ speaker: "c1" });
+    expect(chatPairs(db)[0]).toMatchObject({ speaker: "e1", lines: 1 }); // the specialist has just spoken
   });
 
   it("a real specialist breaks off to take the phone from the stock person, then takes payment", () => {
@@ -428,6 +430,45 @@ describe("employees", () => {
     expect(seated.map((m) => m.visitorId).sort()).toEqual(["c1", "e1"]);
     expect(Math.abs(seated[0]!.at.x - seated[1]!.at.x)).toBeLessThan(0.05);
     expect(last(sat, "e1", "staff_menu")!.awaiting).toBe("staff");
+  });
+
+  it("two real people sitting hold their table, and everyone who joins later sees them seated", () => {
+    const { id } = serving();
+    staffMove(ctx(), "e1", id, "seat", "friendly");
+    const go = chooseTurn(ctx(), "c1", id, "seat:sit");
+    positions.set("c1", last(go, "c1", "escort")!.goal);
+    positions.set("e1", last(go, "e1", "escort")!.goal);
+    settleIntents(ctx(NOW + 6000));
+    expect(seatedList(db).map((s) => s.visitorId).sort()).toEqual(["c1", "e1"]);
+    const table = db.prepare("SELECT data FROM conversations WHERE id = ?").get(id) as { data: string };
+    expect(JSON.parse(table.data).seat.tableId).toBeDefined();
+  });
+
+  it("when a real specialist leaves, an NPC takes their place and the conversation carries on", () => {
+    const { id } = serving();
+    staffMove(ctx(), "e1", id, "m0", "friendly");
+    const out = handOverPost(ctx(), "e1");
+    expect(last(out, "all", "notice")?.text).toMatch(/Sam left\. .* \(NPC\) has taken their place/);
+    const eng = last(out, "all", "engaged")!;
+    expect(eng.npcId).toMatch(/^spec-phones/);
+    expect(eng.lead).toMatchObject({ x: -4, z: -3 }); // right where Sam stood
+    expect(last(out, "c1", "turn")).toMatchObject({ conversationId: id, ended: false });
+    expect(db.prepare("SELECT with_id, with_kind FROM conversations WHERE id = ?").get(id)).toEqual({ with_id: eng.npcId, with_kind: "npc" });
+    // Sam's own leaving then has nothing left to end
+    expect(last(leaveStore(ctx(), "e1"), "c1", "turn")).toBeUndefined();
+  });
+
+  it("an NPC who takes over a seated chat sits where the specialist sat, and the table stays taken", () => {
+    const { id } = serving();
+    staffMove(ctx(), "e1", id, "seat", "friendly");
+    const go = chooseTurn(ctx(), "c1", id, "seat:sit");
+    positions.set("c1", last(go, "c1", "escort")!.goal);
+    positions.set("e1", last(go, "e1", "escort")!.goal);
+    settleIntents(ctx(NOW + 6000));
+    const out = handOverPost(ctx(NOW + 7000), "e1");
+    expect(last(out, "all", "engaged")).toMatchObject({ seated: true });
+    expect(messagesTo(out, "all", "unseated").map((m) => (m as { visitorId: string }).visitorId)).toEqual(["e1"]);
+    expect(seatedList(db).map((s) => s.visitorId)).toEqual(["c1"]); // the customer is still sitting there
   });
 
   it("free their customer when they leave mid-conversation", () => {

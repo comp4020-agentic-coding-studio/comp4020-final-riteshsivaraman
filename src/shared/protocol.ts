@@ -132,7 +132,10 @@ export interface StaffMenuView {
 export interface ChatPair {
   customerId: string;
   staffId: string;
-  speaker?: string;
+  speaker?: string; // whoever spoke last
+  chars?: number; // how long their line was, which is how long they are drawn talking
+  lines: number; // how many lines so far (a new one restarts the talking)
+  since?: number; // server time of the latest line, stamped as it is sent
 }
 
 export type Role = "customer" | "staff";

@@ -7,7 +7,7 @@ import { NPCS, isStaff, npcPose } from "../../shared/npcs.ts";
 import { settledPeople } from "../../shared/people.ts";
 import { STORE_Y } from "../../shared/protocol.ts";
 import { Actor, type ActorState } from "./gfx/Actor.tsx";
-import { net } from "./net.ts";
+import { net, talkMs } from "./net.ts";
 import { NameFloat } from "./NameFloat.tsx";
 import { NPC_NAME } from "../../shared/duty.ts";
 import { npcLook } from "../../shared/look.ts";
@@ -46,6 +46,11 @@ export function Npcs() {
       if (eng && raw.present) {
         const m = engagedMoment(def.id, eng, now);
         raw = { ...m, present: true };
+        // in a conversation with you they talk only while a line of theirs is on screen, for as long as it takes to say
+        if (eng.visitorId === net.you?.id && !eng.pending && !m.walking && m.mode === "talk") {
+          const speaking = net.turn?.awaiting === "customer" && Date.now() - net.turnAt < talkMs(net.turn.say.length);
+          raw = { ...raw, mode: speaking ? "talk" : "idle" };
+        }
         direct = true;
       } else if (rel && raw.present) {
         const m = rejoinMoment(def.id, rel, now);
@@ -53,6 +58,11 @@ export function Npcs() {
           raw = { ...m, present: true };
           direct = true;
         } else net.released.delete(def.id);
+      }
+      // a table someone is sitting at is taken: no timetable regular sits down on top of them
+      if (raw.present && !direct && raw.seated) {
+        const taken = [...net.seats.values(), ...[...net.engaged.values()].filter((e) => e.seated && e.lead).map((e) => ({ x: e.lead!.x, z: e.lead!.z }))];
+        if (taken.some((t) => Math.hypot(t.x - raw.x, t.z - raw.z) < 0.9)) raw = { ...raw, present: false };
       }
       child.visible = raw.present;
       if (!raw.present) {

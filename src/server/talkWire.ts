@@ -117,7 +117,7 @@ function staffTraitsFor(conversationId: string): StaffTraits {
 // then hand back, except an NPC never needs a human to click anything, so it
 // resolves in the same call (matching the old engine's with_kind: "npc"
 // auto-apply at service.ts's open()/apply()).
-function advanceStaff(sc: Scene, conversationId: string): Scene {
+export function advanceStaff(sc: Scene, conversationId: string): Scene {
   let cur = sc;
   let guard = 0;
   while (!cur.ended && cur.toMove === "staff" && guard++ < 50) {

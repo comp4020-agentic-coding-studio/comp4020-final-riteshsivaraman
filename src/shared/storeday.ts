@@ -135,7 +135,8 @@ const SERVICE_TABLES = TABLES.filter((t) => t.service);
 // on the two stools along that side, each turned a little towards the other
 // (Ritesh, 2026-10-19: "always sit on the same side of a table and sort of face
 // each other slightly"), not across it.
-const TURN_IN = 0.1; // how far towards the other person the gaze is pulled, from the table's centre
+const TURN_IN = 1; // how far along the table's side the gaze leans to the partner, per metre towards the table (45 degrees)
+const BACK_OFF = 0.1; // sat this far back from the stool's middle, so a leaning chest clears the table edge
 export const TABLE_SEATS: Array<{ id: string; guest: Seat; host: Seat }> = SERVICE_TABLES.flatMap((t) => {
   // the stools along this table's own sides, not a neighbour's
   const near = TABLE_STOOLS.filter((s) => Math.abs(s.z - t.z) < t.d / 2 + 0.3 && Math.abs(s.x - t.x) < t.w / 2 + 0.6);
@@ -144,15 +145,17 @@ export const TABLE_SEATS: Array<{ id: string; guest: Seat; host: Seat }> = SERVI
   const side = left.length >= 2 ? left : right.length >= 2 ? right : null;
   if (!side) return [];
   const [a, b] = side;
-  const centre: Pt = { x: t.x, z: t.z };
-  const gaze = (me: Pt, other: Pt): Pt => ({ x: centre.x + (other.x - centre.x) * TURN_IN, z: centre.z + (other.z - centre.z) * TURN_IN });
-  return [
-    {
-      id: t.id,
-      guest: { id: a.id, at: { x: a.x, z: a.z }, face: gaze(a, b) },
-      host: { id: b.id, at: { x: b.x, z: b.z }, face: gaze(b, a) },
-    },
-  ];
+  // facing the table, turned towards the other stool
+  const seat = (me: { id: string; x: number; z: number }, other: { z: number }): Seat => {
+    const towardTable = Math.sign(t.x - me.x);
+    const towardOther = Math.sign(other.z - me.z);
+    return {
+      id: me.id,
+      at: { x: me.x - towardTable * BACK_OFF, z: me.z },
+      face: { x: me.x + towardTable, z: me.z + towardOther * TURN_IN },
+    };
+  };
+  return [{ id: t.id, guest: seat(a, b), host: seat(b, a) }];
 });
 export const BAR_SEATS: Seat[] = BAR_STOOLS.filter((s) => Math.abs(s.x) < COUNTER.w / 2 - 0.4).map((s) => ({
   id: s.id,

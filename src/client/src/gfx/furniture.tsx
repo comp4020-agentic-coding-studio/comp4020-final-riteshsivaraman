@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import { useMemo, useRef, type ReactNode } from "react";
 import {
   CylinderGeometry,
   DoubleSide,
   type BufferGeometry,
+  type Group,
   MeshBasicMaterial,
   MeshStandardMaterial,
   PlaneGeometry,
@@ -26,10 +28,12 @@ import {
   type BackThing,
   type Box,
   type Table as TableSpec,
+  TABLES,
 } from "../../../shared/world.ts";
 import { BAY_LEDGES, BAY_SHELVES, LEDGE_DEPTH, STOOL_SEAT_H } from "../../../shared/plan.ts";
 import { BAY_LEDGE_MODELS, TABLE_ASSIGNMENTS } from "../../../shared/assignments.ts";
-import { DEVICE_SLOTS } from "../../../shared/slots.ts";
+import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID } from "../../../shared/slots.ts";
+import { net } from "../net.ts";
 import { DEVICE_COLOURS, BOX_COLOURS, FACE_X, BlobShadow, Sign, blobTexture, type Cuboid, type Kind } from "./common.tsx";
 import { Device } from "./Device.tsx";
 import {
@@ -263,6 +267,34 @@ function WatchBed({ t }: { t: TableSpec }) {
 // regardless of the real assignment below.
 const PILOT_PHONE_MODEL = new URLSearchParams(location.search).get("pilotPhone") ?? undefined;
 
+const colourFor = (i: number, tableZ: number): string => DEVICE_COLOURS[(((i + Math.round(tableZ * 3) + 6) % DEVICE_COLOURS.length) + DEVICE_COLOURS.length) % DEVICE_COLOURS.length];
+
+// What a slot's device is, for drawing a second copy of it (the one lifted up for
+// the person inspecting it).
+export function slotDevice(slotId: string): { kind: Kind; colour: string; model?: string } | null {
+  const it = DEVICE_SLOT_BY_ID.get(slotId);
+  const table = it ? TABLES.find((t) => t.id === it.tableId) : undefined;
+  if (!it || !table) return null;
+  const i = DEVICE_SLOTS.filter((s) => s.tableId === it.tableId).findIndex((s) => s.id === it.id);
+  return { kind: it.kind as Kind, colour: colourFor(i, table.z), model: PILOT_PHONE_MODEL ?? TABLE_ASSIGNMENTS[it.tableId]?.[it.side] };
+}
+
+// A device on its table. Whoever is inspecting it holds it up to their face
+// (their own copy floats in front of them), so it is gone from the table for
+// them, and hovers a little above it for everyone else watching.
+function SlotDevice({ slotId, children }: { slotId: string; children: ReactNode }) {
+  const g = useRef<Group>(null);
+  useFrame((_, dt) => {
+    const el = g.current;
+    if (!el) return;
+    const mine = net.myInspectSlot === slotId;
+    el.visible = !mine;
+    const lift = !mine && net.inspections.has(slotId) ? 0.12 : 0;
+    el.position.y += (lift - el.position.y) * (1 - Math.exp(-8 * Math.min(dt, 0.05)));
+  });
+  return <group ref={g}>{children}</group>;
+}
+
 export function Table({ box: t }: { box: TableSpec }) {
   const m = mats();
   const bed = isWatchBed(t);
@@ -279,16 +311,9 @@ export function Table({ box: t }: { box: TableSpec }) {
       <mesh geometry={geo} material={m.wood} />
       {bed && <WatchBed t={t} />}
       {items.map((it, i) => (
-        <Device
-          key={it.id}
-          kind={it.kind as Kind}
-          x={it.x}
-          y={t.h}
-          z={it.z}
-          rotY={it.rotY}
-          colour={DEVICE_COLOURS[(((i + Math.round(t.z * 3) + 6) % DEVICE_COLOURS.length) + DEVICE_COLOURS.length) % DEVICE_COLOURS.length]}
-          model={PILOT_PHONE_MODEL ?? assigned?.[it.side]}
-        />
+        <SlotDevice key={it.id} slotId={it.id}>
+          <Device kind={it.kind as Kind} x={it.x} y={t.h} z={it.z} rotY={it.rotY} colour={colourFor(i, t.z)} model={PILOT_PHONE_MODEL ?? assigned?.[it.side]} />
+        </SlotDevice>
       ))}
     </group>
   );

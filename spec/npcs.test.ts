@@ -153,7 +153,7 @@ describe("where heads look", () => {
       }
     }
     expect(down).toBeGreaterThan(50);
-    expect(faces).toBeGreaterThan(20);
+    expect(faces).toBeGreaterThan(30);
   });
 });
 
@@ -195,7 +195,7 @@ describe("the back room", () => {
         expect(facing, `${id} at t=${t} faces (${fx.toFixed(1)}, ${fz.toFixed(1)})`).toBe(true);
       }
     }
-    expect(seen).toBeGreaterThan(20);
+    expect(seen).toBeGreaterThan(30);
   });
 });
 
@@ -299,7 +299,7 @@ describe("sitting", () => {
     }
     expect(atTable).toBeGreaterThan(0);
     expect(atBar).toBeGreaterThan(0);
-    expect(devices).toBeGreaterThan(20);
+    expect(devices).toBeGreaterThan(30);
   });
 
   it("seats people on a stool: close to one, and never two on the same stool at once", () => {
@@ -337,11 +337,17 @@ describe("sitting", () => {
       const apart = Math.hypot(t.guest.at.x - t.host.at.x, t.guest.at.z - t.host.at.z);
       expect(apart, t.id).toBeGreaterThan(0.6);
       expect(apart, t.id).toBeLessThan(1.3);
-      // each looks at the table but is pulled round towards the other: the
-      // gaze leans to the partner's side of the table's middle
-      const lean = (me: typeof t.guest, other: typeof t.host): number => Math.sign(other.at.z - me.at.z) * (me.face.z - TABLES.find((x) => x.id === t.id)!.z);
-      expect(lean(t.guest, t.host), `${t.id} guest`).toBeGreaterThan(0);
-      expect(lean(t.host, t.guest), `${t.id} host`).toBeGreaterThan(0);
+      // each faces the table but is turned round towards the other, by 30 to 50 degrees
+      const turn = (me: typeof t.guest, other: typeof t.host): number => {
+        const table = TABLES.find((x) => x.id === t.id)!;
+        const towardTable = Math.sign(table.x - me.at.x);
+        const along = (me.face.z - me.at.z) * Math.sign(other.at.z - me.at.z);
+        return (Math.atan2(along, Math.abs(me.face.x - me.at.x)) * 180) / Math.PI * (towardTable === 0 ? 0 : 1);
+      };
+      for (const [who, me, other] of [["guest", t.guest, t.host], ["host", t.host, t.guest]] as const) {
+        expect(turn(me, other), `${t.id} ${who}`).toBeGreaterThan(30);
+        expect(turn(me, other), `${t.id} ${who}`).toBeLessThan(50);
+      }
     }
   });
 });

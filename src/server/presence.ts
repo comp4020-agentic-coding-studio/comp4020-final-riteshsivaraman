@@ -21,6 +21,7 @@ import {
   enter,
   inspections,
   chatPairs,
+  handOverPost,
   collectStock,
   leaveConversation,
   closeTalk,
@@ -136,10 +137,21 @@ const staffViewFor = (ctx: Ctx): Outgoing[] => [{ to: "staff", message: { type: 
 
 // who is talking with whom, as last told to everyone: sent again only when it changes
 let lastChats = "[]";
+const lineCounts = new Map<string, { lines: number; since: number }>();
 
 function deliver(out: Outgoing[]): void {
   deliverAll(out);
-  const pairs = JSON.stringify(chatPairs(db));
+  const now = Date.now();
+  const stamped = chatPairs(db).map((p) => {
+    // a new line starts the speaker's talking now
+    const key = `${p.customerId}:${p.staffId}`;
+    const seen = lineCounts.get(key);
+    const since = seen && seen.lines === p.lines ? seen.since : now;
+    lineCounts.set(key, { lines: p.lines, since });
+    return { ...p, since };
+  });
+  for (const key of lineCounts.keys()) if (!stamped.some((p) => `${p.customerId}:${p.staffId}` === key)) lineCounts.delete(key);
+  const pairs = JSON.stringify(stamped);
   if (pairs !== lastChats) {
     lastChats = pairs;
     deliverAll([{ to: "all", message: { type: "chats", pairs: JSON.parse(pairs) } }]);
@@ -184,12 +196,14 @@ export function handleConnection(socket: WebSocket): void {
   // a takeover may already have replaced this session.
   const leave = (): void => {
     if (me && sessions.get(me.id)?.socket === socket) {
+      const handed = handOverPost(serviceCtx(), me.id); // while they still count as here
       sessions.delete(me.id);
       touchVisitor.run(Date.now(), me.id);
       logEvent(me.id, "leave");
       broadcast({ type: "left", id: me.id }, me.id);
-      // their conversation ends, what they had put aside is given back, and
-      // the posts and the customers employees see are updated
+      // an NPC takes their place where they stood; their conversation (if any) carries on
+      // with it, and whatever they had put aside is given back
+      deliver(handed);
       deliver(leaveStore(serviceCtx(), me.id));
     }
   };

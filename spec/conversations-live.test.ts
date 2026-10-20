@@ -123,10 +123,13 @@ it("sends a real specialist for a customer, who shows intent, is accepted, and s
   const turn = (await customer.next((m) => m.type === "turn" && m.awaiting === "customer" && m.choices.length > 0, 2500, cMark)) as Extract<ServerMessage, { type: "turn" }>;
   expect(turn.choices.length).toBeGreaterThan(0);
 
-  // when the specialist leaves, the customer is let go
+  // when the specialist leaves, an NPC takes their place and the conversation carries on
   const m2 = customer.mark();
   employee.socket.close();
-  await customer.next((m) => m.type === "turn" && m.ended, 3000, m2);
+  const taken = (await customer.next((m) => m.type === "notice" && /has taken their place/.test(m.text), 3000, m2)) as Extract<ServerMessage, { type: "notice" }>;
+  expect(taken.text).toMatch(/\(NPC\)/);
+  const carried = (await customer.next((m) => m.type === "turn" && !m.ended && m.choices.length > 0, 3000, m2)) as Extract<ServerMessage, { type: "turn" }>;
+  expect(carried.conversationId).toBe(menu.conversationId);
 });
 
 it("will not let a visitor talk to a character from across the store", async () => {

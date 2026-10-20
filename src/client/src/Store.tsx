@@ -21,6 +21,8 @@ import { productById } from "../../shared/catalogue.ts";
 import { Mall, MallPeople } from "./Mall.tsx";
 import { Npcs } from "./Npcs.tsx";
 import { Actor, type ActorState } from "./gfx/Actor.tsx";
+import { Device } from "./gfx/Device.tsx";
+import { slotDevice } from "./gfx/furniture.tsx";
 import { Room } from "./Room.tsx";
 import { net, useNet } from "./net.ts";
 
@@ -40,12 +42,11 @@ const keys = new Set<string>();
 
 // First person: the camera is the visitor's eyes. Keys move you relative to
 // where you are looking, and collisions use the same boxes the scene draws.
-const INSPECT_RADIUS = 0.32; // metres — close, a real zoomed-in look (Ritesh, 2026-10-12)
-// orbit pitch is signed so positive = camera above the target (looking down
-// at it); the default is "looking over it" (Ritesh, 2026-10-12) — above and
-// a bit in front, not bird's-eye, not level with the screen
-const INSPECT_TARGET = new Vector3();
-const INSPECT_OFFSET = new Vector3();
+// Inspecting a device (Ritesh, 2026-10-21): it floats up off the table and hangs in
+// front of your face, and dragging turns it in the air. `yaw` and `pitch` are what
+// the drag has turned it by; the rest is where the scene draws it.
+export const FLOAT = { x: 0, y: 0, z: 0, facing: 0, yaw: 0, pitch: 0 };
+const floatReach = (kind: string): number => (kind === "laptop" ? 0.6 : kind === "tabletKb" ? 0.52 : kind === "tablet" ? 0.42 : 0.3);
 const PROJECT_TMP = new Vector3();
 // A conversation pans the camera in close on the other person's face (Ritesh,
 // 2026-10-19: "slightly pans into their face and zooms in... you can actually
@@ -67,9 +68,7 @@ function Player() {
   const lastSent = useRef(0);
   const sent = useRef<Pose | null>(null);
   const velocity = useRef({ x: 0, z: 0 });
-  // inspecting a device (D39): orbit angles the drag controls, and the
-  // standing pose to snap back to when it ends
-  const orbit = useRef({ yaw: 0, pitch: -0.25 });
+  // inspecting a device (D39): the standing pose to snap back to when it ends
   const wasInspecting = useRef<string | null>(null);
   const standPose = useRef({ ry: 0, pitch: 0 });
   // true while easing back out of an inspection — the same motion as panning
@@ -81,6 +80,7 @@ function Player() {
   const wasTalkingWith = useRef<string | null>(null);
   const talkStandPose = useRef({ ry: 0, pitch: 0 });
   const talkExiting = useRef(false);
+  const wasThird = useRef(false);
 
   useEffect(() => {
     // `?at=x,z,yawDegrees` starts the camera elsewhere, for screenshots and
@@ -94,6 +94,10 @@ function Player() {
     camera.rotation.set(start && start.length === 4 ? (start[3] * Math.PI) / 180 : 0, start ? (start[2] * Math.PI) / 180 : SPAWN.ry, 0);
     const down = (e: KeyboardEvent) => {
       keys.add(e.code);
+      if (e.code === "KeyV" && !e.repeat) {
+        net.thirdPerson = !net.thirdPerson;
+        net.changed();
+      }
       if ((e.code === "Escape" || e.code === "KeyE") && net.myInspectSlot) net.inspectEnd();
       else if (e.code === "Escape" && net.escort) net.escortCancel();
     };
@@ -120,9 +124,9 @@ function Player() {
       if (!dragging) return;
       dragDistance += Math.abs(e.movementX) + Math.abs(e.movementY);
       if (net.myInspectSlot) {
-        // looking at a device: drag orbits it instead of turning your head
-        orbit.current.yaw -= e.movementX * 0.006;
-        orbit.current.pitch = Math.max(-0.1, Math.min(1.3, orbit.current.pitch - e.movementY * 0.006));
+        // looking at a device: drag turns it in the air instead of turning your head
+        FLOAT.yaw += e.movementX * 0.01;
+        FLOAT.pitch += e.movementY * 0.01;
         return;
       }
       // a conversation holds the camera on the other person's face: dragging
@@ -178,17 +182,27 @@ function Player() {
     if (slot) {
       if (wasInspecting.current !== slot.id) {
         wasInspecting.current = slot.id;
-        orbit.current = { yaw: slot.rotY, pitch: 0.45 };
+        FLOAT.yaw = 0;
+        FLOAT.pitch = 0;
         standPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
+        camera.rotation.order = "YXZ";
       }
-      INSPECT_TARGET.set(slot.x, STORE_Y + TABLE_H + 0.15, slot.z);
-      const cp = Math.cos(orbit.current.pitch);
-      INSPECT_OFFSET.set(Math.sin(orbit.current.yaw) * cp, Math.sin(orbit.current.pitch), Math.cos(orbit.current.yaw) * cp).multiplyScalar(INSPECT_RADIUS);
+      // you stay where you stand; the device comes up off the table to hang in front of you
+      const dx = slot.x - net.me.x;
+      const dz = slot.z - net.me.z;
+      const reach = floatReach(slot.kind);
+      const dh = Math.hypot(dx, dz) || 1;
+      const eyeY = STORE_Y + EYE_HEIGHT;
+      FLOAT.x = net.me.x + (dx / dh) * reach;
+      FLOAT.z = net.me.z + (dz / dh) * reach;
+      FLOAT.y = eyeY - 0.12;
+      FLOAT.facing = Math.atan2(-dx, -dz);
       const ease = 1 - Math.exp(-10 * dt);
-      camera.position.x += (INSPECT_TARGET.x + INSPECT_OFFSET.x - camera.position.x) * ease;
-      camera.position.y += (INSPECT_TARGET.y + INSPECT_OFFSET.y - camera.position.y) * ease;
-      camera.position.z += (INSPECT_TARGET.z + INSPECT_OFFSET.z - camera.position.z) * ease;
-      camera.lookAt(INSPECT_TARGET);
+      camera.position.x += (net.me.x - camera.position.x) * ease;
+      camera.position.y += (eyeY - camera.position.y) * ease;
+      camera.position.z += (net.me.z - camera.position.z) * ease;
+      camera.rotation.y += wrap(FLOAT.facing - camera.rotation.y) * ease;
+      camera.rotation.x += (Math.atan2(FLOAT.y - eyeY, reach) - camera.rotation.x) * ease;
       faceToward(slot.x, slot.z); // others see you turned to the device, leaning over it
       return;
     }
@@ -238,13 +252,27 @@ function Player() {
         talkStandPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
       }
       TALK_TARGET.set(at.x, STORE_Y + (eng?.seated || net.seats.has(talkWithId) ? 1.2 : TALK_HEAD_Y), at.z); // a seated head is lower
+      const mySeat = net.you ? net.seats.get(net.you.id) : undefined;
+      const ease = 1 - Math.exp(-6 * dt); // a touch slower than the device pan: a lean, not a snap-zoom
+      if (mySeat) {
+        // sitting: the view is fixed at your seat, looking straight at them
+        const tx = mySeat.x + (at.x - mySeat.x) * 0.1;
+        const tz = mySeat.z + (at.z - mySeat.z) * 0.1;
+        camera.position.x += (tx - camera.position.x) * ease;
+        camera.position.y += (STORE_Y + 1.18 - camera.position.y) * ease;
+        camera.position.z += (tz - camera.position.z) * ease;
+        camera.lookAt(TALK_TARGET);
+        net.me.x = mySeat.x;
+        net.me.z = mySeat.z;
+        faceToward(mySeat.fx, mySeat.fz); // the body sits turned a little towards them, as everyone else sees
+        return;
+      }
       // stand off on the near side, between where you are now and their face,
       // so the pan reads as leaning toward them rather than swinging around
       const dx = camera.position.x - TALK_TARGET.x;
       const dz = camera.position.z - TALK_TARGET.z;
       const d = Math.hypot(dx, dz) || 1;
       TALK_OFFSET.set((dx / d) * TALK_RADIUS, 0, (dz / d) * TALK_RADIUS);
-      const ease = 1 - Math.exp(-6 * dt); // a touch slower than the device pan: a lean, not a snap-zoom
       camera.position.x += (TALK_TARGET.x + TALK_OFFSET.x - camera.position.x) * ease;
       camera.position.y += (TALK_TARGET.y - camera.position.y) * ease;
       camera.position.z += (TALK_TARGET.z + TALK_OFFSET.z - camera.position.z) * ease;
@@ -324,8 +352,11 @@ function Player() {
     velocity.current.x += (wx * WALK_SPEED - velocity.current.x) * ease;
     velocity.current.z += (wz * WALK_SPEED - velocity.current.z) * ease;
 
-    let x = camera.position.x + velocity.current.x * dt;
-    let z = camera.position.z + velocity.current.z * dt;
+    // (in third person the camera is behind you, so your own place is net.me)
+    const fromMe = net.thirdPerson || wasThird.current;
+    wasThird.current = net.thirdPerson;
+    let x = (fromMe ? net.me.x : camera.position.x) + velocity.current.x * dt;
+    let z = (fromMe ? net.me.z : camera.position.z) + velocity.current.z * dt;
     // where you may stand depends on your role (staff reach the back room)
     if (SHOT) return;
     ({ x, z } = clampToWalkable(net.role, x, z));
@@ -333,9 +364,10 @@ function Player() {
     // people are solid too: other visitors, staff, customers, walkers
     ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow()));
     ({ x, z } = clampToWalkable(net.role, x, z));
-    camera.position.set(x, STORE_Y + EYE_HEIGHT, z);
     net.me.x = x;
     net.me.z = z;
+    if (net.thirdPerson) camera.position.set(x - fx * 2.4, STORE_Y + EYE_HEIGHT + 0.5, z - fz * 2.4);
+    else camera.position.set(x, STORE_Y + EYE_HEIGHT, z);
 
     // Heading as the server and other clients know it: 0 faces +z.
     const ry = Math.atan2(-fx, -fz);
@@ -381,15 +413,25 @@ function Remotes() {
       if (slot && !walking) state = { ...state, mode: "observe", mood: "curious", gaze: { x: slot.x, y: TABLE_H + 0.05, z: slot.z } };
       else if (chat && !walking) {
         const other = chat.with === net.you?.id ? net.me : net.remotes.get(chat.with);
-        state = { ...state, mode: chat.speaking ? "talk" : "listen", mood: chat.speaking ? "smile" : "neutral", ...(other ? { gaze: { x: other.x, y: 1.55, z: other.z } } : {}) };
+        // only the one who just spoke talks, and only as long as the line takes to say
+        const talkingNow = net.serverNow() < chat.until;
+        const mine = chat.speaker === r.info.id;
+        state = { ...state, mode: talkingNow ? (mine ? "talk" : "listen") : "idle", mood: talkingNow && mine ? "smile" : "neutral", ...(other ? { gaze: { x: other.x, y: 1.55, z: other.z } } : {}) };
       }
       speeds.current.set(r.info.id, state);
     }
     root.current?.children.forEach((child) => {
       const r = net.remotes.get(child.name);
       if (r) {
-        child.position.set(r.x, STORE_Y, r.z);
-        child.rotation.y = r.ry;
+        // sitting: exactly on the stool, turned the way the seat faces (a body is not left halfway into the table)
+        const seat = net.seats.get(child.name);
+        if (seat) {
+          child.position.set(seat.x, STORE_Y, seat.z);
+          child.rotation.y = Math.atan2(-(seat.fx - seat.x), -(seat.fz - seat.z));
+        } else {
+          child.position.set(r.x, STORE_Y, r.z);
+          child.rotation.y = r.ry;
+        }
       }
     });
   });
@@ -654,6 +696,82 @@ function GuideMarkers() {
   );
 }
 
+// The device you are inspecting, floated up off its table and held in front of
+// you. It rises from where it sat, and dragging turns it in the air.
+function FloatingDevice() {
+  const live = useNet();
+  const root = useRef<Group>(null);
+  const turn = useRef<Group>(null);
+  const tip = useRef<Group>(null);
+  const shown = useRef<{ id: string; x: number; y: number; z: number } | null>(null);
+  const look = live.myInspectSlot ? slotDevice(live.myInspectSlot) : null;
+  const slot = live.myInspectSlot ? DEVICE_SLOT_BY_ID.get(live.myInspectSlot) : undefined;
+  useFrame((_, delta) => {
+    const g = root.current;
+    if (!g || !slot) return;
+    // start from the table, then ease up to the place in front of you
+    if (!shown.current || shown.current.id !== slot.id) shown.current = { id: slot.id, x: slot.x, y: STORE_Y + TABLE_H, z: slot.z };
+    const k = 1 - Math.exp(-9 * Math.min(delta, 0.05));
+    const sh = shown.current;
+    sh.x += (FLOAT.x - sh.x) * k;
+    sh.y += (FLOAT.y - sh.y) * k;
+    sh.z += (FLOAT.z - sh.z) * k;
+    g.position.set(sh.x, sh.y, sh.z);
+    g.rotation.y = FLOAT.facing;
+    if (turn.current) turn.current.rotation.y = FLOAT.yaw;
+    if (tip.current) tip.current.rotation.x = FLOAT.pitch;
+  });
+  if (!look || !slot) return null;
+  return (
+    <group ref={root}>
+      <group ref={turn}>
+        <group ref={tip}>
+          <Device kind={look.kind} model={look.model ?? (look.kind === "phone" ? "iphone-18-pro" : undefined)} colour={look.colour} x={0} y={0} z={0} rotY={0} held />
+        </group>
+      </group>
+    </group>
+  );
+}
+
+// You, seen from behind, when you ask for it (V): your own character is
+// otherwise out of sight, as it is behind your eyes.
+function SelfView() {
+  const { camera } = useThree();
+  const live = useNet();
+  const root = useRef<Group>(null);
+  const state = useRef<ActorState>({ walking: false, mode: "idle", mood: "neutral" });
+  const last = useRef({ x: 0, z: 0 });
+  useFrame((_, delta) => {
+    const g = root.current;
+    if (!g) return;
+    const show = net.thirdPerson && !net.locked && !net.myInspectSlot && !net.escort;
+    g.visible = show;
+    if (!show) return;
+    const dt = Math.max(delta, 1e-3);
+    const speed = Math.hypot(net.me.x - last.current.x, net.me.z - last.current.z) / dt;
+    last.current = { x: net.me.x, z: net.me.z };
+    const prev = state.current.speed ?? 0;
+    const smooth = prev + (speed - prev) * 0.2;
+    const seat = net.you ? net.seats.get(net.you.id) : undefined;
+    state.current = { walking: smooth > 0.25 && !seat, mode: "idle", mood: "neutral", speed: smooth, seated: !!seat };
+    g.position.set(net.me.x, STORE_Y, net.me.z);
+    g.rotation.y = camera.rotation.y;
+  });
+  if (!live.you || !live.identity) return null;
+  const id = live.identity;
+  return (
+    <group ref={root} visible={false}>
+      <Actor
+        id={live.you.id}
+        shirt={id.kind === "customer" ? live.you.colour : STAFF_SHIRT}
+        look={id.look}
+        uniform={id.kind !== "customer" ? { cap: EMPLOYEE_COLOUR[id.kind], badge: EMPLOYEE_COLOUR[id.kind] } : undefined}
+        getState={() => state.current}
+      />
+    </group>
+  );
+}
+
 function InspectMarkers() {
   const live = useNet();
   return (
@@ -720,6 +838,8 @@ export function Store() {
       <Npcs />
       <Interact />
       <InspectMarkers />
+      <FloatingDevice />
+      <SelfView />
       <DeviceHintGlow />
       <GuideMarkers />
       <Player />

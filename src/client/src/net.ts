@@ -74,6 +74,9 @@ function writeProfile(p: Profile): void {
 // Plain store, not React state: positions change many times a second, so the
 // scene reads `remotes` directly in its frame loop and React only re-renders
 // when the roster, the connection or a conversation changes.
+// how long a line of this many characters takes to say, as time spent drawn talking
+export const talkMs = (chars: number): number => Math.min(9000, Math.max(1500, chars * 65));
+
 class Net {
   status: Status = "connecting";
   you: VisitorInfo | null = null;
@@ -111,7 +114,11 @@ class Net {
   // who is sitting at a table with someone (by visitor id), and where
   seats = new Map<string, { x: number; z: number; fx: number; fz: number }>();
   // real people in a conversation: who each is talking with, and whose turn it is to talk
-  chats = new Map<string, { with: string; speaking: boolean }>();
+  chats = new Map<string, { with: string; speaker?: string; until: number }>();
+  // when the latest line from the other side arrived (their talking is drawn for as long as the line is long)
+  turnAt = 0;
+  // seeing your own character from behind (V)
+  thirdPerson = false;
   // the stock person is close enough for the specialist to take the phone (set by the scene)
   stockNear = false;
   // told to wait somewhere for someone to fetch you, if you are
@@ -264,6 +271,7 @@ class Net {
         return true;
       case "turn":
         this.turn = message;
+        this.turnAt = Date.now();
         return true;
       case "staff_menu": {
         const { type: _t, ...view } = message;
@@ -434,8 +442,10 @@ class Net {
   private setChats(pairs: ChatPair[]): void {
     this.chats = new Map();
     for (const p of pairs) {
-      this.chats.set(p.customerId, { with: p.staffId, speaking: p.speaker === p.customerId });
-      this.chats.set(p.staffId, { with: p.customerId, speaking: p.speaker === p.staffId });
+      // whoever spoke last is drawn talking for as long as their line takes to say
+      const until = p.speaker && p.since !== undefined ? p.since + talkMs(p.chars ?? 0) : 0;
+      this.chats.set(p.customerId, { with: p.staffId, speaker: p.speaker, until });
+      this.chats.set(p.staffId, { with: p.customerId, speaker: p.speaker, until });
     }
   }
 

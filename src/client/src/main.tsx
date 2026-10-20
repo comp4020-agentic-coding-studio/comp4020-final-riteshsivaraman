@@ -54,8 +54,8 @@ function Hud() {
       </div>
       <div className="hud-hint">
         {live.myInspectSlot
-          ? "Drag to look around the device · E, tap away, or Esc to put it down"
-          : "Drag the view to look around · W A S D to walk · arrows turn · E to talk"}
+          ? "Drag to turn the device in your hand · E, tap away, or Esc to put it down"
+          : "Drag the view to look around · W A S D to walk · arrows turn · E to talk · V to see yourself"}
       </div>
       {waiting && (
         <div className="chip-status">

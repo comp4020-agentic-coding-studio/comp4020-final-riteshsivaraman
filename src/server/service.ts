@@ -25,7 +25,7 @@ import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../sh
 import { modelById } from "../shared/talk/data.ts";
 import { takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
-import { beginHumanTalk, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
+import { advanceStaff, beginHumanTalk, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import type { Scene } from "../shared/talk/types.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
@@ -381,6 +381,59 @@ export function enter(ctx: Ctx, visitorId: string, profile: { kind: string; spec
   // a customer's visit begins; an employee has no visit, only a post
   if (profile.kind === "customer") setState(ctx, visitorId, { state: "arriving", want: null, needs: null, with_id: null });
   else ctx.db.prepare("DELETE FROM player_state WHERE visitor_id = ?").run(visitorId);
+}
+
+// A real employee is leaving: an NPC of the same post takes their place on the
+// spot, where they stood (or sat), so it looks as if nothing happened. Any
+// conversation they were in carries on with the NPC. Call it while they are
+// still counted as present, before `leaveStore`.
+export function handOverPost(ctx: Ctx, leaverId: string): Outgoing[] {
+  const emp = ctx.employees.find((e) => e.id === leaverId);
+  const pos = ctx.position(leaverId);
+  if (!emp || !pos) return [];
+  const post = designationOfEmployee(emp);
+  const off = offDuty(ctx);
+  const npcId = Object.keys(NPC_DESIGNATION).find((id) => {
+    const n = NPCS.find((x) => x.id === id);
+    return NPC_DESIGNATION[id] === post && !off.includes(id) && !!n && npcPose(n, ctx.now).present && staffAvailable(ctx, id, "npc");
+  });
+  if (!npcId) return [];
+  const out: Outgoing[] = [{ to: "all", message: { type: "notice", text: `${emp.name} left. ${nameOf(ctx, npcId)} (NPC) has taken their place.` } }];
+  log(ctx, leaverId, "post_handed_over", { npcId });
+  const row = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND with_id = ?").get(leaverId) as ConvRow | undefined;
+  const d0 = row ? anyDataOf(row) : null;
+  if (!row || !d0 || !isTalkData(d0) || d0.scene.ended) {
+    // nobody to carry on with: the NPC appears where they stood, then goes back to its day
+    const eng: Engagement = { npcId, visitorId: leaverId, since: ctx.now, at: pos, from: pos, lead: { x: pos.x, z: pos.z, fx: pos.x, fz: pos.z } };
+    return [...out, { to: "all", message: { type: "engaged", ...eng } }, { to: "all", message: { type: "released", npcId } }];
+  }
+  // a walk with the customer stops where it is
+  const walking = liveEscortOf(ctx.db, row.customer_id);
+  if (walking) out.push(...finishEscort(ctx, walking, "cancelled"));
+  const cur = getConv(ctx.db, row.id) ?? row;
+  const d = anyDataOf(cur) as TalkConvData;
+  const table = d.seat ? TABLE_SEATS.find((x) => x.id === d.seat!.tableId) : undefined;
+  const cpos = ctx.position(row.customer_id) ?? pos;
+  const base = { npcId, visitorId: row.customer_id, since: ctx.now };
+  const eng: Engagement = table
+    ? { ...base, at: table.guest.at, from: table.host.at, lead: { x: table.host.at.x, z: table.host.at.z, fx: table.host.face.x, fz: table.host.face.z }, seated: true }
+    : { ...base, at: cpos, from: pos, lead: { x: pos.x, z: pos.z, fx: cpos.x, fz: cpos.z }, ...(d.checkout?.stage === "fetching" ? { doing: "phone" as const } : {}) };
+  // it is their move, if it was the specialist's
+  const waitingOnStaff = d.scene.toMove === "staff" && !d.checkout && d.stage !== "seat_offer";
+  const scene = waitingOnStaff ? advanceStaff(d.scene, row.id) : d.scene;
+  const next: TalkConvData = { ...d, scene, eng };
+  ctx.db.prepare("UPDATE conversations SET with_id = ?, with_kind = 'npc', data = ? WHERE id = ?").run(npcId, JSON.stringify(next), row.id);
+  log(ctx, row.customer_id, "conversation_handed_to_npc", { conversationId: row.id, from: leaverId, to: npcId });
+  if (table) out.push({ to: "all", message: { type: "unseated", visitorId: leaverId } });
+  out.push({ to: "all", message: { type: "engaged", ...eng } });
+  const now = getConv(ctx.db, row.id)!;
+  if (scene.ended) return [...out, ...finishTalk(ctx, now, scene)];
+  if (d.checkout) {
+    const t = d.checkout.stage === "pay" ? payTurn(d.checkout) : null;
+    out.push(t ? { to: row.customer_id, message: { type: "turn", ...turnView(now, nameOf(ctx, npcId), t.say, t.choices, false, "customer") } } : waitingTurn(ctx, now));
+  } else out.push(showTurn(ctx, now, next));
+  out.push(staffViewMessage(ctx));
+  return out;
 }
 
 export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
@@ -864,8 +917,14 @@ export function chatPairs(db: Database.Database): ChatPair[] {
   const rows = db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' ORDER BY started_at").all() as ConvRow[];
   return rows.map((r) => {
     const d = anyDataOf(r);
-    const toMove = isTalkData(d) && !d.scene.ended && !d.checkout ? d.scene.toMove : null;
-    return { customerId: r.customer_id, staffId: r.with_id, ...(toMove ? { speaker: toMove === "staff" ? r.with_id : r.customer_id } : {}) };
+    const log = isTalkData(d) && !d.scene.ended && !d.checkout ? staffLog(d.scene) : [];
+    const lastLine = log.at(-1);
+    return {
+      customerId: r.customer_id,
+      staffId: r.with_id,
+      lines: log.length,
+      ...(lastLine ? { speaker: lastLine.who === "staff" ? r.with_id : r.customer_id, chars: lastLine.text.length } : {}),
+    };
   });
 }
 
@@ -941,7 +1000,7 @@ export function staffMove(ctx: Ctx, staffId: string, conversationId: string, act
 // is sitting at it now or about to (an NPC's own timetable counts), and no one
 // else from this server is seated there.
 
-const SEAT_LOOKAHEAD = 60; // seconds of the timetable that must also be clear
+const SEAT_LOOKAHEAD = 240; // seconds of the timetable that must also be clear (a chat can run long)
 
 type TableSeat = (typeof TABLE_SEATS)[number];
 
@@ -963,7 +1022,8 @@ function tableTakenByTimetable(ctx: Ctx, t: TableSeat): boolean {
 
 function freeTableFor(ctx: Ctx, customerId: string): TableSeat | null {
   const taken = new Set<string>();
-  for (const r of ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'npc'").all() as ConvRow[]) {
+  // a table is held by every conversation sitting at it, with an NPC or a real specialist
+  for (const r of ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL").all() as ConvRow[]) {
     const d = anyDataOf(r);
     if (isTalkData(d) && d.seat) taken.add(d.seat.tableId);
   }
@@ -982,10 +1042,13 @@ const seatedMessage = (customerId: string, t: TableSeat): Outgoing => ({ to: "al
 
 export function seatedList(db: Database.Database): Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }> {
   const out: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }> = [];
-  for (const r of db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'npc'").all() as ConvRow[]) {
+  for (const r of db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL").all() as ConvRow[]) {
     const d = anyDataOf(r);
     const t = isTalkData(d) && d.seat ? TABLE_SEATS.find((x) => x.id === d.seat!.tableId) : undefined;
-    if (t) out.push({ visitorId: r.customer_id, at: t.guest.at, face: t.guest.face });
+    if (!t) continue;
+    out.push({ visitorId: r.customer_id, at: t.guest.at, face: t.guest.face });
+    // a real specialist sits too (an NPC's seat is drawn from its engagement)
+    if (r.with_kind === "visitor") out.push({ visitorId: r.with_id, at: t.host.at, face: t.host.face });
   }
   return out;
 }
