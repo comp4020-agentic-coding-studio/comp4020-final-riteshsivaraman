@@ -10,7 +10,7 @@ import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { poseChanged } from "../../shared/pose.ts";
 import { wrap } from "../../shared/steering.ts";
 import { designationOf, EMPLOYEE_COLOUR, STAFF_SHIRT } from "../../shared/profile.ts";
-import { avoidPeople } from "../../shared/people.ts";
+import { avoidPeople, engagedPlaces } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions, TABLE_H } from "../../shared/world.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
@@ -375,7 +375,7 @@ function Player() {
     ({ x, z } = clampToWalkable(net.role, x, z));
     ({ x, z } = resolveCollisions(x, z, net.role));
     // people are solid too: other visitors, staff, customers, walkers
-    ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow()));
+    ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow(), engagedPlaces(net.engaged.values(), net.serverNow())));
     ({ x, z } = clampToWalkable(net.role, x, z));
     net.me.x = x;
     net.me.z = z;
