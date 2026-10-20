@@ -41,6 +41,9 @@ COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/static /app/static
 COPY --from=build /app/src/server /app/src/server
 COPY --from=build /app/src/shared /app/src/shared
+# the talk engine reads its device catalogues from these two data files
+COPY --from=build /app/docs/conversation-model/devices.json /app/docs/conversation-model/devices.json
+COPY --from=build /app/docs/conversation-model/laptops.json /app/docs/conversation-model/laptops.json
 COPY --from=build /app/README.md /app/README.md
 COPY --from=build /app/package.json /app/package.json
 COPY --from=build /app/tsconfig.json /app/tsconfig.json
