@@ -117,6 +117,9 @@ class Net {
   chats = new Map<string, { with: string; speaker?: string; until: number }>();
   // when the latest line from the other side arrived (their talking is drawn for as long as the line is long)
   turnAt = 0;
+  staffAt = 0; // the same, for a specialist: when their panel last changed
+  // where the server put you on joining: the view moves there once
+  spawn: { x: number; z: number; ry: number } | null = null;
   // seeing your own character from behind (V)
   thirdPerson = false;
   // the stock person is close enough for the specialist to take the phone (set by the scene)
@@ -238,6 +241,7 @@ class Net {
         this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
         this.intents = new Map(message.intents.map((i) => [i.id, i]));
         this.setChats(message.chats);
+        this.spawn = message.spawn;
         this.seats = new Map(message.seated.map((s) => [s.visitorId, { x: s.at.x, z: s.at.z, fx: s.face.x, fz: s.face.z }]));
         this.pollIntents();
         this.myInspectSlot = message.inspecting.find((i) => i.visitorId === message.you.id)?.slotId ?? null;
@@ -276,6 +280,7 @@ class Net {
       case "staff_menu": {
         const { type: _t, ...view } = message;
         this.staffConv = view;
+        this.staffAt = Date.now();
         return true;
       }
       case "staff_menu_end":

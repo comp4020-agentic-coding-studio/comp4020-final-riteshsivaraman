@@ -174,6 +174,19 @@ function Player() {
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
 
+    // just joined: the view goes where the server put you (outside the entrance for a
+    // customer, the back room for an employee), unless the URL placed the camera
+    if (net.spawn) {
+      if (!new URLSearchParams(location.search).has("at")) {
+        camera.position.set(net.spawn.x, STORE_Y + EYE_HEIGHT, net.spawn.z);
+        camera.rotation.order = "YXZ";
+        camera.rotation.set(0, net.spawn.ry, 0);
+        net.me.x = net.spawn.x;
+        net.me.z = net.spawn.z;
+      }
+      net.spawn = null;
+    }
+
     // Inspecting a device (D39): the device stays on the table; your own
     // position doesn't change (others still see you standing there), only
     // the camera eases in close and orbits on drag. Ends the frame early —

@@ -13,7 +13,7 @@ import {
   type World,
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
-import { NPCS, npcPose } from "../shared/npcs.ts";
+import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
 import type { ChatPair, CustomerView, Engagement, Inspection, IntentView, ServerMessage, StaffMenuView, TurnView } from "../shared/protocol.ts";
 import { engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
@@ -25,7 +25,7 @@ import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../sh
 import { modelById } from "../shared/talk/data.ts";
 import { takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
-import { advanceStaff, beginHumanTalk, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
+import { advanceStaff, beginHumanTalk, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, standInAnswer, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import type { Scene } from "../shared/talk/types.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
@@ -205,6 +205,8 @@ interface TalkConvData {
   seat?: { tableId: string }; // seated at this table now
   sat?: boolean; // has sat once already, so "sit back down" is offered after a demo
   checkout?: Checkout; // the sale is made: stock is being fetched, then they pay here
+  // the customer has left and an NPC customer stands in for them, answering from the engine's own customer model
+  standIn?: { npcId: string; name: string; eng: Engagement };
 }
 
 // Paying on the spot (Ritesh, 2026-10-19): once they have decided, the
@@ -268,6 +270,11 @@ export function engagements(db: Database.Database): Engagement[] {
     const d = anyDataOf(r);
     return d.eng ?? { npcId: r.with_id, visitorId: r.customer_id, since: r.started_at, at: d.at ?? { x: 0, z: 0 } };
   });
+  // an NPC customer standing in for one who left, with a real specialist
+  for (const r of db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor'").all() as ConvRow[]) {
+    const d = anyDataOf(r);
+    if (isTalkData(d) && d.standIn) live.push(d.standIn.eng);
+  }
   // an NPC that has walked over to show intent (not yet accepted) stands there too
   const pending = (db.prepare("SELECT * FROM intents WHERE status = 'open' AND staff_kind = 'npc'").all() as IntentRow[]).map(
     intentEngagement,
@@ -383,6 +390,68 @@ export function enter(ctx: Ctx, visitorId: string, profile: { kind: string; spec
   else ctx.db.prepare("DELETE FROM player_state WHERE visitor_id = ?").run(visitorId);
 }
 
+const standInReplies = (scene: Scene, conversationId: string): Scene => {
+  let cur = scene;
+  for (let i = 0; i < 5 && !cur.ended && cur.toMove === "customer"; i++) {
+    const next = standInAnswer(cur, conversationId);
+    if (next === cur) break;
+    cur = next;
+  }
+  return cur;
+};
+
+// A real customer is leaving a conversation with a real specialist: an NPC
+// customer takes their place where they stood (or sat) and the conversation
+// carries on, so the specialist is not left talking to nobody. Call it while
+// they still count as present, before `leaveStore`.
+export function handOverCustomer(ctx: Ctx, leaverId: string): Outgoing[] {
+  const row = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND customer_id = ?").get(leaverId) as ConvRow | undefined;
+  const d = row ? anyDataOf(row) : null;
+  if (!row || !d || !isTalkData(d) || d.scene.ended || d.checkout || d.standIn) return [];
+  const used = new Set<string>();
+  for (const r of ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor'").all() as ConvRow[]) {
+    const o = anyDataOf(r);
+    if (isTalkData(o) && o.standIn) used.add(o.standIn.npcId);
+  }
+  // one who is in the store now if there is one; otherwise one who is due later steps in early
+  const free = NPCS.filter((n) => !isStaff(n) && !used.has(n.id));
+  const npc = free.find((n) => npcPose(n, ctx.now).present) ?? free[0];
+  const cpos = ctx.position(leaverId);
+  const spos = ctx.position(row.with_id);
+  if (!npc || !cpos || !spos) return [];
+  // walking with the specialist stops here
+  const out: Outgoing[] = [];
+  const walking = liveEscortOf(ctx.db, leaverId);
+  if (walking) out.push(...finishEscort(ctx, walking, "cancelled"));
+  const cur = getConv(ctx.db, row.id) ?? row;
+  const d1 = anyDataOf(cur) as TalkConvData;
+  const table = d1.seat ? TABLE_SEATS.find((x) => x.id === d1.seat!.tableId) : undefined;
+  const base = { npcId: npc.id, visitorId: row.with_id, since: ctx.now };
+  const eng: Engagement = table
+    ? { ...base, at: table.host.at, from: table.guest.at, lead: { x: table.guest.at.x, z: table.guest.at.z, fx: table.guest.face.x, fz: table.guest.face.z }, seated: true }
+    : { ...base, at: spos, from: cpos, lead: { x: cpos.x, z: cpos.z, fx: spos.x, fz: spos.z } };
+  const name = nameOf(ctx, npc.id);
+  const scene = standInReplies(d1.scene, row.id);
+  const next: TalkConvData = { ...d1, scene, standIn: { npcId: npc.id, name, eng } };
+  saveTalkConv(ctx, cur, next, false);
+  log(ctx, leaverId, "customer_stood_in_for", { conversationId: row.id, npcId: npc.id });
+  out.push({ to: "all", message: { type: "notice", text: `${nameOf(ctx, leaverId)} left. ${name} (NPC) is standing in for them.` } });
+  if (table) out.push({ to: "all", message: { type: "unseated", visitorId: leaverId } });
+  out.push({ to: "all", message: { type: "engaged", ...eng } });
+  const now = getConv(ctx.db, row.id)!;
+  if (scene.ended) return [...out, ...finishTalk(ctx, now, scene)];
+  out.push(staffMenu(ctx, now, next), staffViewMessage(ctx));
+  return out;
+}
+
+// The customer who left has come back (same visitor): the stand-in steps aside.
+export function retireStandIn(ctx: Ctx, visitorId: string): Outgoing[] {
+  const row = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND customer_id = ?").get(visitorId) as ConvRow | undefined;
+  const d = row ? anyDataOf(row) : null;
+  if (!row || !d || !isTalkData(d) || !d.standIn) return [];
+  return finishTalk(ctx, row, { ...d.scene, ended: { how: "left", why: "the customer came back" } });
+}
+
 // A real employee is leaving: an NPC of the same post takes their place on the
 // spot, where they stood (or sat), so it looks as if nothing happened. Any
 // conversation they were in carries on with the NPC. Call it while they are
@@ -439,7 +508,8 @@ export function handOverPost(ctx: Ctx, leaverId: string): Outgoing[] {
 export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
   const out: Outgoing[] = [];
   const open = openConversationOf(ctx.db, visitorId);
-  if (open) out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left"));
+  const carriedOn = open && isTalkData(anyDataOf(open)) && !!(anyDataOf(open) as TalkConvData).standIn; // an NPC is already standing in
+  if (open && !carriedOn) out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left"));
   out.push(...closeTalk(ctx, visitorId));
   out.push(...cancelIntentsOf(ctx, visitorId));
   const leaving = liveEscortOf(ctx.db, visitorId);
@@ -791,6 +861,8 @@ export function requestTalk(ctx: Ctx, customerId: string, withId: string): Outgo
     if (live.from_id === withId) return [...putDown, ...acceptIncoming(ctx, customerId, live)];
     return [...putDown, notice(customerId, `${nameOf(ctx, withId)} knows you want to talk. They will come to you.`)];
   }
+  // the greeter always makes the first move (Ritesh, 2026-10-21): asking for them just brings them over
+  if (withId === "greeter-1") return [...putDown, ...showIntent(ctx, { fromId: withId, customerId, staffId: withId, staffKind: "npc", reason: "greet" })];
   return [...putDown, ...showIntent(ctx, { fromId: customerId, customerId, staffId: withId, staffKind: r.ok.withKind, reason: "ask" })];
 }
 
@@ -929,8 +1001,10 @@ export function chatPairs(db: Database.Database): ChatPair[] {
 }
 
 // What is going on when it is not the specialist's move.
+const customerName = (ctx: Ctx, row: ConvRow, d: TalkConvData): string => d.standIn?.name ?? nameOf(ctx, row.customer_id);
+
 function staffStatus(ctx: Ctx, row: ConvRow, d: TalkConvData): string {
-  const name = nameOf(ctx, row.customer_id);
+  const name = customerName(ctx, row, d);
   if (d.checkout) return d.checkout.stage === "fetching" ? `The ${d.checkout.sale.name} is being brought out. Step over to the stock person and take it (E); ${name} will wait.` : `Taking payment from ${name}…`;
   if (d.stage === "seat_offer") return `Waiting for ${name} to say whether to sit down…`;
   if (liveEscortOf(ctx.db, row.customer_id)) return `Walking with ${name}…`;
@@ -942,11 +1016,11 @@ function staffMenu(ctx: Ctx, row: ConvRow, d: TalkConvData): Outgoing {
   const blocked = !!d.checkout || d.stage === "seat_offer" || !!liveEscortOf(ctx.db, row.customer_id) || !!d.scene.ended;
   const myMove = d.scene.toMove === "staff" && !blocked;
   const acts = myMove ? staffActList(d.scene) : [];
-  if (myMove && !d.scene.forced && !d.seat && freeTableFor(ctx, row.customer_id)) acts.push({ id: "seat", label: "Offer to sit down at a table", hint: "talk it through seated" });
+  if (myMove && !d.scene.forced && !d.seat && !d.standIn && freeTableFor(ctx, row.customer_id)) acts.push({ id: "seat", label: "Offer to sit down at a table", hint: "talk it through seated" });
   const view: StaffMenuView = {
     conversationId: row.id,
     customerId: row.customer_id,
-    customerName: nameOf(ctx, row.customer_id),
+    customerName: customerName(ctx, row, d),
     log: staffLog(d.scene),
     awaiting: myMove ? "staff" : "customer",
     acts,
@@ -973,7 +1047,7 @@ export function staffMove(ctx: Ctx, staffId: string, conversationId: string, act
   if (!isTalkData(d0)) return [notice(staffId, "That conversation is over.")];
   if (d0.checkout || d0.stage === "seat_offer" || liveEscortOf(ctx.db, row.customer_id)) return [notice(staffId, "Not yet: wait for this to finish.")];
   if (actId === "seat") {
-    if (d0.seat || d0.scene.toMove !== "staff") return [notice(staffId, "Not now.")];
+    if (d0.seat || d0.standIn || d0.scene.toMove !== "staff") return [notice(staffId, "Not now.")];
     if (!freeTableFor(ctx, row.customer_id)) return [notice(staffId, "Every table is taken right now."), staffMenu(ctx, row, d0)];
     const next: TalkConvData = { ...d0, stage: "seat_offer" };
     saveTalkData(ctx, row, next);
@@ -983,8 +1057,11 @@ export function staffMove(ctx: Ctx, staffId: string, conversationId: string, act
   const r = stepStaffMove(d0.scene, actId, toneId);
   if ("error" in r) return [notice(staffId, "That is not one of the moves.")];
   log(ctx, row.customer_id, "talk_staff_move", { conversationId: row.id, by: staffId, move: r.label, tone: toneId });
-  const next: TalkConvData = { ...d0, scene: r.scene };
+  // a stand-in customer answers at once, and never walks off to a device or a table
+  const scene = d0.standIn ? standInReplies(r.scene, row.id) : r.scene;
+  const next: TalkConvData = { ...d0, scene };
   saveTalkConv(ctx, row, next, false);
+  if (d0.standIn) return scene.ended ? finishTalk(ctx, row, scene) : [staffMenu(ctx, row, next), staffViewMessage(ctx)];
   const out: Outgoing[] = [];
   // a demo: the two of them walk to a real device of that model
   if (r.scene.demoed.length > d0.scene.demoed.length) return [...out, ...startDemoEscort(ctx, row, r.scene.demoed[r.scene.demoed.length - 1]!), staffMenu(ctx, row, next)];
@@ -1046,7 +1123,7 @@ export function seatedList(db: Database.Database): Array<{ visitorId: string; at
     const d = anyDataOf(r);
     const t = isTalkData(d) && d.seat ? TABLE_SEATS.find((x) => x.id === d.seat!.tableId) : undefined;
     if (!t) continue;
-    out.push({ visitorId: r.customer_id, at: t.guest.at, face: t.guest.face });
+    if (!(isTalkData(d) && d.standIn)) out.push({ visitorId: r.customer_id, at: t.guest.at, face: t.guest.face });
     // a real specialist sits too (an NPC's seat is drawn from its engagement)
     if (r.with_kind === "visitor") out.push({ visitorId: r.with_id, at: t.host.at, face: t.host.face });
   }
@@ -1583,10 +1660,8 @@ export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
   return open(ctx, customerId, npcId, "npc", script, at);
 }
 
-const GREETER_APPROACH_RANGE = 4.0; // metres: generous, since the NPC closes the distance itself
-
 // A customer who hasn't asked for anything yet (just arrived, or browsing)
-// gets approached by the greeter once, if the greeter is free and nearby —
+// gets approached by the greeter once, wherever they are (if the greeter is busy they wait their turn) —
 // so the first contact in the store doesn't depend on the visitor pressing E
 // first (Ritesh, 2026-10-12, "the biggest thing"). Only the greeter: every
 // other role waits to be asked, which matches a real store (a specialist
@@ -1603,8 +1678,7 @@ export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   if (!greeter) return [];
   const pose = npcPose(greeter, ctx.now);
   if (!pose.present) return [];
-  const here = ctx.position(customerId);
-  if (!here || dist(here, pose) > GREETER_APPROACH_RANGE) return [];
+  if (!ctx.position(customerId)) return [];
   if (!scriptFor("greeter")) return [];
   log(ctx, customerId, "npc_approached", { npcId: "greeter-1" });
   return showIntent(ctx, { fromId: "greeter-1", customerId, staffId: "greeter-1", staffKind: "npc", reason: "greet" });
@@ -1705,6 +1779,7 @@ function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
   if (isTalkData(prior) && prior.checkout?.stage === "fetching") up.push({ to: "all", message: { type: "released", npcId: prior.checkout.stockId } });
   if (isTalkData(prior) && prior.checkout) releaseReservationsOf(ctx, row.customer_id, "left before paying");
   const data: TalkConvData = { ...(isTalkData(prior) ? prior : {}), engine: "talk", scene, checkout: undefined };
+  if (data.standIn) up.push({ to: "all", message: { type: "released", npcId: data.standIn.npcId } });
   saveTalkConv(ctx, row, data, true);
   log(ctx, row.customer_id, "conversation_ended", { conversationId: row.id, why: scene.ended ? `talk:${scene.ended.how}` : "talk:unknown" });
   const cur = stateOf(ctx.db, row.customer_id);

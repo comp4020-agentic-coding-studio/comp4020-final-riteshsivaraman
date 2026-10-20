@@ -192,6 +192,8 @@ export type ServerMessage =
       engaged: Engagement[];
       inspecting: Inspection[];
       chats: ChatPair[];
+      // where you start: the client puts your view there
+      spawn: Pose;
       intents: IntentView[];
       seated: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }>;
     }
@@ -243,5 +245,7 @@ export const ENTRANCE_HALF = 1.5;
 // Ceiling height in metres (drawn by the client; kept here beside the floor).
 export const CEILING = 3.0;
 
-// Where a visitor appears: just inside the glass front, facing into the store.
-export const SPAWN: Pose = { x: 0, z: FLOOR.minZ + 0.4, ry: Math.PI };
+// Where a visitor appears (Ritesh, 2026-10-21): a customer just outside the
+// entrance, on the walkway, facing in; an employee in the back room, facing the shop.
+export const SPAWN: Pose = { x: 0, z: FLOOR.minZ - 1.5, ry: Math.PI };
+export const SPAWN_STAFF: Pose = { x: 0, z: 11.3, ry: 0 };

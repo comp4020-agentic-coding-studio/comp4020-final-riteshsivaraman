@@ -43,12 +43,16 @@ export function Npcs() {
       const eng = net.engaged.get(def.id);
       const rel = net.released.get(def.id);
       let direct = false;
-      if (eng && raw.present) {
+      if (eng && (raw.present || eng.lead)) {
         const m = engagedMoment(def.id, eng, now);
         raw = { ...m, present: true };
         // in a conversation with you they talk only while a line of theirs is on screen, for as long as it takes to say
         if (eng.visitorId === net.you?.id && !eng.pending && !m.walking && m.mode === "talk") {
-          const speaking = net.turn?.awaiting === "customer" && Date.now() - net.turnAt < talkMs(net.turn.say.length);
+          // (a specialist is spoken to by a stand-in customer: their line is the newest in the chat)
+          const line = net.staffConv?.log.at(-1);
+          const speaking = net.staffConv
+            ? line?.who === "customer" && Date.now() - net.staffAt < talkMs(line.text.length)
+            : net.turn?.awaiting === "customer" && Date.now() - net.turnAt < talkMs(net.turn.say.length);
           raw = { ...raw, mode: speaking ? "talk" : "idle" };
         }
         direct = true;

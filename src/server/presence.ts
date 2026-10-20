@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { WebSocket } from "ws";
 import {
   SPAWN,
+  SPAWN_STAFF,
   type ClientMessage,
   type Identity,
   type Pose,
@@ -21,7 +22,9 @@ import {
   enter,
   inspections,
   chatPairs,
+  handOverCustomer,
   handOverPost,
+  retireStandIn,
   collectStock,
   leaveConversation,
   closeTalk,
@@ -196,7 +199,8 @@ export function handleConnection(socket: WebSocket): void {
   // a takeover may already have replaced this session.
   const leave = (): void => {
     if (me && sessions.get(me.id)?.socket === socket) {
-      const handed = handOverPost(serviceCtx(), me.id); // while they still count as here
+      const pre = serviceCtx(); // while they still count as here
+      const handed = [...handOverPost(pre, me.id), ...handOverCustomer(pre, me.id)];
       sessions.delete(me.id);
       touchVisitor.run(Date.now(), me.id);
       logEvent(me.id, "leave");
@@ -235,10 +239,11 @@ export function handleConnection(socket: WebSocket): void {
       }
 
       // appear at the spawn point, or beside whoever is standing on it
-      const spot = avoidPeople(SPAWN.x, SPAWN.z, otherVisitors(visitor.id), Date.now());
+      const start = profile.kind === "customer" ? SPAWN : SPAWN_STAFF;
+      const spot = avoidPeople(start.x, start.z, otherVisitors(visitor.id), Date.now());
       me = {
         ...visitor,
-        ...SPAWN,
+        ...start,
         x: spot.x,
         z: spot.z,
         role: profile.kind === "customer" ? "customer" : "staff",
@@ -256,6 +261,8 @@ export function handleConnection(socket: WebSocket): void {
       logEvent(me.id, "join", { name: me.name, kind: me.kind, role: me.role });
       const ctx = serviceCtx();
       enter(ctx, me.id, profile, profile.name);
+      deliver(retireStandIn(ctx, me.id)); // if an NPC was standing in for them, it steps aside
+      if (me.kind === "customer") deliver(tryGreeterApproach(ctx, me.id)); // the greeter always makes the first move
 
       send(socket, {
         type: "welcome",
@@ -269,6 +276,7 @@ export function handleConnection(socket: WebSocket): void {
         engaged: engagements(db),
         inspecting: inspections(db),
         chats: chatPairs(db),
+        spawn: { x: me.x, z: me.z, ry: me.ry },
         intents: intentViews(ctx),
         seated: seatedList(db),
       });

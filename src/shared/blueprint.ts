@@ -7,7 +7,7 @@
 // Everything is drawn as a visitor standing at the entrance, facing in, would
 // see it: the +x wall is on the visitor's LEFT, the -x wall on their right.
 import { MALL, ROUTES } from "./mall.ts";
-import { CEILING, FLOOR, SPAWN, STORE_Y, WALKWAY_DEPTH } from "./protocol.ts";
+import { CEILING, FLOOR, SPAWN, SPAWN_STAFF, STORE_Y, WALKWAY_DEPTH } from "./protocol.ts";
 import {
   BACK_WALL,
   BAY_LEDGES,
@@ -248,7 +248,9 @@ export function renderPlan(): string {
 
   // spawn
   g.circle(px(SPAWN.x), py(SPAWN.z), 6, "#2a9d8f");
-  g.text(px(SPAWN.x) - 10, py(SPAWN.z) + 4, "visitor spawn (faces the shop)", 10, "end", "#2a9d8f", "600");
+  g.text(px(SPAWN.x) - 10, py(SPAWN.z) + 4, "customer spawn (outside the entrance)", 10, "end", "#2a9d8f", "600");
+  g.circle(px(SPAWN_STAFF.x), py(SPAWN_STAFF.z), 6, "#2a9d8f");
+  g.text(px(SPAWN_STAFF.x) - 10, py(SPAWN_STAFF.z) + 4, "employee spawn (back room)", 10, "end", "#2a9d8f", "600");
 
   // dimensions
   const SW = FLOOR.maxX - FLOOR.minX;

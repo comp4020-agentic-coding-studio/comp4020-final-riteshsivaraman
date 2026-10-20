@@ -91,8 +91,15 @@ it("sends a real specialist for a customer, who shows intent, is accepted, and s
 
   const { v: customer } = await join({ kind: "customer", name: "Cust Live" });
   await walkTo(customer, "greeter-1");
-  customer.send({ type: "talk_start", withId: "greeter-1" });
-  const hello = (await customer.next((m) => m.type === "turn")) as Extract<ServerMessage, { type: "turn" }>;
+  // the greeter makes the first move: it comes over, and pressing E once it has arrived is the yes
+  let hello: Extract<ServerMessage, { type: "turn" }> | undefined;
+  for (let i = 0; i < 20 && !hello; i++) {
+    customer.send({ type: "talk_start", withId: "greeter-1" });
+    await pause(400);
+    hello = customer.messages.find((m): m is Extract<ServerMessage, { type: "turn" }> => m.type === "turn");
+  }
+  expect(hello).toBeDefined();
+  hello = hello!;
   expect(hello.choices.map((c) => c.id)).toContain("phone");
   customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "phone" });
   await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id === "help"));

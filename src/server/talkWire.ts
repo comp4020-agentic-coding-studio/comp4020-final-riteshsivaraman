@@ -6,7 +6,7 @@ import {
   staffActs,
   type CustomerMenu,
 } from "../shared/talk/scene.ts";
-import { randomStaff, staffMove, type StaffTraits } from "../shared/talk/npc.ts";
+import { customerMove, randomPersona, randomStaff, staffMove, type StaffTraits } from "../shared/talk/npc.ts";
 import { derive } from "../shared/talk/scene.ts";
 import { modelById } from "../shared/talk/data.ts";
 import { TONES, type StaffAct } from "../shared/talk/types.ts";
@@ -250,4 +250,20 @@ export function staffStats(sc: Scene): { answers: Array<{ label: string; value: 
   });
   void modelById;
   return { answers, candidates };
+}
+
+// ---- a stand-in for a customer who has left (Ritesh, 2026-10-21) ----
+//
+// When the real customer walks out on a real specialist, an NPC customer takes
+// their place and answers from the same menu, using the engine's own customer
+// model with a persona seeded from the conversation. It never buys: at the
+// point of confirming it says it will think about it, so no stock is held for
+// someone who is not really there.
+export function standInAnswer(sc: Scene, conversationId: string): Scene {
+  const menu = customerMenu(sc);
+  if (!menu) return sc;
+  const persona = randomPersona(rngFor(`persona:${conversationId}`, 0), "stand-in");
+  const reply: CustomerReply = menu.pending.kind === "confirm" ? { picks: ["leave"], tone: "neutral" } : customerMove(sc, persona, rngFor(conversationId, sc.turn));
+  const next = applyCustomer(sc, reply);
+  return "error" in next ? sc : next;
 }
