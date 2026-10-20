@@ -20,7 +20,7 @@ import { designationOf, type EmployeeKind, type Specialty } from "../shared/prof
 import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
 import { TABLE_ASSIGNMENTS } from "../shared/assignments.ts";
-import { clampToWalkable, COUNTER } from "../shared/world.ts";
+import { ENTRANCE_ZONE, clampToWalkable, COUNTER } from "../shared/world.ts";
 import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
 import { takeOne } from "./stock.ts";
@@ -1662,7 +1662,7 @@ export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
 }
 
 // A customer who hasn't asked for anything yet (just arrived, or browsing)
-// gets approached by the greeter once, wherever they are (if the greeter is busy they wait their turn) —
+// gets approached by the greeter once, as soon as they stand just inside the entrance (if the greeter is busy they wait their turn) —
 // so the first contact in the store doesn't depend on the visitor pressing E
 // first (Ritesh, 2026-10-12, "the biggest thing"). Only the greeter: every
 // other role waits to be asked, which matches a real store (a specialist
@@ -1679,7 +1679,9 @@ export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   if (!greeter) return [];
   const pose = npcPose(greeter, ctx.now);
   if (!pose.present) return [];
-  if (!ctx.position(customerId)) return [];
+  // only someone standing just inside the entrance
+  const here = ctx.position(customerId);
+  if (!here || here.x < ENTRANCE_ZONE.minX || here.x > ENTRANCE_ZONE.maxX || here.z < ENTRANCE_ZONE.minZ || here.z > ENTRANCE_ZONE.maxZ) return [];
   if (!scriptFor("greeter")) return [];
   log(ctx, customerId, "npc_approached", { npcId: "greeter-1" });
   return showIntent(ctx, { fromId: "greeter-1", customerId, staffId: "greeter-1", staffKind: "npc", reason: "greet" });

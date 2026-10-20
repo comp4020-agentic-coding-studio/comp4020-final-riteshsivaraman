@@ -616,9 +616,13 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     expect(db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id)).not.toEqual({ ended_at: null });
   });
 
-  it("always makes the first move, wherever the customer is (they arrive outside the entrance)", () => {
-    addVisitor("c1", "Pebble", { x: 0, z: -11 });
+  it("goes up to whoever is standing just inside the entrance, and not to anyone elsewhere", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    addVisitor("c2", "Biscuit", { x: 0, z: -11 }); // still outside
+    addVisitor("c3", "Fern", { x: 5, z: 5 }); // deep in the store
     expect(last(tryGreeterApproach(ctx(), "c1"), "all", "intent")).toMatchObject({ fromId: "greeter-1", toId: "c1", reason: "greet" });
+    expect(tryGreeterApproach(ctx(), "c2")).toEqual([]);
+    expect(tryGreeterApproach(ctx(), "c3")).toEqual([]);
   });
 
   it("a customer pressing E on the greeter shows their own intent; the greeter accepts, it does not wait to be accepted", () => {

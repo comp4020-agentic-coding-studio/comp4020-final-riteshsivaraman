@@ -299,6 +299,8 @@ export const WALKWAY: Rect = {
   minZ: FLOOR.minZ - 0.5 - WALKWAY_DEPTH + 0.5,
   maxZ: FLOOR.minZ - 0.65,
 };
+// Whoever stands in here, just inside the entrance, is who the greeter goes up to (Ritesh, 2026-10-21).
+export const ENTRANCE_ZONE: Rect = { minX: -3.5, maxX: 3.5, minZ: FLOOR.minZ, maxZ: FLOOR.minZ + 3.5 };
 const ENTRANCE: Rect = {
   minX: -ENTRANCE_HALF + 0.3,
   maxX: ENTRANCE_HALF - 0.3,

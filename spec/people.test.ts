@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
-import { avoidPeople, nonVisitorPeople, settledPeople } from "../src/shared/people.ts";
+import { avoidPeople, engagedPlaces, nonVisitorPeople, settledPeople } from "../src/shared/people.ts";
 import { BODY_RADIUS, separateFromPeople } from "../src/shared/world.ts";
 
 // Promise: people are solid (Ritesh, 2026-10-11, "have collision between
@@ -114,4 +114,22 @@ it("moves people continuously: nobody is pushed further than a side-step in a ti
     }
     prev = cur;
   }
+});
+
+it("an NPC who has gone to talk to someone is solid where it stands now, not at its post (no invisible obstacle behind it)", () => {
+  const greeter = NPCS.find((n) => n.id === "greeter-1")!;
+  const post = npcPose(greeter, T0);
+  const meeting = { x: post.x + 4, z: post.z + 4 };
+  const eng = { npcId: "greeter-1", visitorId: "c", since: T0, at: meeting, from: meeting, lead: { x: meeting.x, z: meeting.z, fx: meeting.x, fz: meeting.z } };
+  const places = engagedPlaces([eng], T0);
+  // at its post: nothing there any more
+  const probe = { x: post.x + 0.1, z: post.z };
+  const before = avoidPeople(probe.x, probe.z, [], T0); // while it is at its post, you are pushed off it
+  expect(Math.hypot(before.x - post.x, before.z - post.z)).toBeGreaterThanOrEqual(MIN - 1e-6);
+  const after = avoidPeople(probe.x, probe.z, [], T0, places); // once it has gone, the spot is free
+  expect(Math.hypot(after.x - probe.x, after.z - probe.z)).toBeLessThan(0.05);
+  expect(nonVisitorPeople(T0, places).some((p) => Math.hypot(p.x - meeting.x, p.z - meeting.z) < 0.05)).toBe(true);
+  // and where it stands now you cannot walk through it
+  const bumped = avoidPeople(meeting.x + 0.1, meeting.z, [], T0, places);
+  expect(Math.hypot(bumped.x - meeting.x, bumped.z - meeting.z)).toBeGreaterThanOrEqual(MIN - 1e-6);
 });

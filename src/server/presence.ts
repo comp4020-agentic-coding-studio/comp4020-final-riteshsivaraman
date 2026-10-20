@@ -45,7 +45,7 @@ import {
   type Employee,
   type Outgoing,
 } from "./service.ts";
-import { avoidPeople } from "../shared/people.ts";
+import { avoidPeople, engagedPlaces } from "../shared/people.ts";
 import { clampToWalkable } from "../shared/world.ts";
 import { db } from "./db.ts";
 import { emitEvent } from "./eventlog.ts";
@@ -262,7 +262,6 @@ export function handleConnection(socket: WebSocket): void {
       const ctx = serviceCtx();
       enter(ctx, me.id, profile, profile.name);
       deliver(retireStandIn(ctx, me.id)); // if an NPC was standing in for them, it steps aside
-      if (me.kind === "customer") deliver(tryGreeterApproach(ctx, me.id)); // the greeter always makes the first move
 
       send(socket, {
         type: "welcome",
@@ -372,7 +371,7 @@ export function handleConnection(socket: WebSocket): void {
         me.refused = wanted && held;
       }
       // people are solid: not through another visitor, staff or customer
-      p = avoidPeople(p.x, p.z, otherVisitors(me.id), now);
+      p = avoidPeople(p.x, p.z, otherVisitors(me.id), now, engagedPlaces(engagements(db), now));
       p = clampToWalkable(me.role, p.x, p.z);
       me.x = p.x;
       me.z = p.z;
