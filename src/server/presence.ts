@@ -47,7 +47,7 @@ import {
   type Outgoing,
 } from "./service.ts";
 import { avoidPeople, engagedPlaces } from "../shared/people.ts";
-import { clampToWalkable } from "../shared/world.ts";
+import { clampToWalkable, zoneOf, type Zone } from "../shared/world.ts";
 import { db } from "./db.ts";
 import { emitEvent } from "./eventlog.ts";
 
@@ -63,6 +63,7 @@ interface Session extends VisitorInfo, Pose {
   look?: LookChoice;
   socket: WebSocket;
   lastMoveAt: number;
+  zone: Zone; // where in the building, for the event log: a change of zone is logged
   refused: boolean; // standing at a staff-only boundary: the refusal is logged once, not per step
 }
 
@@ -99,7 +100,7 @@ function broadcast(message: ServerMessage, exceptId: string): void {
   }
 }
 
-function logEvent(visitorId: string, type: string, data?: unknown): void {
+function logEvent(visitorId: string | null, type: string, data?: unknown): void {
   const ts = Date.now();
   insertEvent.run(ts, visitorId, type, data === undefined ? null : JSON.stringify(data));
   emitEvent(ts, visitorId, type, data);
@@ -170,6 +171,8 @@ function deliver(out: Outgoing[]): void {
 
 function deliverAll(out: Outgoing[]): void {
   for (const o of out) {
+    // what the store tells people (a refusal, a swap, a called-off order) is part of the story
+    if (o.message.type === "notice") logEvent(o.to !== "all" && o.to !== "staff" ? o.to : null, o.to === "all" || o.to === "staff" ? "announcement" : "notice", { text: o.message.text });
     if (o.to === "all") {
       for (const s of sessions.values()) send(s.socket, o.message);
     } else if (o.to === "staff") {
@@ -259,13 +262,14 @@ export function handleConnection(socket: WebSocket): void {
         look: profile.look,
         socket,
         lastMoveAt: 0,
+        zone: zoneOf(spot.x, spot.z),
         refused: false,
       };
       const others = [...sessions.values()].map(present);
       sessions.set(me.id, me);
 
       touchVisitor.run(Date.now(), me.id);
-      logEvent(me.id, "join", { name: me.name, kind: me.kind, role: me.role });
+      logEvent(me.id, "join", { name: me.name, kind: me.kind, role: me.role, specialty: me.specialty, zone: me.zone, x: me.x, z: me.z });
       const ctx = serviceCtx();
       enter(ctx, me.id, profile, profile.name);
       deliver(retireStandIn(ctx, me.id)); // if an NPC was standing in for them, it steps aside
@@ -384,6 +388,12 @@ export function handleConnection(socket: WebSocket): void {
       me.x = p.x;
       me.z = p.z;
       me.ry = message.ry;
+      // walking into another part of the building is an event; each step is not
+      const zone = zoneOf(p.x, p.z);
+      if (zone !== me.zone) {
+        logEvent(me.id, "zone", { from: me.zone, to: zone, x: p.x, z: p.z });
+        me.zone = zone;
+      }
       broadcast({ type: "moved", id: me.id, x: me.x, z: me.z, ry: me.ry }, me.id);
       // a customer who hasn't been approached yet, checked on their own
       // movement rather than any timer (D32/D40)

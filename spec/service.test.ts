@@ -1057,6 +1057,40 @@ describe("a sale after the chat: the bag, the specialist, the payment (Ritesh, 2
   });
 });
 
+// One whole visit, told only by the event log: whoever reads the log can say who did what
+// without opening the app (week 10, "logs, narrated").
+describe("the event log tells the whole story of a sale", () => {
+  it("records the greeting, the chat, the order, the hand-over, the payment and the end, each with who and what", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    tryGreeterApproach(ctx(), "c1");
+    expect(eventTypes()).toEqual(expect.arrayContaining(["profile", "npc_approached", "intent_shown"]));
+    const p = npc("spec-phones");
+    positions.set("c1", { x: p.x + 1, z: p.z });
+    const hello = talkAt(startTalk(ctx(), "c1", "spec-phones"));
+    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(hello.conversationId) as { data: string };
+    const data = JSON.parse(row.data);
+    data.scene.pending = { kind: "confirm" };
+    db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify(data), hello.conversationId);
+    chooseTurn(ctx(), "c1", hello.conversationId, "opt:yes");
+    const pay = payFor("c1");
+    chooseTurn(ctx(pay.t + 1000), "c1", pay.id, "pay:card");
+    const story = (db.prepare("SELECT type FROM events WHERE visitor_id = 'c1' ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
+    const order = ["conversation_started", "reserved", "stock_checked", "order_placed", "conversation_ended", "stock_handed_over", "intent_shown", "payment_started", "purchase_paid"];
+    let at = 0;
+    for (const t of order) {
+      const i = story.indexOf(t, at);
+      expect(i, `${t} should come after the step before it, in ${story.join(" > ")}`).toBeGreaterThanOrEqual(at);
+      at = i;
+    }
+    // every row says who (the visitor) and, where it matters, with whom and what
+    const placed = JSON.parse((db.prepare("SELECT data FROM events WHERE type = 'order_placed'").get() as { data: string }).data);
+    expect(placed).toMatchObject({ spec: "spec-phones", sale: { colour: expect.any(String), price: expect.any(Number) } });
+    // nothing secret in any row
+    for (const e of db.prepare("SELECT data FROM events").all() as Array<{ data: string | null }>) expect(e.data ?? "").not.toMatch(/token/i);
+  });
+});
+
 describe("sitting down to talk it through (Ritesh, 2026-10-19)", () => {
   const T = NOW + 60_000;
   const open = () => {

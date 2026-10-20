@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { FLOOR, SPAWN } from "../src/shared/protocol.ts";
+import { FLOOR, SPAWN, SPAWN_STAFF } from "../src/shared/protocol.ts";
 import {
   BACK_ROOM_Z0,
   BACK_ROOM_Z1,
@@ -76,4 +76,12 @@ it("keeps staff inside the building", () => {
 it("stops customers at the bar partitions, which staff may pass", () => {
   const partitions = solidsFor("customer").length - solidsFor("staff").length;
   expect(partitions).toBe(2);
+});
+
+it("names where in the building someone is, for the event log", async () => {
+  const { zoneOf } = await import("../src/shared/world.ts");
+  expect(zoneOf(SPAWN.x, SPAWN.z)).toBe("outside"); // customers arrive outside the entrance
+  expect(zoneOf(SPAWN_STAFF.x, SPAWN_STAFF.z)).toBe("back_room"); // employees arrive in the back room
+  expect(zoneOf(0, FLOOR.minZ + 1)).toBe("entrance");
+  expect(zoneOf(0, 0)).toBe("shop_floor");
 });

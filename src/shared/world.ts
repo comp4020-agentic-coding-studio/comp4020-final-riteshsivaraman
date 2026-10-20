@@ -301,6 +301,15 @@ export const WALKWAY: Rect = {
 };
 // Whoever stands in here, just inside the entrance, is who the greeter goes up to (Ritesh, 2026-10-21).
 export const ENTRANCE_ZONE: Rect = { minX: -3.5, maxX: 3.5, minZ: FLOOR.minZ, maxZ: FLOOR.minZ + 3.5 };
+// Where in the building someone is, as a word for the event log: a change of zone
+// is the one movement worth recording (positions themselves are never persisted).
+export type Zone = "outside" | "entrance" | "shop_floor" | "back_room";
+export function zoneOf(x: number, z: number): Zone {
+  if (z < FLOOR.minZ) return "outside";
+  if (z > FLOOR.maxZ) return "back_room";
+  if (x >= ENTRANCE_ZONE.minX && x <= ENTRANCE_ZONE.maxX && z <= ENTRANCE_ZONE.maxZ) return "entrance";
+  return "shop_floor";
+}
 const ENTRANCE: Rect = {
   minX: -ENTRANCE_HALF + 0.3,
   maxX: ENTRANCE_HALF - 0.3,
