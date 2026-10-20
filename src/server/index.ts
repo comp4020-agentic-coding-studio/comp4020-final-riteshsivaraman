@@ -6,7 +6,13 @@ import { Hono } from "hono";
 import { WebSocketServer } from "ws";
 import "./db.ts"; // open the database and create tables before anything else
 import { renderMarkdown } from "./markdown.ts";
+import { emitError } from "./eventlog.ts";
 import { handleConnection } from "./presence.ts";
+
+// A throw outside a socket handler is logged, not silent. The process keeps
+// running: a store with people in it should not drop because one path failed.
+process.on("uncaughtException", (err) => emitError("uncaught_exception", null, undefined, err));
+process.on("unhandledRejection", (err) => emitError("unhandled_rejection", null, undefined, err));
 
 const app = new Hono();
 

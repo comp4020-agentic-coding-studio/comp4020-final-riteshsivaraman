@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { formatEvent } from "../src/server/eventlog.ts";
+import { formatError, formatEvent, makeFolder } from "../src/server/eventlog.ts";
 
 // Promise: each events row is also one stdout line that says who, what and
 // when, tells two visitors apart, and never carries a token or typed text
@@ -34,4 +34,25 @@ it("keeps tokens and typed notes out of the line", () => {
   expect(line).not.toContain("SECRETSECRET");
   expect(line).not.toContain("allergic");
   expect(line).toContain("note=yes");
+});
+
+// Promise: a failure leaves one line that says who, which message type and what
+// broke, without the message body (crit 10: "enough context to reproduce it").
+it("an error line names the visitor, the message type and the cause, not the body", () => {
+  const line = formatError(1, "handler_error", ADA, "talk_choose", new Error("no such conversation"));
+  expect(line).toContain("[11111111] handler_error");
+  expect(line).toContain("user=11111111");
+  expect(line).toContain("msg=talk_choose");
+  expect(line).toContain('error="no such conversation"');
+  expect(line).not.toContain("\n");
+});
+
+// Promise: a notice repeated every 400ms is one log line, then a count.
+it("folds a repeated line into one, and reports the count once the window passes", () => {
+  const fold = makeFolder(10_000);
+  expect(fold("a|wait", 0)).toEqual({ log: true, repeated: 0 });
+  for (let t = 400; t < 8000; t += 400) expect(fold("a|wait", t).log).toBe(false);
+  expect(fold("b|wait", 8000).log).toBe(true); // another person is not folded
+  expect(fold("a|wait", 11_000)).toEqual({ log: true, repeated: 19 });
+  expect(fold("a|wait", 30_000)).toEqual({ log: true, repeated: 0 });
 });

@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import type { WebSocket } from "ws";
+import type { RawData, WebSocket } from "ws";
 import {
   SPAWN,
   SPAWN_STAFF,
@@ -48,7 +48,7 @@ import {
 import { avoidPeople, engagedPlaces } from "../shared/people.ts";
 import { clampToWalkable, zoneOf, type Zone } from "../shared/world.ts";
 import { db } from "./db.ts";
-import { emitEvent, setNameLookup } from "./eventlog.ts";
+import { emitError, emitEvent, makeFolder, setNameLookup } from "./eventlog.ts";
 import { NPC_NAME } from "../shared/duty.ts";
 
 // Presence: who is in the store right now, where they stand and which role
@@ -108,6 +108,16 @@ function logEvent(visitorId: string | null, type: string, data?: unknown): void 
   const ts = Date.now();
   insertEvent.run(ts, visitorId, type, data === undefined ? null : JSON.stringify(data));
   emitEvent(ts, visitorId, type, data);
+}
+
+// A held key re-asking every few hundred ms would flood the log with one notice
+const noticeFolder = makeFolder(10_000);
+
+function logNotice(to: string, text: string): void {
+  const everyone = to === "all" || to === "staff";
+  const verdict = noticeFolder(`${to}|${text}`, Date.now());
+  if (!verdict.log) return;
+  logEvent(everyone ? null : to, everyone ? "announcement" : "notice", verdict.repeated ? { text, repeated: verdict.repeated } : { text });
 }
 
 const identityOf = (s: Session): Identity => ({ kind: s.kind, specialty: s.specialty, look: s.look });
@@ -176,7 +186,7 @@ function deliver(out: Outgoing[]): void {
 function deliverAll(out: Outgoing[]): void {
   for (const o of out) {
     // what the store tells people (a refusal, a swap, a called-off order) is part of the story
-    if (o.message.type === "notice") logEvent(o.to !== "all" && o.to !== "staff" ? o.to : null, o.to === "all" || o.to === "staff" ? "announcement" : "notice", { text: o.message.text });
+    if (o.message.type === "notice") logNotice(o.to, o.message.text);
     if (o.to === "all") {
       for (const s of sessions.values()) send(s.socket, o.message);
     } else if (o.to === "staff") {
@@ -226,11 +236,12 @@ export function handleConnection(socket: WebSocket): void {
     }
   };
 
-  socket.on("message", (raw) => {
+  const onMessage = (raw: RawData): void => {
     let message: ClientMessage;
     try {
       message = JSON.parse(raw.toString()) as ClientMessage;
     } catch {
+      emitError("bad_message", me?.id ?? null, undefined, "not JSON");
       return;
     }
 
@@ -403,7 +414,29 @@ export function handleConnection(socket: WebSocket): void {
       if (me.kind === "customer") deliver(tryGreeterApproach(serviceCtx(), me.id));
       deliver(settleIntents(serviceCtx()));
     }
+  };
+
+  // A throw inside a handler must not take the server down, and must leave a
+  // line that says who sent what (the message type, never its contents).
+  socket.on("message", (raw) => {
+    let type: string | undefined;
+    try {
+      type = (JSON.parse(raw.toString()) as { type?: string }).type;
+    } catch {
+      // onMessage reports the bad JSON
+    }
+    try {
+      onMessage(raw);
+    } catch (err) {
+      emitError("handler_error", me?.id ?? null, type, err);
+    }
   });
 
-  socket.on("close", leave);
+  socket.on("close", () => {
+    try {
+      leave();
+    } catch (err) {
+      emitError("handler_error", me?.id ?? null, "close", err);
+    }
+  });
 }

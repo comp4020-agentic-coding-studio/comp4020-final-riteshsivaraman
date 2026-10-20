@@ -55,3 +55,41 @@ export function formatEvent(ts: number, visitorId: string | null, type: string, 
 export function emitEvent(ts: number, visitorId: string | null, type: string, data?: unknown): void {
   console.log(formatEvent(ts, visitorId, type, data));
 }
+
+// A failure, on stderr (flyctl logs shows both streams). Enough to find the
+// code and the person: the kind, who, which message type, the error's own text
+// and the first stack frames. Never the message body, which may hold typed text.
+export function formatError(ts: number, kind: string, visitorId: string | null, messageType: string | undefined, err: unknown): string {
+  const e = err instanceof Error ? err : new Error(String(err));
+  const frames = (e.stack ?? "").split("\n").slice(1, 4).map((l) => l.trim()).join(" | ");
+  const who = visitorId ? nameLookup(visitorId) : undefined;
+  const fields = [
+    visitorId ? `user=${short(visitorId)}` : "",
+    who ? `who=${scalar(who)}` : "",
+    messageType ? `msg=${scalar(messageType)}` : "",
+    `error=${JSON.stringify(e.message)}`,
+    frames ? `at=${JSON.stringify(frames)}` : "",
+  ].filter(Boolean);
+  return `${new Date(ts).toISOString()} [${visitorId ? short(visitorId) : "-"}] ${kind} ${fields.join(" ")}`;
+}
+
+export function emitError(kind: string, visitorId: string | null, messageType: string | undefined, err: unknown): void {
+  console.error(formatError(Date.now(), kind, visitorId, messageType, err));
+}
+
+// Folds identical lines inside a window into the next one that gets through:
+// the first is logged, repeats are swallowed and counted, and the first line
+// after the window says how many were swallowed.
+export function makeFolder(windowMs: number): (key: string, now: number) => { log: boolean; repeated: number } {
+  const seen = new Map<string, { at: number; folded: number }>();
+  return (key, now) => {
+    const prev = seen.get(key);
+    if (prev && now - prev.at < windowMs) {
+      prev.folded++;
+      return { log: false, repeated: 0 };
+    }
+    seen.set(key, { at: now, folded: 0 });
+    if (seen.size > 500) for (const [k, v] of seen) if (now - v.at >= windowMs) seen.delete(k);
+    return { log: true, repeated: prev?.folded ?? 0 };
+  };
+}
