@@ -423,7 +423,15 @@ function Remotes() {
       const looking = [...net.inspections.values()].find((i) => i.visitorId === r.info.id);
       const slot = looking ? DEVICE_SLOT_BY_ID.get(looking.slotId) : undefined;
       const chat = net.chats.get(r.info.id);
-      if (slot && !walking) state = { ...state, mode: "observe", mood: "curious", gaze: { x: slot.x, y: TABLE_H + 0.05, z: slot.z } };
+      // showing intent to talk: eyes on the person they want, and a wave
+      const reaching = [...net.intents.values()].find((i) => i.fromId === r.info.id && i.state === "open" && (i.ready || !i.human));
+      let target: { x: number; z: number } | undefined;
+      if (reaching) {
+        const npcDef = NPCS.find((n) => n.id === reaching.toId);
+        target = reaching.toId === net.you?.id ? net.me : (net.remotes.get(reaching.toId) ?? (npcDef ? npcPose(npcDef, net.serverNow()) : undefined));
+      }
+      if (reaching && target && !walking) state = { ...state, mode: "wave", mood: "smile", gaze: { x: target.x, y: 1.55, z: target.z } };
+      else if (slot && !walking) state = { ...state, mode: "observe", mood: "curious", gaze: { x: slot.x, y: TABLE_H + 0.05, z: slot.z } };
       else if (chat && !walking) {
         const other = chat.with === net.you?.id ? net.me : net.remotes.get(chat.with);
         // only the one who just spoke talks, and only as long as the line takes to say

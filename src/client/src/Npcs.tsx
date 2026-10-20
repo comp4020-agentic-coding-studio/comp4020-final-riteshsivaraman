@@ -46,6 +46,11 @@ export function Npcs() {
       if (eng && (raw.present || eng.lead)) {
         const m = engagedMoment(def.id, eng, now);
         raw = { ...m, present: true };
+        // showing intent: eyes on the person they want to talk to, wherever they are now, and a wave
+        if (eng.pending) {
+          const who = eng.visitorId === net.you?.id ? net.me : net.remotes.get(eng.visitorId);
+          if (who) raw = { ...raw, gaze: { x: who.x, y: 1.55, z: who.z } };
+        }
         // in a conversation with you they talk only while a line of theirs is on screen, for as long as it takes to say
         if (eng.visitorId === net.you?.id && !eng.pending && !m.walking && m.mode === "talk") {
           // (a specialist is spoken to by a stand-in customer: their line is the newest in the chat)
