@@ -1,6 +1,6 @@
 ---
 status: draft
-what: ADR 1 --- stack choice for Seen. Facts filled in; narrative is [TK] for Ritesh to write.
+what: ADR 1 --- stack choice for Seen. Facts and reasoning filled in.
 date: 2026-10-06
 ---
 
@@ -19,7 +19,7 @@ well under 48 hours from concept to deploy.
 1. **Hono + Preact SPA (chosen)** --- Node server (Hono) on `@hono/node-server`,
    Preact SPA built with Vite, `better-sqlite3` + Drizzle ORM, Vitest,
    plain `ws` for WebSockets later, a Yjs sync server on the same port in
-   v0.2. Reasons [TK --- Ritesh's call on what to say here]: lighter than
+   v0.2. Reasons: lighter than
    Fastify for this scope, raw WebSocket access without a plugin layer for
    the Yjs sync server coming in C9.
 2. **Crit 7's Astro stack (fallback, not used)** --- Astro + @astrojs/node +
@@ -40,5 +40,4 @@ Hono + Preact SPA, per above.
 - No server-side compile step: the server runs via `tsx` directly in
   production (see `Dockerfile`), trading a slightly slower boot for one
   less build stage to get wrong under deadline pressure.
-- [TK --- Ritesh: anything else worth saying about why this held up, or
-  didn't, once C9's Yjs layer actually gets built]
+- The Hono, SQLite and `ws` parts carried over to the store unchanged (see ADR 7).

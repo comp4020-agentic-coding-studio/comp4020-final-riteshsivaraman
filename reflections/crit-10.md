@@ -1,26 +1,29 @@
----
-status: skeleton
-what: Fact list and [TK] gaps for the crit 10 reflection. Ritesh writes the prose (150 to 300 words, as crit-9.md).
-date: 2026-10-18
-source: Claude's notes from the crit-10 prep session of 2026-10-18; commits cited by hash.
----
-
 # Crit 10 reflection
 
 ## What was the breakthrough that moved the work forward?
 
-Facts to draw on (not prose):
-- The events table already recorded every state change (CLAUDE.md invariant), but nothing reached stdout, so `flyctl logs` showed only "listening on". Fixed in `a60962b`: one stdout line per events row, same writers, no new dependency.
-- Week 10 slide it ties to: "logs help only when a command the agent can run prints them" (tl;dr).
-- Checked with two real WebSocket clients (Ada and Bo) on a throwaway database: the log alone says who joined, who was refused the back room, who switched role, who left. A session token never appeared in the log (checked against every token in the database).
-- Whether this was a breakthrough or a gap you had not seen: [TK]
+The breakthrough was noticing that my event log lived in the wrong place. Every
+state change already wrote a row to the events table, so I counted that as
+logging. However, `flyctl logs` only showed "listening on", which meant neither
+the agent nor I could read any of it when something went wrong. The week 10
+lecture puts it as: logs help only when a command the agent can run prints
+them. So every events row now prints one line to stdout with the time, the
+event and the visitor
+([`a60962b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a60962b)),
+and later I added names so two people can be told apart at a glance
+([`73bb0a0`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/73bb0a0)).
+Reading the log from a test run then showed two holes: one notice written 140
+times, and an error that left no line at all. Both are fixed and tested
+([`c5fbeff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/c5fbeff)).
 
 ## What did this work change about who I want to be as a software developer?
 
-- [TK] Ritesh's own account.
-- Prompts that may help: the D18 clamp was believed missing until found under another name (`clampToWalkable`); a mutation (customers clamped as staff) turned `spec/presence.test.ts` red, so the rule is guarded.
-- Known gap you will be asked about: role is self-chosen (`DEV_ROLE_SWITCH`), so "staff only" holds against a customer who stays a customer. Written down in ADR 3's addendum. [TK] your decision.
-
-## Evidence kinds
-- Repo: `a60962b`, ADR 3 addendum, `spec/eventlog.test.ts`.
-- Recall only: anything about what you felt or decided in the session. [TK]
+I want to be a developer who builds the way I will later read the app back.
+The staff only back room rule was believed missing until I found it under
+another name, `clampToWalkable`. Now I check a rule like that three ways: a
+test, a mutation that turns the test red, and a log line that shows the
+refusal. The lecture says authorisation is checked on the server for every
+action, and I can now show that from the log alone. One gap remains. Role is
+chosen by the visitor, so staff only holds against a customer who stays a
+customer, and ADR 3 says so. Before this crit I thought logging was something
+to add at the end. Now I think of the log as part of how I check the app.

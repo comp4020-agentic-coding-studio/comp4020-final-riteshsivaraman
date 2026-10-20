@@ -1,6 +1,6 @@
 ---
 status: draft
-what: ADR 5 --- storage becomes a real axis of a product's stock key, alongside colour. Facts filled in; "Why this" and "What would change this" are [TK] for Ritesh.
+what: ADR 5 --- storage becomes a real axis of a product's stock key, alongside colour. Facts and reasoning filled in.
 date: 2026-10-12
 ---
 
@@ -52,7 +52,9 @@ the product id, and not defer the schema change to a later session.
 
 ## What would change this
 
-[TK — Ritesh]
+Variants multiplying beyond phones would make the separate SKU table (option C)
+worth its extra join. A product whose options are not colour and storage would
+need a different key again.
 
 ## Consequence
 

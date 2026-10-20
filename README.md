@@ -1,70 +1,62 @@
-<!--
-SCAFFOLD, not finished prose. Claude drafted the structure, the fact lists and the [TK]
-markers on 2026-10-17. Ritesh writes the paragraphs (CLAUDE.md, "Ritesh writes the prose").
-Delete this comment when the prose is his. Target 400 to 600 words, published at /readme/.
-Facts below come from SCOPE.md (section named in brackets) unless marked otherwise.
--->
+# Store
 
-# [TK store name]
-
-[TK one or two sentences, Ritesh's words: what this is.]
-
-Facts to build it from:
-- An obvious parody of a famous fruit-themed retail store, as a shared first-person 3D shop. [SCOPE intro, D6]
-- Real visitors and CPU players share one room; the Genius Bar queue is the shared state. [SCOPE 0, D2, D3]
-- Brand name is still `[TK]`.
+Store is a shared first-person 3D shop, an obvious parody of a famous fruit-themed
+retail store. Real visitors and CPU staff walk the same room, and the Genius Bar
+queue is the shared state: you can see who is ahead of you, and they are a mix of
+people and characters. It has a logo but no brand name, and it is never presented as official.
 
 ## What good means here
 
-[TK Ritesh: a first answer to "is it any good?". The three questions from the week 8 lecture are function, quality of execution, and differentiation from the median.]
+**Function.** Store is for anyone who has stood in a busy shop wanting a phone and
+not getting one. Each part of a visit is simulated end to end, so a visitor feels
+both the satisfaction and the frustration of the real thing. The satisfaction is
+choosing a phone, seeing the colours and storage, sitting down to talk it through,
+paying and being handed a bag. The frustration is a colour that is out of stock, a
+price over budget, and a wait. Stock is finite and shared, so two visitors can
+race for the last unit.
 
-**Function.**
-- [TK who is this for. SCOPE 0b gives the direction but not a person. The earlier attempt to answer this described the company's culture, not a person, so it stayed `[TK]`.]
-- Direction in Ritesh's words (SCOPE 0b, 2026-10-10): each part of a store visit is simulated end to end, so you feel both the satisfaction and the frustration of a real visit.
-- Satisfaction he named: wanting a flagship phone, seeing colours, storage and memory options, being asked about other products, swiping a card, being handed a bag.
-- Frustration he named: a problem not resolved, a colour or configuration out of stock, a price out of budget, long waits.
+**Quality of execution.** The room should feel calm, like a hotel lobby, while the
+queue is lived. Nobody should have to read instructions: a character looks at you, waves and
+walks over, and you answer from a short menu.
 
-**Quality of execution.**
-- [TK how it should feel, and what a visitor should notice first versus later. The calm hotel-lobby intent against the lived queue is in `CLAUDE.md`; say it in your own words.]
-
-**Differentiation from the median.**
-- [TK what a generic "multi-user, real-time 3D shop" would be, and what this does instead.]
+**Differentiation from the median.** A generic multi-user 3D shop would be an empty room
+with avatars and a chat box. Here the people matter because they use the same
+scarce things: a specialist, a table, the last phone. When a real employee leaves,
+a CPU takes their place and the conversation carries on.
 
 ## How it works
 
-Facts only (SCOPE 3, 3b to 3d, 5):
-- Visitors choose customer or an employee kind, and customise a character. [D34]
-- Stock is finite and shared, so two visitors can race for the last unit. [SCOPE 0b]
-- CPU players and staff take real slots and queue positions, and are labelled as CPUs. [Tier 1 item 7, section 5]
-- Humans win over CPUs for slots, devices and capacity. [section 5]
-- Conversations are menu-driven. [D9]
-- [TK confirm which of these are built and live today before this goes out. `WORKLOG.md` is the place to check.]
+Visitors choose customer or an employee kind and customise a character. Real and
+CPU staff use the same conversation model, and conversations are menus, never free
+text. A visitor is whoever holds a random token in their browser, so there are no
+accounts. The server decides what each person may do ([ADR 3](docs/adr/0003-conversations-and-player-state.md)),
+and every change is saved to SQLite, so it is all still there after a restart.
 
 ## What is enforced and what is judged
 
-Enforced in `spec/` (see the test files for the exact rules):
-- [TK list the rules that have a check today, one line each, for example the back room being staff-only, an out-of-stock configuration being unbuyable, the occupancy cap.]
+Enforced in `spec/`: the back room is staff-only, an out-of-stock phone cannot be
+bought and only one of two visitors gets the last unit, one visitor cannot answer
+in another's conversation, the drawings of the store match the 3D model, and every
+event becomes a log line that names who did it.
 
-Judged by me, because no automated check can tell:
-- [TK whether the wait feels frustrating and the room feels calm and crowded.]
-- [TK how you judged it: `CLAUDE.md` says two browser profiles, as two different visitors, at 1920x1080 and 390x844. Say what you actually did and when.]
+Judged by me: whether a wait feels frustrating and the room feels calm. No test can
+tell, so I play it as two visitors in separate browser profiles at 1920x1080 and
+390x844. A play session on 14 October found the customer flow "way too linear"
+([SCOPE.md](SCOPE.md)), and I changed it.
 
 ## What I read
 
-Sources behind the definition (the files hold what each is, and `references/README.md` says how far to trust them):
-- Visitor accounts of real store visits: `references/accounts.md`.
-- Commentary on the store's design intent: `references/experience.md`.
-- Two satirical reels: `references/reels.md`.
-- The final project brief's notes on what good means at small scale, and the week 8 lecture's three questions.
-- [TK add what you read on small-web or small-scale software. The brief asks you to cite some.]
-- Decisions are recorded as architecture decision records in `docs/adr/` (Nygard's format).
+- Robin Sloan, [An app can be a home-cooked meal](https://www.robinsloan.com/notes/home-cooked-app/): an app can be good because it is made for a small group, which is the scale of this room.
+- Eight public accounts of store visits ([references/accounts.md](references/accounts.md)), the source of the satisfactions and frustrations above.
+- The Twelve-Factor App, [XI. Logs](https://12factor.net/logs), for how the app reports what people did.
 
 ## What I chose not to build
 
-SCOPE Tier 3 (2026-10-10) lists what is cut from this submission: baskets, purchases, payments, refunds, repair flows, product comparison, user accounts, chat between visitors, voice, more than one store, multiple floors, rigged human characters, VR, native mobile, any paid API.
-- [TK say in your own words which of these matter most and why. Check each against what is actually cut; `CUTS.md` has none for the store yet.]
+Refunds, user accounts, chat between visitors, voice, more than one store, VR and
+native mobile are cut ([SCOPE.md](SCOPE.md), Tier 3). Accounts and chat matter
+most. Both would let a visitor say or be anything, and the store works because
+what you can do is limited to asking for help, looking at devices and paying.
 
 ## Status
 
-- Live at [TK confirm the URL and whether it serves the store]. The Fly app is `comp4020-final-riteshsivaraman`.
-- [TK what is built today, from `WORKLOG.md`.]
+Live at [comp4020-final-riteshsivaraman.fly.dev](https://comp4020-final-riteshsivaraman.fly.dev). Built today: customers and employees, a greeter who approaches arrivals, real and CPU specialists, demos, tables, a stock runner, payment on the spot and a log of who did what. There is no occupancy cap yet.

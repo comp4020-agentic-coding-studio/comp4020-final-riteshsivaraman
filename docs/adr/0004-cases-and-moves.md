@@ -1,6 +1,6 @@
 ---
 status: draft
-what: ADR 4 --- a customer's visit is held by a durable case, and conversations are moves with preconditions over that case. Facts filled in; "Why this" and "What would change this" are [TK] for Ritesh.
+what: ADR 4 --- a customer's visit is held by a durable case, and conversations are moves with preconditions over that case. Facts and reasoning filled in.
 date: 2026-10-12
 ---
 
@@ -30,8 +30,8 @@ visitors, and every state change writes an `events` row first.
 | Initiation | **Either party can start a conversation, always** (replaces ADR 3's "a character only talks to a visitor who starts it"). Proximity still applies. |
 | Menus | The employee's reply is picked from a menu in the same format as the customer's. |
 | Proximity | An employee can only serve a customer they are near. Taking a customer from across the room is not allowed. |
-| Storage | [TK] current-state tables plus events (what exists) vs event-sourced. Recommended: current-state plus events; not yet confirmed. |
-| First slice | [TK] transcripts T1 (upgrade) and T4 (Genius Bar) together; not yet confirmed. |
+| Storage | Current-state tables plus events, not event-sourced (confirmed in the addendum of 2026-10-13). |
+| First slice | The phone purchase scene and the device-service scene (the Genius Bar), both built (WORKLOG, 2026-10-18 and 2026-10-19). |
 
 ## Options considered
 
@@ -56,11 +56,11 @@ Facts (proposed, not yet built):
 - Rules that are server-authoritative (stock, slots, ownership) need mutation checks (CLAUDE.md defect loop).
 - A migration needs a backup and a rehearsal on a copy of the Fly volume before deploy.
 
-Open (nothing here has a default I will pick quietly):
+Settled or still open:
 
-- `[TK]` prices, storage sizes, care plan terms, trade-in value rules: every one is Ritesh's word or a source.
-- `[TK]` whether trade-in, care plan and set-up are in the first build.
-- `[TK]` whether the basket and ticket survive a restart of the visit (database rows) or only the exchange.
+- Prices and storage sizes are copied from the maker's own pages with source and date (D37). Care plan terms and trade-in value rules are not built.
+- Trade-in, care plan and set-up are not in the first build.
+- A sale in progress is an `orders` row, so it survives a restart of the visit.
 
 ## Addendum: option B confirmed and the schema built (2026-10-13)
 
@@ -92,8 +92,16 @@ staff consultation mid-conversation while the customer waits (T3).
 
 ## Why this
 
-[TK] Ritesh's reasoning.
+Playing the first version end to end showed that a script per lane leaves a
+customer with nobody at the end of it. A durable case gives the Genius Bar
+something to show, lets a handoff carry what was said, and lets either side
+start. Moves with preconditions cost more design than an authored graph, but a
+graph explodes once handoffs and the order of questions vary. Checking each move
+on the server also keeps the rules in one place for the log and the tests.
 
 ## What would change this
 
-[TK] Ritesh's reasoning.
+A need to replay a visit from its events would push storage towards
+event-sourcing. A conversation that needs free text from a person would break
+the closed list of moves.
+

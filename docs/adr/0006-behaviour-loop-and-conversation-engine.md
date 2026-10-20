@@ -3,8 +3,7 @@ status: draft
 what: ADR 6 --- how NPC and player-controlled visitors run their idle/schedule
   loop and get interrupted into conversations, and how conversation content is
   computed (slot-filling over facts, not an authored tree scaled up). Facts
-  filled in from a grilling session; "Why this" and "What would change this"
-  are [TK] for Ritesh.
+  and reasoning filled in from a grilling session.
 date: 2026-10-13
 ---
 
@@ -94,8 +93,18 @@ decision at a time, 2026-10-13.
 
 ## Why this
 
-[TK] Ritesh's reasoning, in his own voice.
+I wanted NPCs and real people to run the same loop, so a person who walks up to
+a specialist and a specialist who walks up to a person are the same event. The
+timetable stays the default because it needs no timers, which the machine that
+stops when idle requires. Storing progress as facts, with no third state
+machine, means there is one place to read when something goes wrong. Slot-filling
+beats a bigger authored graph because the transcripts ask questions in the order
+that fits the answer.
 
 ## What would change this
 
-[TK] Ritesh's reasoning.
+A transcript that needs a conversation torn down from outside would force
+mid-conversation interrupts. Per-role behaviour that differs more than the shared
+skeleton allows would send those roles to their own written loops, as repair and
+pickup already have.
+

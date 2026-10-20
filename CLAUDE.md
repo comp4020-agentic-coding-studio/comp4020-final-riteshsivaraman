@@ -3,12 +3,12 @@
 COMP4020 final project, branch `new-idea`: an obvious parody of a famous
 fruit-themed retail store, as a shared first-person 3D shop (React Three
 Fiber client, Hono + ws + SQLite server). Real visitors and CPU players share
-one room, and the Genius Bar queue is the shared state. Brand name is `[TK]`.
+one room, and the Genius Bar queue is the shared state. The store has a logo and no brand name.
 Scope, decisions D1 to D24, tiers and open items: `SCOPE.md`.
 
 ## Don't invent, don't guess through ambiguity
 No made-up copy, stats, sources, or feature details. If a decision isn't
-pinned (see `SCOPE.md`'s `[TK]` items and open decisions), mark it `[TK]` and ask rather than
+pinned (see `SCOPE.md`'s open items), say so and ask rather than
 guessing plausibly. This extends to implementation: never build through an
 ambiguous requirement by picking the most plausible reading and proceeding —
 stop and ask. A wrong guess built on top of other code is more expensive to
@@ -110,9 +110,10 @@ the agent deciding alone, not a considered choice.
 
 ## Ritesh writes the prose
 README.md, PROCESS.md, ADR text, and reflections/*.md are his, in his voice.
-Draft structure, fact lists, and `[TK]` markers for gaps — never finished
-paragraphs standing in for his account. (The brief warns agent-written docs
-read like the crit agents' median answer.)
+Every claim in them is tied to a commit or a file, and a gap in the record is
+stated as a gap, never filled with an invented fact. For the final submission he
+rewrites them in his own words. (The brief warns agent-written docs read like
+the crit agents' median answer.)
 
 ## Parody integrity
 This is an *obvious* spoof (D6), not a discreet lookalike. No real
@@ -125,6 +126,12 @@ Before shipping, a fresh subagent with no prior context reviews the live app
 for stray real names and for visible COMP4020/crit/marker language inside
 the app itself. The repo's own docs are expected to say it's a COMP4020
 project. `.claude/agents/fiction-integrity-reviewer.md` runs this check.
+The course's image-generation proxy (`.claude/skills/gen-image`) may be used
+to turn a design idea into a concrete reference picture — **ask Ritesh first**
+every time, even when it's for the agent's own reference rather than to show
+him, since it spends the shared course image budget. Generated images are
+mood/reference only, never shipped as a texture or asset (everything in the
+app stays procedural, same rule as above).
 
 ## Keys never touch this repo
 The runtime-AI key (D8; OpenRouter now, `mise.local.toml`'s `OPENROUTER_API_KEY`,

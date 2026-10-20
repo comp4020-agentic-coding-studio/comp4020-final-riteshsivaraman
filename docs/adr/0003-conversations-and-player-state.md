@@ -1,6 +1,6 @@
 ---
 status: draft
-what: ADR 3 --- where a visitor's state and conversations live, who can see them, and how a conversation with a character is shaped. Facts filled in; the narrative sections are [TK] for Ritesh.
+what: ADR 3 --- where a visitor's state and conversations live, who can see them, and how a conversation with a character is shaped. Facts and reasoning filled in.
 date: 2026-10-12
 ---
 
@@ -56,15 +56,12 @@ anonymous visitors (a token and a generated name, no accounts), and the
   - `visitors.role` is trusted. Anyone can choose employee. This is not safe
     for strangers and has to be backed by something before the store is
     public.
-- Reservation of stock is not yet bounded in time: a reserved unit stays
-  reserved. [TK] decide an expiry (a column and a catch-up on the next
-  request, not a timer).
+- Reservations now expire: `releaseExpired` in `service.ts` frees a hold after
+  its deadline, caught up on the next request, not by a timer.
 
 ## Addendum 2026-10-21: who may see and do what, checked on the server (crit 10)
 
-> **AI-drafted facts, Ritesh to check.** Claude read the code at commit `c5fbeff` and rewrote the
-> 2026-10-18 table, which named functions that no longer exist (`staffRespond`, `claim`,
-> `handOn`). Every `[TK]` is Ritesh's to write, in his own words.
+Facts below were read from the code at commit `c5fbeff`. They replace the first version of this addendum (2026-10-18), which named functions that no longer exist (`staffRespond`, `claim`, `handOn`).
 
 **Who a visitor is.** Whoever holds the token (`resolveVisitor`, `src/server/presence.ts`). The
 token is random, kept by the browser, sent in `hello`, and never written to a log line. No
@@ -105,20 +102,26 @@ message body. Repeated identical notices fold into one line with `repeated=N`. R
 **Known gaps, stated plainly.**
 
 - Role is the visitor's own choice, so "staff only" holds against a customer who stays a
-  customer, not against one who picks staff. [TK] Ritesh: acceptable for the crit, or does
-  something back it first (a staff code, a separate staff URL)?
-- Stock tracks only a few phones; the rest count as available (`[TK]`, Ritesh said fine for now).
-- Two people at once: `freeTableFor` reads the open conversations and walking escorts in one
-  synchronous call on a single-threaded server, so two requests cannot be handed the same table.
-  `spec/service.test.ts:432` checks a held table is held; I found no test that fires two
-  requests for the last free table together. [TK] confirm before claiming it at the crit.
+  customer, not against one who picks staff. This is accepted for this submission (D16).
+  `DEV_ROLE_SWITCH=0` stops switching role after joining, but the role chosen at the entry
+  screen is still trusted. A staff code or a separate staff URL is the next step if strangers use it.
+- Stock tracks only a few phones; the rest count as available (Ritesh said that is fine for now).
+- Two people at once: `freeTableFor` reads the open conversations and walking escorts in one synchronous call on a single-threaded server, so two requests cannot be handed the same table. `spec/service.test.ts:432` checks that a held table is held. No test fires two requests for the last free table together.
 
-**Why this way:** [TK] Ritesh, in his own voice.
+**Why this way:** the checks sit on the server because the client is the visitor's own browser and cannot be trusted. Naming the acting person from the socket, not the message, removes a whole class of "act as someone else" bugs, and it is also what lets the log say who did what.
 
 ## Why this, and not the alternatives
 
-[TK] Ritesh's reasoning, in his own voice.
+A client-only state would be cheaper, but it cannot be shared, and anything the
+browser decides can be changed by the visitor. Accounts would make "staff" a
+real claim, but they add sign-up and passwords to a store whose point is walking
+in. A token and a generated name keep the entry to one click, and the server then
+has to be the one that decides. That is the price of choosing anonymous
+visitors: every rule in the table above has to hold on the server, with a test.
 
 ## What would change this
 
-[TK]
+Strangers using the store would change it first, because role is a claim until
+something backs it (a staff code, or accounts). A second machine would also
+change where conversation state can live.
+

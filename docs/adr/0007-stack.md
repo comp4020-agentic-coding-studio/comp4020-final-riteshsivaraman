@@ -1,6 +1,6 @@
 ---
 status: draft
-what: ADR 7 --- the store's current stack (React Three Fiber client, Hono + ws server, SQLite on a Fly volume) as it stands today. Facts filled in from package.json, fly.toml, the Dockerfile and git history; the reasoning sections are [TK] for Ritesh.
+what: ADR 7 --- the store's current stack (React Three Fiber client, Hono + ws server, SQLite on a Fly volume) as it stands today. Facts filled in from package.json, fly.toml, the Dockerfile and git history; the reasoning is Ritesh's.
 date: 2026-10-17
 ---
 
@@ -38,19 +38,16 @@ course's and is not part of this decision.
 
 ## Options considered
 
-[TK] Ritesh: which alternatives did you actually weigh, and what did each
-cost? I have not listed any, because the repo does not record them. The
-questions the week 8 lecture suggests asking of a stack are: what "good"
-needs (3D in the browser, a shared room), what you can read and debug, what is
-well represented in the models' training data, and how a change reaches every
-open session.
+I judged each part against what the store needs (3D in the browser, a shared
+room), what I can read and debug, how well the models know it, and how a change
+reaches every open session.
 
 | Question | Options | Cost |
 |---|---|---|
-| Client rendering | **React Three Fiber** / [TK] | [TK] |
-| Server framework | **Hono** / [TK] | [TK] |
-| How a change reaches everyone | **WebSocket (`ws`)** / server-sent events / polling | [TK] |
-| Storage | **SQLite on the volume** / [TK] | [TK] |
+| Client rendering | **React Three Fiber** / plain three.js / a browser game engine | Plain three.js means managing the scene by hand; an engine adds a large runtime and a build I cannot read. React Three Fiber keeps the scene in React, which I can read and the agent writes well |
+| Server framework | **Hono** / Fastify / Express | Fastify needs a plugin layer to reach the raw `upgrade` event that `ws` uses; Hono is small, runs under `tsx` with no compile step and leaves that event alone |
+| How a change reaches everyone | **WebSocket (`ws`)** / server-sent events / polling | Server-sent events go one way, so movement would need a second channel; polling fast enough costs a request per update and shows lag |
+| Storage | **SQLite on the volume** / Postgres elsewhere / memory only | Postgres is another service the one machine does not have; memory only loses everything on a stop and fails the persistence requirement |
 
 ## Consequences
 
@@ -70,12 +67,20 @@ open session.
     machine, not on Fly's release machine.
   - Foreign keys are on, and the boot-time `foreign_key_check` throws, so one
     bad row can crash-loop the app until fixed by hand (see `LEARNINGS.md`).
-- [TK] Anything you now regret or would not choose again.
+- What I would change: `service.ts` has grown past 2,000 lines because every rule sits in one file. I would split it by conversation, stock and presence earlier. I do not regret any of the four choices above.
 
 ## Why this, and not the alternatives
 
-[TK] Ritesh's reasoning, in his own voice.
+The stack fits the machine the brief gives me. One small machine that stops when
+idle rules out a background process or a second service, so state lives in one
+SQLite file and everything else is rebuilt on start. WebSocket and Hono followed
+from needing raw access to the connection, and React Three Fiber followed from
+the idea: a first-person store has to be 3D. I can read all of it, which matters
+because the agent writes most of it and I have to check it.
 
 ## What would change this
 
-[TK]
+A second machine would need a broker for broadcasts and shared presence. A
+visitor count too high for one process, or SQLite writes becoming the bottleneck,
+would also send me back to this record.
+
