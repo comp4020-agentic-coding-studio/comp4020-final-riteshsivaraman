@@ -621,12 +621,18 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     expect(last(tryGreeterApproach(ctx(), "c1"), "all", "intent")).toMatchObject({ fromId: "greeter-1", toId: "c1", reason: "greet" });
   });
 
-  it("brings the greeter over when the customer asks for them, instead of the customer starting it", () => {
+  it("a customer pressing E on the greeter shows their own intent; the greeter accepts, it does not wait to be accepted", () => {
     const g = npc("greeter-1");
     addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
     const out = requestTalk(ctx(), "c1", "greeter-1");
-    expect(last(out, "all", "intent")).toMatchObject({ fromId: "greeter-1", toId: "c1", reason: "greet" });
-    expect(last(out, "c1", "turn")).toBeUndefined();
+    expect(last(out, "all", "intent")).toMatchObject({ fromId: "c1", toId: "greeter-1", reason: "ask" });
+    expect(last(out, "all", "engaged")).not.toHaveProperty("waving"); // the visitor asked, so the greeter does not wave
+  });
+
+  it("an NPC that came over by itself waves, one the visitor asked does not", () => {
+    const g = npc("greeter-1");
+    addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
+    expect(last(tryGreeterApproach(ctx(), "c1"), "all", "engaged")).toMatchObject({ npcId: "greeter-1", pending: true, waving: true });
   });
 
   it("does not approach while a human holds the greeter post", () => {

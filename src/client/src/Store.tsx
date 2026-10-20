@@ -774,7 +774,9 @@ function SelfView() {
     const prev = state.current.speed ?? 0;
     const smooth = prev + (speed - prev) * 0.2;
     const seat = net.you ? net.seats.get(net.you.id) : undefined;
-    state.current = { walking: smooth > 0.25 && !seat, mode: "idle", mood: "neutral", speed: smooth, seated: !!seat };
+    // your own open intent to talk: you wave, so you can see what others see
+    const reaching = [...net.intents.values()].some((i) => i.fromId === net.you?.id && i.state === "open" && (i.ready || !i.human));
+    state.current = { walking: smooth > 0.25 && !seat, mode: reaching && !seat && smooth < 0.25 ? "wave" : "idle", mood: reaching ? "smile" : "neutral", speed: smooth, seated: !!seat };
     g.position.set(net.me.x, STORE_Y, net.me.z);
     g.rotation.y = camera.rotation.y;
   });

@@ -14,7 +14,7 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
-import type { ChatPair, CustomerView, Engagement, Inspection, IntentView, ServerMessage, StaffMenuView, TurnView } from "../shared/protocol.ts";
+import { FLOOR, type ChatPair, type CustomerView, type Engagement, type Inspection, type IntentView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
 import { engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
@@ -740,7 +740,9 @@ function endLiveIntents(ctx: Ctx, match: (r: IntentRow) => boolean, why: "accept
 // staff member coming to find them); the other end is whoever must accept.
 function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: string; staffKind: "npc" | "visitor"; reason: IntentView["reason"]; hold?: { x: number; z: number; label: string }; hint?: { x: number; z: number; label: string } }): Outgoing[] {
   if (liveIntentOf(ctx.db, p.customerId, p.staffId)) return [];
-  const at = ctx.position(p.customerId) ?? { x: 0, z: 0 };
+  let at = ctx.position(p.customerId) ?? { x: 0, z: 0 };
+  // a customer still outside the entrance (where they arrive) is met just inside the door, not out on the walkway
+  if (p.staffKind === "npc" && at.z < FLOOR.minZ + 0.8) at = { x: Math.max(-1, Math.min(1, at.x)), z: FLOOR.minZ + 1.2 };
   const held = !!p.hold;
   const busy = !held && staffBusy(ctx, p.staffId, p.staffKind);
   const id = randomUUID();
@@ -764,7 +766,8 @@ function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: 
 function intentEngagement(r: IntentRow): Engagement {
   const since = r.opened_at ?? r.created_at;
   const at = { x: r.at_x ?? 0, z: r.at_z ?? 0 };
-  const base: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since, at, pending: true };
+  // it waves only if it is the one who wants to talk; if the customer asked, it just looks at them until it accepts
+  const base: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since, at, pending: true, ...(r.from_id === r.staff_id ? { waving: true } : {}) };
   return base;
 }
 
@@ -861,8 +864,6 @@ export function requestTalk(ctx: Ctx, customerId: string, withId: string): Outgo
     if (live.from_id === withId) return [...putDown, ...acceptIncoming(ctx, customerId, live)];
     return [...putDown, notice(customerId, `${nameOf(ctx, withId)} knows you want to talk. They will come to you.`)];
   }
-  // the greeter always makes the first move (Ritesh, 2026-10-21): asking for them just brings them over
-  if (withId === "greeter-1") return [...putDown, ...showIntent(ctx, { fromId: withId, customerId, staffId: withId, staffKind: "npc", reason: "greet" })];
   return [...putDown, ...showIntent(ctx, { fromId: customerId, customerId, staffId: withId, staffKind: r.ok.withKind, reason: "ask" })];
 }
 

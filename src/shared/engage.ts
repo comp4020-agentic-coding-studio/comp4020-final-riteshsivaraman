@@ -88,7 +88,7 @@ export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Mome
   if (e.pending) {
     // arrived, showing intent: facing them, waiting to be accepted
     const ry = headingTo(goal.x, goal.z, e.at.x, e.at.z);
-    return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "wave", "smile", "waving to a visitor to say they would like to talk"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };
+    return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, e.waving ? "wave" : "idle", "smile", e.waving ? "waving to a visitor to say they would like to talk" : "about to accept a visitor"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };
   }
   // arrived: facing the visitor, talking
   const ry = headingTo(goal.x, goal.z, e.at.x, e.at.z);

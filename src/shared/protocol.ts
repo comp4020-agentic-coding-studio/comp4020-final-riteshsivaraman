@@ -64,6 +64,8 @@ export interface Engagement {
   // true while the NPC has walked over to show intent to talk but the other
   // side has not accepted yet: it stands facing them, not yet talking
   pending?: boolean;
+  // with `pending`: it is the NPC that wants to talk, so it waves (not when the visitor asked)
+  waving?: boolean;
   // set while the NPC is walking a customer somewhere: it starts from `from`
   // (not its timetable) and stops at `lead`, facing (fx, fz)
   from?: { x: number; z: number };
