@@ -60,32 +60,58 @@ anonymous visitors (a token and a generated name, no accounts), and the
   reserved. [TK] decide an expiry (a column and a catch-up on the next
   request, not a timer).
 
-## Addendum 2026-10-18: who may do what, checked on the server (crit 10)
+## Addendum 2026-10-21: who may see and do what, checked on the server (crit 10)
 
-Facts below were read from the code at commit `a60962b`; the reasoning is `[TK]` for Ritesh.
+> **AI-drafted facts, Ritesh to check.** Claude read the code at commit `c5fbeff` and rewrote the
+> 2026-10-18 table, which named functions that no longer exist (`staffRespond`, `claim`,
+> `handOn`). Every `[TK]` is Ritesh's to write, in his own words.
 
-**Who a visitor is:** whoever holds the token (`resolveVisitor`, `presence.ts`). The token is
-random, kept by the browser, sent in `hello`, and never written to a log line. No account.
+**Who a visitor is.** Whoever holds the token (`resolveVisitor`, `src/server/presence.ts`). The
+token is random, kept by the browser, sent in `hello`, and never written to a log line. No
+account. A second tab with the same token takes over the first (the old socket is closed with code 4000, "opened elsewhere").
+
+**The rule that makes the rest hold.** The acting person is always the socket's own session
+(`me.id`). No message carries an "as whom" field, so one visitor cannot act as another. A client
+can only name the *thing* it acts on (a conversation id, an intent id, a device slot), and the
+server then checks that the session is allowed to touch that thing.
 
 **What each action checks, on the server:**
 
 | Action | Checked in | Rule |
 |---|---|---|
-| Walk (`move`) | `presence.ts`, `clampToWalkable(role, ...)` (`world.ts`) | A customer's position is clamped to the shop floor and outside. The back room is staff-only (D18). The client runs the same function for feel; the server's answer wins. |
-| Switch role | `presence.ts`, only if `DEV_ROLE_SWITCH` is not `0` | **Trusted claim.** Anyone can become staff (see Consequences above). Switching back re-clamps the position. |
-| Start a conversation | `startTalk`, `service.ts` | Only a visitor with a customer state; one conversation at a time. |
-| Take a turn | `chooseTurn` | Only the customer of that conversation, only on their turn, only an option the script offers. |
-| Reply, hand to genius, end | `staffRespond` | Only the staff member the conversation is with, only on their turn. |
-| Claim, hand on | `claim`, `handOn` | Only an online employee, only for a customer waiting for help; a claim also needs the matching post. |
-| Inspect a device | `startInspect` | Within range, and not while someone else holds that slot. |
+| Walk (`move`) | `presence.ts`, `clampToWalkable(role, ...)` | A customer is clamped to the shop floor and outside; the back room is staff-only (D18). At most 25 updates a second; non-finite numbers are dropped. The client runs the same function for feel, the server's answer wins. |
+| Press E at someone (`talk_start`) | `requestTalk` / `resolveTalk` | Only a visitor in a customer state (arriving, browsing, waiting for help); in range; the other person on duty and with a script. |
+| Take a turn (`talk_choose`) | `chooseTurn` | Only the customer of that conversation, only while it is open, only a choice the script is offering. Another visitor's conversation id gets "That conversation is over." (`spec/service.test.ts:184`). |
+| Staff move (`staff_move`) | `staffMove` | Only the staff member the conversation is with, only while it is open, only a move the script offers; not while a checkout or walk is under way. |
+| Show / accept intent | `showIntentById`, `acceptIntentById` | Only the person the intent is addressed to (`staff_id` / `to_id`), and only while it is still live. |
+| Take a stock order (`order_take`) | `takeOrder` | Only the specialist the order names, in range of the runner, after the runner has arrived. |
+| Inspect a device | `startInspect` | In range, and not while someone else holds that slot. |
+| Leave / close a conversation | `leaveConversation`, `closeTalk` | Acts on the caller's own open conversation only. |
+| Switch role | `presence.ts`, unless `DEV_ROLE_SWITCH=0` | **A claim, not a check.** Anyone can become staff. Switching back re-clamps the position. |
 
-**What the log shows:** every row above also writes an `events` row and one stdout line
-(`src/server/eventlog.ts`). A customer refused a staff-only spot logs `staff_area_refused`
-once per approach. Read it with `mise exec -- flyctl logs -a <app> --no-tail`.
+**What each person sees.** Everyone gets presence (positions, names, colours), who is inspecting
+what, the chat pairs and the intents. Staff additionally get the customers' states
+(`staffViewFor`, `customersView`). A conversation's turns go only to its two people. A notice goes
+to the one person it is for, except announcements (someone left, an NPC stands in), which go to
+all.
 
-**Known gap, stated plainly:** role is the visitor's own choice, so "staff only" holds against a
-customer who stays a customer, not against one who picks staff. [TK] Ritesh: is that acceptable
-for the crit, or does something back it first (a staff code, a separate staff URL)?
+**What the log shows.** Every action above writes an `events` row and one stdout line
+(`src/server/eventlog.ts`). A customer refused a staff-only spot logs `staff_area_refused` once
+per approach. A throw in a handler or an uncaught exception logs `handler_error` /
+`uncaught_exception` on stderr with the user, the message type and the error text, never the
+message body. Repeated identical notices fold into one line with `repeated=N`. Read it with
+`mise exec -- flyctl logs -a <app> --no-tail`.
+
+**Known gaps, stated plainly.**
+
+- Role is the visitor's own choice, so "staff only" holds against a customer who stays a
+  customer, not against one who picks staff. [TK] Ritesh: acceptable for the crit, or does
+  something back it first (a staff code, a separate staff URL)?
+- Stock tracks only a few phones; the rest count as available (`[TK]`, Ritesh said fine for now).
+- Two people at once: `freeTableFor` reads the open conversations and walking escorts in one
+  synchronous call on a single-threaded server, so two requests cannot be handed the same table.
+  `spec/service.test.ts:432` checks a held table is held; I found no test that fires two
+  requests for the last free table together. [TK] confirm before claiming it at the crit.
 
 **Why this way:** [TK] Ritesh, in his own voice.
 
