@@ -236,7 +236,7 @@ Every line is built from state and data; nothing is free text. Pieces:
 - `named(ctx, id)` decides whether to say "it": the phone talked about most recently, and only if that line
   talked about just that one (`mentioned` matches longest names first so "iPhone 18 Pro" is not found inside
   "iPhone 18 Pro Max").
-- All placeholder phrases are marked [TK] for Ritesh to rewrite.
+- All placeholder phrases are flagged as placeholders for Ritesh to rewrite.
 
 **Tone and face:** `TONE_EXPRESSION` in `types.ts` maps friendly/neutral/impatient/unsure to the character's own
 `smile`/`neutral`/`focused`/`worried`; every `Line` carries `expression`.
@@ -319,7 +319,7 @@ persisted or logged.
   memory/storage space (see `laptops-v2-notes.md`), and excludes the nano-texture display finish
   (no bank question distinguishes a finish; including it left two rows the engine could never
   resolve between -- see the laptop `data.ts` comment on `skusStandard`).
-- Service v1 is phone-only, 4 symptoms, no pricing beyond `[TK]` placeholder, and has no page or
+- Service v1 is phone-only, 4 symptoms, no pricing beyond a placeholder, and has no page or
   replay suite. It has never been played by a human.
 
 ## 11. The device-service scene: what a genuinely different pool shape actually needed

@@ -2,7 +2,7 @@
 status: raw
 what: OCR'd text of Instagram carousel posts about the store's design intent (no checkout counters, mobile payment, hands-on tables). Marketing commentary, not visitor accounts.
 date: 2026-10-10
-source: Instagram posts saved by Ritesh; author and links [TK]
+source: Instagram posts saved by Ritesh; author and links not recorded
 ---
 
 APPLE STORES HAD NO CHECKOUT

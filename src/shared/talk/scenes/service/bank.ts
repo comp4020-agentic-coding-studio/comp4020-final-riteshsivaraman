@@ -6,7 +6,7 @@ import type { Ctx, Option, Scene } from "./types.ts";
 
 // v1 bank: 4 symptoms (service-scene-proposal.md section 3's recommended
 // scope), the model, water exposure, data-matters (feeds the mandatory
-// gate), and prior-repair-elsewhere ([TK] invented eligibility note, not
+// gate), and prior-repair-elsewhere (invented eligibility note, not
 // acted on in v1 beyond being asked and recorded).
 
 export interface Contribution {
@@ -124,7 +124,7 @@ export const BANK: QuestionDef[] = [
   },
   {
     id: "prior_repair",
-    // [TK] invented eligibility question (service-scene-proposal.md section 2)
+    // invented eligibility question (service-scene-proposal.md section 2)
     // -- recorded for v1, not yet acted on by any outcome rule.
     kind: "soft",
     ask: () => "Has anyone other than an authorised repairer opened or worked on it before?",

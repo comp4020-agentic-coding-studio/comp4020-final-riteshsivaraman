@@ -4,7 +4,7 @@ import { closingLine, dataLossLine, outcomeLine } from "../src/shared/talk/scene
 import { faultById } from "../src/shared/talk/scenes/service/data.ts";
 
 // Lighter than the purchase scenes' wording specs: v1's lines are explicitly
-// [TK] placeholders for Ritesh (CLAUDE.md's "Ritesh writes the prose"), so
+// placeholders for Ritesh (CLAUDE.md's "Ritesh writes the prose"), so
 // this only checks the structural facts -- every tone maps to a real face,
 // the data-loss line exists and is non-empty (it is said unconditionally,
 // never built from state that could be missing), and outcomeLine reads real

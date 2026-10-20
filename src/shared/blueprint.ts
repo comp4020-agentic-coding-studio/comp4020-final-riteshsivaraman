@@ -542,7 +542,7 @@ export function renderWalls(): string {
     for (const mx of GLASS.mullionX.filter((m) => m < GLASS.entranceX[0] || m > GLASS.entranceX[1])) g.line(hx(mx), hy(CEILING), hx(mx), base, "#7b8087", 3);
     for (const ex of GLASS.entranceX) g.line(hx(ex), hy(CEILING), hx(ex), base, "#2a6a95", 3);
     g.text(hx(0), hy(CEILING / 2), "entrance opening", 11, "middle", "#2a6a95", "700");
-    g.text(hx(0), hy(CEILING / 2) + 14, `${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, assumed [TK]`, 10, "middle", "#2a6a95");
+    g.text(hx(0), hy(CEILING / 2) + 14, `${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, assumed`, 10, "middle", "#2a6a95");
     g.text(hx(0), hy(CEILING) + 22, "header band", 9, "middle", "#444");
     g.line(MX, base, MX + 2 * x0 * ES, base, "#111", 2);
     vDim(g, hy(0), hy(CEILING), MX - 10, `${CEILING} m`);
@@ -699,12 +699,12 @@ export function renderDocument(): string {
     <tr><td>Product tables</td><td>${TABLE_W} wide x ${TABLE_LEN} long (elongated, front to back), four in each side column and three in the middle, products on the two long sides only, ${CLEAR_GAP.toFixed(1)} m clear between them front to back</td><td>Your description</td></tr>
     <tr><td>Service tables</td><td>${SERVICE_SIDE} m square (1.5 times the earlier 1.2 m side, on your request), one nearest the bar in each side column and one in the middle column, two stools tucked under each of its left and right sides, no products</td><td>Your description</td></tr>
     <tr><td>Bench along each side wall</td><td>${BENCHES[0].w} m deep, ${BENCHES[0].d} m long (it stops where the indented bays start), ${BENCHES[0].h} m high</td><td>Your instruction, from the references</td></tr>
-    <tr><td>Ledges in front of the bays</td><td>one short ledge on the ${BAY_LEDGES["+x"][0].half} half of each of the three bays on each side, ${LEDGE_DEPTH} m out from the wall, one product on each</td><td class="warn">Which half and which product are [TK]: working defaults</td></tr>
+    <tr><td>Ledges in front of the bays</td><td>one short ledge on the ${BAY_LEDGES["+x"][0].half} half of each of the three bays on each side, ${LEDGE_DEPTH} m out from the wall, one product on each</td><td class="warn">Which half and which product are working defaults</td></tr>
     <tr><td>Where the store is</td><td>On the <b>first floor</b> of a mall atrium: a ${WALKWAY_DEPTH} m walkway outside the glass with a glass balustrade, the void down to the ground-floor concourse, and opposite shopfronts on both floors. Visitors can step out through the entrance and look down.</td><td>Your instruction and picture (2026-10-11)</td></tr>
     <tr><td>Entrance clear zone</td><td>${CLEAR_ZONE.toFixed(1)} m from the glass to the first table, kept empty: customers are received here</td><td>Your instruction</td></tr>
     <tr><td>Service bar</td><td>${COUNTER.w} m long x ${COUNTER.d} m deep, ${COUNTER.h} m high, ${BAR_STOOLS.length} stools tucked under the overhang</td><td>Almost from the far end of one service table to the far end of the other; 13 stools by your instruction</td></tr>
     <tr><td>Staff door</td><td>${(DOOR.maxX - DOOR.minX).toFixed(1)} m wide, left of the bar as you face it (+x)</td><td>Your description</td></tr>
-    <tr><td>Entrance opening</td><td>${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, middle of the glass front</td><td class="warn">Assumed [TK]</td></tr>
+    <tr><td>Entrance opening</td><td>${GLASS.entranceX[1] - GLASS.entranceX[0]} m wide, middle of the glass front</td><td class="warn">Assumed</td></tr>
     <tr><td>Back room</td><td>${D} m deep, same footprint: inventory on four rows of rolling shelves, a repair room with two benches, a manager's office, a break and training room, lockers and restrooms, and a back door to a loading dock</td><td>Your pasted description of a store's back of house; placement is mine, to correct</td></tr>
   </table>
   <h2>Where the scale is uncertain</h2>

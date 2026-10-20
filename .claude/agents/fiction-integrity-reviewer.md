@@ -48,8 +48,8 @@ COMP4020 project - that is not a finding.
      "assignment", "assessment", "pnpm check", or anything that reads as
      talking about the assignment rather than being the product.
    - Visible placeholder copy a real visitor would notice: "Lorem ipsum",
-     "TODO", "[TK]", obviously unfinished strings. (`[TK]` in docs is fine;
-     `[TK]` rendered in the live UI is not.)
+     "TODO", obviously unfinished strings. (Placeholder
+     markers in docs are fine; one rendered in the live UI is not.)
    - A CPU player that is disguised as a human where the README says CPUs are
      labelled.
 5. Judge it as a stranger, not as someone who knows the brief - if something

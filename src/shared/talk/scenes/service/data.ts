@@ -17,7 +17,7 @@
 //     assessment after liquid exposure can risk the data on the device
 //
 // INVENTED (this fictional store's own policy, not a real repair chain's
-// actual rules -- [TK]/[verify] the same way SCOPE.md marks invented policy
+// actual rules -- [verify] the same way SCOPE.md marks invented policy
 // elsewhere): exact turnaround days, cost bands, and the "prior repair
 // elsewhere needs reassessment" eligibility rule. Nothing here is a real
 // price or a real warranty term copied from anywhere.
@@ -32,7 +32,7 @@ export const SYMPTOM_LABEL: Record<Symptom, string> = {
 };
 
 export type CostBand = "free" | "low" | "mid" | "high";
-// [TK] invented price ranges, not sourced from any real repairer -- Ritesh's
+// invented price ranges, not sourced from any real repairer -- Ritesh's
 // call before this goes anywhere customer-facing.
 export const COST_LABEL: Record<CostBand, string> = {
   free: "no charge",
@@ -56,9 +56,9 @@ export interface FaultRec {
   // assessment, logic-board work and some battery/charging-IC repairs can
   // require a wipe or a reset).
   destructive: boolean;
-  // [TK] invented: not a real turnaround time from any repairer.
+  // invented: not a real turnaround time from any repairer.
   etaDays: number | null;
-  // [TK] invented: not a real price from any repairer.
+  // invented: not a real price from any repairer.
   costBand: CostBand;
 }
 

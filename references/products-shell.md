@@ -44,7 +44,7 @@ find a number I say so and give the working value I used, marked *assumed*.
   is huge and cropped: phones fanned at an angle, often cut off by the frame,
   with a white margin, and one small framed accessory picture. No text.
 - **Glass front.** Full-height glass with thin steel mullions, a solid header
-  band across the top, and a centre opening (the plan's 3 m is `[TK]`).
+  band across the top, and a centre opening (the plan's 3 m is an assumption).
 - **Back of house.** I found no authoritative standard. What turned up:
   fire-rated back-of-house doors with vision panels and closers (UK fit-out
   documents); one schedule with door leaves of 845 x 2100 mm and 100 mm walls;

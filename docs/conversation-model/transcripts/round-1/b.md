@@ -139,7 +139,7 @@ Turns: 20 lines (10 staff, 10 customer).
 
 ## Customer throw-backs used
 
-- "Is the bigger one worth the extra money?" (answered only from the sheet: Pro Max is about $200 higher than the Pro at each tier, same chip and same camera system, screen is 6.9" vs 6.3". Exact Pro Max prices are [TK] in the sheet.)
+- "Is the bigger one worth the extra money?" (answered only from the sheet: Pro Max is about $200 higher than the Pro at each tier, same chip and same camera system, screen is 6.9" vs 6.3". Exact Pro Max prices are missing in the sheet.)
 - Canned actions used at C4 and C6, which probably belong in the throw-back menu too: "Can I try the smaller one?" and "That feels about right."
 
 ## Things staff could have asked but didn't
@@ -156,7 +156,7 @@ Turns: 20 lines (10 staff, 10 customer).
 ## Assumptions I made
 
 - Pro Max colours: sheet says "same as 18 Pro", so they would have been the same four. Not needed in the transcript.
-- I did not state any exact Pro Max price. S4 gives only "about $200 more at each tier", which is the sheet's wording; exact figures are [TK].
+- I did not state any exact Pro Max price. S4 gives only "about $200 more at each tier", which is the sheet's wording; exact figures are not stated.
 - "Easier to hold" for 6.3" vs 6.9" is the customer's framing and staff's common-sense reading of screen size, not a sheet fact. The sheet has no weight for the Pro or Pro Max.
 - S6 "easier in the hand" is mild inference from the screen size difference; if this is too strong, replace with "smaller screen, 6.3"".
 - Whether the demo unit is Glacier or any other colour is UNKNOWN. Staff say they'll check.

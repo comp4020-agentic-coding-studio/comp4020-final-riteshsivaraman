@@ -6,13 +6,13 @@ import type { Ctx, CustomerReply, Line, Option, Pending, StaffAct, Tone } from "
 // nobody can say anything the data does not back: a staff claim is read off a
 // model record, a customer line is the label of what they picked. Tone is a
 // small wrapper on top. These wrappers are placeholders for wording Ritesh
-// reviews and rewrites [TK]; the four tones are fixed, the phrases are not.
+// reviews and rewrites; the four tones are fixed, the phrases are not.
 
 // Tone is carried by phrasing, never by a lead-in stuck on the front of
 // whatever the menu label happens to be (that is how "Sure." ended up in front
 // of "Not sure."). A customer says each pick as a sentence built for it, with
 // a variant per tone; staff lead-ins depend on how the customer's last answer
-// went. The phrases are placeholders for wording Ritesh rewrites [TK]; the
+// went. The phrases are placeholders for wording Ritesh rewrites; the
 // four tones are fixed.
 
 // What a customer's answer sounded like, so staff do not say "Great." to "Not sure."

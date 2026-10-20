@@ -70,7 +70,7 @@ required actually reading `service.ts` first. Lesson: before writing "X
 isn't built" into a design doc, grep the whole subsystem the claim is
 about (here: `grep -n handOn\|note src/server/service.ts`), not just the
 one file the current line of reasoning happened to have open — a confident
-negative claim is exactly the kind of thing `[TK]`/don't-invent should have
+negative claim is exactly the kind of thing the don't-invent rule should have
 caught before it got documented, not after. Written into CLAUDE.md's
 "Don't invent, don't guess through ambiguity" section
 ([`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff))
@@ -191,14 +191,14 @@ gradually clocks the horror; differentiation: no villain, it's the culture's
 own stated values applied with total consistency) --- but the first one,
 "who is this actually for," got an answer about the company's culture, not
 a specific persona, and I didn't push past that before moving on. The
-scaffold I wrote (structure/fact-list/`[TK]`, not finished prose, per
-CLAUDE.md) correctly left that one `[TK]` rather than inventing a persona to
+scaffold I wrote (structure/fact-list/a placeholder marker, not finished prose, per
+CLAUDE.md) correctly left that one gap marked rather than inventing a persona to
 fill the gap --- but if I'd been drafting instead of interviewing, "a young
 employee at a transparency-first startup" is exactly the kind of plausible-
 sounding filler I'd have written in without noticing it was never actually
 answered. Lesson: when interviewing for a definition that'll anchor later
 decisions (this one anchors a C9 grading criterion), an unanswered question
-needs to stay visibly unanswered (`[TK]`), not get smoothed over by my own
+needs to stay visibly unanswered, not get smoothed over by my own
 next-most-plausible guess just because the conversation moved on.
 
 ## A rotation or heading sign is wrong in a way that reading the code won't catch — three separate times in one session
@@ -302,7 +302,7 @@ each. A subagent sees only its delegation message, so each prompt carried the
 rules in full: facts only from `devices.md`, anything else UNKNOWN, menus
 only, and a required "assumptions I made" section. All three independently
 declined to state the iPhone 18 Pro Max's exact prices (the sheet says
-`[TK]`) and flagged the $2,299 figure they needed as an inference; A and C
+a placeholder) and flagged the $2,299 figure they needed as an inference; A and C
 also refused "long battery" and "water resistant" claims. Lesson (week 9:
 a subagent sees only the delegation message, so restate every rule you want
 followed): the required assumptions section is what made the gap visible to

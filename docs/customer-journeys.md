@@ -2,7 +2,7 @@
 status: draft
 what: Seven end-to-end customer experience transcripts for the store, for Ritesh to review before any conversation scripts are built. Each is annotated with who initiates, where people stand, and what state changes.
 date: 2026-10-12
-source: Account 1 to 3 and the two reels in references/ (the failure beats and the staff voice); the intended-experience posts in references/experience.md; everything about trade-ins, set-up and care plans is my general knowledge of how phone retail works, not sourced (marked [verify]). Product names and prices are invented or [TK].
+source: Account 1 to 3 and the two reels in references/ (the failure beats and the staff voice); the intended-experience posts in references/experience.md; everything about trade-ins, set-up and care plans is my general knowledge of how phone retail works, not sourced (marked [verify]). Product names and prices are invented placeholders.
 ---
 
 # Customer journeys: how a visit actually goes
@@ -16,7 +16,7 @@ How to read a transcript:
 - `[walks to ...]` is a movement. `[state: ...]` is the visitor's stored state.
 - **→C** or **→S** says who starts that exchange (customer or staff). Either can,
   always (your rule from 2026-10-12).
-- Prices are `[TK]`. Amounts the customer says out loud are the customer's words.
+- Prices are placeholders. Amounts the customer says out loud are the customer's words.
 - The satire is in the *lived* experience (T2, T6), the calm is in the
   *intended* one (T1, T3). The store should be able to produce both from the
   same machinery depending on staffing, stock and who you get.
@@ -61,7 +61,7 @@ about $1,100. Takes photos of her kid, runs out of storage.*
 
 **Aisha:** About eleven hundred. I'd rather not go over.
 
-**Dan:** That works. Two options. *[picks up two devices]* The standard is lighter and the battery will beat your current one by a long way. The pro has the better camera and zoom, and it's heavier. At 256 the standard is [TK price], at 256 the pro is [TK price], which is just over where you want to be.
+**Dan:** That works. Two options. *[picks up two devices]* The standard is lighter and the battery will beat your current one by a long way. The pro has the better camera and zoom, and it's heavier. At 256 the standard is [price], at 256 the pro is [price], which is just over where you want to be.
 
 **Aisha:** Is the camera really that different for video of a toddler?
 
@@ -81,7 +81,7 @@ about $1,100. Takes photos of her kid, runs out of storage.*
 
 **Aisha:** *[takes out her phone]* The back's cracked.
 
-**Dan:** *[checks]* That brings the value down, but it still counts: [TK amount] off. So you'd be at [TK total]. Want to go with that?
+**Dan:** *[checks]* That brings the value down, but it still counts: [amount] off. So you'd be at [total]. Want to go with that?
 
 **Aisha:** Yes. And a case, I suppose, since it's a new phone.
 
@@ -222,7 +222,7 @@ with him, bored). Wants to spend under $500. Greg isn't technical.*
 
 **Greg:** The newer one. *[hands it over]*
 
-**Dan:** Great, that works for family set-up. Now, about price. Under $500, you said. The newest ones start above that. The older generation is [TK price] new, same screen quality, slightly slower camera. For an eleven-year-old, I'd go there.
+**Dan:** Great, that works for family set-up. Now, about price. Under $500, you said. The newest ones start above that. The older generation is [price] new, same screen quality, slightly slower camera. For an eleven-year-old, I'd go there.
 
 **Noah:** *[to Dan]* Does it do the camera thing where it's like, the portrait thing?
 
@@ -230,27 +230,27 @@ with him, bored). Wants to spend under $500. Greg isn't technical.*
 
 **Noah:** Is it the same as the pink one?
 
-**Dan:** The pink one is the new one. It's [TK price]. *[to Greg]* I'd skip it.
+**Dan:** The pink one is the new one. It's [price]. *[to Greg]* I'd skip it.
 
 **Greg:** What storage?
 
-**Dan:** 128 is plenty for a kid who streams and doesn't take thousands of videos. If you want to be safe, 256 is [TK price] more. I'd go 128, and put him on the photo cloud plan if he runs out.
+**Dan:** 128 is plenty for a kid who streams and doesn't take thousands of videos. If you want to be safe, 256 is [price] more. I'd go 128, and put him on the photo cloud plan if he runs out.
 
 **Greg:** And a care plan? He's going to drop it.
 
-**Dan:** Yes. For a kid, I'd say get it. It covers accidental damage with a fee per incident. [verify: care plan terms] For a phone this age the plan is [TK price] a month.
+**Dan:** Yes. For a kid, I'd say get it. It covers accidental damage with a fee per incident. [verify: care plan terms] For a phone this age the plan is [price] a month.
 
 **Greg:** Is it worth it?
 
 **Dan:** If he drops it once, probably. If he never does, no. I'd honestly say it's worth it for an eleven-year-old and a bus.
 
-**Greg:** And can I get a call-and-text only plan? From the carrier. My plan is with [TK carrier].
+**Greg:** And can I get a call-and-text only plan? From the carrier. My plan is with [carrier].
 
 **Dan:** I don't know that one. I don't want to guess and have you sign up for the wrong thing. Give me a sec. *[walks to the next specialist, asks, comes back after 40 seconds]* They say it's something you'd need to sort with your carrier, and that this phone works with any. I'm sorry I couldn't be more definite.
 
 **Greg:** That's fine. Thanks for checking.
 
-**Dan:** Let me get you a black one in 128 and a case. He'll want a colourful case. Cases are on the back wall, Noah, help yourself, but keep it under [TK].
+**Dan:** Let me get you a black one in 128 and a case. He'll want a colourful case. Cases are on the back wall, Noah, help yourself, but keep it under [limit].
 *[Noah goes to the case wall. A staff member (Jo) asks him whether he needs help. He says no.]*
 
 (The rest follows T1: runner, payment on Dan's device, optional set-up.)
@@ -273,7 +273,7 @@ Found out the bar takes walk-ins only if there's a free slot.*
 
 **Hamza:** My phone keeps switching off. I think it's the battery. Do I need an appointment?
 
-**Mira:** It's best, yes. The bar books in slots (every 20 minutes, [TK]); the next free one is 3:40. Is that okay?
+**Mira:** It's best, yes. The bar books in slots (every 20 minutes); the next free one is 3:40. Is that okay?
 
 **Hamza:** I can do 3:40. It's 3:05.
 
@@ -297,7 +297,7 @@ Found out the bar takes walk-ins only if there's a free slot.*
 
 **Hamza:** Is it covered?
 
-**Sam:** It's out of warranty, so it's a paid repair. [TK price]. It takes about an hour and a half here, or I can have the technician do it now if there's a bench free. *[checks]* There's one.
+**Sam:** It's out of warranty, so it's a paid repair. [price]. It takes about an hour and a half here, or I can have the technician do it now if there's a bench free. *[checks]* There's one.
 
 **Hamza:** Is there any risk to my data?
 
@@ -305,7 +305,7 @@ Found out the bar takes walk-ins only if there's a free slot.*
 
 **Hamza:** Last night.
 
-**Sam:** Good. So: repair today, [TK price], 90 minutes. Or do nothing and I can tell you what to turn off. Which?
+**Sam:** Good. So: repair today, [price], 90 minutes. Or do nothing and I can tell you what to turn off. Which?
 
 **Hamza:** Repair. Can I wait?
 
@@ -466,15 +466,15 @@ earbuds but not a care plan.*
 
 **Elena:** Yes. But I don't want something I'll lose.
 
-**Jo:** Then I'd say the in-ear with a case, which also finds itself if you press a button on your phone. They're [TK price]. The over-ears are better for noise, but you're walking around, I'd guess?
+**Jo:** Then I'd say the in-ear with a case, which also finds itself if you press a button on your phone. They're [price]. The over-ears are better for noise, but you're walking around, I'd guess?
 
 **Elena:** Mostly the train.
 
-**Jo:** Then actually the over-ears are better on a train. But you'll want a case, and they're [TK price] more. *[hands her both]* Try the noise cancelling.
+**Jo:** Then actually the over-ears are better on a train. But you'll want a case, and they're [price] more. *[hands her both]* Try the noise cancelling.
 
 **Elena:** *[tries]* Oh. Wow. I'm taking those. Are they much more?
 
-**Jo:** [TK price] versus [TK price]. They'll come out of your budget.
+**Jo:** [price] versus [price]. They'll come out of your budget.
 
 **Elena:** I'll go with the in-ears.
 
@@ -565,7 +565,7 @@ These are your calls; none of them has a default I'd pick quietly.
    target, or is a shorter version the crit-time version?
 3. **Do prices and models exist at all?** The transcripts assume a few
    phones with real-feeling choices (storage, colour, a standard and a pro, an
-   older generation). The stock table has three `[TK]` placeholder phones now.
+   older generation). The stock table has three placeholder phones now.
 4. **Trade-in, care plan and set-up:** in or out for the first build?
 5. **Basket and ticket persistence:** database rows (as the player state is)
    or per-conversation only?
@@ -573,5 +573,5 @@ These are your calls; none of them has a default I'd pick quietly.
    suggestion is yes: one script, two drivers, so a visitor can't tell
    which they got until they ask a hard question.
 
-*Every price, threshold and policy marked `[TK]` or `[verify]` above needs
+*Every price, threshold and policy in square brackets or marked `[verify]` above needs
 either your word or a source before it appears in the app.*

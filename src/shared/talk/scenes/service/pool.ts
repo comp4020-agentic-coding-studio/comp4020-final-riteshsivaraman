@@ -12,7 +12,7 @@ export interface Constraints {
   maxPrice?: number; // required by EngineConstraints's bound; unused here (no price ceiling in this scene)
   symptom?: Symptom;
   wetExposure?: boolean;
-  priorRepair?: boolean; // [TK] invented eligibility rule: may affect which outcomes are offered
+  priorRepair?: boolean; // invented eligibility rule: may affect which outcomes are offered
   confirmedFault?: string; // set by the run_check staff move -- a fact, not a customer answer
 }
 

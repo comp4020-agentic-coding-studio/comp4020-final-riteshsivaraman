@@ -9,7 +9,7 @@
 // Storage is a real axis (ADR 5, docs/adr/0005-storage-sku-key.md) but there
 // is no picker in the conversation script yet: `defaultStorage` is what the
 // server sells until one exists. `START_STOCK`'s quantities are still a
-// placeholder [TK] — deliberately uneven, and sometimes zero, so "sold out"
+// placeholder — deliberately uneven, and sometimes zero, so "sold out"
 // and "someone else got the last one" can actually happen in a spec.
 
 export interface Product {
@@ -92,7 +92,7 @@ export const productById = (id: string): Product | undefined => PRODUCTS.find((p
 // storage choice (ADR 5) — the cheapest/first option Apple lists.
 export const defaultStorage = (product: Product): string => product.storageOptions[0] ?? "";
 
-// The units on the shelf at the start [TK]. Keyed product -> colour ->
+// The units on the shelf at the start (placeholder). Keyed product -> colour ->
 // storage -> qty; only the `defaultStorage` tier is reachable through
 // today's conversation flow, so other tiers are left thin or at zero on
 // purpose, not because they are estimated to sell that way.

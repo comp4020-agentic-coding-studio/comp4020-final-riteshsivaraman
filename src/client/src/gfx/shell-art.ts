@@ -366,7 +366,7 @@ function bigWord(g: CanvasRenderingContext2D, text: string, x: number, y: number
 }
 
 // Poster and screen art. Sizes are in pixels, aspect follows the panel. Only
-// generic product words appear; tag lines are `[TK]` (not invented here).
+// generic product words appear; tag lines are left out (not invented here).
 export function posterTexture(kind: PosterKind, w = 512, h = 256, variant = 0): CanvasTexture {
   return cached(`poster:${kind}:${w}:${h}:${variant}`, () =>
     canvasTexture(w, h, (g) => {

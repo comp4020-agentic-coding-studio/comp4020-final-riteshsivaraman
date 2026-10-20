@@ -28,24 +28,24 @@ find every resource by reading this file, not by discovering it mid-task.
   storage, or the data model. An accepted record is
   never edited; a changed decision gets a new, numbered record that
   supersedes it and says why.
-- `docs/adr/0007-stack.md` — ADR 7 (draft): the stack as it stands (R3F, Hono + ws, SQLite on a Fly volume). Facts filled in, reasoning `[TK]` for Ritesh. Read before changing stack, storage or the real-time transport.
+- `docs/adr/0007-stack.md` — ADR 7 (draft): the stack as it stands (R3F, Hono + ws, SQLite on a Fly volume). Facts and reasoning filled in. Read before changing stack, storage or the real-time transport.
 - `docs/adr/0008-multi-floor.md` — ADR 8 (draft): how a second floor (option B,
   "Atrium Stair") is represented in `Pose`, the protocol, persistence and
   `clampToWalkable`. Options laid out, nothing picked yet — read before
   touching `Pose`, `FLOOR`, `world.ts` or `presence.ts`'s move handling.
 - `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
   the database, menu conversations, employees online see customers' states. Facts
-  filled in, reasoning `[TK]` for Ritesh. Read before touching `visitors`,
+  filled in, reasoning filled in. Read before touching `visitors`,
   `player_state`, `conversations`, `stock` or `src/shared/conversation.ts`.
 - `docs/adr/0003-conversations-and-player-state.md`, addendum 2026-10-18 — the table of what each action checks on the server, and the stdout log (`src/server/eventlog.ts`). Crit 10's "decision written down with why".
 - `docs/customer-journeys.md` — seven end-to-end customer transcripts (draft, for
   Ritesh's review) and what they imply; read before writing any conversation
-  script. Prices and policies in it are `[TK]`/`[verify]`.
+  script. Prices and policies in it are placeholders or marked `[verify]`.
 - `docs/adr/0004-cases-and-moves.md` — ADR 4 (draft): a durable case per customer
   goal and conversations as moves with preconditions; either party can start.
   Supersedes ADR 3's "character only talks if the visitor starts". **Option B
   confirmed and schema built 2026-10-13 (SCOPE D42)** — see the addendum.
-  Reasoning `[TK]`.
+  Reasoning filled in.
 - `scripts/sim/` (`pnpm sim`, optional `--seed=N` to replay a run) — SCOPE
   D43: a throwaway terminal prototype of the loop/case/slot design, option B
   (cheap and disposable, not the shipped engine — `src/server/cases.ts`
@@ -75,7 +75,7 @@ find every resource by reading this file, not by discovering it mid-task.
   (repair and pickup excepted), and concretises ADR 4's "moves with
   preconditions" as slot-filling with a per-script ordering policy instead of
   an authored node graph. D40's NPC-auto-claim wiring question and build
-  sequencing remain open. Reasoning `[TK]`. See SCOPE.md D41.
+  sequencing remain open. Reasoning filled in. See SCOPE.md D41.
 - `docs/data-overview.html` — diagram of where every kind of data lives today.
 - `src/shared/assignments.ts` — maps every table id+side, wall desktop/
   monitor/headphone slot, and bay ledge to a specific real model id (pure
@@ -105,7 +105,7 @@ find every resource by reading this file, not by discovering it mid-task.
   product notes. `references/README.md` says what each is.
 - `docs/design-handoff.md` — the visual design spec of the earlier app on
   `main`, kept as marked history. It is **not** the store's design; the store's
-  look is `docs/graphics-brief.md`. `[TK]` whether to delete it.
+  look is `docs/graphics-brief.md`. Whether to delete it is open.
 - `WORKLOG.md` — current state of the build, read this first for "where did
   we leave off." Top section is the store project; the earlier app's log is kept below
   it as history.
@@ -128,7 +128,7 @@ find every resource by reading this file, not by discovering it mid-task.
 - `docs/graphics-brief.md` — the brief the four graphics specialists work to:
   fixed sizes, budget, ownership of `src/client/src/gfx/*`, how to check a look.
 - `README.md`, `PROCESS.md`, `reflections/crit-8.md` — Ritesh's prose.
-  `README.md` is a scaffold of facts and `[TK]` markers for him to write
+  `README.md` is written
   into; `reflections/crit-8.md` is marked history of the earlier app.
 - `pnpm dev` (`scripts/dev.ts`) — server on 8080 plus the client on 5173 with
   hot reload; open http://localhost:5173.

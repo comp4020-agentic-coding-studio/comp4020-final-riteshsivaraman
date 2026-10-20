@@ -203,7 +203,7 @@ define its own instead of needing a core change); then the actual scene build.
 built as a real blocking precondition (not a decorative line), outcomes fixed-now/booked/cannot-fix/
 declines/left. Explicitly deferred: the "replace the device" cross-scene handoff (needs the case
 object conversation-types.md section I names as separate shared work), G2's other device classes,
-any pricing beyond `[TK]`-labelled invented placeholder.
+any pricing beyond labelled invented placeholder.
 
 **The answer to "did the core actually generalise" (engine-reference.md section 11 has the full
 account):** the question-bank fold (`core/engine.ts` step 1) is proven pool-shape-generic -- it held

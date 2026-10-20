@@ -29,7 +29,7 @@ finish and small-part sizes.
 
 ### Display tables
 - No published dimensions for the real store tables turned up (no top
-  thickness, no leg section). `[TK]` if Ritesh has a measured number.
+  thickness, no leg section). a measured number would replace this.
 - Material: early stores pale maple, later stores white oak (secondary
   sources disagree whether the maple was solid or veneer; a forum post names a
   Salt Lake City millwork firm as maker). Unverified.

@@ -68,7 +68,7 @@ export const BAY_SIGN_Y = 2.75;
 // The wall bench stops where the bays start. In front of some bays a short
 // ledge at bench height carries one product (Ritesh, 2026-10-11: "one half of
 // each indented shelf may have a bench to showcase a product"). Which half and
-// which product are [TK]: these are working defaults, one ledge on the front
+// which product are working defaults:, one ledge on the front
 // half of every bay, so they can be changed here and everything follows.
 export interface BayLedge {
   bay: number; // 0 is the bay nearest the glass
@@ -103,7 +103,7 @@ export const BACK_WALL = {
 } as const;
 
 // The glass front: mullions, a header band across the top, and an entrance
-// opening (assumed 3 m wide, in the middle: [TK] until the real door is known).
+// opening (assumed 3 m wide, in the middle: assumed until the real door is known).
 export const GLASS = { mullionX: [-4.5, 4.5], headerH: 0.45, entranceX: [-ENTRANCE_HALF, ENTRANCE_HALF] } as const;
 
 export const DOOR_H = 2.3;

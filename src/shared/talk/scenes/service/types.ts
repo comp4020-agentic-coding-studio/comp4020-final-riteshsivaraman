@@ -36,7 +36,7 @@ export interface CustomerReply {
 }
 
 // fixed_now/booked both mean "fixed"; booked carries where and the (invented,
-// [TK]) ETA. cannot_fix is the no-match path; declines is the customer
+// ETA. cannot_fix is the no-match path; declines is the customer
 // turning down the quote; left is leaving mid-conversation.
 export type Outcome = { how: "fixed_now" } | { how: "booked"; location: "in_store" | "send_away"; etaDays: number | null } | { how: "cannot_fix" } | { how: "declines" } | { how: "left"; why: string };
 

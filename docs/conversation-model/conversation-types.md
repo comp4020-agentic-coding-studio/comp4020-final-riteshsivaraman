@@ -94,7 +94,7 @@ sketch's symptoms, the `run_check` staff move, the mandatory data-loss gate (ver
 failing-first), outcomes fixed-now/booked/cannot-fix/declines/left. **Deferred to a later
 pass:** the "replace the device" cross-scene handoff below (needs conversation-types.md
 section I's case object, which doesn't exist yet), G2's other device classes, loaner/
-warranty/eligibility policy beyond a `[TK]` placeholder, an automated reviewer pass, and
+warranty/eligibility policy beyond a placeholder, an automated reviewer pass, and
 Ritesh playing it. This was also the scene that tested whether the core extraction
 (`core-extraction-proposal.md`) actually generalises beyond two purchase scenes -- see
 `engine-reference.md` for what it found needed to stay scene-owned.

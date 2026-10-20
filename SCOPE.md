@@ -7,7 +7,7 @@ source: references/help-me-scope.md plus the scoping conversation of 2026-10-10
 
 # Scope: parody 3D retail store
 
-Brand name: `[TK]` (placeholder idea: "Pineapple"). It is an obvious, loud
+Brand name: none. The store has a logo but no name (an early placeholder idea was "Pineapple"). It is an obvious, loud
 parody of a famous fruit-themed retail store, not a discreet lookalike. No real
 logos, no real product names, never presented as official.
 
@@ -39,7 +39,7 @@ What this implies for scope (inference, to confirm):
   stock** that other visitors can deplete. That is a second shared resource
   beside Genius Bar slots, which partly reopens D2's "exactly one".
 - A visitor needs a **budget**, so "out of budget" is a state the store can
-  produce. `[TK]` where the budget comes from (assigned on entry? chosen?).
+  produce. The budget comes from the customer's own answer to the budget question in the conversation, not from the entry screen.
 - Frustrations must be **designed, deterministic and visible** (a displayed
   wait, a stock count), not random punishments. Testable: an out-of-stock
   configuration cannot be bought. Judged: whether it feels frustrating.
@@ -71,7 +71,7 @@ What this implies for scope (inference, to confirm):
 | D20 | The drawings (plan, four wall elevations, ceiling) are the specification: 3D, server and checks are built from the same data (`src/shared/plan.ts`, `world.ts`, `mall.ts`), and a check fails if the committed drawings are stale. Ritesh approves the drawings before the 3D is changed | 2026-10-11 |
 | D21 | The shop is about 10 x 10 x 3 m, from the rectified references (back wall 3.3 : 1, side walls 3.35 : 1, wall height 3 m as Ritesh gave it). This replaces the earlier 16 x 15 x 3.8 m, whose proportions the photographs did not support. The 3 m height is the one absolute scale; not yet deployed, held for approval of the blueprint PDF | 2026-10-11 |
 | D22 | Tables (Ritesh, 2026-10-11): each side column has four almost-square product tables (1.0 x 1.2 m) and, nearest the bar, a larger square service table (1.2 m side, no products, a stool left and right) for customers to sit and talk with staff; the middle column has three product tables and one service table. One product on each side of a product table | 2026-10-11 |
-| D23 | Room enlarged (Ritesh, 2026-10-11, "option A"): 11 x 15.4 m under the same 3 m wall, so product tables are 1.0 m apart front to back and 2.0 m or more apart across, with 2.5 m clear inside the glass where customers are received. Service tables have two stools each on their left and right, tucked under; the bar runs almost from the far edge of one service table to the other (6.6 m) with 13 tucked stools; the staff door follows the bar end. The wall bench stops where the indented bays start, with a short ledge in front of half of each bay carrying one product (which half and which product are [TK], working defaults). Supersedes the size in D21; the 3.3 : 1 and 3.35 : 1 ratios are no longer the shop's | 2026-10-11 |
+| D23 | Room enlarged (Ritesh, 2026-10-11, "option A"): 11 x 15.4 m under the same 3 m wall, so product tables are 1.0 m apart front to back and 2.0 m or more apart across, with 2.5 m clear inside the glass where customers are received. Service tables have two stools each on their left and right, tucked under; the bar runs almost from the far edge of one service table to the other (6.6 m) with 13 tucked stools; the staff door follows the bar end. The wall bench stops where the indented bays start, with a short ledge in front of half of each bay carrying one product (which half and which product are working defaults). Supersedes the size in D21; the 3.3 : 1 and 3.35 : 1 ratios are no longer the shop's | 2026-10-11 |
 | D24 | Tables, floor and people (Ritesh, 2026-10-11): product tables 1.2 x 2.0 m (larger, elongated), service tables 1.8 m square (1.5x), the 4+1 / 3+1 counts and 1.0 m gaps kept, so the shop is 12 x 18.2 m with 1.5 m clear inside the glass (was 2.5 m: "too much space at the front"). The store is on the **first floor** of a mall atrium: a 3.4 m walkway outside the glass with a glass balustrade, the void down to the ground-floor concourse, opposite shopfronts on both floors; visitors may step out through the entrance and look down (my addition, one constant to remove). People collide: visitors, staff, customers and first-floor walkers are solid to a visitor (server and client share `people.ts`); NPCs follow fixed paths and do not dodge. Faces have expressions; product screens and faces are original procedural textures, no photos | 2026-10-11 |
 | D13 | Intent: shopping is pretend ("the joy of shopping, no real purchase"), including fun details such as the card swipe. Tier and flow not yet decided; this partly re-opens the Tier 3 cut of purchases | 2026-10-10 |
 | D25 | Characters are procedural humans built from primitives (no rig, no sourced models), made more realistic and varied in shape, size, face, hair and clothing. Closes D11 without the spike and supersedes Tier 1 item 2 ("fictional creatures") and the Tier 3 cut on "human-like rigged characters", which stays true for rigged models. Existing code was already human (`Person.tsx`) | 2026-10-11 |
@@ -93,8 +93,10 @@ What this implies for scope (inference, to confirm):
 | D41 | Behaviour loop and conversation mechanism, reached by grilling (Ritesh, 2026-10-13): resolves D32's open "option B/C" behaviour decision as **C** — NPCs/staff keep the `storeday.ts` timetable as default, interruptible out of the current segment, with no rewind (D1's "rejoin at current time" already covers resuming) and no third mission-progress layer (progress is just the facts already in `player_state`/`conversations`/`case_facts`). One generic loop skeleton covers every customer purpose and staff role, with `repair` and `pickup` as named exceptions. Interrupts only apply to idle/schedule segments, not mid-conversation (T6's staff walk-away is a voluntary `talk_leave`, not a forced preemption); sources are mostly a customer's own request, secondarily a staff approach (generalises D40's `tryGreeterApproach` to every role). A human-controlled visitor's state is read by the identical loop logic as an NPC's — no is-human branch. Concretises D36/ADR4's "moves with preconditions over a case" as **slot-filling + an ordering policy** (named facts like budget/storage/tradein, each with its own question and answer handling, plus a per-script policy choosing the next unfilled slot) rather than an authored node graph scaled up, so adaptive question order (customer-journeys.md: "asked in the order that fits the answer") doesn't explode into one node per ordering. D40's own `tryNpcAutoClaim` wiring question and which mission/role is built first remain open. See docs/adr/0006 | 2026-10-13 |
 | D42 | Case persistence, option B (Ritesh, 2026-10-13, "the point is basically to have some kind of internal CRM running in the bg"): builds ADR4's already-decided three-lifetime model (visit / case / exchange) rather than the cheaper alternative of adding an owner+facts blob directly to `player_state` (option A, considered and rejected — stays 1:1 with one visitor, can't outlive the visit or later cover two visitors in one case). A `cases` row (owner, status, a deadline column for a hold/appointment) plus `case_facts` (one row per learned fact, who learned it and when) is the thing a handoff actually reassigns; `conversations` becomes one exchange within a case, many per case. Corrects an earlier claim in this session: a staff-to-staff handoff **already exists** (`handOn` in `service.ts`, tested) but is a single 140-char free-text note, written only from an explicit human "Hand on" action — it never fires from a conversation script itself (T1, T7's in-script handoffs), and can't be read programmatically by the receiving script. Case/case_facts is the structured, scriptable version of the same idea, not a new concept. **Open, logged rather than resolved:** multi-person parties sharing one conversation (T3: a parent deciding, a child asking) and staff-to-staff consultation mid-conversation while the customer waits (T3's carrier-plan check) — neither is covered by this decision or anything decided before it | 2026-10-13 |
 | D43 | Terminal prototype, option B (Ritesh, 2026-10-13, "I just wanted to make this terminal based game to make sure that we can make sure we're on the same page but cheaply"): a throwaway text sim (`scripts/sim/`, `pnpm sim`) checks the loop/case/slot design feels right before investing in the real engine, rather than building ADR 6's slot engine for real against the live server first (the alternative, rejected for now: bigger commitment, and the design hadn't been played yet). Standalone and in-memory — a mirror of `src/server/cases.ts`'s shape, not the real module; reuses the real sourced catalogue (D37) for believability. Covers both POVs (customer, employee: greeter or specialist:phones) and the phones slot script only (use_case, budget, storage, colour, tradein, accessories, careplan, setup); `repair`/`pickup` exceptions are not built here. NPC randomness: each NPC gets seeded traits (impulsiveness, price sensitivity, decisiveness, staff attentiveness) once, so its own answers stay consistent with itself while differing between NPCs — "everyone doesn't act rationally, otherwise everybody would act the same way" (Ritesh), modelled as personality bias, not independent per-turn dice. All four hooks wired: NPC slot answers, a mind-change/upsell-or-abandon roll before committing, a payment-stall roll, and staff-notice-delay (`noticeDelay`, `npc.ts`) — a low-attentiveness Mira or Dan can leave a waiting customer for up to two checks before noticing, echoing T2's "nobody comes," in the ambient run and in both human-played POVs; never a permanent block, and never rolled against a human's own choice when the human is the one playing that post.
+| D44 | Apple's own assets and OS names (Ritesh, 2026-10-17): no Apple Design Resources (SF Pro, SF Symbols, UI kits, templates) in the repo or the shipped app, because the Apple Design Resources licence (2023-06-21) only permits mock-ups of UIs for Apple-platform software and bars embedding, extraction and distribution (sections 2A to 2C, 3); the downloaded files live outside the repo at `Final/apple-design-resources-reference-only/` as visual reference only. Everything on the phone screens stays procedural (D20 spirit, `docs/graphics-brief.md`). Extends D37: real OS and first-party app names (iOS, iPadOS, watchOS, "Dynamic Island") may be used the same way as real product and model names, sourced and dated; Apple's logo, wordmark and artwork stay invented. OS and app names are not yet sourced from Apple's pages; copy them from there before using | 2026-10-17 |
+| D45 | Poster and signage pictures are generated with the course image proxy and shipped as image files (Ritesh, 2026-10-19: "replace all handmade graphics posters with actual stuff using the image generation tool"). This is an explicit exception to the procedural-only rule (D20 spirit, `docs/graphics-brief.md`) and to CLAUDE.md's "reference only" note, for wall posters only: prompts ask for no text, logos or brand names, files are `src/client/public/posters/*.webp`, the old canvas posters remain as the fallback until each picture loads. Devices, furniture and everything else stay procedural | 2026-10-19 |
 
-**2026-10-14 follow-up, live feedback:** Ritesh played it and flagged the customer-POV flow as "way too linear" — the model was picked by a hidden dice roll and only revealed at checkout, there was no "not sure" option anywhere, and no compare/demo step at all; a fixed menu tree, no matter how many branches, was still "only like 1% of the possibilities." Fixed by making product choice its own first move (never hidden, `scripts/sim/product.ts`'s real two-candidate shortlist-by-budget replaces the silent pre-roll) and by wiring an **optional free-tier Gemini bridge** (`scripts/sim/ai.ts`, same shape as D8: env-var key, scripted fallback when missing or failed) so the human side of a conversation takes free text instead of a menu — answer, say "not sure" and get a real suggestion explained, ask a question back and have the same question stand until actually answered, or volunteer several facts in one breath (T7) and have them all land. The model only classifies/narrates; `setFact`/`handOff` stay in the deterministic engine, same AI boundary D8 already drew for the real game. Grounded against invented specs: the prompt is told to hedge on anything beyond name/tier/price (mirroring Dan's own "I don't want to guess" in T3), and `[verify]` Google's current free-tier data-use terms, checked live this session — free-tier content is used to improve Google's products, paid tier isn't; resolves the `[TK]` this left open in section 6. With no key, every path still falls back to the original menu flow, so this is additive, not a replacement. The employee POV's NPC-customer side has **not** been upgraded to the same free-text engagement yet — an explicit next step, not silently finished.
+**2026-10-14 follow-up, live feedback:** Ritesh played it and flagged the customer-POV flow as "way too linear" — the model was picked by a hidden dice roll and only revealed at checkout, there was no "not sure" option anywhere, and no compare/demo step at all; a fixed menu tree, no matter how many branches, was still "only like 1% of the possibilities." Fixed by making product choice its own first move (never hidden, `scripts/sim/product.ts`'s real two-candidate shortlist-by-budget replaces the silent pre-roll) and by wiring an **optional free-tier Gemini bridge** (`scripts/sim/ai.ts`, same shape as D8: env-var key, scripted fallback when missing or failed) so the human side of a conversation takes free text instead of a menu — answer, say "not sure" and get a real suggestion explained, ask a question back and have the same question stand until actually answered, or volunteer several facts in one breath (T7) and have them all land. The model only classifies/narrates; `setFact`/`handOff` stay in the deterministic engine, same AI boundary D8 already drew for the real game. Grounded against invented specs: the prompt is told to hedge on anything beyond name/tier/price (mirroring Dan's own "I don't want to guess" in T3), and `[verify]` Google's current free-tier data-use terms, checked live this session — free-tier content is used to improve Google's products, paid tier isn't; resolves the question this left open in section 6. With no key, every path still falls back to the original menu flow, so this is additive, not a replacement. The employee POV's NPC-customer side has **not** been upgraded to the same free-text engagement yet — an explicit next step, not silently finished.
 
 **Same day, provider swap:** live testing surfaced that Google's free tier is 5 requests/minute on this account (a single conversation needs more than that) and that model availability shifts mid-session — `gemini-2.5-flash`/`-flash-lite` both 404'd as "no longer available to new users" despite `models.list()` still showing them, and a second, billing-linked key hit `402` with its prepaid credits depleted (checked live: once billing is linked, a project is on the paid tier for every request, no free allowance underneath it — this is not "free until some threshold"). Switched `ai.ts` to **OpenRouter** instead: `:free`-suffixed models are genuinely free with no billing link at all, 20 req/min and 50/day with no purchase, rising to 1,000/day after a one-time **lifetime** $10 (not a balance that's spent) — checked against OpenRouter's own rate-limit docs and its public `/models` endpoint, not guessed. Plain `fetch`, no SDK dependency; `@google/genai` removed. Key lives in `mise.local.toml` as `OPENROUTER_API_KEY`, same never-committed pattern.
 
@@ -217,7 +219,7 @@ confused customer.
 9. **Customer NPCs (3 archetypes)**: arrive and leave on a time schedule,
    occupy devices, yield to humans (see D7 rules below).
 10. **One device interaction** that leaves a persistent trace for the next
-    visitor. `[TK: what the interaction and trace are]`
+    visitor. the interaction is inspecting a device (`startInspect`); the trace it leaves is an `inspect_start` / `inspect_end` row in `events`.
 11. **Occupancy cap** with a defined "store is full" behaviour.
 12. **Events log** (append-only: who, what, when), also the server logs crit 10
     reads.
@@ -235,11 +237,13 @@ confused customer.
 
 ### Tier 3: explicitly cut from this submission
 
-Baskets, purchases, payments, refunds, repair flows, product comparison, user
-accounts, chat between visitors, voice, more than one store, multiple floors,
-human-like rigged characters, VR, native mobile, any paid API.
+Refunds, user accounts, chat between visitors, voice, more than one store,
+multiple floors, rigged characters, VR, native mobile, any paid API. (The
+original cut also named baskets, purchases, payments, repair flows and product
+comparison; D13 reopened purchases and the store now has payment on the spot,
+a device-service scene and demos, so those are no longer cut.)
 
-## 3b. Staff roles (draft; names are `[TK]` parody names)
+## 3b. Staff roles (draft; names are invented parody names)
 
 Staff are a finite shared resource: each has a role, a specialty, a
 `busy_until`, a current customer, and two dials (knowledge, warmth) that pick
@@ -295,7 +299,7 @@ Breadth is cheap if a product is a data row, not a model: a family (phone,
 tablet, laptop, watch, earbuds, desktop, display, accessory) has one shared
 parametric mesh and one shared interaction; a product is name, family, options
 (colour, storage, memory), price and stock. Prices and names are invented
-parody data, never real ones (`[TK]`). Breadth of **scenarios** is the
+parody data, never real ones. Breadth of **scenarios** is the
 expensive axis (each needs a state machine, dialogue and a test), so the
 catalogue can be wide while the scenarios stay few.
 
@@ -398,8 +402,7 @@ Proposed boundary, **not yet agreed**:
 Why these matter: free quotas run out (including from markers and crit
 agents), visitor text is untrusted input to a model, output is not
 deterministic and so cannot be asserted in `spec/`, and the data-use terms of
-the free tier have not been checked by me. `[TK: verify Google's current
-free-tier terms before shipping]`
+the free tier have not been checked by me. `(checked on 2026-10-14, below)`
 
 **Checked live, 2026-10-14** (while building the terminal sim's AI bridge,
 D43): per Google's own pricing and rate-limit pages, free-tier content is
@@ -416,24 +419,23 @@ app works. Not testable: whether the AI lines are good (judged).
 
 ## 7. Open items (need Ritesh)
 
-- `[TK]` Brand name.
-- `[TK]` Occupancy cap number (D12: measure first), and behaviour at the cap
+- Brand name: none; the store has a logo and no name.
+- Open: occupancy cap number (D12: measure first), and behaviour at the cap
   (humans waiting? CPUs despawn first?).
-- `[TK]` The phrase pool for visitor-to-visitor talk (D10), and what the
+- Open: the phrase pool for visitor-to-visitor talk (D10), and what the
   "AI suggests" step is allowed to see.
-- `[TK]` What expires and what is kept for good (queue entries, bookings,
+- Open: what expires and what is kept for good (queue entries, bookings,
   device traces). The marker returns the next day, so this decides what they
   find.
-- `[TK]` First technical task: creature vs human rendering spike (D11), at
-  390x844 and 1920x1080, measured and screenshotted.
-- `[TK]` The end-to-end store journey (door to exit): which stages are modelled.
+- Closed by D25: characters are procedural humans, so the creature vs human spike (D11) was not needed.
+- Settled in `docs/customer-journeys.md` and the talk scenes: the end-to-end store journey (door to exit) and which stages are modelled.
   Draft needs Ritesh's own account of a real visit; see the conversation of
   2026-10-10.
-- `[TK]` Device interaction and the persistent trace it leaves.
-- `[TK]` The three customer archetypes (children/adults were suggested; if
+- Open: device interaction and the persistent trace it leaves.
+- Open: the three customer archetypes (children/adults were suggested; if
   creatures, what are the types).
-- `[TK]` How many CPU players, and what a CPU does when the queue is empty.
-- `[TK]` Asset sources, each with its licence checked per file.
+- Open: how many CPU players, and what a CPU does when the queue is empty.
+- Everything is procedural except generated posters and the logo (D45); no downloaded assets.
 - Crit group is **Dachi** (Wed 10:30 to 12:00, cutoff Wed 08:30, no
   exceptions listed): crit 9 cutoff **Wed 14 Oct 08:30**, crit 10 cutoff
   **Wed 21 Oct 08:30**, final **Mon 9 Nov 12:00**.

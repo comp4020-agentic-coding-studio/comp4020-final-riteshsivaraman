@@ -74,7 +74,7 @@ Only listed in the compare page's model dropdown (https://www.apple.com/au/iphon
 
 No price disagrees. No colour disagrees. Every old price, colour list and tier matches the 2026-10-17 pages.
 
-- 18 Pro Max prices: old sheet had "$200 higher, exact [TK]". Now filled: 256GB 2,299; 512GB 2,699; 1TB 3,499; 2TB 4,699. This is exactly +$200 at every tier over the 18 Pro.
+- 18 Pro Max prices: old sheet had "$200 higher, exact figure missing". Now filled: 256GB 2,299; 512GB 2,699; 1TB 3,499; 2TB 4,699. This is exactly +$200 at every tier over the 18 Pro.
 - iPhone Duo "no telephoto (third-party report)": Apple's page lists two lenses (Fusion Main, Fusion Ultra Wide), agreeing with "no separate telephoto", but also says the Main "enables 12MP optical-quality 2x Telephoto". Wording differs; the third-party source is not needed any more.
 - iPhone Duo "No Action button": confirmed by buy-page text "— No Action button".
 - iPhone 16 chip: old sheet "prior gen"; page states A18 chip.

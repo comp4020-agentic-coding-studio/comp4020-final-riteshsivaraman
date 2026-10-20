@@ -95,7 +95,7 @@ The page takes a hash: `#role=staff|customer&vs=npc&seed=7` (against an NPC) or
   the new engine's richer menu has no staff-side UI yet), and the "bought" ending does not reserve
   real stock (the new engine's model ids and the store's catalogue/stock ids were never
   reconciled -- a separate piece of work, named in `server-wiring-proposal.md`, not hidden).
-- **Wording is placeholder** ([TK]): all phrases are in each scene's `lines.ts`; Ritesh rewrites
+- **Wording is placeholder:** all phrases are in each scene's `lines.ts`; Ritesh rewrites
   them in his voice. Service's lines are especially placeholder-heavy (v1 proved the mechanism,
   not the wording).
 - **Laptop has had no automated reviewer pass** (prompt E in `prompts.md`), no hand-written
@@ -106,7 +106,7 @@ The page takes a hash: `#role=staff|customer&vs=npc&seed=7` (against an NPC) or
 - **Service v1's deliberate scope cuts** (service-scene-proposal.md section 3): the "replace the
   device" cross-scene handoff (needs the case/handoff machinery conversation-types.md section I
   names as separate shared work, not something this engine does internally), G2's other device
-  classes, and any pricing mechanism beyond `[TK]`-labelled invented placeholder.
+  classes, and any pricing mechanism beyond labelled invented placeholder.
 - **Unbuilt:** coverage report over reachable pools (specified in decisions.md, not built);
   mutation checks were done by hand on the important rules, not automated (the data-loss gate's
   own mutation check is an exception -- see `spec/talk-service-sim.test.ts`); listener facial

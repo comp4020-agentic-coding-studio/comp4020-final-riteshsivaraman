@@ -2,7 +2,7 @@
 
 Source of truth for Seen's visual design. The actual app gets built against
 this. Facts below are extracted directly from the design exploration's code,
-not invented — `[TK]` marks anything that still needs a call from Ritesh.
+not invented. Anything that still needs a call from Ritesh is listed under open questions.
 
 **Provenance:** this came out of a standalone frontend design exploration at
 `/Users/riteshs/Documents/email-app-design-exploration/` (Preact + Vite,
@@ -87,7 +87,7 @@ This is the whole "foreboding" budget. Keep it at exactly two.
    monospace, reading **"Also opened {time}. Not by you."** — shown only on
    a subset of messages (not every email; it should be the kind of thing a
    user half-notices, not a constant banner). Exact trigger condition for
-   *which* messages show it is `[TK]` — the design exploration applied it
+   *which* messages show it is undecided — the design exploration applied it
    to a handful of messages by hand; the real app needs a real rule (e.g.
    tied to an actual "someone else viewed this" event in the `events` log —
    this is a natural hook into the event-log invariant in the main
@@ -127,10 +127,10 @@ slide-up compose (open → minimize → expand → discard/send) are all real UI
 states the exploration implemented and verified live — safe to treat as
 settled interaction patterns, not just mockup chrome.
 
-## Open questions `[TK]`
+## Open questions
 
 - Exact trigger rule for the ghost-read line (see above).
 - Whether the two signature devices need variants for mobile/narrow widths
   — exploration verified responsive collapse structurally but didn't
   specifically re-check the ghost-read line's legibility at `860px`.
-- Dark mode: not attempted in any pass. `[TK]` whether Seen needs one.
+- Dark mode: not attempted in any pass. Whether Seen needs one is undecided.

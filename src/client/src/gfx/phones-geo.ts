@@ -254,7 +254,7 @@ export const IPHONE_18_PRO: PhoneModelSpec = {
   ],
 };
 
-// iPhone 18 Pro Max (6.9"). [TK] ESTIMATE, not Apple's numbers: the 18 Pro's
+// iPhone 18 Pro Max (6.9"). ESTIMATE, not Apple's numbers: the 18 Pro's
 // body and camera layout scaled up by the screen sizes (6.9 / 6.3), thickness
 // unchanged, so the demo unit is the right shape and about the right size.
 // Replace with the tech-spec dimensions from apple.com/au/iphone-18-pro-max/

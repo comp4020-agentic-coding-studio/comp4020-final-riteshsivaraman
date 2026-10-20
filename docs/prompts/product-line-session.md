@@ -16,7 +16,7 @@ shared first-person 3D shop (React Three Fiber client, Hono + ws + SQLite
 server, shared pure TypeScript in `src/shared`). Read `CLAUDE.md` first, then
 `SCOPE.md` (decisions D1 to D37), `docs/graphics-brief.md`,
 `docs/customer-journeys.md` and `docs/adr/0004-cases-and-moves.md`. Follow
-CLAUDE.md throughout: no invented facts (mark `[TK]` and ask), small commits,
+CLAUDE.md throughout: no invented facts (mark it as a gap and ask), small commits,
 no push, no amend/rebase, nothing secret in the repo, and **stop and ask before
 any decision that is expensive to reverse**.
 
@@ -34,7 +34,7 @@ a real name, and make them look different from each other.
 Use the real, current product names and model names, copied from the maker's
 own website. Everything else stays invented: **no logo or brand mark** (use the
 existing invented ring-and-dot mark), no company name as the store's name (still
-`[TK]`), no photographs, no downloaded models/textures/fonts, no box art or
+placeholder), no photographs, no downloaded models/textures/fonts, no box art or
 packaging copied. The shop is an obvious spoof and is never presented as
 official.
 
@@ -98,7 +98,7 @@ inspect already logs an event; include the model id in it.
 
 - Touch the server, the cases and moves work (ADR 4), the staff panel or
   conversations. A later session joins this catalogue to them.
-- Write Ritesh's prose (README, PROCESS, ADR text). Draft facts and `[TK]` only.
+- Write Ritesh's prose (README, PROCESS, ADR text). Draft facts only and mark gaps.
 - Invent a model that is not in the real line-up, or a spec you did not read.
 - Add a dependency without a stated reason in the commit.
 

@@ -5,7 +5,7 @@ import type { Ctx, CustomerReply, Line, Option, Pending, StaffAct, Tone } from "
 // Wording for the laptop scene. Same architecture as src/shared/talk/lines.ts
 // (phones) -- staffBase/staffLine split, say()/SAID for customer picks,
 // answerThrowback for throw-backs -- with laptop facts and questions in place
-// of phone ones. All phrases are placeholders [TK] for Ritesh to rewrite.
+// of phone ones. All phrases are placeholders for Ritesh to rewrite.
 
 const NEGATIVE = new Set(["notsure", "unsure", "no", "notforme", "expensive", "keep", "decline", "think", "avg", "notyet"]);
 const REJECT = new Set(["notforme", "expensive", "no", "others", "keep", "decline", "think"]);

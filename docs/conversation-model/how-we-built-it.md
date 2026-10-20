@@ -269,7 +269,7 @@ gets a spot-check against the transcripts, and fixes get re-reviewed on seeds th
 ## 11. Open items and decisions waiting
 
 See the "Not done" section of `README.md`. In short: the ADR (after Ritesh approves the POC), wiring and the
-event log, the old engine's removal, wording rewrite [TK], the coverage report, forced reconfirm or not,
+event log, the old engine's removal, wording rewrite, the coverage report, forced reconfirm or not,
 a third review pass, and every scene other than buying a phone.
 
 ## 12. Where the course lessons are

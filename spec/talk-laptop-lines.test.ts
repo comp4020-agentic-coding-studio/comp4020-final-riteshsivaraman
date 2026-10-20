@@ -8,7 +8,7 @@ import { TONE_EXPRESSION, TONES, type Scene, type Tone } from "../src/shared/tal
 
 // Promise: what the characters say in the laptop scene reads as English, the
 // same promise spec/talk-lines.test.ts makes for phones. The exact wording
-// differs (this scene's own [TK] placeholders), but the shape of what is
+// differs (this scene's own placeholders), but the shape of what is
 // checked -- no bare menu label, no stacked acknowledgements, tone maps to a
 // real face, menu text never equals speech -- is identical.
 

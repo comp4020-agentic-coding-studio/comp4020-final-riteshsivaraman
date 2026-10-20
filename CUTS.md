@@ -20,11 +20,11 @@ indirectly by the early-send path in `spec/seen.test.ts`, and manually
 verified in a live browser session, but there's no automated test that
 waits out a real auto-send deadline. Manual/crit-time check instead.
 
-## 2026-10-06: Company name left as `[TK]` placeholder (`Panopticorp`)
+## 2026-10-06: Company name left as a placeholder (`Panopticorp`)
 
 Ritesh deferred the real company name decision; `Panopticorp` is a
-placeholder throughout code and copy (search for `[TK]` / `panopticorp` to
-find every spot). Needs a real decision before shipping --- check it's not a
+placeholder throughout code and copy (search for `panopticorp` to
+find every spot). The store that replaced it has a logo and no name (see README). Needs a real decision before shipping --- check it's not a
 real company.
 
 ## 2026-10-07: `spec/seen.test.ts`'s self-destruct timing is only safe at near-zero latency

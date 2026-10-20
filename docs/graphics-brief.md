@@ -7,7 +7,7 @@ date: 2026-10-11
 # Graphics brief
 
 The store is a parody retail store (an obvious spoof; the brand name is still
-`[TK]`). Three.js through React Three Fiber, **procedural only**: no downloaded
+the name is undecided). Three.js through React Three Fiber, **procedural only**: no downloaded
 models, textures or fonts, nothing sourced from the web. Everything is drawn in
 code (geometry, canvas textures, small instanced meshes).
 
@@ -31,7 +31,7 @@ comment at the relevant field — never present an unverified layout as fact.
   sign. Invent the brand marks and box art. **Product and model names may be the
   real current ones (SCOPE D37), sourced from the maker's pages, not memory.**
   Where no real name applies use generic words ("CASE") or an abstract mark.
-  Do not invent the company name itself: that is `[TK]`.
+  Do not invent the company name itself: the store has no name.
 - Change `src/shared/*` or any spec. Positions, sizes and heights there are the
   model the server, the collision and the drawings use. Draw on them, do not
   move them. If you believe a shared number is wrong, say so in your report.

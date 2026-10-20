@@ -185,7 +185,7 @@ check before relying on it):
 - Whether the Fly app is serving the store or the earlier app: not checked.
 - `pnpm check` and `pnpm check:evidence` status on this branch: not run.
 
-**Still open** (from SCOPE.md): brand name `[TK]`, occupancy cap (D12),
+**Still open** (from SCOPE.md): brand name (none; the store has a logo only), occupancy cap (D12),
 creatures vs humans spike (D11), AI boundary (D8), budget source, what the
 device trace is. No ADR yet for the stack or for D8.
 
@@ -201,11 +201,11 @@ visitors (decision pending, D32); `Person.tsx` is now unused; the draw call and
 phone frame-rate cost of ~30 people has not been measured on a real device.
 
 **2026-10-12, later (conversations, subsystem 1 of 3):** ADR 3 drafted
-(`docs/adr/0003-...`, reasoning `[TK]` for Ritesh); D34 in SCOPE.md. Migration 2
+(`docs/adr/0003-...`, reasoning now filled in); D34 in SCOPE.md. Migration 2
 adds `visitors.role/specialty/look`, `player_state`, `conversations`, `stock`.
 `src/shared/conversation.ts` is the pure menu state machine (greeter and phones
 script; stock passed in), `src/server/stock.ts` seeds and takes stock
-atomically, `src/shared/catalogue.ts` is `[TK]` placeholder data. Specs:
+atomically, `src/shared/catalogue.ts` is placeholder data. Specs:
 `conversation` (graph integrity, out-of-stock cannot be bought, last unit goes
 to one visitor, migration keeps existing visitors). **Not yet:** server wiring
 (protocol messages, persisting state, broadcasting to employees), the
@@ -557,7 +557,7 @@ vitest tests) green against a rebuilt `static/`.
 
 Built v0.1 for the C8 cutoff (Wed 7 Oct, 08:30), attachments cut (see
 CUTS.md). Stack: Hono + Preact SPA + better-sqlite3 + Drizzle + Vitest, ADR 1
-at `docs/adr/0001-stack.md` (facts filled in, narrative `[TK]` for Ritesh).
+at `docs/adr/0001-stack.md` (facts and reasoning filled in).
 
 **Built and verified** (against the Docker-built image, `pnpm check` green,
 plus a live two-tab browser pass):
@@ -609,10 +609,10 @@ want it gone before the crit.
   done autonomously (course brief: C8 wants it public at the cutoff).
 - README.md / PROCESS.md: still template boilerplate. Ritesh writes these
   (CLAUDE.md "Ritesh writes the prose"). ADR 1's narrative sections are
-  `[TK]`.
+  filled in.
 - `reflections/crit-8.md`: not written --- Ritesh's prose, two standing
   prompts (see `reflections/README.md`).
-- Company name still `Panopticorp [TK]` (CUTS.md).
+- Company name still the old placeholder `Panopticorp` in the earlier app (CUTS.md); the store has a logo and no name.
 - Fiction-integrity sweep (CLAUDE.md) not yet run --- do this before shipping
   public, after the company name is real.
 
@@ -635,7 +635,7 @@ Also added the first of the two signature devices: the unread asterisk
 (`✳`, rotated, `--signal`) in `EmailListRow`, wired through `Inbox.tsx` via a
 new `myAddress` prop; `Sent.tsx` doesn't pass it, so it never shows on your
 own sent mail. The ghost-read line (second signature device) is still not
-built -- its trigger condition is `[TK]` in the design doc itself, don't
+built -- its trigger condition is undecided in the design doc itself, don't
 guess at it.
 
 No new LEARNINGS.md entry from this pass -- the stale-`static/`-dir gotcha I

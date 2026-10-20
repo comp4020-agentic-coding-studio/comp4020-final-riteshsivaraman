@@ -1355,7 +1355,7 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
   const sale: Sale = { name: modelById(sku.model).name, colour: sku.colour, storage: sku.storage, price: sku.price };
   // checking stock is real: a unit the shop tracks is taken off the shelf and
   // held for them (one customer wins the last unit, S11); a phone the stock
-  // table does not list is not tracked yet [TK], so it is simply available
+  // table does not list is not tracked yet, so it is simply available
   const product = `iphone-${sku.model}`;
   const tracked = ctx.db.prepare("SELECT 1 FROM stock WHERE product = ? AND colour = ? AND storage = ?").get(product, sku.colour, sku.storage);
   if (tracked) {
