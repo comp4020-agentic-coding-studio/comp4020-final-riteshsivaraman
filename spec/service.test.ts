@@ -12,11 +12,13 @@ import {
   handOverPost,
   retireStandIn,
   seatedList,
-  collectStock,
   chooseTurn,
   customersView,
   enter,
   HOLD_MS,
+  ORDER_MS,
+  takeOrder,
+  orderViews,
   leaveConversation,
   closeTalk,
   endInspect,
@@ -74,6 +76,26 @@ function addVisitor(id: string, name: string, at: { x: number; z: number }, kind
   present.push(id);
   enter(ctx(), id, { kind, specialty });
   if (kind !== "customer") employees.push({ id, name, kind: kind as Employee["kind"], specialty: specialty as Employee["specialty"] });
+}
+
+// An NPC specialist's sale carried through to the payment conversation: the chat is dismissed,
+// the runner arrives (following the specialist if they have moved) and hands over the bag, the
+// specialist comes to the customer, who accepts. Time moves on a second at a time, as polling does.
+const orderStage = (): string | undefined => (db.prepare("SELECT stage FROM orders ORDER BY created_at DESC").get() as { stage: string } | undefined)?.stage;
+function payFor(customer: string, spec = "spec-phones"): { id: string; t: number } {
+  closeTalk(ctx(NOW + 1000), customer);
+  let t = NOW + 2000;
+  while (t < NOW + ORDER_MS && orderStage() === "fetching") {
+    settleIntents(ctx(t));
+    t += 1000;
+  }
+  for (let i = 0; i < 150; i++, t += 1000) {
+    const out = requestTalk(ctx(t), customer, spec);
+    const turn = last(out, customer, "turn");
+    if (turn) return { id: turn.conversationId, t };
+    settleIntents(ctx(t));
+  }
+  throw new Error(`no payment conversation: stage=${orderStage()} intents=${JSON.stringify(db.prepare("SELECT reason,status,from_id FROM intents").all())}`);
 }
 
 beforeEach(() => {
@@ -184,29 +206,27 @@ describe("stock at the moment of sale", () => {
   it("takes a unit off the shelf when the specialist checks stock, and holds it", () => {
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
     const { out } = selling("c1", "spec-phones", glacier);
-    expect(last(out, "c1", "turn")).toMatchObject({ ended: false, awaiting: "staff" });
+    expect(last(out, "c1", "turn")).toMatchObject({ ended: true });
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
     const r = db.prepare("SELECT status, expires_at FROM reservations WHERE visitor_id = 'c1'").get() as { status: string; expires_at: number };
-    expect(r).toEqual({ status: "held", expires_at: NOW + HOLD_MS });
+    expect(r).toEqual({ status: "held", expires_at: NOW + ORDER_MS });
     expect(eventTypes()).toEqual(expect.arrayContaining(["reserved", "stock_checked"]));
   });
 
   it("sells the unit when they pay, and it stays gone", () => {
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const { id } = selling("c1", "spec-phones", glacier);
-    settleIntents(ctx(NOW + 120_000));
-    settleIntents(ctx(NOW + 121_500));
-    chooseTurn(ctx(NOW + 122_000), "c1", id, "pay:card");
+    selling("c1", "spec-phones", glacier);
+    const pay = payFor("c1");
+    chooseTurn(ctx(pay.t + 1000), "c1", pay.id, "pay:card");
     expect(db.prepare("SELECT status FROM reservations WHERE visitor_id = 'c1'").get()).toEqual({ status: "sold" });
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
   });
 
   it("gives it back if they call it off at the payment", () => {
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
-    const { id } = selling("c1", "spec-phones", glacier);
-    settleIntents(ctx(NOW + 120_000));
-    settleIntents(ctx(NOW + 121_500));
-    chooseTurn(ctx(NOW + 122_000), "c1", id, "pay:cancel");
+    selling("c1", "spec-phones", glacier);
+    const pay = payFor("c1");
+    chooseTurn(ctx(pay.t + 1000), "c1", pay.id, "pay:cancel");
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before);
     expect(eventTypes()).toContain("reservation_released");
   });
@@ -224,11 +244,11 @@ describe("stock at the moment of sale", () => {
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
     selling("c1", "spec-phones", glacier);
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before - 1);
-    expect(releaseExpired(ctx(NOW + HOLD_MS - 1))).toBe(0);
-    expect(releaseExpired(ctx(NOW + HOLD_MS))).toBe(1);
+    expect(releaseExpired(ctx(NOW + ORDER_MS - 1))).toBe(0);
+    expect(releaseExpired(ctx(NOW + ORDER_MS))).toBe(1);
     expect(stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro)).toBe(before);
     expect(eventTypes()).toContain("reservation_expired");
-    expect(releaseExpired(ctx(NOW + HOLD_MS * 2))).toBe(0); // only once
+    expect(releaseExpired(ctx(NOW + ORDER_MS * 2))).toBe(0); // only once
   });
 
   it("gives it back at once when the visitor leaves", () => {
@@ -360,32 +380,6 @@ describe("employees", () => {
     const first = staffMove(ctx(), "e1", id, "m0", "friendly");
     expect(last(first, "c1", "turn")).toBeDefined();
     expect(chatPairs(db)[0]).toMatchObject({ speaker: "e1", lines: 1 }); // the specialist has just spoken
-  });
-
-  it("a real specialist breaks off to take the phone from the stock person, then takes payment", () => {
-    const { id } = serving();
-    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(id) as { data: string };
-    const data = JSON.parse(row.data);
-    data.scene.pending = { kind: "confirm" };
-    data.scene.toMove = "customer";
-    db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify(data), id);
-    const out = chooseTurn(ctx(), "c1", id, "opt:yes");
-    const menu = last(out, "e1", "staff_menu")!;
-    expect(menu.collect).toMatchObject({ stockName: expect.any(String) });
-    expect(chatPairs(db)[0]!.speaker).toBeUndefined(); // nobody is talking while it is fetched
-    // not yet: still on the way
-    expect(last(collectStock(ctx(NOW + 500), "e1"), "e1", "notice")?.text).toMatch(/still on the way/);
-    // arrived, but the specialist has wandered off
-    const at = menu.collect!.at;
-    positions.set("e1", { x: at.x + 8, z: at.z });
-    expect(last(collectStock(ctx(NOW + 120_000), "e1"), "e1", "notice")?.text).toMatch(/Go over to/);
-    // beside the stock person: they take it, the customer is asked to pay
-    positions.set("e1", { x: at.x + 0.8, z: at.z });
-    const took = collectStock(ctx(NOW + 120_000), "e1");
-    expect(last(took, "c1", "turn")!.choices.map((c) => c.id)).toEqual(["pay:card", "pay:phone", "pay:cancel"]);
-    expect(last(took, "all", "released")?.npcId).toMatch(/^stock-/);
-    expect(last(took, "e1", "staff_menu")!.collect).toBeUndefined();
-    expect(eventTypes()).toEqual(expect.arrayContaining(["stock_collected", "stock_handed_over"]));
   });
 
   it("takes turns: the specialist moves, the customer answers, and what they said shows beside the chat", () => {
@@ -925,8 +919,7 @@ describe("being walked to a demo device (Ritesh, 2026-10-19)", () => {
   });
 });
 
-describe("paying on the spot (Ritesh, 2026-10-19)", () => {
-  const LATER = NOW + 120_000; // long enough for the stock person to walk out from the back
+describe("a sale after the chat: the bag, the specialist, the payment (Ritesh, 2026-10-21)", () => {
   // drive the engine to the moment of deciding: "yes" on the confirm question
   const decide = () => {
     const p = npc("spec-phones");
@@ -940,51 +933,127 @@ describe("paying on the spot (Ritesh, 2026-10-19)", () => {
     return { id: hello.conversationId, out };
   };
 
-  it("checks stock on their phone and sends a stock person from the back; no one walks to a till", () => {
+  it("ends the chat when it is agreed: someone will fetch it, and everyone is free to roam", () => {
     const { out } = decide();
     const turn = last(out, "c1", "turn")!;
-    expect(turn.ended).toBe(false);
-    expect(turn.awaiting).toBe("staff");
-    expect(turn.say).toMatch(/get it brought out to you/);
+    expect(turn.ended).toBe(true);
+    expect(turn.say).toMatch(/brought out/);
+    expect(turn.say).toMatch(/come and find you/);
     expect(turn.say).not.toMatch(/till/);
-    const engaged = messagesTo(out, "all", "engaged") as Array<Extract<ServerMessage, { type: "engaged" }>>;
-    expect(engaged.find((e) => e.npcId === "spec-phones")).toMatchObject({ doing: "phone" });
-    const stock = engaged.find((e) => e.npcId.startsWith("stock-"))!;
-    expect(stock.lead).toBeDefined(); // walks out to the specialist
-    expect(last(out, "c1", "escort")).toBeUndefined();
-    expect(eventTypes()).toEqual(expect.arrayContaining(["stock_checked", "stock_ordered"]));
+    // the stock runner is sent, waving, to where the specialist is
+    const runner = (messagesTo(out, "all", "engaged") as Array<Extract<ServerMessage, { type: "engaged" }>>).find((e) => e.npcId.startsWith("stock-"))!;
+    expect(runner).toMatchObject({ pending: true, waving: true, visitorId: "spec-phones" });
+    expect(orderViews(ctx())).toEqual([expect.objectContaining({ customerId: "c1", specId: "spec-phones", stage: "fetching" })]);
+    expect(eventTypes()).toEqual(expect.arrayContaining(["stock_checked", "order_placed", "stock_ordered"]));
   });
 
-  it("brings it out, hands it over, and takes payment right there", () => {
-    const { id } = decide();
-    // while it is on the way they can only wait
-    expect(last(chooseTurn(ctx(NOW + 1000), "c1", id, "pay:card"), "c1", "notice")?.text).toMatch(/still getting it/);
-    expect(last(settleIntents(ctx(LATER)), "c1", "turn")).toBeUndefined(); // arrived: the hand-over beat starts
-    const out = settleIntents(ctx(LATER + 1500));
+  it("the runner hands the bag to an NPC specialist a beat after arriving, who then comes to the customer to take payment", () => {
+    decide();
+    closeTalk(ctx(NOW + 1000), "c1");
+    expect(settleIntents(ctx(NOW + 5000))).toEqual([]); // still walking out from the back
+    let t = NOW + 6000;
+    let out: Outgoing[] = [];
+    while (orderStage() === "fetching" && t < NOW + ORDER_MS) {
+      out = settleIntents(ctx(t));
+      t += 1000;
+    }
+    expect(orderStage()).toBe("with_spec");
     expect(last(out, "all", "released")?.npcId).toMatch(/^stock-/);
-    const pay = last(out, "c1", "turn")!;
-    expect(pay.say).toMatch(/Here it is: the iPhone .* A\$[\d,]+\. How would you like to pay\?/);
-    expect(pay.choices.map((c) => c.id)).toEqual(["pay:card", "pay:phone", "pay:cancel"]);
-    const done = chooseTurn(ctx(LATER + 2000), "c1", id, "pay:phone");
-    expect(last(done, "c1", "turn")).toMatchObject({ ended: true });
-    expect(last(done, "c1", "turn")!.say).toMatch(/gone through/);
-    expect(eventTypes()).toEqual(expect.arrayContaining(["stock_handed_over", "purchase_paid", "conversation_ended"]));
+    // the specialist shows intent to the customer: it waves and the customer has to accept
+    expect(last(out, "all", "intent")).toMatchObject({ fromId: "spec-phones", toId: "c1", reason: "pay" });
+    expect(last(out, "all", "engaged")).toMatchObject({ npcId: "spec-phones", waving: true });
+    expect(eventTypes()).toContain("stock_handed_over");
   });
 
-  it("lets you call it off at the payment", () => {
-    const { id } = decide();
-    settleIntents(ctx(LATER));
-    settleIntents(ctx(LATER + 1500));
-    const out = chooseTurn(ctx(LATER + 2000), "c1", id, "pay:cancel");
+  it("takes payment once the customer accepts, and the unit is sold", () => {
+    decide();
+    const pay = payFor("c1");
+    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(pay.id) as { data: string };
+    expect(JSON.parse(row.data).checkout).toMatchObject({ stage: "pay" });
+    expect(orderViews(ctx())[0]!.stage).toBe("paying");
+    const turnNow = last(chooseTurn(ctx(pay.t + 1000), "c1", pay.id, "pay:phone"), "c1", "turn")!;
+    expect(turnNow).toMatchObject({ ended: true });
+    expect(turnNow.say).toMatch(/gone through/);
+    expect(orderViews(ctx())).toEqual([]);
+    expect(eventTypes()).toEqual(expect.arrayContaining(["payment_started", "purchase_paid", "conversation_ended"]));
+  });
+
+  it("the customer can call it off at the payment", () => {
+    decide();
+    const pay = payFor("c1");
+    const out = chooseTurn(ctx(pay.t + 1000), "c1", pay.id, "pay:cancel");
     expect(last(out, "c1", "turn")!.say).toMatch(/put it back/);
     expect(eventTypes()).toContain("purchase_cancelled");
     expect(eventTypes()).not.toContain("purchase_paid");
   });
 
-  it("sends the stock person back if the customer walks away before it arrives", () => {
+  it("an NPC specialist follows a customer who wanders off after it has set out", () => {
     decide();
-    const out = leaveConversation(ctx(NOW + 2000), "c1");
+    closeTalk(ctx(NOW + 1000), "c1");
+    let t = NOW + 2000;
+    while (orderStage() === "fetching" && t < NOW + ORDER_MS) {
+      settleIntents(ctx(t));
+      t += 1000;
+    }
+    const before = db.prepare("SELECT at_x, at_z FROM intents WHERE reason = 'pay' AND status = 'open'").get() as { at_x: number; at_z: number };
+    // it has set out for where the customer stood; they walk on, and it goes after them
+    positions.set("c1", { x: before.at_x + 8, z: before.at_z });
+    for (let i = 0; i < 80; i++, t += 1000) settleIntents(ctx(t));
+    const after = db.prepare("SELECT at_x, from_x FROM intents WHERE reason = 'pay' AND status = 'open'").get() as { at_x: number; from_x: number | null };
+    expect(Math.abs(after.at_x - (before.at_x + 8))).toBeLessThan(0.01);
+    expect(after.from_x).not.toBeNull();
+  });
+
+  it("calls the order off after a while, tells the customer, and puts the unit back", () => {
+    decide();
+    const before = db.prepare("SELECT status FROM reservations WHERE visitor_id = 'c1'").get();
+    expect(before).toEqual({ status: "held" });
+    const out = settleIntents(ctx(NOW + ORDER_MS + 1000));
+    expect(last(out, "c1", "notice")?.text).toMatch(/could not get your .* in time/);
+    expect(last(out, "all", "released")?.npcId).toMatch(/^stock-/);
+    expect(orderViews(ctx())).toEqual([]);
+    expect(eventTypes()).toEqual(expect.arrayContaining(["order_cancelled", "reservation_released"]));
+  });
+
+  it("calls the order off when the customer leaves, and tells the specialist", () => {
+    decide();
+    const out = leaveStore(ctx(NOW + 2000), "c1");
+    expect(orderViews(ctx())).toEqual([]);
     expect(messagesTo(out, "all", "released").map((m) => (m as { npcId: string }).npcId).some((n) => n.startsWith("stock-"))).toBe(true);
+    expect(eventTypes()).toContain("order_cancelled");
+  });
+
+  // a real specialist: the runner comes to them and they press E; then they go and find the customer
+  it("a real specialist presses E to take the bag, then shows intent to the customer", () => {
+    const e = { x: -4, z: -3 };
+    addVisitor("c1", "Pebble", { x: e.x + 1, z: e.z });
+    addVisitor("e1", "Sam", e, "specialist", "phones");
+    const id = last(startTalk(ctx(), "c1", "e1"), "c1", "turn")!.conversationId;
+    const row = db.prepare("SELECT data FROM conversations WHERE id = ?").get(id) as { data: string };
+    const data = JSON.parse(row.data);
+    data.scene.pending = { kind: "confirm" };
+    data.scene.toMove = "customer";
+    db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify(data), id);
+    const out = chooseTurn(ctx(), "c1", id, "opt:yes");
+    expect(last(out, "c1", "turn")).toMatchObject({ ended: true });
+    expect(last(out, "e1", "staff_menu_end")?.note).toMatch(/Sale agreed/);
+    // not yet: the runner is still on the way out
+    expect(last(takeOrder(ctx(NOW + 500), "e1"), "e1", "notice")?.text).toMatch(/still on the way/);
+    // it arrives beside them; they press E from too far away, then from beside it
+    let t = NOW + 2000;
+    for (; t < NOW + 40_000; t += 1000) settleIntents(ctx(t));
+    positions.set("e1", { x: e.x + 12, z: e.z });
+    expect(last(takeOrder(ctx(t), "e1"), "e1", "notice")?.text).toMatch(/Go over to/);
+    const runner = JSON.parse((db.prepare("SELECT runner FROM orders").get() as { runner: string }).runner) as { at: { x: number; z: number } };
+    // (the runner follows the specialist who moved away; wait for it to arrive again)
+    for (let i = 0; i < 60; i++, t += 1000) settleIntents(ctx(t));
+    const where = JSON.parse((db.prepare("SELECT runner FROM orders").get() as { runner: string }).runner) as { at: { x: number; z: number } };
+    positions.set("e1", { x: where.at.x + 0.5, z: where.at.z });
+    expect(runner).toBeDefined();
+    const took = takeOrder(ctx(t), "e1");
+    expect(last(took, "e1", "notice")?.text).toMatch(/Here you go.*Thanks/s);
+    expect(last(took, "all", "intent")).toMatchObject({ fromId: "e1", toId: "c1", reason: "pay", state: "open" });
+    expect(orderStage()).toBe("with_spec");
   });
 });
 

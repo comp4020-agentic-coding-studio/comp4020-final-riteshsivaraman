@@ -1,6 +1,6 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { Euler, type Group, Quaternion, Vector3 } from "three";
+import { Euler, type Group, Quaternion, SRGBColorSpace, TextureLoader, Vector3, type Texture } from "three";
 import { gazeAt } from "../../../shared/gaze.ts";
 import { lookFor, type LookChoice } from "../../../shared/look.ts";
 import type { Behaviour } from "../../../shared/behaviour.ts";
@@ -27,8 +27,46 @@ export interface ActorState {
   speed?: number; // m/s, to pace the legs; defaults to a normal walk
   seated?: boolean;
   device?: boolean;
+  // carrying the store's bag (a phone on its way to a customer)
+  carrying?: boolean;
   // a world point to look at (y is height above the floor), if any
   gaze?: { x: number; y: number; z: number };
+}
+
+// The store's bag: dark paper with the mark on both faces, a pair of handles. Hung
+// at the right hand's side while someone carries it.
+let bagLogo: Texture | null = null;
+function bagMark(): Texture {
+  if (!bagLogo) {
+    bagLogo = new TextureLoader().load("/brand/logo-white.png");
+    bagLogo.colorSpace = SRGBColorSpace;
+  }
+  return bagLogo;
+}
+function Bag({ getState }: { getState: () => ActorState }) {
+  const ref = useRef<Group>(null);
+  useFrame(() => {
+    if (ref.current) ref.current.visible = !!getState().carrying;
+  });
+  const mark = bagMark();
+  return (
+    <group ref={ref} visible={false} position={[0.3, 0.6, -0.02]}>
+      <mesh>
+        <boxGeometry args={[0.2, 0.3, 0.1]} />
+        <meshStandardMaterial color="#1c1e22" roughness={0.85} />
+      </mesh>
+      {[0.0501, -0.0501].map((z) => (
+        <mesh key={z} position={[0, -0.01, z]} rotation={[0, z > 0 ? 0 : Math.PI, 0]}>
+          <planeGeometry args={[0.1, 0.1]} />
+          <meshBasicMaterial map={mark} transparent toneMapped={false} depthWrite={false} />
+        </mesh>
+      ))}
+      <mesh position={[0, 0.17, 0]}>
+        <torusGeometry args={[0.05, 0.006, 6, 16, Math.PI]} />
+        <meshStandardMaterial color="#8a8d92" roughness={0.7} />
+      </mesh>
+    </group>
+  );
 }
 
 // `?snap=1` skips the easing between poses, so a still shows the settled pose
@@ -124,7 +162,9 @@ export function Actor({
   }, [char]);
   return (
     <>
-      <primitive object={char.root} />
+      <primitive object={char.root}>
+        <Bag getState={getState} />
+      </primitive>
       {held && (
         <group ref={devRef}>
           {/* the dev bone is turned each frame so +z (the screen) faces the

@@ -25,7 +25,8 @@ import {
   handOverCustomer,
   handOverPost,
   retireStandIn,
-  collectStock,
+  takeOrder,
+  orderViews,
   leaveConversation,
   closeTalk,
   staffMove,
@@ -140,6 +141,7 @@ const staffViewFor = (ctx: Ctx): Outgoing[] => [{ to: "staff", message: { type: 
 
 // who is talking with whom, as last told to everyone: sent again only when it changes
 let lastChats = "[]";
+let lastOrders = "[]";
 const lineCounts = new Map<string, { lines: number; since: number }>();
 
 function deliver(out: Outgoing[]): void {
@@ -154,6 +156,11 @@ function deliver(out: Outgoing[]): void {
     return { ...p, since };
   });
   for (const key of lineCounts.keys()) if (!stamped.some((p) => `${p.customerId}:${p.staffId}` === key)) lineCounts.delete(key);
+  const orders = JSON.stringify(orderViews(serviceCtx()));
+  if (orders !== lastOrders) {
+    lastOrders = orders;
+    deliverAll([{ to: "all", message: { type: "orders", orders: JSON.parse(orders) } }]);
+  }
   const pairs = JSON.stringify(stamped);
   if (pairs !== lastChats) {
     lastChats = pairs;
@@ -275,6 +282,7 @@ export function handleConnection(socket: WebSocket): void {
         engaged: engagements(db),
         inspecting: inspections(db),
         chats: chatPairs(db),
+        orders: orderViews(ctx),
         spawn: { x: me.x, z: me.z, ry: me.ry },
         intents: intentViews(ctx),
         seated: seatedList(db),
@@ -332,8 +340,8 @@ export function handleConnection(socket: WebSocket): void {
       deliver(startInspect(serviceCtx(), me.id, message.slotId));
       return;
     }
-    if (me && message.type === "stock_collect") {
-      deliver(collectStock(serviceCtx(), me.id));
+    if (me && message.type === "order_take") {
+      deliver(takeOrder(serviceCtx(), me.id));
       return;
     }
     if (me && message.type === "inspect_end") {

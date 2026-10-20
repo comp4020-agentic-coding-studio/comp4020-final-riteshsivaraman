@@ -207,6 +207,30 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE intents ADD COLUMN shown_at INTEGER;
   `,
+  // 11: a sale outlives the chat that made it (Ritesh, 2026-10-21). The chat ends,
+  // a stock runner brings the phone out in a bag and hands it to the specialist,
+  // who finds the customer and takes payment. `runner` is the stock person's walk
+  // (an Engagement), re-aimed as the specialist moves. An NPC that has to find a
+  // customer who has wandered starts its walk from `from_x/from_z`.
+  `
+  CREATE TABLE orders (
+    id          TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL REFERENCES visitors(id),
+    spec_id     TEXT NOT NULL,
+    spec_kind   TEXT NOT NULL,
+    stock_id    TEXT NOT NULL,
+    stage       TEXT NOT NULL,
+    sale        TEXT NOT NULL,
+    runner      TEXT,
+    created_at  INTEGER NOT NULL,
+    expires_at  INTEGER NOT NULL,
+    arrived_at  INTEGER,
+    ended_at    INTEGER
+  );
+  CREATE INDEX orders_live ON orders (stage, customer_id);
+  ALTER TABLE intents ADD COLUMN from_x REAL;
+  ALTER TABLE intents ADD COLUMN from_z REAL;
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own

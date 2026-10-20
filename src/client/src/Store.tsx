@@ -439,7 +439,7 @@ function Remotes() {
         const mine = chat.speaker === r.info.id;
         state = { ...state, mode: talkingNow ? (mine ? "talk" : "listen") : "idle", mood: talkingNow && mine ? "smile" : "neutral", ...(other ? { gaze: { x: other.x, y: 1.55, z: other.z } } : {}) };
       }
-      speeds.current.set(r.info.id, state);
+      speeds.current.set(r.info.id, { ...state, carrying: net.carrying(r.info.id) });
     }
     root.current?.children.forEach((child) => {
       const r = net.remotes.get(child.name);
@@ -511,8 +511,8 @@ function Interact() {
   useEffect(() => {
     const press = (e: KeyboardEvent) => {
       if (e.code !== "KeyE" || e.repeat || net.locked) return;
-      if (net.staffConv?.collect) {
-        if (net.stockNear) net.stockCollect();
+      if (net.runnerNear) {
+        net.takeOrder();
         return;
       }
       if (net.hint?.intentId) (net.hint.show ? net.intentShow(net.hint.intentId) : net.intentAccept(net.hint.intentId));
@@ -524,10 +524,13 @@ function Interact() {
   }, []);
 
   useFrame(() => {
-    const coll = net.staffConv?.collect;
-    const near = !!coll && Math.hypot(net.me.x - coll.at.x, net.me.z - coll.at.z) < 2.4;
-    if (near !== net.stockNear) {
-      net.stockNear = near;
+    // the stock person has come to you with the bag: close enough to take it
+    const mine = net.myOrderAsSpecialist;
+    const runnerEng = mine?.stage === "fetching" ? net.engaged.get(mine.stockId) : undefined;
+    const rp = runnerEng ? engagedMoment(runnerEng.npcId, runnerEng, net.serverNow()) : undefined;
+    const near = !!rp && !rp.walking && Math.hypot(net.me.x - rp.x, net.me.z - rp.z) < 2.6;
+    if (near !== net.runnerNear) {
+      net.runnerNear = near;
       net.changed();
     }
     const yaw = camera.rotation.y;
@@ -696,9 +699,13 @@ function GuideMarkers() {
   // where you were told to wait to be fetched: green
   const w = live.waitingAt;
   if (w) out.push({ key: "wait", x: w.x, z: w.z, colour: "#8cf0b4" });
-  // a specialist waiting for the phone: the stock person: purple
-  const coll = live.staffConv?.collect;
-  if (coll) out.push({ key: "collect", x: coll.at.x, z: coll.at.z, colour: "#c79bff" });
+  // a specialist waiting for the bag: where the stock person is: purple
+  const order = live.myOrderAsSpecialist;
+  const runner = order?.stage === "fetching" ? live.engaged.get(order.stockId) : undefined;
+  if (runner) {
+    const rp = engagedMoment(runner.npcId, runner, live.serverNow());
+    out.push({ key: "collect", x: rp.x, z: rp.z, colour: "#c79bff" });
+  }
   // a specialist: where to meet each customer you have been sent for: blue
   if (live.isEmployee && live.you) {
     for (const i of live.intents.values()) {
@@ -776,7 +783,7 @@ function SelfView() {
     const seat = net.you ? net.seats.get(net.you.id) : undefined;
     // your own open intent to talk: you wave, so you can see what others see
     const reaching = [...net.intents.values()].some((i) => i.fromId === net.you?.id && i.state === "open" && (i.ready || !i.human));
-    state.current = { walking: smooth > 0.25 && !seat, mode: reaching && !seat && smooth < 0.25 ? "wave" : "idle", mood: reaching ? "smile" : "neutral", speed: smooth, seated: !!seat };
+    state.current = { carrying: net.carrying(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: reaching && !seat && smooth < 0.25 ? "wave" : "idle", mood: reaching ? "smile" : "neutral", speed: smooth, seated: !!seat };
     g.position.set(net.me.x, STORE_Y, net.me.z);
     g.rotation.y = camera.rotation.y;
   });

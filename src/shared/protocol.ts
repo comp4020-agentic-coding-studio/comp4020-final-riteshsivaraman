@@ -86,7 +86,7 @@ export interface IntentView {
   fromName: string;
   toId: string;
   toName: string;
-  reason: "greet" | "help" | "ask";
+  reason: "greet" | "help" | "ask" | "pay";
   // held: told to wait near `wait` and not yet being fetched
   state: "queued" | "open" | "held";
   wait?: { x: number; z: number; label: string };
@@ -124,9 +124,20 @@ export interface StaffMenuView {
     candidates: Array<{ name: string; screen: string; from: string; battery: string; note: string }>;
   };
   status: string; // what is happening when it is not your move
-  // the phone is being brought out: the specialist is free to step away from the
-  // chat, meet the stock person and take it (a break in the middle of the talk)
-  collect?: { stockId: string; stockName: string; at: { x: number; z: number }; what: string };
+}
+
+// A sale after the chat is over: the phone is on its way in a bag, then with
+// the specialist, who takes payment. Everyone sees it (the bag is carried).
+export interface OrderView {
+  id: string;
+  customerId: string;
+  customerName: string;
+  specId: string;
+  specName: string;
+  stockId: string;
+  stockName: string;
+  stage: "fetching" | "with_spec" | "paying";
+  what: string; // "silver iPhone 18 Pro"
 }
 
 // Two real people in a conversation, so everyone else sees them talk and
@@ -169,8 +180,8 @@ export type ClientMessage =
   // off, or starting anything else
   | { type: "inspect_start"; slotId: string }
   | { type: "inspect_end" }
-  // the specialist takes the phone from the stock person
-  | { type: "stock_collect" }
+  // the specialist takes the bag from the stock person who has come to them
+  | { type: "order_take" }
   // Sent as an ordinary message just before closing. A clean WebSocket close
   // takes about 5 s to reach the server through Fly's proxy (measured), while
   // a message arrives at once, so this is what makes a departure prompt.
@@ -194,6 +205,7 @@ export type ServerMessage =
       engaged: Engagement[];
       inspecting: Inspection[];
       chats: ChatPair[];
+      orders: OrderView[];
       // where you start: the client puts your view there
       spawn: Pose;
       intents: IntentView[];
@@ -209,6 +221,9 @@ export type ServerMessage =
   | { type: "staff_menu_end"; conversationId: string; note: string }
   | { type: "staff_view"; customers: CustomerView[] }
   | { type: "chats"; pairs: ChatPair[] }
+  | { type: "orders"; orders: OrderView[] }
+  // a line for a specialist's corner feed
+  | { type: "update"; text: string }
   | { type: "duty"; offDuty: string[] }
   | ({ type: "engaged" } & Engagement)
   | ({ type: "intent" } & IntentView)

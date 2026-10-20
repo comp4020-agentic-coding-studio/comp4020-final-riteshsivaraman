@@ -79,12 +79,20 @@ function Hud() {
           {live.myInspectSlot ? "" : " · Esc to stop following"}
         </div>
       )}
-      {live.staffConv?.collect && (
+      {live.myOrderAsCustomer && !live.locked && (
         <div className="escort-banner">
-          {live.stockNear
-            ? <>Press <kbd>E</kbd> to take the {live.staffConv.collect.what} from {live.staffConv.collect.stockName}</>
-            : <>{live.staffConv.collect.stockName} is bringing the {live.staffConv.collect.what}: go and meet them. {live.staffConv.customerName} will wait.</>}
+          Your {live.myOrderAsCustomer.what} is being fetched. {live.myOrderAsCustomer.specName} will come and find you.
         </div>
+      )}
+      {live.myOrderAsSpecialist?.stage === "fetching" && !live.locked && (
+        <div className="escort-banner">
+          {live.runnerNear
+            ? <>Press <kbd>E</kbd> to take the bag from {live.myOrderAsSpecialist.stockName}</>
+            : <>{live.myOrderAsSpecialist.stockName} is bringing {live.myOrderAsSpecialist.customerName}'s {live.myOrderAsSpecialist.what}. They will find you.</>}
+        </div>
+      )}
+      {live.myOrderAsSpecialist?.stage === "with_spec" && !live.locked && (
+        <div className="escort-banner">You have {live.myOrderAsSpecialist.customerName}'s {live.myOrderAsSpecialist.what}: find them and take payment.</div>
       )}
       {live.hint && !live.locked && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
       {!live.hint && live.deviceHint && !live.locked && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect {live.deviceHint.name}</div>}

@@ -267,3 +267,9 @@ export function standInAnswer(sc: Scene, conversationId: string): Scene {
   const next = applyCustomer(sc, reply);
   return "error" in next ? sc : next;
 }
+
+// The scene behind a payment conversation: the sale was settled in the chat
+// before, so it is already over; only the paying is left to do.
+export function payScene(): Scene {
+  return { ...newScene(), ended: { how: "bought", sku: { model: "", storage: "", colour: "", price: 0 } as never } };
+}

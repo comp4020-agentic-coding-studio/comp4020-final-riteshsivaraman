@@ -17,11 +17,15 @@ export function IntentBadge({ id }: { id: string }) {
     it.fromId === id
       ? it.state === "queued"
         ? `waiting for ${target}`
-        : `wants to talk to ${target}`
+        : it.reason === "pay"
+          ? `coming to take payment from ${target}`
+          : `wants to talk to ${target}`
       : it.state === "queued"
         ? `${source} is waiting`
         : source === "you"
           ? "you want to talk"
-          : `${source} wants to talk`;
+          : it.reason === "pay"
+            ? `${source} has your phone and wants to take payment`
+            : `${source} wants to talk`;
   return <div className="intent-badge">💬 {text}</div>;
 }

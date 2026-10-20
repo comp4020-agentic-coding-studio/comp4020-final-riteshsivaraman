@@ -48,7 +48,13 @@ export function Npcs() {
         raw = { ...m, present: true };
         // showing intent: eyes on the person they want to talk to, wherever they are now, and a wave
         if (eng.pending) {
-          const who = eng.visitorId === net.you?.id ? net.me : net.remotes.get(eng.visitorId);
+          let who: { x: number; z: number } | undefined = eng.visitorId === net.you?.id ? net.me : net.remotes.get(eng.visitorId);
+          if (!who) {
+            // the stock person looking for a specialist who is an NPC
+            const other = NPCS.find((n) => n.id === eng.visitorId);
+            const oe = net.engaged.get(eng.visitorId);
+            who = oe ? engagedMoment(eng.visitorId, oe, now) : other ? npcPose(other, now) : undefined;
+          }
           if (who) raw = { ...raw, gaze: { x: who.x, y: 1.55, z: who.z } };
         }
         // in a conversation with you they talk only while a line of theirs is on screen, for as long as it takes to say
@@ -89,7 +95,7 @@ export function Npcs() {
       shown.current.set(def.id, { x: nx, z: nz, ry: raw.ry });
       child.position.set(nx, STORE_Y, nz);
       child.rotation.y = raw.ry;
-      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: raw.mood, seated: raw.seated, device: raw.device, gaze: raw.gaze };
+      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: raw.mood, seated: raw.seated, device: raw.device, gaze: raw.gaze, carrying: net.carrying(def.id) };
       intents.current[i] = raw.intent;
     });
     if (LABELS && ++frames.current % 20 === 0) bump((n) => n + 1);

@@ -9,6 +9,7 @@ import type {
   Engagement,
   Identity,
   ChatPair,
+  OrderView,
   Inspection,
   IntentView,
   Present,
@@ -122,8 +123,10 @@ class Net {
   spawn: { x: number; z: number; ry: number } | null = null;
   // seeing your own character from behind (V)
   thirdPerson = false;
-  // the stock person is close enough for the specialist to take the phone (set by the scene)
-  stockNear = false;
+  // sales after the chat: the bag on its way, then with the specialist (everyone sees who carries it)
+  orders: OrderView[] = [];
+  // the stock person has come to you and you may take the bag (set by the scene)
+  runnerNear = false;
   // told to wait somewhere for someone to fetch you, if you are
   get waitingAt(): { x: number; z: number; label: string; who: string; reason: string } | null {
     for (const i of this.intents.values()) if ((i.state === "held" || (i.state === "open" && i.human)) && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName, reason: i.reason };
@@ -144,7 +147,7 @@ class Net {
   // a specialist in a conversation (the same hold while walking applies)
   get staffTalking(): StaffMenuView | null {
     // while the phone is brought out the chat is on hold: they can walk over and take it
-    return this.escort || this.staffConv?.collect ? null : this.staffConv;
+    return this.escort ? null : this.staffConv;
   }
   // locked into a conversation, as either side: no walking, the camera on the other
   get locked(): boolean {
@@ -241,6 +244,7 @@ class Net {
         this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
         this.intents = new Map(message.intents.map((i) => [i.id, i]));
         this.setChats(message.chats);
+        this.orders = message.orders;
         this.spawn = message.spawn;
         this.seats = new Map(message.seated.map((s) => [s.visitorId, { x: s.at.x, z: s.at.z, fx: s.face.x, fz: s.face.z }]));
         this.pollIntents();
@@ -289,6 +293,12 @@ class Net {
         return true;
       case "chats":
         this.setChats(message.pairs);
+        return true;
+      case "orders":
+        this.orders = message.orders;
+        return true;
+      case "update":
+        this.pushUpdate(message.text);
         return true;
       case "staff_view":
         this.customers = message.customers;
@@ -454,9 +464,21 @@ class Net {
     }
   }
 
-  // the specialist takes the phone from the stock person
-  stockCollect(): void {
-    this.send({ type: "stock_collect" });
+  // the specialist takes the bag from the stock person who has come to them
+  takeOrder(): void {
+    this.send({ type: "order_take" });
+  }
+
+  // the order you are part of, on either side
+  get myOrderAsCustomer(): OrderView | undefined {
+    return this.orders.find((o) => o.customerId === this.you?.id && o.stage !== "paying");
+  }
+  get myOrderAsSpecialist(): OrderView | undefined {
+    return this.orders.find((o) => o.specId === this.you?.id);
+  }
+  // who is carrying a bag right now
+  carrying(id: string): boolean {
+    return this.orders.some((o) => (o.stage === "fetching" && o.stockId === id) || ((o.stage === "with_spec" || o.stage === "paying") && o.specId === id));
   }
 
   private pushUpdate(text: string): void {
