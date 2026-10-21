@@ -1737,10 +1737,9 @@ export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   const script = scriptFor("greeter");
   if (!script || !customerFree(ctx, customerId)) return [];
   if (staffBusy(ctx, "greeter-1", "npc")) return []; // someone else has her
-  // a customer still outside the entrance (where they arrive) is met just inside the door, not out on the walkway
-  const at = here.z < FLOOR.minZ + 0.8 ? { x: Math.max(-1, Math.min(1, here.x)), z: FLOOR.minZ + 1.2 } : here;
+  // she walks up to where they actually stand (the entrance zone is already inside the door), so she faces them
   log(ctx, customerId, "npc_approached", { npcId: "greeter-1" });
-  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", script, at)];
+  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", script, here)];
 }
 
 // ---- taking turns ----

@@ -390,7 +390,10 @@ class Timeline {
   ) {
     this.pos = { ...post };
     this.heading = headingTo(post.x, post.z, face.x, face.z);
+    this.faceAt = face;
   }
+  // where they look when standing at their post with nothing to do
+  private faceAt: Pt;
   // wait here until time t
   stand(until: number, intent?: string, mode: Behaviour = "idle", mood?: string, face?: Pt): void {
     if (until <= this.t + 1e-6) return;
@@ -413,7 +416,11 @@ class Timeline {
       return;
     }
     const home = { ...this.pos };
-    const base = this.heading;
+    // back at their post they look the way they were put there to (towards the
+    // door and the front of the shop), not the way they happened to be walking
+    // when they got back: a greeter who walked home to the left of the door
+    // would otherwise stand there facing the side wall
+    const base = Math.hypot(home.x - this.post.x, home.z - this.post.z) < 0.5 ? headingTo(home.x, home.z, this.faceAt.x, this.faceAt.z) : this.heading;
     const seed = Array.from(this.id).reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
     let n = 0;
     while (until - this.t > 2.2 && n++ < 400) {

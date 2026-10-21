@@ -1,7 +1,8 @@
 import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
-import { PMREMGenerator, Vector3 } from "three";
+import { PMREMGenerator, PerspectiveCamera, Vector3 } from "three";
+import type { Camera } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { engagedMoment } from "../../shared/engage.ts";
@@ -58,6 +59,20 @@ const TALK_HEAD_Y = 1.55; // engage.ts's own gaze height for a person's face
 const TALK_RADIUS = 0.9; // metres from the face — close, but not nose-to-nose
 const TALK_TARGET = new Vector3();
 const TALK_OFFSET = new Vector3();
+// where the view would point if it looked straight at the target: the view turns
+// towards it by easing, the way it already moves, so the pan in is one smooth
+// motion and not a move with a snap in the middle
+const LOOK_CAM = new PerspectiveCamera();
+LOOK_CAM.rotation.order = "YXZ";
+function turnToward(camera: Camera, target: Vector3, ease: number): void {
+  LOOK_CAM.position.copy(camera.position);
+  LOOK_CAM.updateWorldMatrix(true, false);
+  LOOK_CAM.lookAt(target);
+  camera.rotation.order = "YXZ";
+  camera.rotation.y += wrap(LOOK_CAM.rotation.y - camera.rotation.y) * ease;
+  camera.rotation.x += (LOOK_CAM.rotation.x - camera.rotation.x) * ease;
+  camera.rotation.z = 0;
+}
 // device-targeting reticle point, in normalised device coordinates
 // (-1..1, y up): low and centred, not the crosshair-dead-centre of the view
 const TARGET_NDC_X = 0;
@@ -266,7 +281,7 @@ function Player() {
       }
       TALK_TARGET.set(at.x, STORE_Y + (eng?.seated || net.seats.has(talkWithId) ? 1.2 : TALK_HEAD_Y), at.z); // a seated head is lower
       const mySeat = net.you ? net.seats.get(net.you.id) : undefined;
-      const ease = 1 - Math.exp(-6 * dt); // a touch slower than the device pan: a lean, not a snap-zoom
+      const ease = 1 - Math.exp(-5 * dt); // slower than the device pan: a lean, not a snap-zoom
       if (mySeat) {
         // sitting: the view is fixed at your seat, looking straight at them
         const tx = mySeat.x + (at.x - mySeat.x) * 0.1;
@@ -274,7 +289,7 @@ function Player() {
         camera.position.x += (tx - camera.position.x) * ease;
         camera.position.y += (STORE_Y + 1.18 - camera.position.y) * ease;
         camera.position.z += (tz - camera.position.z) * ease;
-        camera.lookAt(TALK_TARGET);
+        turnToward(camera, TALK_TARGET, ease);
         net.me.x = mySeat.x;
         net.me.z = mySeat.z;
         faceToward(mySeat.fx, mySeat.fz); // the body sits turned a little towards them, as everyone else sees
@@ -289,7 +304,7 @@ function Player() {
       camera.position.x += (TALK_TARGET.x + TALK_OFFSET.x - camera.position.x) * ease;
       camera.position.y += (TALK_TARGET.y - camera.position.y) * ease;
       camera.position.z += (TALK_TARGET.z + TALK_OFFSET.z - camera.position.z) * ease;
-      camera.lookAt(TALK_TARGET);
+      turnToward(camera, TALK_TARGET, ease);
       // the body turns to the other person too, so both are seen face to face; the
       // specialist steps in close if the customer was left some way off (after a demo)
       const me = net.you?.id;

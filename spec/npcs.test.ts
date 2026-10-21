@@ -367,3 +367,23 @@ describe("a handshake names who it is with (so it can be dropped when they are n
     expect(seen).toBeGreaterThan(5);
   });
 });
+
+// Promise: the greeter, standing about with nothing to do, looks towards the
+// doorway and the shop front, not into the side wall (crit 10 feedback: she
+// "stands on the side and faces the wall"). She used to take her facing from
+// whichever way she was walking when she got back to her post.
+describe("the greeter's idle facing", () => {
+  it("is almost never into the side wall", () => {
+    const greeter = NPCS.find((n) => n.id === "greeter-1")!;
+    let standing = 0;
+    let intoWall = 0;
+    for (let t = 0; t < 900; t++) {
+      const p = npcPose(greeter, t * 1000);
+      if (!p.present || p.walking) continue;
+      standing++;
+      if (p.x < -1.5 && -Math.sin(p.ry) < -0.5) intoWall++; // on the left of the door, facing left
+    }
+    expect(standing).toBeGreaterThan(300);
+    expect(intoWall / standing).toBeLessThan(0.1);
+  });
+});

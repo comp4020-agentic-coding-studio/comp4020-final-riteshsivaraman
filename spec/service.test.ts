@@ -4,6 +4,7 @@ import { defaultStorage, productById, START_STOCK } from "../src/shared/catalogu
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
 import { TABLE_SEATS } from "../src/shared/storeday.ts";
 import type { ServerMessage } from "../src/shared/protocol.ts";
+import { ENTRANCE_ZONE } from "../src/shared/world.ts";
 import { migrate } from "../src/server/migrate.ts";
 import {
   beginSale,
@@ -588,6 +589,12 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     expect(last(out, "all", "engaged")).not.toHaveProperty("pending"); // she is talking, not waiting to be accepted
     expect(stateOf(db, "c1")?.state).toBe("in_conversation");
     expect(eventTypes()).toEqual(expect.arrayContaining(["npc_approached", "conversation_started"]));
+  });
+
+  it("she walks to where the customer actually stands, even right at the door, so she faces them", () => {
+    const at = { x: 2.5, z: ENTRANCE_ZONE.minZ + 0.3 };
+    addVisitor("c1", "Pebble", at);
+    expect(last(tryGreeterApproach(ctx(), "c1"), "all", "engaged")).toMatchObject({ npcId: "greeter-1", visitorId: "c1", at });
   });
 
   it("never approaches the same customer twice", () => {
