@@ -70,7 +70,7 @@ function Hud() {
       )}
       {live.waitingAt && !live.locked && (
         <div className="escort-banner">
-          Wait near {live.waitingAt.label}. {live.waitingAt.who ? `${live.waitingAt.who} will come and find you.` : "Someone will come and get you as soon as they're free."}
+          Head to {live.waitingAt.label} and press E on whoever is free.
         </div>
       )}
       {live.escort && (

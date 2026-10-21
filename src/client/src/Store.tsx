@@ -423,15 +423,7 @@ function Remotes() {
       const looking = [...net.inspections.values()].find((i) => i.visitorId === r.info.id);
       const slot = looking ? DEVICE_SLOT_BY_ID.get(looking.slotId) : undefined;
       const chat = net.chats.get(r.info.id);
-      // showing intent to talk: eyes on the person they want, and a wave
-      const reaching = [...net.intents.values()].find((i) => i.fromId === r.info.id && i.state === "open" && (i.ready || !i.human));
-      let target: { x: number; z: number } | undefined;
-      if (reaching) {
-        const npcDef = NPCS.find((n) => n.id === reaching.toId);
-        target = reaching.toId === net.you?.id ? net.me : (net.remotes.get(reaching.toId) ?? (npcDef ? npcPose(npcDef, net.serverNow()) : undefined));
-      }
-      if (reaching && target && !walking) state = { ...state, mode: "wave", mood: "smile", gaze: { x: target.x, y: 1.55, z: target.z } };
-      else if (slot && !walking) state = { ...state, mode: "observe", mood: "curious", gaze: { x: slot.x, y: TABLE_H + 0.05, z: slot.z } };
+      if (slot && !walking) state = { ...state, mode: "observe", mood: "curious", gaze: { x: slot.x, y: TABLE_H + 0.05, z: slot.z } };
       else if (chat && !walking) {
         const other = chat.with === net.you?.id ? net.me : net.remotes.get(chat.with);
         // only the one who just spoke talks, and only as long as the line takes to say
@@ -515,8 +507,7 @@ function Interact() {
         net.takeOrder();
         return;
       }
-      if (net.hint?.intentId) (net.hint.show ? net.intentShow(net.hint.intentId) : net.intentAccept(net.hint.intentId));
-      else if (net.hint) net.talkStart(net.hint.id);
+      if (net.hint) net.talkStart(net.hint.id);
       else if (net.deviceHint && !net.myInspectSlot) net.inspectStart(net.deviceHint.slotId);
     };
     window.addEventListener("keydown", press);
@@ -565,39 +556,14 @@ function Interact() {
       net.changed();
     }
 
-    let best: { id: string; name: string; d: number; intentId?: string; show?: boolean } | null = null;
+    let best: { id: string; name: string; d: number } | null = null;
     const free = net.state === "arriving" || net.state === "browsing" || net.state === "waiting_for_help";
-    // someone has shown intent to talk to you and is close enough: E accepts it
-    // (customers and staff alike). Your own outstanding intents are not offered again.
     const myId = net.you?.id;
-    if (myId && !net.locked && net.status === "open" && (free || net.identity.kind !== "customer")) {
-      const now = net.serverNow();
-      for (const it of net.intents.values()) {
-        if (it.toId !== myId || it.state !== "open") continue;
-        if (it.human && !it.ready) continue; // a real user has not shown intent yet
-        const e = net.engaged.get(it.fromId);
-        const rem = net.remotes.get(it.fromId);
-        const pos = e ? engagedMoment(it.fromId, e, now) : rem;
-        if (!pos) continue;
-        const d = Math.hypot(pos.x - net.me.x, pos.z - net.me.z);
-        if (d > TALK_HINT_RANGE) continue;
-        if (!best || d < best.d) best = { id: it.fromId, name: it.fromName, d, intentId: it.id };
-      }
-    }
-    // a specialist standing by their customer: E shows intent to talk
-    if (myId && !best && !net.locked && net.status === "open" && net.identity.kind !== "customer") {
-      for (const it of net.intents.values()) {
-        if (it.fromId !== myId || !it.human || it.ready || it.state !== "open") continue;
-        const r = net.remotes.get(it.toId);
-        if (!r) continue;
-        const d = Math.hypot(r.x - net.me.x, r.z - net.me.z);
-        if (d <= TALK_HINT_RANGE && (!best || d < (best as { d: number }).d)) best = { id: it.toId, name: it.toName, d, intentId: it.id, show: true } as unknown as typeof best;
-      }
-    }
-    const waitingOn = new Set([...net.intents.values()].filter((i) => i.fromId === myId).map((i) => i.toId));
-    if (!best && net.identity.kind === "customer" && free && !net.locked && net.status === "open") {
+    const isCustomer = net.identity.kind === "customer";
+    // E talks to whoever is close and roughly in front of you; the server says
+    // whether they are free. A customer reaches staff; an employee reaches customers.
+    if (myId && (isCustomer ? free : true) && !net.locked && net.status === "open") {
       const consider = (id: string, name: string, x: number, z: number) => {
-        if (waitingOn.has(id)) return;
         const dx = x - net.me.x;
         const dz = z - net.me.z;
         const d = Math.hypot(dx, dz);
@@ -607,21 +573,27 @@ function Interact() {
         if (!best || d < best.d) best = { id, name, d };
       };
       const now = net.serverNow();
-      for (const n of NPCS) {
-        const post = NPC_DESIGNATION[n.id];
-        if (!post || !scriptFor(post) || net.offDuty.has(n.id) || net.engaged.has(n.id) || net.released.has(n.id)) continue;
-        const p = npcPose(n, now);
-        if (p.present) consider(n.id, NPC_LABEL[n.id] ?? n.id, p.x, p.z);
+      if (isCustomer) {
+        for (const n of NPCS) {
+          const post = NPC_DESIGNATION[n.id];
+          if (!post || !scriptFor(post) || net.offDuty.has(n.id) || net.engaged.has(n.id) || net.released.has(n.id)) continue;
+          const p = npcPose(n, now);
+          if (p.present) consider(n.id, NPC_LABEL[n.id] ?? n.id, p.x, p.z);
+        }
       }
       for (const r of net.remotes.values()) {
-        if (r.identity.kind === "customer") continue;
-        const post = designationOf({ kind: r.identity.kind, specialty: r.identity.specialty });
-        if (post && scriptFor(post)) consider(r.info.id, r.info.name, r.x, r.z);
+        if (isCustomer) {
+          if (r.identity.kind === "customer") continue;
+          const post = designationOf({ kind: r.identity.kind, specialty: r.identity.specialty });
+          if (post && scriptFor(post)) consider(r.info.id, r.info.name, r.x, r.z);
+        } else if (r.identity.kind === "customer" && !net.chats.has(r.info.id)) {
+          consider(r.info.id, r.info.name, r.x, r.z);
+        }
       }
     }
-    const b = best as { id: string; name: string; intentId?: string; show?: boolean } | null;
-    const next = b ? { id: b.id, name: b.name, intentId: b.intentId, show: b.show } : null;
-    if (next?.id !== net.hint?.id || next?.intentId !== net.hint?.intentId || next?.show !== net.hint?.show) {
+    const b = best as { id: string; name: string } | null;
+    const next = b ? { id: b.id, name: b.name } : null;
+    if (next?.id !== net.hint?.id) {
       net.hint = next;
       net.changed();
     }
@@ -706,15 +678,6 @@ function GuideMarkers() {
     const rp = engagedMoment(runner.npcId, runner, live.serverNow());
     out.push({ key: "collect", x: rp.x, z: rp.z, colour: "#c79bff" });
   }
-  // a specialist: where to meet each customer you have been sent for: blue
-  if (live.isEmployee && live.you) {
-    for (const i of live.intents.values()) {
-      if (i.fromId !== live.you.id || i.state === "queued") continue;
-      const r = live.remotes.get(i.toId);
-      const spot = i.wait ?? (r ? { x: r.x, z: r.z } : null);
-      if (spot) out.push({ key: `meet:${i.id}`, x: spot.x, z: spot.z, colour: "#6cc4ff" });
-    }
-  }
   return (
     <>
       {out.map((m) => (
@@ -781,9 +744,7 @@ function SelfView() {
     const prev = state.current.speed ?? 0;
     const smooth = prev + (speed - prev) * 0.2;
     const seat = net.you ? net.seats.get(net.you.id) : undefined;
-    // your own open intent to talk: you wave, so you can see what others see
-    const reaching = [...net.intents.values()].some((i) => i.fromId === net.you?.id && i.state === "open" && (i.ready || !i.human));
-    state.current = { carrying: net.carrying(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: reaching && !seat && smooth < 0.25 ? "wave" : "idle", mood: reaching ? "smile" : "neutral", speed: smooth, seated: !!seat };
+    state.current = { carrying: net.carrying(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: "idle", mood: "neutral", speed: smooth, seated: !!seat };
     g.position.set(net.me.x, STORE_Y, net.me.z);
     g.rotation.y = camera.rotation.y;
   });

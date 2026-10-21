@@ -61,10 +61,10 @@ export interface Engagement {
   visitorId: string;
   since: number; // server time
   at: { x: number; z: number }; // where the visitor stood when it began
-  // true while the NPC has walked over to show intent to talk but the other
-  // side has not accepted yet: it stands facing them, not yet talking
+  // true while the NPC has walked over to take payment and is not yet talking:
+  // it stands facing the customer
   pending?: boolean;
-  // with `pending`: it is the NPC that wants to talk, so it waves (not when the visitor asked)
+  // with `pending`: it waves as it comes
   waving?: boolean;
   // set while the NPC is walking a customer somewhere: it starts from `from`
   // (not its timetable) and stops at `lead`, facing (fx, fz)
@@ -75,24 +75,6 @@ export interface Engagement {
   // what it is doing while it stands there instead of just talking (checking
   // stock on its phone)
   doing?: "phone";
-}
-
-// Intent to talk (Ritesh, 2026-10-19): a conversation starts with one side
-// showing intent and the other accepting, never by one side opening it. A
-// busy person's intents wait ('queued') until they are free.
-export interface IntentView {
-  id: string;
-  fromId: string;
-  fromName: string;
-  toId: string;
-  toName: string;
-  reason: "greet" | "help" | "ask" | "pay";
-  // held: told to wait near `wait` and not yet being fetched
-  state: "queued" | "open" | "held";
-  wait?: { x: number; z: number; label: string };
-  human?: boolean; // the person coming is a real user (they walk themselves)
-  ready?: boolean; // a real user has shown intent in person: the customer can now accept
-  since: number; // server time
 }
 
 // Someone inspecting a device (D39, first pass: phone only, stays on the
@@ -166,13 +148,9 @@ export type ClientMessage =
   | { type: "talk_close" }
   // a specialist's move in a conversation: one of the moves offered, in a tone
   | { type: "staff_move"; conversationId: string; actId: string; tone: string }
-  // accept someone's intent to talk to you (E on the prompt)
-  | { type: "intent_accept"; intentId: string }
-  // "let the server catch up": sent while an intent involving you is open, so
-  // the one-second beat and the give-up are checked without a server timer
-  | { type: "intent_poll" }
-  // a specialist, standing by their customer, shows intent to talk (E)
-  | { type: "intent_show"; intentId: string }
+  // "let the server catch up": sent while a payment visit or a walk involving
+  // you is open, so its beats are checked without a server timer
+  | { type: "settle" }
   // give up following a member of staff (Esc while being walked somewhere)
   | { type: "escort_cancel" }
   // an employee's side
@@ -208,7 +186,6 @@ export type ServerMessage =
       orders: OrderView[];
       // where you start: the client puts your view there
       spawn: Pose;
-      intents: IntentView[];
       seated: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }>;
     }
   | { type: "joined"; visitor: Present }
@@ -226,8 +203,6 @@ export type ServerMessage =
   | { type: "update"; text: string }
   | { type: "duty"; offDuty: string[] }
   | ({ type: "engaged" } & Engagement)
-  | ({ type: "intent" } & IntentView)
-  | { type: "intent_end"; id: string; why: "accepted" | "expired" | "cancelled" }
   // a member of staff is walking you somewhere: follow them; `goal` is where you should stand
   | { type: "seated"; visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }
   | { type: "unseated"; visitorId: string }

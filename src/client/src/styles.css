@@ -565,11 +565,6 @@ kbd {
   z-index: 20;
   max-width: calc(100vw - 24px);
 }
-.intent-badge {
-  margin-top: 2px;
-  font: 600 13px system-ui, sans-serif;
-  color: #ffd23f;
-}
 .missions {
   position: fixed;
   left: 12px;

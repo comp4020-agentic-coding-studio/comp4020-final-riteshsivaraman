@@ -83,7 +83,7 @@ it("ignores a profile that is not valid, rather than trusting it", async () => {
   expect(welcome.identity.look).toBeUndefined();
 });
 
-it("sends a real specialist for a customer, who shows intent, is accepted, and serves them through the engine", async () => {
+it("points a customer to a real specialist, who walks up, presses E, and serves them through the engine", async () => {
   // the specialist is in the store first, so they are who is sent for the customer
   const { v: employee, welcome } = await join({ kind: "specialist", specialty: "phones", name: "Sam" });
   expect(welcome.offDuty).not.toContain("spec-phones"); // an extra pair of hands, not a replacement
@@ -105,20 +105,17 @@ it("sends a real specialist for a customer, who shows intent, is accepted, and s
   await customer.next((m) => m.type === "turn" && m.choices.some((c) => c.id === "help"));
   customer.send({ type: "talk_choose", conversationId: hello.conversationId, choice: "help" });
   const told = (await customer.next((m) => m.type === "turn" && m.ended)) as Extract<ServerMessage, { type: "turn" }>;
-  expect(told.say).toMatch(/Sam will come and find you/);
+  expect(told.say).toMatch(/Head over to the phones area: Sam will look after you/);
 
-  // Sam is given the customer as a task, goes to them and shows intent in person
-  const task = (await employee.next((m) => m.type === "intent" && m.fromId === employee.id)) as Extract<ServerMessage, { type: "intent" }>;
-  expect(task).toMatchObject({ toId: customer.id, reason: "help" });
+  // Sam is told a customer is waiting, walks up to them and presses E: the conversation opens at once
+  await employee.next((m) => m.type === "notice" && /New customer/.test(m.text));
   customer.send({ type: "talk_close" });
   customer.send({ type: "move", x: 2, z: 0, ry: 0 });
   await pause(150);
-  employee.send({ type: "intent_show", intentId: task.id });
-  await customer.next((m) => m.type === "intent" && m.id === task.id && m.ready === true);
 
-  // the customer accepts: both are in the conversation, Sam given the engine's moves
+  // both are in the conversation, Sam given the engine's moves
   const mark = employee.mark();
-  customer.send({ type: "intent_accept", intentId: task.id });
+  employee.send({ type: "talk_start", withId: customer.id });
   const waiting = (await customer.next((m) => m.type === "turn" && m.withId === employee.id)) as Extract<ServerMessage, { type: "turn" }>;
   expect(waiting.awaiting).toBe("staff");
   const menu = (await employee.next((m) => m.type === "staff_menu", 6000, mark)) as Extract<ServerMessage, { type: "staff_menu" }>;

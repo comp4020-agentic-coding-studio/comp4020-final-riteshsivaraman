@@ -11,7 +11,6 @@ import type {
   ChatPair,
   OrderView,
   Inspection,
-  IntentView,
   Present,
   Role,
   ServerMessage,
@@ -109,9 +108,7 @@ class Net {
   customers: CustomerView[] = [];
   notice: { text: string; at: number } | null = null;
   // who is close enough to talk to, set by the scene
-  hint: { id: string; name: string; intentId?: string; show?: boolean } | null = null;
-  // intent to talk (server-authoritative): who has shown intent to whom
-  intents = new Map<string, IntentView>();
+  hint: { id: string; name: string } | null = null;
   // who is sitting at a table with someone (by visitor id), and where
   seats = new Map<string, { x: number; z: number; fx: number; fz: number }>();
   // real people in a conversation: who each is talking with, and whose turn it is to talk
@@ -127,13 +124,11 @@ class Net {
   orders: OrderView[] = [];
   // the stock person has come to you and you may take the bag (set by the scene)
   runnerNear = false;
-  // told to wait somewhere for someone to fetch you, if you are
-  get waitingAt(): { x: number; z: number; label: string; who: string; reason: string } | null {
-    for (const i of this.intents.values()) if ((i.state === "held" || (i.state === "open" && i.human)) && i.toId === this.you?.id && i.wait) return { ...i.wait, who: i.fromName, reason: i.reason };
-    // nobody sent for you yet (everyone is taken): wait at the spot, and whoever is free first comes
-    if (this.state === "waiting_for_help" && !this.escort && ![...this.intents.values()].some((i) => i.toId === this.you?.id)) {
+  // told where to go for the help you asked for: the spot of the post you need
+  get waitingAt(): { x: number; z: number; label: string } | null {
+    if (this.state === "waiting_for_help" && !this.escort) {
       const spot = this.needs ? waitSpotFor(this.needs) : null;
-      if (spot) return { ...spot, who: "", reason: "help" };
+      if (spot) return spot;
     }
     return null;
   }
@@ -153,7 +148,7 @@ class Net {
   get locked(): boolean {
     return this.talking !== null || this.staffTalking !== null;
   }
-  private intentPoller: ReturnType<typeof setInterval> | null = null;
+  private settlePoller: ReturnType<typeof setInterval> | null = null;
   // devices being inspected right now, by slot id (D39) — server-authoritative,
   // so another visitor sees the same thing live, including one who joins mid-look
   inspections = new Map<string, Inspection>();
@@ -242,12 +237,11 @@ class Net {
         this.engaged = new Map(message.engaged.map((e) => [e.npcId, e]));
         this.released.clear();
         this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
-        this.intents = new Map(message.intents.map((i) => [i.id, i]));
         this.setChats(message.chats);
         this.orders = message.orders;
         this.spawn = message.spawn;
         this.seats = new Map(message.seated.map((s) => [s.visitorId, { x: s.at.x, z: s.at.z, fx: s.face.x, fz: s.face.z }]));
-        this.pollIntents();
+        this.pollSettle();
         this.myInspectSlot = message.inspecting.find((i) => i.visitorId === message.you.id)?.slotId ?? null;
         this.remotes.clear();
         for (const o of message.others) this.addRemote(o);
@@ -296,6 +290,7 @@ class Net {
         return true;
       case "orders":
         this.orders = message.orders;
+        this.pollSettle();
         return true;
       case "update":
         this.pushUpdate(message.text);
@@ -311,12 +306,6 @@ class Net {
         this.engaged.set(message.npcId, message);
         this.released.delete(message.npcId);
         return true;
-      case "intent": {
-        const { type: _t, ...view } = message;
-        this.intents.set(view.id, view);
-        this.pollIntents();
-        return true;
-      }
       case "seated":
         this.seats.set(message.visitorId, { x: message.at.x, z: message.at.z, fx: message.face.x, fz: message.face.z });
         if (message.visitorId === this.you?.id) {
@@ -332,16 +321,12 @@ class Net {
       case "escort": {
         const { type: _t, ...e } = message;
         this.escort = e;
-        this.pollIntents();
+        this.pollSettle();
         return true;
       }
       case "escort_end":
         if (this.escort?.id === message.id) this.escort = null;
-        this.pollIntents();
-        return true;
-      case "intent_end":
-        this.intents.delete(message.id);
-        this.pollIntents();
+        this.pollSettle();
         return true;
       case "released": {
         const e = this.engaged.get(message.npcId);
@@ -374,7 +359,7 @@ class Net {
     this.state = state;
     this.want = want;
     this.needs = needs;
-    this.pollIntents();
+    this.pollSettle();
   }
 
   private addRemote(v: Present): void {
@@ -384,28 +369,19 @@ class Net {
 
   // ---- what the visitor does ----
 
-  // the server decides when a beat has passed or someone gave up, but it has
-  // no timer: while an intent involving you is open, ask it to catch up
-  private pollIntents(): void {
-    // also while waiting for help: the server hands you to whoever is free next
-    const mine = (this.you ? [...this.intents.values()].some((i) => i.fromId === this.you!.id || i.toId === this.you!.id) : false) || this.escort !== null || this.state === "waiting_for_help";
-    if (mine && !this.intentPoller) this.intentPoller = setInterval(() => this.send({ type: "intent_poll" }), 500);
-    else if (!mine && this.intentPoller) {
-      clearInterval(this.intentPoller);
-      this.intentPoller = null;
+  // the server decides when a beat has passed, but it has no timer: while a
+  // walk or an order involving you is open, ask it to catch up
+  private pollSettle(): void {
+    const mine = this.escort !== null || this.orders.some((o) => o.customerId === this.you?.id || o.specId === this.you?.id);
+    if (mine && !this.settlePoller) this.settlePoller = setInterval(() => this.send({ type: "settle" }), 500);
+    else if (!mine && this.settlePoller) {
+      clearInterval(this.settlePoller);
+      this.settlePoller = null;
     }
   }
 
   escortCancel(): void {
     if (this.escort && !this.myInspectSlot) this.send({ type: "escort_cancel" });
-  }
-
-  intentShow(intentId: string): void {
-    this.send({ type: "intent_show", intentId });
-  }
-
-  intentAccept(intentId: string): void {
-    this.send({ type: "intent_accept", intentId });
   }
 
   talkStart(withId: string): void {

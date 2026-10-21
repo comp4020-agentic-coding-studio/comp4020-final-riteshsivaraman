@@ -16,8 +16,8 @@ price over budget, and a wait. Stock is finite and shared, so two visitors can
 race for the last unit.
 
 **Quality of execution.** The room should feel calm, like a hotel lobby, while the
-queue is lived. Nobody should have to read instructions: a character looks at you, waves and
-walks over, and you answer from a short menu.
+queue is lived. Nobody should have to read instructions: a character walks up to you, or you
+press E, and you answer from a short menu.
 
 **Differentiation from the median.** A generic multi-user 3D shop would be an empty room
 with avatars and a chat box. Here the people matter because they use the same

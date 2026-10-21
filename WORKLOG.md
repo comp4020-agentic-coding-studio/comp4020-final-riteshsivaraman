@@ -10,6 +10,17 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## Talking without a handshake (2026-10-21)
+
+After crit 10 (everyone stuck behind one greeting, "Maya wants to talk" over every head) the intent
+handshake is gone (SCOPE D46). `requestTalk` is now `startTalk` for a customer and `staffTalk` for an
+employee; `tryGreeterApproach` opens the conversation at once if she is free; `pointToHelper` replaces
+`assignHelper`/`assignWaiting`. The `intents` table now holds only payment visits (`sendForPayment`,
+`settleVisits`), and the client message is `settle`. Gone from the protocol: `intent`, `intent_end`,
+`intent_accept`, `intent_show`, the welcome `intents` list; gone from the client: `IntentBadge`, the
+wave, the wait banner's "will come and find you". `spec/greeter-live.test.ts` reproduces the crit with
+three customers over real WebSockets.
+
 ## Conversation model: phone scene wired into the real server (2026-10-19)
 
 Ritesh's call after reviewing `server-wiring-proposal.md`'s six laid-out options: phone only,

@@ -94,14 +94,12 @@ export function sentence(p: ParsedLine): string {
       return `announcement: "${f.text}"`;
     case "npc_approached":
       return `${named(f, "npcId")} went up to ${who}`;
-    case "intent_shown":
-      return `${named(f, "from")} showed intent to talk to ${named(f, "to")} (${f.reason}${f.queued === "true" ? ", has to wait their turn" : ""})`;
-    case "intent_shown_in_person":
-      return `${named(f, "by")} reached ${who} and showed intent in person`;
-    case "intent_accepted":
-      return `${named(f, "to")} accepted ${named(f, "from")}'s intent to talk`;
-    case "intent_ended":
-      return `${named(f, "from")}'s intent to ${named(f, "to")} ended: ${f.why} (${f.detail})`;
+    case "pay_visit_started":
+      return `${named(f, "by")} set off to take payment from ${who}${f.queued === "true" ? " (still with someone, so it waits)" : ""}`;
+    case "pay_visit_ended":
+      return `${named(f, "by")}'s payment visit to ${who} ended: ${f.why} (${f.detail})`;
+    case "staff_approached":
+      return `${named(f, "staffId")} went up to ${who}`;
     case "conversation_started":
       return `${who} began talking with ${named(f, "with")}${f.script === "payment" ? " about paying" : ""}`;
     case "talk_turn":

@@ -14,7 +14,7 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
-import { FLOOR, type ChatPair, type CustomerView, type Engagement, type Inspection, type IntentView, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
+import { FLOOR, type ChatPair, type CustomerView, type Engagement, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
 import { engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
@@ -270,7 +270,7 @@ export function engagements(db: Database.Database): Engagement[] {
     const d = anyDataOf(r);
     if (isTalkData(d) && d.standIn) live.push(d.standIn.eng);
   }
-  // an NPC that has walked over to show intent (not yet accepted) stands there too
+  // an NPC that has walked over to take payment stands there too
   const pending = (db.prepare("SELECT * FROM intents WHERE status = 'open' AND staff_kind = 'npc'").all() as IntentRow[]).map(
     intentEngagement,
   );
@@ -527,8 +527,6 @@ export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
     setState(ctx, visitorId, { state: "leaving", with_id: null });
     log(ctx, visitorId, "state", { state: "leaving" });
   }
-  // someone who was being sent for has gone: whoever that freed can take the next waiting customer
-  out.push(...assignWaiting(ctx));
   out.push(staffViewMessage(ctx), dutyMessage(ctx));
   return out;
 }
@@ -578,8 +576,8 @@ function resolveTalk(ctx: Ctx, customerId: string, withId: string): { fail: Outg
   return { ok: { withKind, script, here } };
 }
 
-// Opens a conversation at once. Kept as the primitive that accepting an
-// intent ends in; the live game goes through `requestTalk` (intent first).
+// Opens a conversation at once, or says the other person is busy. A customer
+// pressing E goes through `requestTalk`, which lands here.
 export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoing[] {
   releaseExpired(ctx);
   const closed = closeTalk(ctx, customerId); // never leave an NPC held by the last conversation
@@ -588,8 +586,8 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
   const putDown = [...closed, ...endInspect(ctx, customerId, "started a conversation")];
   const r = resolveTalk(ctx, customerId, withId);
   if ("fail" in r) return [...putDown, ...r.fail];
-  const busy = ctx.db.prepare("SELECT 1 FROM conversations WHERE ended_at IS NULL AND with_id = ?").get(withId);
-  if (busy) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} is with someone else. Please wait a moment.`)];
+  // busy: in a conversation, still standing with someone on their last turn, walking someone somewhere, or on their way to take payment
+  if (staffBusy(ctx, withId, r.ok.withKind)) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} is with someone else. Please wait a moment.`)];
   return [...putDown, ...open(ctx, customerId, withId, r.ok.withKind, r.ok.script, r.ok.here)];
 }
 
@@ -602,9 +600,7 @@ const usesTalkEngine = (script: ScriptId, _withKind: "npc" | "visitor"): boolean
 
 function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "visitor", script: ScriptId, at: { x: number; z: number }, engagedSince: number = ctx.now): Outgoing[] {
   const id = randomUUID();
-  // whatever intent led here is over (a path that skipped the handshake, such
-  // as a staff member's claim, still clears it so nothing is left dangling)
-  const cleared = endLiveIntents(ctx, (r) => r.customer_id === customerId && r.staff_id === withId, "accepted");
+  const cleared: Outgoing[] = [];
   if (usesTalkEngine(script, withKind)) {
     const humanStaff = withKind === "visitor";
     // a real specialist moves first: the customer waits for them
@@ -649,21 +645,22 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
 }
 
 
-// ---- intent to talk (Ritesh, 2026-10-19) ----
+// ---- talking, and the payment visit ----
 //
-// A conversation never opens because one side decided to: one side shows
-// intent and the other accepts. A greeter walks over and you press E; you
-// press E at a specialist and they accept a beat later; a person who is
-// already busy accepts only once they are done (the intent waits, 'queued').
-// Nothing here is a timer: the beat, the give-up and the queue are all
-// decided by whichever request arrives next (a move, or the client's
-// intent_poll while an intent involving it is open).
+// Talking has no handshake. E at someone who is free opens the conversation at
+// once (`startTalk`); E at someone who is busy is refused with "with someone
+// else". The greeter works the same way: she opens a conversation with whoever
+// is first inside the entrance while she is free (`tryGreeterApproach`), and
+// anyone she misses is simply left for E.
+//
+// The one thing that still travels between people is the payment. Once a phone
+// has been agreed and brought out, the specialist walks to the customer and the
+// payment conversation opens when they get there and the customer is free. That
+// visit is a row in `intents` (the table's old name; it now holds only these).
+// Nothing here is a timer: the beat, the queue and the cancelling are all
+// decided by whichever request arrives next (a move, or the client's `settle`).
 
-export const INTENT_BEAT_MS = 1000; // an NPC accepts this long after it arrives
-export const INTENT_GIVE_UP_MS = 30_000; // staff who showed intent leave after this long ignored
-const INTENT_CANCEL_DIST = 9; // metres the customer may wander from where they asked
-const WAIT_RADIUS = 2.0; // metres: "at" the spot they were told to wait at
-const WAIT_LEAVE_DIST = 3.2; // beyond this the wait starts again
+export const VISIT_BEAT_MS = 1000; // the payment opens this long after the specialist arrives
 
 interface IntentRow {
   id: string;
@@ -672,51 +669,23 @@ interface IntentRow {
   customer_id: string;
   staff_id: string;
   staff_kind: "npc" | "visitor";
-  reason: IntentView["reason"];
-  status: "held" | "queued" | "open" | "accepted" | "expired" | "cancelled";
+  reason: string;
+  status: "queued" | "open" | "accepted" | "expired" | "cancelled";
   created_at: number;
   opened_at: number | null;
   arrived_at: number | null;
   at_x: number | null;
   at_z: number | null;
   ended_at: number | null;
-  wait_x: number | null;
-  wait_z: number | null;
-  wait_label: string | null;
-  delay_ms: number | null;
-  wait_since: number | null;
-  shown_at: number | null;
   from_x: number | null;
   from_z: number | null;
 }
 
 const liveIntentOf = (db: Database.Database, customerId: string, staffId: string): IntentRow | undefined =>
-  db.prepare("SELECT * FROM intents WHERE customer_id = ? AND staff_id = ? AND status IN ('held','queued','open') LIMIT 1").get(customerId, staffId) as IntentRow | undefined;
+  db.prepare("SELECT * FROM intents WHERE customer_id = ? AND staff_id = ? AND status IN ('queued','open') LIMIT 1").get(customerId, staffId) as IntentRow | undefined;
 
-function intentView(ctx: Ctx, r: IntentRow): IntentView {
-  return {
-    id: r.id,
-    fromId: r.from_id,
-    fromName: nameOf(ctx, r.from_id),
-    toId: r.to_id,
-    toName: nameOf(ctx, r.to_id),
-    reason: r.reason,
-    state: r.status === "held" ? "held" : r.status === "queued" ? "queued" : "open",
-    ...(r.wait_x !== null && r.wait_z !== null ? { wait: { x: r.wait_x, z: r.wait_z, label: r.wait_label ?? "there" } } : {}),
-    ...(r.staff_kind === "visitor" ? { human: true, ready: r.shown_at !== null } : {}),
-    since: r.opened_at ?? r.created_at,
-  };
-}
-
-export function intentViews(ctx: Ctx): IntentView[] {
-  return (ctx.db.prepare("SELECT * FROM intents WHERE status IN ('held','queued','open') ORDER BY created_at, rowid").all() as IntentRow[]).map((r) => intentView(ctx, r));
-}
-
-const intentMessage = (ctx: Ctx, r: IntentRow): Outgoing => ({ to: "all", message: { type: "intent", ...intentView(ctx, r) } });
-
-// An NPC is taken (and further intents to it wait) from the moment it walks
-// over to show intent. A human is only taken while actually in a conversation:
-// they can hold several missions and pick the order themselves.
+// An NPC is taken from the moment it walks over to take payment. A human is
+// only taken while actually in a conversation.
 function staffBusy(ctx: Ctx, staffId: string, kind: "npc" | "visitor"): boolean {
   if (kind === "visitor") return !!openConversationOf(ctx.db, staffId);
   if (npcBusy(ctx, staffId)) return true;
@@ -735,91 +704,64 @@ function customerFree(ctx: Ctx, customerId: string): boolean {
 function endIntent(ctx: Ctx, r: IntentRow, why: "accepted" | "expired" | "cancelled", detail: string): Outgoing[] {
   const wasOpen = r.status === "open";
   ctx.db.prepare("UPDATE intents SET status = ?, ended_at = ? WHERE id = ?").run(why, ctx.now, r.id);
-  log(ctx, r.customer_id, why === "accepted" ? "intent_accepted" : "intent_ended", { intentId: r.id, from: r.from_id, to: r.to_id, why, detail });
-  const out: Outgoing[] = [{ to: "all", message: { type: "intent_end", id: r.id, why } }];
-  // an NPC that walked over and was not accepted walks back to its day
+  log(ctx, r.customer_id, "pay_visit_ended", { visitId: r.id, by: r.staff_id, why, detail });
+  const out: Outgoing[] = [];
+  // an NPC that walked over and did not get to take payment walks back to its day
   if (why !== "accepted" && wasOpen && r.staff_kind === "npc") out.push({ to: "all", message: { type: "released", npcId: r.staff_id } });
   return out;
 }
 
 function endLiveIntents(ctx: Ctx, match: (r: IntentRow) => boolean, why: "accepted" | "cancelled"): Outgoing[] {
-  const rows = (ctx.db.prepare("SELECT * FROM intents WHERE status IN ('held','queued','open')").all() as IntentRow[]).filter(match);
+  const rows = (ctx.db.prepare("SELECT * FROM intents WHERE status IN ('queued','open')").all() as IntentRow[]).filter(match);
   return rows.flatMap((r) => endIntent(ctx, r, why, "superseded"));
 }
 
-// Shows intent to talk. `fromId` is whoever initiated (the customer, or the
-// staff member coming to find them); the other end is whoever must accept.
-function showIntent(ctx: Ctx, p: { fromId: string; customerId: string; staffId: string; staffKind: "npc" | "visitor"; reason: IntentView["reason"]; hold?: { x: number; z: number; label: string }; hint?: { x: number; z: number; label: string }; from?: { x: number; z: number } }): Outgoing[] {
+// Sends the specialist to the customer to take payment. A specialist who is
+// still with someone waits in line until they are free.
+function sendForPayment(ctx: Ctx, p: { customerId: string; staffId: string; staffKind: "npc" | "visitor"; from?: { x: number; z: number } }): Outgoing[] {
   if (liveIntentOf(ctx.db, p.customerId, p.staffId)) return [];
-  let at = ctx.position(p.customerId) ?? { x: 0, z: 0 };
-  // a customer still outside the entrance (where they arrive) is met just inside the door, not out on the walkway
-  if (p.staffKind === "npc" && at.z < FLOOR.minZ + 0.8) at = { x: Math.max(-1, Math.min(1, at.x)), z: FLOOR.minZ + 1.2 };
-  const held = !!p.hold;
-  const busy = !held && staffBusy(ctx, p.staffId, p.staffKind);
+  const at = ctx.position(p.customerId) ?? { x: 0, z: 0 };
+  const busy = staffBusy(ctx, p.staffId, p.staffKind);
   const id = randomUUID();
-  const toId = p.fromId === p.customerId ? p.staffId : p.customerId;
-  const status = held ? "held" : busy ? "queued" : "open";
-  // how long they take to come once you are there: a few seconds, not instant
-  const delay = held ? 3000 + Math.floor(Math.random() * 5000) : null;
   ctx.db
-    .prepare("INSERT INTO intents (id, from_id, to_id, customer_id, staff_id, staff_kind, reason, status, created_at, opened_at, at_x, at_z, wait_x, wait_z, wait_label, delay_ms, from_x, from_z) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(id, p.fromId, toId, p.customerId, p.staffId, p.staffKind, p.reason, status, ctx.now, busy || held ? null : ctx.now, at.x, at.z, (p.hold ?? p.hint)?.x ?? null, (p.hold ?? p.hint)?.z ?? null, (p.hold ?? p.hint)?.label ?? null, delay, p.from?.x ?? null, p.from?.z ?? null);
+    .prepare("INSERT INTO intents (id, from_id, to_id, customer_id, staff_id, staff_kind, reason, status, created_at, opened_at, at_x, at_z, from_x, from_z) VALUES (?, ?, ?, ?, ?, ?, 'pay', ?, ?, ?, ?, ?, ?, ?)")
+    .run(id, p.staffId, p.customerId, p.customerId, p.staffId, p.staffKind, busy ? "queued" : "open", ctx.now, busy ? null : ctx.now, at.x, at.z, p.from?.x ?? null, p.from?.z ?? null);
   const row = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(id) as IntentRow;
-  log(ctx, p.customerId, "intent_shown", { intentId: id, from: p.fromId, to: toId, reason: p.reason, queued: busy, held });
-  const out: Outgoing[] = [intentMessage(ctx, row)];
-  if (!busy && !held) out.push(...beginApproach(row));
-  else if (p.fromId === p.customerId) out.push(notice(p.customerId, `${nameOf(ctx, p.staffId)} is with someone. They will come to you as soon as they are free.`));
-  return out;
+  log(ctx, p.customerId, "pay_visit_started", { visitId: id, by: p.staffId, queued: busy });
+  return busy ? [] : beginApproach(row);
 }
 
-// How an NPC with an open intent is drawn. A person coming to find you walks
-// over; the Genius Bar stays behind the bar, facing you, to take payment.
+// How an NPC walking over to take payment is drawn: it comes to the customer
+// and waves, then stands there.
 function intentEngagement(r: IntentRow): Engagement {
-  const since = r.opened_at ?? r.created_at;
-  const at = { x: r.at_x ?? 0, z: r.at_z ?? 0 };
-  // it waves only if it is the one who wants to talk; if the customer asked, it just looks at them until it accepts
-  const base: Engagement = {
+  return {
     npcId: r.staff_id,
     visitorId: r.customer_id,
-    since,
-    at,
+    since: r.opened_at ?? r.created_at,
+    at: { x: r.at_x ?? 0, z: r.at_z ?? 0 },
     pending: true,
-    ...(r.from_id === r.staff_id ? { waving: true } : {}),
-    // an NPC that has been told to find someone who has moved starts from where it stands, not from its post
+    waving: true,
+    // an NPC that was told to find someone who has moved starts from where it stands, not from its post
     ...(r.from_x !== null && r.from_z !== null ? { from: { x: r.from_x, z: r.from_z } } : {}),
   };
-  return base;
 }
 
 const beginApproach = (r: IntentRow): Outgoing[] => (r.staff_kind === "npc" ? [{ to: "all", message: { type: "engaged", ...intentEngagement(r) } }] : []);
 
-// Where the staff end of an intent is, and whether they have got to the
-// customer. An NPC's position is the same pure function the clients draw.
-function staffEnd(ctx: Ctx, r: IntentRow, cpos: { x: number; z: number }): { arrived: boolean } {
-  if (r.staff_kind === "npc") {
-    return { arrived: !engagedMoment(r.staff_id, intentEngagement(r), ctx.now).walking };
-  }
+// Whether the specialist has got to the customer. An NPC's position is the
+// same pure function the clients draw.
+function staffArrived(ctx: Ctx, r: IntentRow, cpos: { x: number; z: number }): boolean {
+  if (r.staff_kind === "npc") return !engagedMoment(r.staff_id, intentEngagement(r), ctx.now).walking;
   const spos = ctx.position(r.staff_id);
-  return { arrived: !!spos && dist(spos, cpos) <= TALK_RANGE };
+  return !!spos && dist(spos, cpos) <= TALK_RANGE;
 }
 
-function acceptIntent(ctx: Ctx, r: IntentRow): Outgoing[] {
-  if (r.reason === "pay") return openPay(ctx, r);
-  const emp = ctx.employees.find((e) => e.id === r.staff_id);
-  const designation = r.staff_kind === "npc" ? NPC_DESIGNATION[r.staff_id] : emp ? designationOfEmployee(emp) : undefined;
-  const script: ScriptId | null = designation ? scriptFor(designation) : null;
-  const cpos = ctx.position(r.customer_id);
-  if (!script || !cpos) return endIntent(ctx, r, "cancelled", "no conversation to have");
-  const out = endIntent(ctx, r, "accepted", "accepted");
-  return [...out, ...open(ctx, r.customer_id, r.staff_id, r.staff_kind, script, cpos, r.staff_kind === "npc" ? (r.opened_at ?? ctx.now) : ctx.now)];
-}
-
-// Runs whatever has become due: queued intents whose person is now free
-// start, an NPC accepts a customer one beat after arriving, staff who were
-// ignored for long enough give up, and anyone who has left cancels theirs.
-export function settleIntents(ctx: Ctx): Outgoing[] {
-  const out: Outgoing[] = [...assignWaiting(ctx)];
-  const rows = ctx.db.prepare("SELECT * FROM intents WHERE status IN ('held','queued','open') ORDER BY created_at, rowid").all() as IntentRow[];
+// Runs whatever has become due: a specialist who was waiting in line starts
+// walking, the payment opens a beat after they arrive, a specialist who has
+// gone or a customer who has left cancels the visit.
+export function settleVisits(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  const rows = ctx.db.prepare("SELECT * FROM intents WHERE status IN ('queued','open') ORDER BY created_at, rowid").all() as IntentRow[];
   for (const r0 of rows) {
     let r = r0;
     const cpos = ctx.position(r.customer_id);
@@ -828,36 +770,15 @@ export function settleIntents(ctx: Ctx): Outgoing[] {
       out.push(...endIntent(ctx, r, "cancelled", staffGone ? "staff left" : "customer left"));
       continue;
     }
-    if (r.status === "held") {
-      // told to wait at a spot: only once they are there, for a few seconds, does help come
-      const spot = { x: r.wait_x ?? cpos.x, z: r.wait_z ?? cpos.z };
-      const d = dist(cpos, spot);
-      if (d > WAIT_LEAVE_DIST) {
-        if (r.wait_since !== null) ctx.db.prepare("UPDATE intents SET wait_since = NULL WHERE id = ?").run(r.id); // wandered off: the wait starts again
-        continue;
-      }
-      if (d > WAIT_RADIUS) continue;
-      if (r.wait_since === null) {
-        ctx.db.prepare("UPDATE intents SET wait_since = ? WHERE id = ?").run(ctx.now, r.id);
-        continue;
-      }
-      if (ctx.now - r.wait_since < (r.delay_ms ?? 0)) continue;
-      ctx.db.prepare("UPDATE intents SET status = 'queued' WHERE id = ?").run(r.id);
-      r = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(r.id) as IntentRow;
-    }
     if (r.status === "queued") {
       if (staffBusy(ctx, r.staff_id, r.staff_kind)) continue;
       ctx.db.prepare("UPDATE intents SET status = 'open', opened_at = ?, at_x = ?, at_z = ? WHERE id = ?").run(ctx.now, cpos.x, cpos.z, r.id);
       r = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(r.id) as IntentRow;
-      out.push(intentMessage(ctx, r), ...beginApproach(r));
+      out.push(...beginApproach(r));
     }
-    if (r.reason !== "pay" && dist(cpos, { x: r.at_x ?? cpos.x, z: r.at_z ?? cpos.z }) > INTENT_CANCEL_DIST) {
-      out.push(...endIntent(ctx, r, "cancelled", "customer walked away"));
-      continue;
-    }
-    const { arrived } = staffEnd(ctx, r, cpos);
+    const arrived = staffArrived(ctx, r, cpos);
     // someone coming to take payment follows a customer who wanders off, from where they stand now
-    if (r.reason === "pay" && r.staff_kind === "npc" && r.status === "open" && arrived && dist(cpos, { x: r.at_x ?? cpos.x, z: r.at_z ?? cpos.z }) > 1.5) {
+    if (r.staff_kind === "npc" && arrived && dist(cpos, { x: r.at_x ?? cpos.x, z: r.at_z ?? cpos.z }) > 1.5) {
       const here = engagedMoment(r.staff_id, intentEngagement(r), ctx.now);
       ctx.db.prepare("UPDATE intents SET at_x = ?, at_z = ?, from_x = ?, from_z = ?, opened_at = ?, arrived_at = NULL WHERE id = ?").run(cpos.x, cpos.z, here.x, here.z, ctx.now, r.id);
       r = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(r.id) as IntentRow;
@@ -865,91 +786,57 @@ export function settleIntents(ctx: Ctx): Outgoing[] {
       continue;
     }
     if (!arrived) continue;
-    const free = customerFree(ctx, r.customer_id);
-    if (r.arrived_at === null || (!free && ctx.now - r.arrived_at > 1000)) {
-      // the waiting clock starts when they are there and the customer is free to answer
+    // the beat starts when they are there and the customer is free to answer
+    if (!customerFree(ctx, r.customer_id)) {
+      if (r.arrived_at !== null) ctx.db.prepare("UPDATE intents SET arrived_at = NULL WHERE id = ?").run(r.id);
+      continue;
+    }
+    if (r.arrived_at === null) {
       ctx.db.prepare("UPDATE intents SET arrived_at = ? WHERE id = ?").run(ctx.now, r.id);
-      r = { ...r, arrived_at: ctx.now };
+      continue;
     }
-    const waited = ctx.now - (r.arrived_at ?? ctx.now);
-    if (r.from_id === r.customer_id && r.staff_kind === "npc") {
-      // the customer asked and an NPC has no key to press: it accepts after a beat
-      if (free && waited >= INTENT_BEAT_MS) out.push(...acceptIntent(ctx, r));
-    } else if (r.reason !== "pay" && r.from_id !== r.customer_id && r.staff_kind === "npc" && free && waited >= INTENT_GIVE_UP_MS) {
-      out.push(...endIntent(ctx, r, "expired", "ignored"));
-    }
+    if (ctx.now - r.arrived_at >= VISIT_BEAT_MS) out.push(...openPay(ctx, r));
   }
   return [...out, ...settleEscorts(ctx), ...settleOrders(ctx)];
 }
 
-// A customer presses E at someone: shows intent (or accepts theirs).
-export function requestTalk(ctx: Ctx, customerId: string, withId: string): Outgoing[] {
+// A person presses E at someone. A customer reaches an NPC or an employee; an
+// employee reaches a customer. Either way the conversation opens at once, or
+// they are told the other person is busy.
+export function requestTalk(ctx: Ctx, actorId: string, withId: string): Outgoing[] {
+  if (ctx.employees.some((e) => e.id === actorId)) return staffTalk(ctx, actorId, withId);
+  return startTalk(ctx, actorId, withId);
+}
+
+// An employee walks up to a customer and presses E.
+function staffTalk(ctx: Ctx, staffId: string, customerId: string): Outgoing[] {
   releaseExpired(ctx);
-  const putDown = [...closeTalk(ctx, customerId), ...endInspect(ctx, customerId, "started a conversation")];
-  const r = resolveTalk(ctx, customerId, withId);
-  if ("fail" in r) return [...putDown, ...r.fail];
-  const live = liveIntentOf(ctx.db, customerId, withId);
-  if (live) {
-    if (live.from_id === withId) return [...putDown, ...acceptIncoming(ctx, customerId, live)];
-    return [...putDown, notice(customerId, `${nameOf(ctx, withId)} knows you want to talk. They will come to you.`)];
-  }
-  return [...putDown, ...showIntent(ctx, { fromId: customerId, customerId, staffId: withId, staffKind: r.ok.withKind, reason: "ask" })];
-}
-
-// The target of an intent presses E.
-function acceptIncoming(ctx: Ctx, acceptorId: string, r: IntentRow): Outgoing[] {
-  if (r.status === "held") return [notice(acceptorId, `${nameOf(ctx, r.from_id)} will fetch you once you are waiting at ${r.wait_label ?? "the spot"}.`)];
-  if (r.status !== "open") return [notice(acceptorId, "They are with someone else; they will be with you as soon as they are free.")];
-  if (r.to_id !== acceptorId) return [];
-  const cpos = ctx.position(r.customer_id);
-  if (!cpos) return [];
-  if (!staffEnd(ctx, r, cpos).arrived) return [notice(acceptorId, `${nameOf(ctx, r.from_id)} is still on the way.`)];
-  // a real user coming to you has to show intent in person first (E)
-  if (r.staff_kind === "visitor" && r.from_id === r.staff_id && r.shown_at === null) return [notice(acceptorId, `${nameOf(ctx, r.from_id)} is on their way over.`)];
-  if (!customerFree(ctx, r.customer_id)) return [notice(acceptorId, "Finish what you are doing first.")];
-  if (r.staff_kind === "visitor" && openConversationOf(ctx.db, r.staff_id)) return [notice(acceptorId, "Finish your current conversation first.")];
-  const closed = closeTalk(ctx, r.customer_id);
-  const still = ctx.db.prepare("SELECT * FROM intents WHERE id = ? AND status = 'open'").get(r.id) as IntentRow | undefined;
-  return still ? [...closed, ...acceptIntent(ctx, still)] : closed;
-}
-
-// A specialist who has got to their customer shows intent (E). From then on
-// the customer is prompted and can accept.
-export function showIntentById(ctx: Ctx, staffId: string, intentId: string): Outgoing[] {
-  const r = ctx.db.prepare("SELECT * FROM intents WHERE id = ? AND status = 'open'").get(intentId) as IntentRow | undefined;
-  if (!r || r.staff_id !== staffId || r.staff_kind !== "visitor" || r.from_id !== staffId) return [notice(staffId, "They are not waiting for you any more.")];
-  const cpos = ctx.position(r.customer_id);
+  const emp = ctx.employees.find((e) => e.id === staffId);
+  const st = stateOf(ctx.db, customerId);
+  const script = emp ? scriptFor(designationOfEmployee(emp)) : null;
+  if (!emp || !st || !ctx.present.includes(customerId)) return [notice(staffId, "There is nobody there to talk to.")];
+  if (!script) return [notice(staffId, "You have nothing to talk about yet.")];
+  if (openConversationOf(ctx.db, staffId)) return [notice(staffId, "Finish your current conversation first.")];
+  const cpos = ctx.position(customerId);
   const spos = ctx.position(staffId);
   if (!cpos || !spos || dist(cpos, spos) > TALK_RANGE) return [notice(staffId, "Walk a little closer first.")];
-  if (r.shown_at !== null) return [];
-  ctx.db.prepare("UPDATE intents SET shown_at = ? WHERE id = ?").run(ctx.now, r.id);
-  log(ctx, r.customer_id, "intent_shown_in_person", { intentId: r.id, by: staffId });
-  const row = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(r.id) as IntentRow;
-  return [intentMessage(ctx, row), notice(staffId, `${nameOf(ctx, r.customer_id)} can see you now. Waiting for them to accept.`)];
+  if (!customerFree(ctx, customerId)) return [notice(staffId, `${nameOf(ctx, customerId)} is busy right now.`)];
+  const putDown = endInspect(ctx, customerId, "an employee started a conversation");
+  log(ctx, customerId, "staff_approached", { staffId });
+  return [...putDown, ...open(ctx, customerId, staffId, "visitor", script, cpos)];
 }
 
-export function acceptIntentById(ctx: Ctx, acceptorId: string, intentId: string): Outgoing[] {
-  const r = ctx.db.prepare("SELECT * FROM intents WHERE id = ? AND status IN ('held','queued','open')").get(intentId) as IntentRow | undefined;
-  if (!r) return [notice(acceptorId, "They are not waiting for you any more.")];
-  return acceptIncoming(ctx, acceptorId, r);
-}
-
-// Someone left the store: everything they were part of is cancelled.
+// Someone left the store: any payment visit they were part of is cancelled.
 function cancelIntentsOf(ctx: Ctx, visitorId: string): Outgoing[] {
   return endLiveIntents(ctx, (r) => r.customer_id === visitorId || r.staff_id === visitorId, "cancelled");
 }
 
-// Who can take a new customer right now: not in a conversation, not already
-// sent for one, not walking someone somewhere.
-function staffAvailable(ctx: Ctx, id: string, kind: "npc" | "visitor"): boolean {
-  if (staffBusy(ctx, id, kind)) return false;
-  const live = ctx.db.prepare("SELECT COUNT(*) AS n FROM intents WHERE staff_id = ? AND status IN ('held','queued','open')").get(id) as { n: number };
-  return live.n === 0;
-}
+// Who can take a new customer right now: not in a conversation, not walking
+// someone somewhere, not on their way to take payment.
+const staffAvailable = (ctx: Ctx, id: string, kind: "npc" | "visitor"): boolean => !staffBusy(ctx, id, kind);
 
-// The staff member to send for a customer who needs `post` (Ritesh, 2026-10-19):
-// a real user who is free first, else a free NPC. When everyone is taken it is
-// null, and the customer joins the shared queue: whoever is free first comes.
+// The staff member to name for a customer who needs `post`: a real user who is
+// free first, else a free NPC. Null when everyone is taken.
 function pickHelper(ctx: Ctx, post: string): { id: string; kind: "npc" | "visitor" } | null {
   const off = offDuty(ctx);
   const humans = ctx.employees.filter((e) => designationOfEmployee(e) === post).map((e) => ({ id: e.id, kind: "visitor" as const }));
@@ -963,42 +850,20 @@ function pickHelper(ctx: Ctx, post: string): { id: string; kind: "npc" | "visito
   return humans.find((h) => staffAvailable(ctx, h.id, h.kind)) ?? npcs.find((n) => staffAvailable(ctx, n.id, n.kind)) ?? null;
 }
 
-// Whoever is free now takes the customers who have been waiting longest.
-// Runs on whatever request arrives next: a conversation ending, a poll.
-function assignWaiting(ctx: Ctx): Outgoing[] {
-  const out: Outgoing[] = [];
-  const rows = ctx.db
-    .prepare("SELECT visitor_id, needs FROM player_state WHERE state = 'waiting_for_help' AND needs IS NOT NULL ORDER BY since, rowid")
-    .all() as Array<{ visitor_id: string; needs: string }>;
-  for (const r of rows) {
-    if (!ctx.present.includes(r.visitor_id) || !scriptFor(r.needs)) continue;
-    if (openConversationOf(ctx.db, r.visitor_id)) continue; // still with someone (the greeter's last turn counts)
-    if (ctx.db.prepare("SELECT 1 FROM intents WHERE customer_id = ? AND reason = 'help' AND status IN ('held','queued','open') LIMIT 1").get(r.visitor_id)) continue;
-    const a = assignHelper(ctx, r.visitor_id, r.needs);
-    out.push(...a.out);
-  }
-  return out;
-}
-
-// The customer needs `post`: a particular person is sent for them, who walks
-// over and shows intent (a human gets it as a mission). If everyone is taken,
-// nobody is named: they wait in the shared queue.
-export function assignHelper(ctx: Ctx, customerId: string, post: string): { out: Outgoing[]; helperName: string | null; waitLabel?: string | null; queued?: boolean } {
+// The customer needs `post`: they are told where to go and who is free, and
+// every free real employee of that post is told a customer is waiting. Nobody
+// is sent: the customer walks over and presses E.
+export function pointToHelper(ctx: Ctx, customerId: string, post: string): { out: Outgoing[]; helperName: string | null; waitLabel?: string | null; queued?: boolean } {
   if (!scriptFor(post)) return { out: [], helperName: null };
   const spot = waitSpotFor(post);
-  const existing = ctx.db.prepare("SELECT staff_id FROM intents WHERE customer_id = ? AND reason = 'help' AND status IN ('held','queued','open') LIMIT 1").get(customerId) as { staff_id: string } | undefined;
-  if (existing) return { out: [], helperName: nameOf(ctx, existing.staff_id), waitLabel: spot?.label ?? null };
   const helper = pickHelper(ctx, post);
   if (!helper) {
     log(ctx, customerId, "help_queued", { post });
     return { out: [], helperName: null, waitLabel: spot?.label ?? null, queued: true };
   }
-  // an NPC sent for you does not appear at once: you are told to wait near the
-  // area, and they come when you are there. A person walks themselves (a mission).
-  const hold = helper.kind === "npc" ? spot : null;
-  const out = showIntent(ctx, { fromId: helper.id, customerId, staffId: helper.id, staffKind: helper.kind, reason: "help", ...(hold ? { hold } : {}), ...(!hold && spot ? { hint: spot } : {}) });
-  // a real user is told straight away: this is their customer
-  if (helper.kind === "visitor") out.push(notice(helper.id, `New customer: ${nameOf(ctx, customerId)} is waiting${spot ? ` near ${spot.label}` : ""}. Go and meet them.`));
+  const out: Outgoing[] = ctx.employees
+    .filter((e) => designationOfEmployee(e) === post && staffAvailable(ctx, e.id, "visitor"))
+    .map((e) => notice(e.id, `New customer: ${nameOf(ctx, customerId)} is waiting${spot ? ` near ${spot.label}` : ""}. Go and meet them.`));
   return { out, helperName: nameOf(ctx, helper.id), waitLabel: spot?.label ?? null };
 }
 
@@ -1295,8 +1160,8 @@ const payTurn = (c: Checkout): TalkTurn => ({
 // The chat that makes the sale ends. A stock runner (always an NPC) brings the
 // phone out in a bag with the logo and finds the specialist wherever they are,
 // waves, and hands it over (a real specialist presses E; an NPC accepts after a
-// beat). The specialist then finds the customer, shows intent, and the customer
-// accepts: a short payment conversation. Everyone is free to roam meanwhile.
+// beat). The specialist then finds the customer, and a short payment
+// conversation opens when they get there. Everyone is free to roam meanwhile.
 // Nothing is a timer: each step is settled by whichever request arrives next.
 
 interface OrderRow {
@@ -1436,7 +1301,7 @@ function handOverBag(ctx: Ctx, o: OrderRow): Outgoing[] {
     out.push(notice(o.spec_id, `${nameOf(ctx, o.stock_id)}: "Here you go, ${nameOf(ctx, o.customer_id)}'s ${what}, in the bag."  You: "Thanks, I'll take it over."`));
     out.push({ to: o.spec_id, message: { type: "update", text: `You have ${nameOf(ctx, o.customer_id)}'s ${what}: find them to take payment.` } });
   }
-  out.push(...showIntent(ctx, { fromId: o.spec_id, customerId: o.customer_id, staffId: o.spec_id, staffKind: o.spec_kind, reason: "pay" }));
+  out.push(...sendForPayment(ctx, { customerId: o.customer_id, staffId: o.spec_id, staffKind: o.spec_kind }));
   return out;
 }
 
@@ -1491,7 +1356,7 @@ function settleOrders(ctx: Ctx): Outgoing[] {
   return out;
 }
 
-// The customer has accepted the specialist's intent to take payment: a short
+// The specialist has got to the customer to take payment: a short
 // payment conversation opens (the sale itself was settled in the first chat).
 function openPay(ctx: Ctx, r: IntentRow): Outgoing[] {
   const o = ctx.db.prepare("SELECT * FROM orders WHERE customer_id = ? AND spec_id = ? AND stage = 'with_spec' LIMIT 1").get(r.customer_id, r.staff_id) as OrderRow | undefined;
@@ -1535,7 +1400,7 @@ function transferOrders(ctx: Ctx, leaverId: string, npcId: string, at: { x: numb
       out.push({ to: "all", message: { type: "engaged", ...next } });
     } else {
       // it has the bag: it goes to the customer, from where the specialist stood
-      out.push(...showIntent(ctx, { fromId: npcId, customerId: o.customer_id, staffId: npcId, staffKind: "npc", reason: "pay", from: at }));
+      out.push(...sendForPayment(ctx, { customerId: o.customer_id, staffId: npcId, staffKind: "npc", from: at }));
     }
   }
   return out;
@@ -1851,31 +1716,31 @@ export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
 }
 
 // A customer who hasn't asked for anything yet (just arrived, or browsing)
-// gets approached by the greeter once, as soon as they stand just inside the entrance (if the greeter is busy they wait their turn) —
-// so the first contact in the store doesn't depend on the visitor pressing E
-// first (Ritesh, 2026-10-12, "the biggest thing"). Only the greeter: every
-// other role waits to be asked, which matches a real store (a specialist
-// doesn't stalk the floor; the greeter is the one who says hello).
+// gets greeted once, as soon as they stand just inside the entrance and the
+// greeter is free: she walks up and the conversation opens at once, first come
+// first served. If she is busy, or they have walked past the entrance zone,
+// nobody waits for her: it is up to the customer to press E. Only the greeter
+// does this: every other role waits to be asked, which matches a real store
+// (a specialist doesn't stalk the floor; the greeter is the one who says hello).
 export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
   if (!st || (st.state !== "arriving" && st.state !== "browsing") || st.with_id) return [];
   // greeted already on THIS visit (the same person coming back another day is greeted again)
   const visitStart = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { t: number | null }).t ?? 0;
-  const greeted =
-    ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1' AND started_at >= ?").get(customerId, visitStart) ||
-    ctx.db.prepare("SELECT 1 FROM intents WHERE customer_id = ? AND staff_id = 'greeter-1' AND created_at >= ?").get(customerId, visitStart);
-  if (greeted) return []; // asked or approached before: up to the customer now
+  if (ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1' AND started_at >= ?").get(customerId, visitStart)) return [];
   if (offDuty(ctx).includes("greeter-1")) return [];
   const greeter = NPCS.find((n) => n.id === "greeter-1");
-  if (!greeter) return [];
-  const pose = npcPose(greeter, ctx.now);
-  if (!pose.present) return [];
+  if (!greeter || !npcPose(greeter, ctx.now).present) return [];
   // only someone standing just inside the entrance
   const here = ctx.position(customerId);
   if (!here || here.x < ENTRANCE_ZONE.minX || here.x > ENTRANCE_ZONE.maxX || here.z < ENTRANCE_ZONE.minZ || here.z > ENTRANCE_ZONE.maxZ) return [];
-  if (!scriptFor("greeter")) return [];
+  const script = scriptFor("greeter");
+  if (!script || !customerFree(ctx, customerId)) return [];
+  if (staffBusy(ctx, "greeter-1", "npc")) return []; // someone else has her
+  // a customer still outside the entrance (where they arrive) is met just inside the door, not out on the walkway
+  const at = here.z < FLOOR.minZ + 0.8 ? { x: Math.max(-1, Math.min(1, here.x)), z: FLOOR.minZ + 1.2 } : here;
   log(ctx, customerId, "npc_approached", { npcId: "greeter-1" });
-  return showIntent(ctx, { fromId: "greeter-1", customerId, staffId: "greeter-1", staffKind: "npc", reason: "greet" });
+  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", script, at)];
 }
 
 // ---- taking turns ----
@@ -1920,7 +1785,7 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
       log(ctx, row.customer_id, "state", { state: to, want: e.want ?? null, needs: e.needs ?? null });
     } else if (e.type === "request_help") {
       log(ctx, row.customer_id, "help_requested", { needs: e.needs });
-      const a = assignHelper(ctx, row.customer_id, e.needs);
+      const a = pointToHelper(ctx, row.customer_id, e.needs);
       out.push(...a.out);
       if (a.helperName || a.queued) helper = `${a.helperName ?? ""}|${a.waitLabel ?? ""}`;
     }
@@ -1930,15 +1795,15 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
   const next: ConvData = { ...data, conv: r.state, awaiting: "customer", pending: undefined };
   saveConv(ctx, row, next, r.turn.ended);
   const [helperName, waitLabel] = (helper ?? "").split("|");
-  // nobody named when everyone is taken: whoever is free first will come
+  // nobody sends for them: they are told where to go, and who is free if anyone is
   const say = helper !== null
     ? helperName
       ? waitLabel
-        ? `Of course. Wait near ${waitLabel} and ${helperName} will come and find you.`
-        : `Of course. ${helperName} will come and find you. Have a look around while you wait.`
+        ? `Of course. Head over to ${waitLabel}: ${helperName} will look after you.`
+        : `Of course. ${helperName} will look after you. Have a look around and say hello.`
       : waitLabel
-        ? `Of course. Wait near ${waitLabel} and someone will come and get you as soon as they're free.`
-        : "Of course. Someone will come and get you as soon as they're free. Have a look around while you wait."
+        ? `Of course. Head over to ${waitLabel} and ask whoever is free.`
+        : "Of course. Have a look around and ask whoever is free."
     : r.turn.say;
   out.push({ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, r.turn.choices, r.turn.ended, "customer") } });
   if (r.turn.ended) {
@@ -1985,9 +1850,8 @@ function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
   const sm = stateMessage(ctx, row.customer_id);
   if (sm) out.push(sm);
   if (row.with_kind === "visitor") {
-    // a real specialist is free again: told, and the longest-waiting customer is theirs
+    // a real specialist is free again: told
     out.push({ to: row.with_id, message: { type: "staff_menu_end", conversationId: row.id, note: scene.ended?.how === "bought" ? (orderOfCustomer(ctx.db, row.customer_id)?.stage === "fetching" ? `Sale agreed: ${nameOf(ctx, row.customer_id)}'s phone is being brought out. Take the bag from the stock person, then find them to take payment.` : "Sale complete.") : "That conversation is over." } });
-    out.push(...assignWaiting(ctx));
   }
   out.push(staffViewMessage(ctx));
   return out;
@@ -2018,7 +1882,7 @@ export function closeTalk(ctx: Ctx, customerId: string): Outgoing[] {
   if (!row) return [];
   log(ctx, customerId, "conversation_closed", { conversationId: row.id });
   // the NPC is free again and whoever was waiting for it can come now
-  return [{ to: "all", message: { type: "released", npcId: row.with_id } }, ...settleIntents(ctx)];
+  return [{ to: "all", message: { type: "released", npcId: row.with_id } }, ...settleVisits(ctx)];
 }
 
 function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgoing[] {

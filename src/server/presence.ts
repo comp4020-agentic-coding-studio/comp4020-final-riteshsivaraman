@@ -30,11 +30,8 @@ import {
   closeTalk,
   staffMove,
   requestTalk,
-  acceptIntentById,
-  showIntentById,
-  settleIntents,
+  settleVisits,
   cancelEscort,
-  intentViews,
   seatedList,
   leaveStore,
   startInspect,
@@ -302,7 +299,6 @@ export function handleConnection(socket: WebSocket): void {
         chats: chatPairs(db),
         orders: orderViews(ctx),
         spawn: { x: me.x, z: me.z, ry: me.ry },
-        intents: intentViews(ctx),
         seated: seatedList(db),
       });
       broadcast({ type: "joined", visitor: present(me) }, me.id);
@@ -326,20 +322,12 @@ export function handleConnection(socket: WebSocket): void {
       deliver(chooseTurn(serviceCtx(), me.id, message.conversationId, message.choice));
       return;
     }
-    if (me && message.type === "intent_accept" && typeof message.intentId === "string") {
-      deliver(acceptIntentById(serviceCtx(), me.id, message.intentId));
-      return;
-    }
     if (me && message.type === "escort_cancel") {
       deliver(cancelEscort(serviceCtx(), me.id));
       return;
     }
-    if (me && message.type === "intent_show" && typeof message.intentId === "string") {
-      deliver(showIntentById(serviceCtx(), me.id, message.intentId));
-      return;
-    }
-    if (me && message.type === "intent_poll") {
-      deliver(settleIntents(serviceCtx()));
+    if (me && message.type === "settle") {
+      deliver(settleVisits(serviceCtx()));
       return;
     }
     if (me && message.type === "staff_move" && typeof message.conversationId === "string" && typeof message.actId === "string") {
@@ -412,7 +400,7 @@ export function handleConnection(socket: WebSocket): void {
       // a customer who hasn't been approached yet, checked on their own
       // movement rather than any timer (D32/D40)
       if (me.kind === "customer") deliver(tryGreeterApproach(serviceCtx(), me.id));
-      deliver(settleIntents(serviceCtx()));
+      deliver(settleVisits(serviceCtx()));
     }
   };
 

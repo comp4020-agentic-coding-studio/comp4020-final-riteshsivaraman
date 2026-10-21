@@ -2,7 +2,6 @@ import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { Vector3, type Group, type Object3D } from "three";
-import { IntentBadge } from "./IntentBadge.tsx";
 import { net } from "./net.ts";
 
 // A name floating over a head, only for people close enough to be worth
@@ -36,7 +35,6 @@ export function NameFloat({ id, name, npc, y }: { id: string; name: string; npc:
         <div ref={el} className={`name-float${npc ? "" : " player"}`}>
           <b>{name}</b>
           {npc && <i>NPC</i>}
-          <IntentBadge id={id} />
         </div>
       </Html>
     </group>
