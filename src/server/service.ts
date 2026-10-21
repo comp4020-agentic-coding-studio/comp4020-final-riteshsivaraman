@@ -1864,11 +1864,16 @@ function finishTalk(ctx: Ctx, row: ConvRow, scene: Scene): Outgoing[] {
 // the visitor's latest ended NPC conversation with no conversation_closed
 // event yet, so it survives a restart and needs no timer. Also run when the
 // visitor leaves the store or starts another talk, so an NPC is never stuck.
+const PENDING_CLOSE_MS = 5 * 60_000; // how long an NPC stays with someone who has not dismissed the last turn
 function pendingCloseWhere(ctx: Ctx, column: "customer_id" | "with_id", id: string): ConvRow | undefined {
   const row = ctx.db
     .prepare(`SELECT * FROM conversations WHERE ${column} = ? AND with_kind = 'npc' AND ended_at IS NOT NULL ORDER BY ended_at DESC, rowid DESC LIMIT 1`)
     .get(id) as ConvRow | undefined;
   if (!row) return undefined;
+  // only someone still here, and only for a while: a conversation nobody dismissed
+  // (an old row from before dismissing was recorded, or a visitor whose connection
+  // dropped) must never keep an NPC standing busy for good
+  if (!ctx.present.includes(row.customer_id) || ctx.now - (row.ended_at ?? 0) > PENDING_CLOSE_MS) return undefined;
   const closed = ctx.db
     .prepare("SELECT 1 FROM events WHERE visitor_id = ? AND type = 'conversation_closed' AND data LIKE ? LIMIT 1")
     .get(row.customer_id, `%"conversationId":"${row.id}"%`);

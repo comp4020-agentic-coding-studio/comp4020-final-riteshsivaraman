@@ -624,6 +624,23 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     expect(last(tryGreeterApproach(ctx(), "c2"), "c2", "turn")).toMatchObject({ withId: "greeter-1" });
   });
 
+  it("an old conversation nobody dismissed, from a customer long gone, does not keep her busy", () => {
+    // the live database held rows like this from before dismissing was recorded
+    db.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES ('ghost', 'tok-ghost', 'Ghost', '#fff', 0, 0)").run();
+    db.prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at, ended_at) VALUES ('old', 'ghost', 'greeter-1', 'npc', 'greeter', 'x', '{}', 1, 2)").run();
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    expect(last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
+  });
+
+  it("someone who stays on the last line past the limit no longer holds her", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    addVisitor("c2", "Biscuit", { x: 0.4, z: -8 });
+    tryGreeterApproach(ctx(), "c1");
+    leaveConversation(ctx(), "c1"); // never dismissed
+    expect(tryGreeterApproach(ctx(), "c2")).toEqual([]);
+    expect(last(tryGreeterApproach(ctx(NOW + 10 * 60_000), "c2"), "c2", "turn")).toMatchObject({ withId: "greeter-1" });
+  });
+
   it("someone who has walked past the entrance is not chased", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
     addVisitor("c2", "Biscuit", { x: 0.4, z: -8 });
