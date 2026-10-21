@@ -1,5 +1,6 @@
 import { afterEach, expect, inject, it } from "vitest";
 import WebSocket from "ws";
+import { NPCS, npcPose } from "../src/shared/npcs.ts";
 import type { ClientMessage, ServerMessage } from "../src/shared/protocol.ts";
 import type { Profile } from "../src/shared/profile.ts";
 
@@ -56,6 +57,15 @@ const join = async (profile?: Profile): Promise<{ v: Visitor; welcome: Extract<S
   const welcome = await v.join(profile);
   return { v, welcome };
 };
+// stand beside an NPC: where it is on the server's clock right now
+async function walkTo(v: Visitor, npcId: string): Promise<void> {
+  const p = npcPose(NPCS.find((n) => n.id === npcId)!, Date.now());
+  for (let i = 0; i < 3; i++) {
+    v.send({ type: "move", x: p.x + 1.1, z: p.z, ry: 0 });
+    await pause(60);
+  }
+}
+
 const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 it("greets the first customer at once, leaves the others free, and refuses E plainly while she is busy", async () => {
@@ -79,7 +89,8 @@ it("greets the first customer at once, leaves the others free, and refuses E pla
   // nobody is told anything is floating over them or waiting for them
   for (const v of customers) expect(v.messages.map((m) => m.type as string)).not.toContain("intent");
 
-  // Bo presses E at her while she is with Ann: told plainly, and not queued
+  // Bo walks up to her and presses E while she is with Ann: told plainly, and not queued
+  await walkTo(bo, "greeter-1");
   const mark = bo.mark();
   bo.send({ type: "talk_start", withId: "greeter-1" });
   const refused = (await bo.next((m) => m.type === "notice", 3000, mark)) as Extract<ServerMessage, { type: "notice" }>;
@@ -87,12 +98,12 @@ it("greets the first customer at once, leaves the others free, and refuses E pla
   await pause(1200);
   expect(bo.messages.slice(mark).some((m) => m.type === "turn")).toBe(false);
 
-  // Ann finishes and lets her go; Bo presses E and is greeted at once
+  // Ann finishes and lets her go; Bo is still just inside, so she greets him at once
   ann.send({ type: "talk_leave" });
   ann.send({ type: "talk_close" });
   await pause(200);
   const mark2 = bo.mark();
-  bo.send({ type: "talk_start", withId: "greeter-1" });
+  bo.send({ type: "move", x: 1.0, z: -8, ry: 0 });
   const second = (await bo.next((m) => m.type === "turn", 3000, mark2)) as Extract<ServerMessage, { type: "turn" }>;
   expect(second.withId).toBe("greeter-1");
-});
+}, 30_000);
