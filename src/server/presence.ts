@@ -26,6 +26,7 @@ import {
   rejoin,
   takeOrder,
   orderViews,
+  holdViews,
   leaveConversation,
   closeTalk,
   staffMove,
@@ -155,6 +156,7 @@ const staffViewFor = (ctx: Ctx): Outgoing[] => [{ to: "staff", message: { type: 
 // who is talking with whom, as last told to everyone: sent again only when it changes
 let lastChats = "[]";
 let lastOrders = "[]";
+let lastHolds = "[]";
 const lineCounts = new Map<string, { lines: number; since: number }>();
 
 function deliver(out: Outgoing[]): void {
@@ -173,6 +175,11 @@ function deliver(out: Outgoing[]): void {
   if (orders !== lastOrders) {
     lastOrders = orders;
     deliverAll([{ to: "all", message: { type: "orders", orders: JSON.parse(orders) } }]);
+  }
+  const holds = JSON.stringify(holdViews(serviceCtx()));
+  if (holds !== lastHolds) {
+    lastHolds = holds;
+    deliverAll([{ to: "all", message: { type: "holds", holds: JSON.parse(holds) } }]);
   }
   const pairs = JSON.stringify(stamped);
   if (pairs !== lastChats) {
@@ -303,6 +310,7 @@ export function handleConnection(socket: WebSocket): void {
         inspecting: inspections(db),
         chats: chatPairs(db),
         orders: orderViews(ctx),
+        holds: holdViews(ctx),
         spawn: { x: me.x, z: me.z, ry: me.ry },
         seated: seatedList(db),
       });
