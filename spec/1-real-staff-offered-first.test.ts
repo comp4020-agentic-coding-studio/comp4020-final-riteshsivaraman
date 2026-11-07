@@ -8,6 +8,9 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import type { ClientMessage, ServerMessage } from "../src/shared/protocol.ts";
 import type { Profile } from "../src/shared/profile.ts";
+import { migrate } from "../src/server/migrate.ts";
+import { seedStock } from "../src/server/stock.ts";
+import { catchUpOffers, customersView, enter, handOverPost, OFFER_MS, releaseClaimsOf, requestTalk, stateOf, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
 
 // Issue #1, SCOPE D47 and D48. Promise: given a waiting customer, a free real
 // staff user is offered the customer before any CPU, exactly one staff member
@@ -30,9 +33,15 @@ import type { Profile } from "../src/shared/profile.ts";
 //    claim row /claim|staff_approached/ (the second is what a staff E press
 //    already writes today), a CPU takeover row /npc_approached|npc_claimed|takeover/.
 //    Each must name the staff member (or NPC) and the customer.
-// Not covered here: criterion 6 (a claim released on disconnect: it interacts
-// with the existing stand-in handover, which the issue does not reconcile) and
-// criterion 8 (no timers: a static property, left to review).
+// Criterion 6 (a claim released on disconnect) and the pass-on to the next
+// nearest (criterion 3) are pinned at the bottom against the store service
+// with an in-memory database and a fake clock, as spec/service.test.ts does:
+// a real 15 s wait per step would make them slow, and the release needs
+// every NPC of the post busy, which the live store's timetable cannot be made
+// to arrange. Criterion 6 follows Ritesh's ruling (2026-11-07, option A): an
+// NPC of the post carries a conversation on if one is free (`handOverPost`),
+// and only when none is the customer goes back on the waiting list.
+// Criterion 8 (no timers) is a static property, left to review.
 
 const OFFER_WINDOW_MS = 15_000; // D48
 let child: ChildProcess;
@@ -266,4 +275,147 @@ describe("a CPU takes a customer only after the 15 s window with no real claim",
     expect(turn.withId).toBe("greeter-1");
     expect(eventsNaming(TAKEOVER, "greeter-1", ann.id).length, "the takeover wrote no events row naming the greeter and Ann").toBeGreaterThanOrEqual(1);
   }, 40_000);
+});
+
+// ---- the same rules against the store service, on a fake clock ----
+
+describe("the offer passes on, and a released claim keeps its place (store service, fake clock)", () => {
+  const NOW = 1000; // 1 s into the day: staff are at their posts
+  let mem: Database.Database;
+  const positions = new Map<string, { x: number; z: number }>();
+  const employees: Employee[] = [];
+  const present: string[] = [];
+  const ctx = (now = NOW): Ctx => ({ db: mem, now, employees, present, position: (id) => positions.get(id) });
+  const fresh = (): void => {
+    mem = new Database(":memory:");
+    mem.pragma("foreign_keys = ON");
+    migrate(mem);
+    seedStock(mem);
+    positions.clear();
+    employees.length = 0;
+    present.length = 0;
+  };
+  afterEach(() => mem?.close());
+  const add = (id: string, at: { x: number; z: number }, kind: "customer" | "specialist" = "customer", specialty = "phones", joinedAt = NOW): void => {
+    mem.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES (?, ?, ?, '#fff', 0, 0)").run(id, `tok-${id}`, id);
+    positions.set(id, at);
+    present.push(id);
+    mem.prepare("INSERT INTO events (ts, visitor_id, type) VALUES (?, ?, 'join')").run(joinedAt, id);
+    enter(ctx(), id, { kind, specialty: kind === "customer" ? undefined : specialty });
+    if (kind !== "customer") employees.push({ id, name: id, kind, specialty: specialty as Employee["specialty"] });
+  };
+  const gone = (id: string): void => {
+    present.splice(present.indexOf(id), 1);
+    const i = employees.findIndex((e) => e.id === id);
+    if (i >= 0) employees.splice(i, 1);
+    positions.delete(id);
+  };
+  const waitedSince = (id: string, since: number): void => {
+    mem.prepare("UPDATE player_state SET since = ? WHERE visitor_id = ?").run(since, id);
+  };
+  const eventsOf = (id: string): Array<{ type: string; data: Record<string, unknown> }> =>
+    (mem.prepare("SELECT type, data FROM events WHERE visitor_id = ? ORDER BY id").all(id) as Array<{ type: string; data: string | null }>).map((r) => ({ type: r.type, data: JSON.parse(r.data ?? "{}") as Record<string, unknown> }));
+  const offeredTo = (customer: string): string | undefined => customersView(ctx()).find((c) => c.id === customer)?.offeredTo;
+  const turnTo = (out: Outgoing[], id: string): Extract<ServerMessage, { type: "turn" }> | undefined =>
+    out.filter((o) => o.to === id && o.message.type === "turn").map((o) => o.message as Extract<ServerMessage, { type: "turn" }>).at(-1);
+
+  it("after 15 s unclaimed, the next nearest real staff user is offered; after them too, the greeter takes the customer", () => {
+    fresh();
+    add("near", { x: 0, z: -6 }, "specialist");
+    add("far", { x: 0, z: 6 }, "specialist");
+    add("ann", { x: 0, z: -8 });
+    expect(turnTo(catchUpOffers(ctx(), "ann"), "ann"), "greeted while two real staff users were free").toBeUndefined();
+    expect(offeredTo("ann")).toBe("near");
+
+    // just inside the window nothing moves
+    catchUpOffers(ctx(NOW + OFFER_MS - 1), "ann");
+    expect(offeredTo("ann")).toBe("near");
+
+    // the window runs out: the farther one is offered, and the greeter still waits
+    expect(turnTo(catchUpOffers(ctx(NOW + OFFER_MS), "ann"), "ann")).toBeUndefined();
+    expect(offeredTo("ann")).toBe("far");
+    expect(eventsOf("ann").map((e) => e.type)).toEqual(expect.arrayContaining(["offer_made", "offer_expired"]));
+
+    // once they let it pass too, the CPU may take her; the takeover names who passed
+    expect(turnTo(catchUpOffers(ctx(NOW + 2 * OFFER_MS), "ann"), "ann")?.withId).toBe("greeter-1");
+    expect(eventsOf("ann").find((e) => e.type === "npc_approached")?.data).toMatchObject({ npcId: "greeter-1", passedOver: ["near", "far"] });
+  });
+
+  it("an offer is withdrawn when its staff user leaves, and the customer goes straight to the next nearest", () => {
+    fresh();
+    add("near", { x: 0, z: -6 }, "specialist");
+    add("far", { x: 0, z: 6 }, "specialist");
+    add("ann", { x: 0, z: -8 });
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("near");
+    gone("near");
+    catchUpOffers(ctx(NOW + 100));
+    expect(offeredTo("ann")).toBe("far");
+    expect(eventsOf("ann").find((e) => e.type === "offer_withdrawn")?.data).toMatchObject({ staffId: "near", why: "staff left" });
+  });
+
+  it("only staff whose E would open a conversation are offered (D54 read as a capability filter, not a skill match)", () => {
+    fresh();
+    add("audio", { x: 0, z: -6 }, "specialist", "audio"); // nearer, but has no conversation to open yet
+    add("phones", { x: 0, z: 6 }, "specialist", "phones");
+    add("ann", { x: 0, z: -8 });
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("phones");
+  });
+
+  it("two equally near: whoever became free first is offered (D53)", () => {
+    fresh();
+    add("later", { x: 1, z: -6 }, "specialist", "phones", NOW);
+    add("earlier", { x: -1, z: -6 }, "specialist", "phones", NOW - 500);
+    add("ann", { x: 0, z: -8 });
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("earlier");
+  });
+
+  it("the longest-waiting customer is offered first, one customer per free staff user", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("bo", { x: 0, z: -8 });
+    add("ann", { x: 0, z: -3 });
+    waitedSince("bo", NOW);
+    waitedSince("ann", NOW - 5000);
+    catchUpOffers(ctx(), "bo");
+    expect(offeredTo("ann")).toBe("sam");
+    expect(offeredTo("bo")).toBeUndefined();
+  });
+
+  it("a claim made by a staff user who then disconnects, with no NPC of the post free, is released and the customer keeps their place (criterion 6)", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -7 });
+    add("bo", { x: 2, z: -7 });
+    waitedSince("ann", NOW - 9000); // Ann has waited longest
+    waitedSince("bo", NOW - 1000);
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("sam");
+    expect(turnTo(requestTalk(ctx(NOW + 10), "sam", "ann"), "ann")?.withId).toBe("sam");
+    expect(eventsOf("ann").find((e) => e.type === "staff_approached")?.data).toMatchObject({ staffId: "sam", offer: "theirs" });
+    expect(stateOf(mem, "ann")?.state).toBe("in_conversation");
+
+    // every NPC phones specialist is busy elsewhere, so nobody can carry Sam's conversation on
+    for (const npc of ["spec-phones", "spec-phones-2"]) {
+      const cid = `busy-with-${npc}`;
+      mem.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES (?, ?, ?, '#fff', 0, 0)").run(cid, `tok-${cid}`, cid);
+      mem.prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, 'npc', 'phones', 'talk', '{}', ?)").run(`conv-${npc}`, cid, npc, NOW);
+    }
+    const t = NOW + 2000;
+    expect(handOverPost(ctx(t), "sam")).toEqual([]);
+    releaseClaimsOf(ctx(t), "sam");
+    gone("sam");
+    expect(stateOf(mem, "ann")?.state).toBe("arriving");
+    expect((mem.prepare("SELECT COUNT(*) AS n FROM conversations WHERE customer_id = 'ann' AND ended_at IS NULL").get() as { n: number }).n).toBe(0);
+    expect(eventsOf("ann").find((e) => e.type === "claim_released")?.data).toMatchObject({ staffId: "sam", waitingSince: NOW - 9000 });
+
+    // back at her original place: ahead of Bo (nearer to the newcomer, and on the list
+    // the whole time), so the next real staff user to come free is offered Ann
+    add("tia", { x: 2, z: -5 }, "specialist");
+    catchUpOffers(ctx(t + 10));
+    expect(offeredTo("ann")).toBe("tia");
+    expect(offeredTo("bo")).toBeUndefined();
+  });
 });
