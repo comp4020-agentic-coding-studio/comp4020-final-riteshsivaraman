@@ -57,7 +57,10 @@ It must run on a phone and on a laptop with two tabs open: aim for under about
 (most 256), no per-frame React state, animate with refs in `useFrame` only if
 the effect is worth it. Use `InstancedMesh` (see `BoxField` in `common.tsx`) or
 shared geometry and materials for anything repeated more than a dozen times.
-No post-processing, no real shadow maps. Soft blob shadows exist (`BlobShadow`).
+No post-processing. A real directional-light shadow map now exists (issue #12,
+`src/shared/sun.ts`'s pure `sunStateAt`, with an automatic low-quality fallback
+under frame-time pressure) alongside the existing soft blob shadows
+(`BlobShadow`); this updates the "no real shadow maps" line that predates #12.
 
 ## Who owns what (all under `src/client/src/`)
 
