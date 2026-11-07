@@ -67,14 +67,28 @@ const asMoment = (p: { x: number; z: number; ry: number; walking: boolean }, mod
   intent,
 });
 
-// Where an engaged NPC is at server time `nowMs`.
-export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Moment {
+// The walk an engagement makes: from where the NPC was, to where it stands.
+function walkOf(npcId: string, e: Engagement): { goal: Pt; path: { pts: Pt[]; secs: number }; still: boolean } {
   const start = e.from ? { x: e.from.x, z: e.from.z } : momentOf(npcId, e.since);
   const goal = e.lead ? { x: e.lead.x, z: e.lead.z } : servicePoint(start, e.at);
   const path = planPath({ x: start.x, z: start.z }, goal, "staff");
-  const t = Math.max(0, (nowMs - e.since) / 1000);
   // already standing where it is to stand (an NPC at the bar taking payment): no walk
-  const p = Math.hypot(goal.x - start.x, goal.z - start.z) < 0.01 || path.pts.length < 2 ? { x: goal.x, z: goal.z, ry: 0, walking: false } : along(path, t);
+  return { goal, path, still: Math.hypot(goal.x - start.x, goal.z - start.z) < 0.01 || path.pts.length < 2 };
+}
+
+// When an engaged NPC stops walking (server ms) and where it stands then. Lets
+// the server judge a walk at the moment it really ended, not whenever the next
+// request happens to arrive (issue #25).
+export function engagedArrival(npcId: string, e: Engagement): { at: number; x: number; z: number } {
+  const w = walkOf(npcId, e);
+  return { at: w.still ? e.since : e.since + w.path.secs * 1000, x: w.goal.x, z: w.goal.z };
+}
+
+// Where an engaged NPC is at server time `nowMs`.
+export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Moment {
+  const { goal, path, still } = walkOf(npcId, e);
+  const t = Math.max(0, (nowMs - e.since) / 1000);
+  const p = still ? { x: goal.x, z: goal.z, ry: 0, walking: false } : along(path, t);
   if (p.walking) return asMoment(p, "idle", "smile", "going over to help a visitor");
   if (e.lead) {
     // led the customer here: waiting at the spot, facing what they came to see

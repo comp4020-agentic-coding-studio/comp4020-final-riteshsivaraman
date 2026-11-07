@@ -15,7 +15,7 @@ import {
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
 import { FLOOR, type ChatPair, type CustomerView, type Engagement, type HoldView, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
-import { engagedMoment } from "../shared/engage.ts";
+import { engagedArrival, engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
@@ -1353,6 +1353,83 @@ export function takeOrder(ctx: Ctx, staffId: string): Outgoing[] {
   return [...handOverBag(ctx, o), staffViewMessage(ctx)];
 }
 
+// The runner is close enough to hand over when it stands within this of the specialist.
+const HANDOVER_RANGE = TALK_RANGE - 0.2;
+const MAX_RUNNER_LEGS = 32; // a bound on one catch-up, never reached in a normal chase
+
+// Where an NPC specialist was at server time `t`, which may be in the past: with
+// whoever it is serving now if that began by then, else where its day put it.
+function npcPlaceAt(ctx: Ctx, npcId: string, eng: Engagement | undefined, t: number): { x: number; z: number } {
+  if (eng && t >= eng.since) {
+    const m = engagedMoment(npcId, eng, t);
+    return { x: m.x, z: m.z };
+  }
+  const n = NPCS.find((x) => x.id === npcId);
+  const p = n ? npcPose(n, t) : { x: 0, z: 0 };
+  return { x: p.x, z: p.z };
+}
+
+// The runner chasing the specialist, caught up to ctx.now (issue #25). Each leg
+// is judged at the moment the runner really got to the end of it, not whenever
+// the next request happens to arrive: did it find the specialist there, and
+// was the specialist still there a beat later to take the bag? If not, the
+// next leg starts at that same moment, towards where the specialist was then.
+// So the result is a pure function of the order row and server time, the same
+// whether the server is asked every 500 ms or every 20 s (an NPC specialist
+// keeps to its own day meanwhile, D1). A real specialist's position is only
+// known now, so their legs start now and they take the bag with E (takeOrder).
+function catchUpRunner(ctx: Ctx, o: OrderRow): Outgoing[] {
+  const npc = o.spec_kind === "npc";
+  const specEng = npc ? engagements(ctx.db).find((e) => e.npcId === o.spec_id) : undefined;
+  const specAt = (t: number) => (npc ? npcPlaceAt(ctx, o.spec_id, specEng, t) : (ctx.position(o.spec_id) ?? { x: 0, z: 0 }));
+  const original = o.runner;
+  let eng = runnerOf(o);
+  let arrivedAt = o.arrived_at;
+  const legFrom = (t: number, here: { x: number; z: number }): void => {
+    eng = { ...eng, since: t, from: here, at: specAt(t) };
+    arrivedAt = null;
+  };
+  const save = (): Outgoing[] => {
+    const moved = JSON.stringify(eng) !== original;
+    if (moved || arrivedAt !== o.arrived_at) saveRunner(ctx, o, eng, arrivedAt);
+    return moved ? [{ to: "all", message: { type: "engaged", ...eng } }] : [];
+  };
+  for (let leg = 0; leg < MAX_RUNNER_LEGS; leg++) {
+    const end = engagedArrival(o.stock_id, eng);
+    if (end.at > ctx.now) break; // still on the way
+    const here = { x: end.x, z: end.z };
+    if (arrivedAt === null) {
+      const t = npc ? end.at : ctx.now;
+      // the specialist has moved on: the runner follows from where it stopped
+      if (dist(specAt(t), here) > HANDOVER_RANGE) {
+        legFrom(t, here);
+        if (!npc) break;
+        continue;
+      }
+      arrivedAt = t;
+    }
+    if (!npc) {
+      // a real one presses E; if they wander off first, the runner follows
+      if (dist(specAt(ctx.now), here) > HANDOVER_RANGE) legFrom(ctx.now, here);
+      break;
+    }
+    // an NPC specialist takes the bag a beat after the runner arrives, once they are free
+    const beat = arrivedAt + CHECKOUT_BEAT_MS;
+    if (beat > ctx.now) break;
+    if (staffBusy(ctx, o.spec_id, "npc")) {
+      // busy with someone else: wait, or follow if they have walked off to them
+      if (dist(specAt(ctx.now), here) > HANDOVER_RANGE) legFrom(ctx.now, here);
+      break;
+    }
+    if (dist(specAt(beat), here) > HANDOVER_RANGE) {
+      legFrom(beat, here);
+      continue;
+    }
+    return [...save(), ...handOverBag(ctx, o)];
+  }
+  return save();
+}
+
 // Whatever has become due for an order: called off if the customer has gone or
 // it has taken too long, the runner following the specialist, the hand-over.
 function settleOrders(ctx: Ctx): Outgoing[] {
@@ -1370,24 +1447,7 @@ function settleOrders(ctx: Ctx): Outgoing[] {
       out.push(...cancelOrder(ctx, o, "specialist_left"));
       continue;
     }
-    if (o.stage !== "fetching") continue;
-    const eng = runnerOf(o);
-    const specAt = placeOf(ctx, o.spec_id, o.spec_kind);
-    const m = engagedMoment(o.stock_id, eng, ctx.now);
-    // the specialist has moved on: the runner follows from where it is
-    if (!m.walking && dist(specAt, { x: m.x, z: m.z }) > TALK_RANGE - 0.2) {
-      const next: Engagement = { ...eng, since: ctx.now, from: { x: m.x, z: m.z }, at: specAt };
-      saveRunner(ctx, o, next, null);
-      out.push({ to: "all", message: { type: "engaged", ...next } });
-      continue;
-    }
-    if (m.walking) continue;
-    if (o.arrived_at === null) {
-      saveRunner(ctx, o, eng, ctx.now);
-      continue;
-    }
-    // an NPC specialist takes the bag a beat after the runner arrives, once they are free; a real one presses E
-    if (o.spec_kind === "npc" && ctx.now - o.arrived_at >= CHECKOUT_BEAT_MS && !staffBusy(ctx, o.spec_id, "npc")) out.push(...handOverBag(ctx, o));
+    if (o.stage === "fetching") out.push(...catchUpRunner(ctx, o));
   }
   return out;
 }
