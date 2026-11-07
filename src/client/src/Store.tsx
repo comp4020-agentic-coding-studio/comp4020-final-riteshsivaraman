@@ -327,6 +327,9 @@ function Player() {
           let nz = net.me.z - (gz / gd) * step;
           ({ x: nx, z: nz } = clampToWalkable(net.role, nx, nz));
           ({ x: nx, z: nz } = resolveCollisions(nx, nz, net.role));
+          // people are solid here too (issue #38): this was the one local
+          // movement path that skipped person-to-person collision.
+          ({ x: nx, z: nz } = avoidPeople(nx, nz, [...net.remotes.values()], net.serverNow(), engagedPlaces(net.engaged.values(), net.serverNow())));
           net.me.x = nx;
           net.me.z = nz;
         }
