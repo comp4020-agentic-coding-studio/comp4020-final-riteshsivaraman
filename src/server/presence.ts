@@ -34,10 +34,11 @@ import {
   cancelEscort,
   seatedList,
   leaveStore,
+  releaseClaimsOf,
+  catchUpOffers,
   startInspect,
   startTalk,
   stateOf,
-  tryGreeterApproach,
   type Ctx,
   type Employee,
   type Outgoing,
@@ -221,7 +222,9 @@ export function handleConnection(socket: WebSocket): void {
   const leave = (): void => {
     if (me && sessions.get(me.id)?.socket === socket) {
       const pre = serviceCtx(); // while they still count as here
-      const handed = [...handOverPost(pre, me.id), ...handOverCustomer(pre, me.id)];
+      // an NPC of their post carries on their conversation if one is free; if not, a
+      // customer they had claimed goes back on the waiting list where they stood (issue #1)
+      const handed = [...handOverPost(pre, me.id), ...releaseClaimsOf(pre, me.id), ...handOverCustomer(pre, me.id)];
       sessions.delete(me.id);
       touchVisitor.run(Date.now(), me.id);
       logEvent(me.id, "leave");
@@ -230,6 +233,8 @@ export function handleConnection(socket: WebSocket): void {
       // with it, and whatever they had put aside is given back
       deliver(handed);
       deliver(leaveStore(serviceCtx(), me.id));
+      // an offer to them, or of them, is withdrawn, and the customer is offered to the next nearest
+      deliver(catchUpOffers(serviceCtx()));
     }
   };
 
@@ -305,6 +310,8 @@ export function handleConnection(socket: WebSocket): void {
       // someone has come in: the posts held, and the customers employees see
       deliver([dutyMessage(ctx)]);
       deliver(staffViewFor(ctx));
+      // a real staff user who has just come in is offered whoever is waiting (D47)
+      deliver(catchUpOffers(serviceCtx()));
       return;
     }
 
@@ -327,6 +334,7 @@ export function handleConnection(socket: WebSocket): void {
       return;
     }
     if (me && message.type === "settle") {
+      deliver(catchUpOffers(serviceCtx()));
       deliver(settleVisits(serviceCtx()));
       return;
     }
@@ -397,9 +405,10 @@ export function handleConnection(socket: WebSocket): void {
         me.zone = zone;
       }
       broadcast({ type: "moved", id: me.id, x: me.x, z: me.z, ry: me.ry }, me.id);
-      // a customer who hasn't been approached yet, checked on their own
-      // movement rather than any timer (D32/D40)
-      if (me.kind === "customer") deliver(tryGreeterApproach(serviceCtx(), me.id));
+      // the offers to real staff users caught up (an expired 15 s window passes on), then a
+      // customer who hasn't been approached yet, checked on their own movement rather than
+      // any timer (D32/D40); the greeter only takes someone no real staff user is offered (D47)
+      deliver(catchUpOffers(serviceCtx(), me.kind === "customer" ? me.id : undefined));
       deliver(settleVisits(serviceCtx()));
     }
   };
