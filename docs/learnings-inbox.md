@@ -29,3 +29,10 @@ his words: "commit all of it logically, then push integration"
 lecture lesson: week 9, "reading: run several at once, writing: one worktree each" plus week 6, compound the harness. The point: the harness must be committed before parallel writers can use it.
 evidence: 9676dc0, e97c1ac, 5fbcb95, 1ca42c5, 8facadb on integration
 
+### 2026-11-07 A slow orchestrator needs a fast front door
+status: candidate
+what happened: After the orchestrator was designed to run on ultracode, Ritesh pointed out that talking to it directly every time would be slow, and that it may work better with prompts refined first. Added an `interface` agent (sonnet) as his default conversation partner, `/brief` and `.agents/inbox/` work orders, and `/status`; the orchestrator now runs in its own session and sends digests to the interface.
+his words: "i think we should have an interfacing agent which is the usual agent i would talk to, because if i try to talk with the orchestrator running ultracode everytime, it takes a lot of time for it to respond. Also, sometimes the orchestartor may work better with prompts that have been refined through the interface agent"
+lecture lesson: week 9, "two context windows" and matching model to task (Sonnet by default, the top model for the genuinely hard subtasks): the expensive agent should not be the one in the conversational loop (lessons-by-week.md week 9 lesson 1).
+evidence: files `.claude/agents/interface.md`, `.claude/skills/brief`, `.claude/skills/status`; uncommitted
+
