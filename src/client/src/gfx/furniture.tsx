@@ -308,7 +308,7 @@ export function Table({ box: t }: { box: TableSpec }) {
       <group position={[t.x, 0, t.z]}>
         <BlobShadow w={t.w + 0.9} d={t.d + 0.9} />
       </group>
-      <mesh geometry={geo} material={m.wood} />
+      <mesh geometry={geo} material={m.wood} castShadow receiveShadow />
       {bed && <WatchBed t={t} />}
       {items.map((it, i) => (
         <SlotDevice key={it.id} slotId={it.id}>
@@ -452,7 +452,7 @@ export function TableStool({ x, z }: { x: number; z: number }) {
   return (
     <group position={[x, 0, z]}>
       <BlobShadow w={0.6} d={0.6} />
-      <mesh geometry={tableStoolGeometry()} material={m.wood} />
+      <mesh geometry={tableStoolGeometry()} material={m.wood} castShadow receiveShadow />
     </group>
   );
 }

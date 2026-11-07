@@ -749,6 +749,9 @@ export function buildCharacter(
       : new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85 });
   const mesh = new SkinnedMesh(merged, material);
   mesh.frustumCulled = false;
+  // the one shadow caster per person (issue #12, AC2: "soft shadows on
+  // staff, customers and tables")
+  mesh.castShadow = true;
   mesh.add(root);
   const group = new Group();
   group.add(mesh);

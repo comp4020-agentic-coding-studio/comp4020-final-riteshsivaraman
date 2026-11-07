@@ -732,7 +732,7 @@ export function ShopShell() {
 
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[w, d]} />
         <meshStandardMaterial map={floor} roughness={0.3} metalness={0.1} />
       </mesh>
