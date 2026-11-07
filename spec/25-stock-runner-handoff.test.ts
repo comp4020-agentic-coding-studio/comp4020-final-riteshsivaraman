@@ -1,9 +1,10 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
+import { engagedMoment } from "../src/shared/engage.ts";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
-import type { ServerMessage } from "../src/shared/protocol.ts";
+import type { Engagement, ServerMessage } from "../src/shared/protocol.ts";
 import { migrate } from "../src/server/migrate.ts";
-import { chooseTurn, closeTalk, enter, ORDER_MS, settleVisits, startTalk, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
+import { chooseTurn, closeTalk, enter, ORDER_MS, settleVisits, startTalk, TALK_RANGE, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
 import { seedStock } from "../src/server/stock.ts";
 
 // Issue #25: "the stock runner never hands off the bag". Root cause (confirmed
@@ -46,7 +47,10 @@ function last<T extends ServerMessage["type"]>(out: Outgoing[], to: string, type
 // up an open order, not necessarily the client's own 500 ms poll rate), and
 // returns the order's final stage plus the full type trail of events logged
 // for the customer.
-function driveSale(startMs: number, tickMs: number): { stage: string | undefined; events: string[] } {
+// `gap` is the runner-to-specialist distance at the tick the bag changed hands
+// (null if it never did): where the runner is drawn, from its own engagement,
+// against where spec-phones' day puts it then (its chat has ended, nothing else engages it here).
+function driveSale(startMs: number, tickMs: number): { stage: string | undefined; events: string[]; gap: number | null } {
   const db = freshDb();
   const positions = new Map<string, { x: number; z: number }>();
   const employees: Employee[] = [];
@@ -76,12 +80,21 @@ function driveSale(startMs: number, tickMs: number): { stage: string | undefined
   const orderStage = (): string | undefined => (db.prepare("SELECT stage FROM orders ORDER BY created_at DESC").get() as { stage: string } | undefined)?.stage;
   let t = startMs + 1000 + tickMs;
   const end = startMs + ORDER_MS + 15_000; // give it a little past the timeout to let cancellation settle
+  let gap: number | null = null;
   for (; t < end; t += tickMs) {
     settleVisits(ctx(t));
-    if (orderStage() !== "fetching") break;
+    if (orderStage() !== "fetching") {
+      if (orderStage() !== "cancelled") {
+        const runner = JSON.parse((db.prepare("SELECT runner FROM orders").get() as { runner: string }).runner) as Engagement;
+        const r = engagedMoment(runner.npcId, runner, t);
+        const s = npcPose(spec, t);
+        gap = Math.hypot(r.x - s.x, r.z - s.z);
+      }
+      break;
+    }
   }
   const events = (db.prepare("SELECT type FROM events WHERE visitor_id = ? ORDER BY id").all(customer) as Array<{ type: string }>).map((e) => e.type);
-  return { stage: orderStage(), events };
+  return { stage: orderStage(), events, gap };
 }
 
 describe("S1 purchase flow: the stock runner hands off the bag despite the specialist moving on its own schedule (issue #25)", () => {
@@ -106,5 +119,21 @@ describe("S1 purchase flow: the stock runner hands off the bag despite the speci
     expect(stage).not.toBe("cancelled");
     expect(events).not.toContain("order_cancelled");
     expect(events).toContain("stock_handed_over");
+  });
+
+  it("the bag changes hands only where the runner has actually reached the specialist, at any time of day", () => {
+    // guards the opposite of the bug: a fix that hands over wherever the runner
+    // happens to stop, with the specialist long gone, passes both tests above.
+    // At a 500 ms catch-up the tick that notices the hand-over is within half a
+    // second of it, so the specialist cannot have walked far since. Start times
+    // span the whole 480 s day so some sales begin just before spec-phones
+    // walks off to another table.
+    const far: string[] = [];
+    for (let s = 0; s < 480_000; s += 15_000) {
+      if (!npcPose(NPCS.find((n) => n.id === "spec-phones")!, s).present) continue;
+      const { stage, gap } = driveSale(s, 500);
+      if (stage !== "with_spec" || gap === null || gap > TALK_RANGE) far.push(`start ${s / 1000}s: ${stage}, gap ${gap?.toFixed(2)} m`);
+    }
+    expect(far).toEqual([]);
   });
 });
