@@ -37,6 +37,10 @@ export interface CustomerView {
   sinceMs: number; // how long they have been in this state
   withName: string | null; // who is dealing with them now
   note: string | null; // a note left when they were handed on
+  // the real staff user this customer is being offered to (D48), and until
+  // when (server ms): what a marker over the customer is drawn from
+  offeredTo?: string;
+  offerUntil?: number;
 }
 
 // The menu a visitor is shown, and whose turn it is. `group` is optional and
