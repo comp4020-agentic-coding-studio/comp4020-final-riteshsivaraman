@@ -139,8 +139,11 @@ Protocol: `docs/workflow.md`. Binding rules:
 - **Only the orchestrator assigns; builders never self-claim.** One issue, one
   branch `agent/<n>-<slug>`, one worktree. No two issues sharing a hot spot
   (`touches:` labels; migrations are single lane).
-- **Agents message only the orchestrator**, and comment progress on their own
-  issue. Questions for Ritesh go in one batched digest (`/clarify`).
+- **Ritesh talks to the `interface` agent** (fast, sonnet), which refines his
+  requests into work orders (`/brief`, `.agents/inbox/`) for the slow ultracode
+  `orchestrator`. Worker agents message only the orchestrator and comment
+  progress on their own issue. Questions for Ritesh go in one batched digest
+  (`/clarify`).
 - **Spec first:** a failing check, red for the right reason, before the builder.
   Reviewer is a fresh, read-only context. Max 2 fix loops, then cut or split.
 - **PRs target `integration`.** Only Ritesh approves a promote to `main`

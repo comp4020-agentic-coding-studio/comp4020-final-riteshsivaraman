@@ -9,16 +9,21 @@ source: conversation of 2026-11-07; course weeks 5, 6, 9, 10; Claude Code docs o
 
 Deadline Mon 9 Nov 2026 12:00 AEDT. Feature freeze Sun 20:00. After the freeze: bug fixes, consistency sweep, bot stress, docs scaffolds only.
 
+## Two sessions
+- **Interface** (`claude --agent interface`, sonnet): the fast front door Ritesh chats with. Refines his requests into work orders (`/brief` into `.agents/inbox/`), runs scoping, clarification, status, quizzes and learning capture, and makes small doc edits itself.
+- **Orchestrator** (`claude --agent orchestrator`, then `/effort ultracode`, opus): slow, thorough, runs the waves. Reads the inbox first, sends digests and decision requests to the interface, not to Ritesh directly.
+- They talk by SendMessage between sessions (find with ListAgents) and by files and issues, so nothing is lost if one is not running.
+
 ## Ritesh's touchpoints (everything else is automated)
 1. Approve the issue batch. 2. Answer the clarification digest (batched). 3. Approve a promote of `integration` to `main` (only he merges to `main`; a push to `main` deploys to Fly). 4. Feel-check in batches. He also writes README.md and PROCESS.md prose himself.
 
 ## Roles (`.claude/agents/`)
-orchestrator (opus, ultracode; the main session) · scoper (opus) · triage (haiku) · researcher (haiku) · server-builder, client-builder, spec-writer (sonnet, worktree) · verifier (sonnet) · reviewer (opus, fresh) · integrator (sonnet, worktree) · steward (sonnet) · bot-tester (sonnet). Existing: event-log-reviewer, fiction-integrity-reviewer (reviewer sub-passes).
+interface (sonnet; his front door) · orchestrator (opus, ultracode; the wave runner) · scoper (opus) · triage (haiku) · researcher (haiku) · server-builder, client-builder, spec-writer (sonnet, worktree) · verifier (sonnet) · reviewer (opus, fresh) · integrator (sonnet, worktree) · steward (sonnet) · bot-tester (sonnet). Existing: event-log-reviewer, fiction-integrity-reviewer (reviewer sub-passes).
 
 Model by `size:` label: `l` or concurrency-sensitive = opus high builder; `s`/`m` = sonnet; labels, search, log reading = haiku.
 
 ## Communication
-- Agents message **only the orchestrator** (SendMessage to `main`). No builder to builder.
+- Worker agents message **only the orchestrator** (SendMessage to `main`). No builder to builder. The `interface` and the orchestrator message each other, and the interface alone talks to Ritesh by default.
 - Every agent also comments progress on its own issue or PR. The board is the record and the process evidence.
 - Builders never self-claim. The orchestrator assigns.
 - Questions for Ritesh are batched by `/clarify`; nothing blocks the rest of the wave.

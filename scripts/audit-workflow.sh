@@ -57,6 +57,12 @@ wl=$(git log -1 --format=%ct -- WORKLOG.md 2>/dev/null || echo 0); hd=$(git log 
 c=$(grep -c '^status: candidate' docs/learnings-inbox.md 2>/dev/null); c=${c:-0}
 [ "$c" -eq 0 ] && p PASS "no unreviewed learning candidates" || p WARN "$c learning candidate(s) waiting for /learn review"
 
+# 10b. work orders waiting for the orchestrator
+if ls .agents/inbox/*.md >/dev/null 2>&1; then
+  o=$(find .agents/inbox -maxdepth 1 -name '*.md' -mmin +30 | wc -l | tr -d ' ')
+  [ "$o" -eq 0 ] && p PASS "inbox has work orders, none older than 30 min" || p WARN "$o work order(s) unacknowledged for over 30 min: is the orchestrator session running?"
+else p PASS "inbox is empty"; fi
+
 # 11. budget log age
 if [ -f .agents/budget.log ]; then
   m=$(( ( $(date +%s) - $(stat -f %m .agents/budget.log 2>/dev/null || stat -c %Y .agents/budget.log) ) / 60 ))

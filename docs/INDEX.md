@@ -114,6 +114,7 @@ find every resource by reading this file, not by discovering it mid-task.
   stack gotchas instead).
 - `docs/workflow.md` — the parallel agent build protocol: roles, labels, branches, gates, spend, audits, learning capture. Agents read this; visual version at https://claude.ai/artifact/NmTRCMo31RSpr6SjFynpEu.
 - `.claude/agents/` and `.claude/skills/` — the 12 workflow agents (orchestrator, scoper, triage, researcher, server/client builders, spec-writer, verifier, reviewer, integrator, steward, bot-tester) and the skills they run (`/sprint`, `/audit-workflow`, `/learn`, `/promote`, ...).
+- `.agents/inbox/` — work orders from the `interface` agent to the `orchestrator` (`/brief`); processed ones move to `done/`. `.agents/drafts/` holds issue drafts from scoping.
 - `scripts/audit-workflow.sh` — deterministic workflow self-audit; results append to `.agents/audit.log`.
 - `docs/learnings-inbox.md` — learning candidates captured after each exchange, before they are promoted into `LEARNINGS.md`. `docs/digests/` holds overnight and wave digests.
 - `CUTS.md` — what got cut under deadline pressure and why. Entries so far
