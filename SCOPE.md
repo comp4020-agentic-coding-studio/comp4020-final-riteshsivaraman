@@ -364,9 +364,10 @@ repeated emissive ring). Each flagship is its own mini-project.
 
 **Keeping the door open for several stores (cheap now, costly to retrofit):**
 
-1. Anything about staff, stock, queue, appointments and events gets a
-   `store_id` from the first migration that creates it. Not added yet, since
-   those tables do not exist yet.
+1. Anything about staff, stock, the waiting list, appointments and events gets
+   a `store_id` from the first migration that creates it. Not added yet, since
+   those tables do not exist yet. (Wording matches D47: "waiting list" is the
+   internal unattended-customer list, not a visible queue.)
 2. A store's layout is data (a definition of floor, solids, zones, theme), not
    file-level constants. `world.ts` is the single Canberra definition today.
 3. Presence rooms are keyed by store; the capacity cap is per store.
