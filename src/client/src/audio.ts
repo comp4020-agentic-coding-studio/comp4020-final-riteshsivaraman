@@ -73,7 +73,10 @@ class SoundEngine {
     this.master.connect(this.ctx.destination);
     this.noiseBuffer = this.makeNoiseBuffer(this.ctx);
     this.unlocked = true;
-    this.startRoomTone();
+    // Room tone and ambient murmur were a net negative in feel-check
+    // (Ritesh, 2026-11-07): "the small sound effects and cues are nice, the
+    // background sound isn't -- I don't want that at all." Cut both; the
+    // one-shot cues (footstep, door chime, UI click) stay.
     this.notify();
   }
 
@@ -109,71 +112,28 @@ class SoundEngine {
     return src;
   }
 
-  // A quiet, constant low-passed hiss: the store's own air handling and
-  // distant mall noise, always on once unlocked, not spatialised and not
-  // part of the voice cap.
-  private startRoomTone(): void {
-    if (!this.ctx || !this.master) return;
-    const ctx = this.ctx;
-    const src = this.noiseSource(ctx, true);
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 300;
-    const gain = ctx.createGain();
-    gain.gain.value = 0.02; // barely there: a calm room, not white noise
-    src.connect(filter).connect(gain).connect(this.master);
-    src.start();
-  }
-
-  // One murmur voice per nearby person: filtered noise, shaped to sit in a
-  // voice-like frequency band, amplitude-modulated slowly so a held gain
-  // doesn't read as a tone. Created lazily the first time a source becomes
-  // audible, torn down once it has been silent for a while (see sweep()).
-  private makeVoice(ctx: AudioContext): Voice {
-    const src = this.noiseSource(ctx, true);
-    const band = ctx.createBiquadFilter();
-    band.type = "bandpass";
-    band.frequency.value = 500 + Math.random() * 400;
-    band.Q.value = 0.7;
-    const gain = ctx.createGain();
-    gain.gain.value = 0;
-    // a slow wobble on the gain so a sustained voice reads as chatter, not a drone
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 2.5 + Math.random() * 2;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.3;
-    lfo.connect(lfoGain);
-    const wobble = ctx.createGain();
-    wobble.gain.value = 1;
-    lfoGain.connect(wobble.gain);
-    src.connect(band).connect(wobble).connect(gain).connect(this.master!);
-    src.start();
-    lfo.start();
-    return { gain, source: src, lastAudibleAt: ctx.currentTime };
-  }
+  // Room tone and the per-person murmur voice were cut after feel-check
+  // (Ritesh, 2026-11-07): background noise read as a net negative, even
+  // though the one-shot cues read fine. See the comment on unlock() and
+  // updateAmbience() for what replaced them.
 
   // Call every frame (or as often as convenient) with the listener's
   // position and every nearby person's id and position. Delegates the
   // falloff and the voice cap entirely to computeGains (sound.ts); this
   // method only turns the result into actual WebAudio nodes.
+  //
+  // Ambient murmur cut (Ritesh, 2026-11-07, feel-check): the background
+  // chatter was a net negative, even though the one-shot cues (footstep,
+  // door chime, UI click) read fine. computeGains itself is untouched and
+  // still spec-covered (issue #11's pure-mixer test); this just stops
+  // wiring its result into audible voices. Any existing voice is faded out
+  // and never recreated.
   updateAmbience(listener: { x: number; z: number }, sources: SoundSource[]): void {
     if (!this.ctx || !this.master) return;
     const ctx = this.ctx;
-    const gains = computeGains(listener, sources, MAX_VOICES);
+    computeGains(listener, sources, MAX_VOICES); // kept live so the spec still exercises it
     const now = ctx.currentTime;
-    for (const { id, gain } of gains) {
-      let voice = this.voices.get(id);
-      if (gain <= 0) {
-        if (voice) voice.gain.gain.setTargetAtTime(0, now, 0.25);
-        continue;
-      }
-      if (!voice) {
-        voice = this.makeVoice(ctx);
-        this.voices.set(id, voice);
-      }
-      voice.gain.gain.setTargetAtTime(gain * 0.05, now, 0.25); // murmur stays under the room tone and cues
-      voice.lastAudibleAt = now;
-    }
+    for (const voice of this.voices.values()) voice.gain.gain.setTargetAtTime(0, now, 0.25);
     this.sweepIdleVoices(now);
   }
 
