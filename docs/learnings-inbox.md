@@ -22,3 +22,10 @@ his words: "Do the five-minute worktree and ultracode test first? ... yes" (answ
 lecture lesson: week 9, worktrees: "two subagents editing one checkout overwrite each other; a git worktree gives each its own checkout" (lessons-by-week.md week 9 lesson 1).
 evidence: test agent branch worktree-agent-aac38dc44f3220548 (no commits)
 
+### 2026-11-07 Branch policy: commit harness work on integration, keep main untouched
+status: candidate
+what happened: Ritesh asked to commit everything logically and push integration. Committing on `integration` (not `main`) kept the deploying branch untouched while making the harness visible to builders, who now merge `origin/integration`. Five commits, no attribution lines, per his rule over the default. Pushed `integration` only, with his explicit yes.
+his words: "commit all of it logically, then push integration"
+lecture lesson: week 9, "reading: run several at once, writing: one worktree each" plus week 6, compound the harness. The point: the harness must be committed before parallel writers can use it.
+evidence: 9676dc0, e97c1ac, 5fbcb95, 1ca42c5, 8facadb on integration
+
