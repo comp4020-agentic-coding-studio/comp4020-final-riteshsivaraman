@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   begin,
   canMove,
@@ -14,16 +14,16 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
-import { FLOOR, type ChatPair, type CustomerView, type Engagement, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
-import { engagedMoment } from "../shared/engage.ts";
+import { FLOOR, type ChatPair, type CustomerView, type Engagement, type HoldView, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
+import { engagedArrival, engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
 import { TABLE_ASSIGNMENTS } from "../shared/assignments.ts";
-import { ENTRANCE_ZONE, clampToWalkable, COUNTER } from "../shared/world.ts";
-import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
+import { ENTRANCE_ZONE, clampToWalkable, COUNTER, zoneOf } from "../shared/world.ts";
+import { CAST, castOf, CYCLE, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
-import { takeOne } from "./stock.ts";
+import { stockOf, takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
 import { advanceStaff, beginHumanTalk, payScene, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, standInAnswer, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import type { Scene } from "../shared/talk/types.ts";
@@ -105,6 +105,15 @@ function setState(ctx: Ctx, id: string, patch: StatePatch): void {
   const state = patch.state ?? cur?.state ?? "arriving";
   const since = cur && cur.state === state ? cur.since : ctx.now;
   const data = cur?.data ? (JSON.parse(cur.data) as Record<string, unknown>) : {};
+  // a new state is a new wait: who already let an offer of them pass, the claim
+  // that put them in a conversation and the place they held on the waiting list
+  // belong to the old one. A live offer is not dropped here: settleOffers
+  // withdraws it, so the withdrawal is logged.
+  if (cur && cur.state !== state) {
+    delete data.offered;
+    delete data.claim;
+    delete data.waitingSince;
+  }
   if (patch.note !== undefined) {
     if (patch.note === null) delete data.note;
     else data.note = patch.note;
@@ -363,9 +372,15 @@ export function customersView(ctx: Ctx): CustomerView[] {
       sinceMs: Math.max(0, ctx.now - r.since),
       withName: r.with_id ? nameOf(ctx, r.with_id) : null,
       note: r.data ? ((JSON.parse(r.data) as { note?: string }).note ?? null) : null,
+      ...offerView(r.data),
     }))
     .sort((a, b) => b.sinceMs - a.sinceMs);
 }
+
+const offerView = (data: string | null): { offeredTo?: string; offerUntil?: number } => {
+  const o = data ? (JSON.parse(data) as { offer?: { to: string; at: number } }).offer : undefined;
+  return o ? { offeredTo: o.to, offerUntil: o.at + OFFER_MS } : {};
+};
 
 const staffViewMessage = (ctx: Ctx): Outgoing => ({ to: "staff", message: { type: "staff_view", customers: customersView(ctx) } });
 const notice = (to: string, text: string): Outgoing => ({ to, message: { type: "notice", text } });
@@ -380,7 +395,10 @@ const stateMessage = (ctx: Ctx, id: string): Outgoing | null => {
 // they left half done is cleaned up first, so they are never stuck behind "finish what you
 // are doing first" for a chat nobody can see any more, then their visit begins afresh.
 export function rejoin(ctx: Ctx, visitorId: string, profile: { kind: string; specialty?: string; look?: unknown }, name?: string): Outgoing[] {
-  const out = [...retireStandIn(ctx, visitorId), ...leaveStore(ctx, visitorId)];
+  // a staff user coming back (a reconnect, or the server restarted under them) with a
+  // customer they had claimed still open: that customer goes back on the waiting list
+  // at their place, as when they leave (issue #1 criterion 6), not out to browsing
+  const out = [...releaseClaimsOf(ctx, visitorId), ...retireStandIn(ctx, visitorId), ...leaveStore(ctx, visitorId)];
   enter(ctx, visitorId, profile, name);
   return out;
 }
@@ -512,6 +530,7 @@ export function handOverPost(ctx: Ctx, leaverId: string): Outgoing[] {
 
 export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
   const out: Outgoing[] = [];
+  withdrawOfferOf(ctx, visitorId, "customer left");
   const open = openConversationOf(ctx.db, visitorId);
   const carriedOn = open && isTalkData(anyDataOf(open)) && !!(anyDataOf(open) as TalkConvData).standIn; // an NPC is already standing in
   if (open && !carriedOn) out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left"));
@@ -588,7 +607,8 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
   if ("fail" in r) return [...putDown, ...r.fail];
   // busy: in a conversation, still standing with someone on their last turn, walking someone somewhere, or on their way to take payment
   if (staffBusy(ctx, withId, r.ok.withKind)) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} is with someone else. Please wait a moment.`)];
-  return [...putDown, ...open(ctx, customerId, withId, r.ok.withKind, r.ok.script, r.ok.here)];
+  // a real staff user being offered this customer is told the offer is off
+  return [...putDown, ...open(ctx, customerId, withId, r.ok.withKind, r.ok.script, r.ok.here), ...settleOffers(ctx)];
 }
 
 // Script "phones" against an NPC uses the new talk engine; everything else
@@ -821,9 +841,26 @@ function staffTalk(ctx: Ctx, staffId: string, customerId: string): Outgoing[] {
   const spos = ctx.position(staffId);
   if (!cpos || !spos || dist(cpos, spos) > TALK_RANGE) return [notice(staffId, "Walk a little closer first.")];
   if (!customerFree(ctx, customerId)) return [notice(staffId, `${nameOf(ctx, customerId)} is busy right now.`)];
-  const putDown = endInspect(ctx, customerId, "an employee started a conversation");
-  log(ctx, customerId, "staff_approached", { staffId });
-  return [...putDown, ...open(ctx, customerId, staffId, "visitor", script, cpos)];
+  // the claim (D48): single-threaded, so the check above and the open below
+  // cannot interleave with another E press; whoever comes second finds the
+  // customer busy. Any free real staff user may claim, offered or not: the
+  // offer only decides who is told, and holds the CPUs back.
+  const before = st;
+  const offer = offerData(before).offer;
+  // one transaction: the conversation, the claim and their rows land together or
+  // not at all, so a throw midway never leaves a conversation no release can find
+  const { putDown, opened } = ctx.db.transaction(() => {
+    log(ctx, customerId, "staff_approached", { staffId, offer: offer ? (offer.to === staffId ? "theirs" : "another's") : "none", ...(offer && offer.to !== staffId ? { offeredTo: offer.to } : {}) });
+    // a rival's offer ends with its own row, so the offer lifecycle reads whole by type
+    if (offer && offer.to !== staffId) log(ctx, customerId, "offer_withdrawn", { staffId: offer.to, why: "claimed by another", by: staffId });
+    const putDown = endInspect(ctx, customerId, "an employee started a conversation");
+    const opened = open(ctx, customerId, staffId, "visitor", script, cpos);
+    recordClaim(ctx, customerId, staffId, before);
+    return { putDown, opened };
+  })();
+  // someone else who was being offered this customer is told it is taken
+  const told = offer && offer.to !== staffId ? [notice(offer.to, `${nameOf(ctx, customerId)} is being looked after by ${nameOf(ctx, staffId)}.`)] : [];
+  return [...putDown, ...opened, ...told, ...settleOffers(ctx)];
 }
 
 // Someone left the store: any payment visit they were part of is cancelled.
@@ -1206,12 +1243,45 @@ export function orderViews(ctx: Ctx): OrderView[] {
   });
 }
 
+// Every unit currently held (reservations, status 'held', not yet expired at
+// ctx.now), for everyone to see (issue #3): who holds it, the reservation's
+// own `expires_at` (never a relative countdown — a client computes its own
+// time-left from this absolute server time) and how many of that exact SKU
+// are still on the shelf. Read-only: showing a hold is not a state change, so
+// this writes no `events` row (CLAUDE.md); appearance and clearance are read
+// off the `reserved` / `reservation_expired` / `reservation_released` / sale
+// events that already exist.
+export function holdViews(ctx: Ctx): HoldView[] {
+  const rows = ctx.db
+    .prepare("SELECT visitor_id, product, colour, storage, expires_at FROM reservations WHERE status = 'held' AND expires_at > ? ORDER BY created_at, rowid")
+    .all(ctx.now) as Array<{ visitor_id: string; product: string; colour: string; storage: string; expires_at: number }>;
+  return rows.map((r) => ({
+    product: r.product,
+    colour: r.colour,
+    storage: r.storage,
+    holderId: r.visitor_id,
+    holderName: nameOf(ctx, r.visitor_id),
+    expiresAt: r.expires_at,
+    free: stockOf(ctx.db, r.product, r.colour, r.storage),
+  }));
+}
+
 // Where someone is right now: a real user where they stand; an NPC where it is
 // drawn (with a visitor, or at its place in the day).
 function placeOf(ctx: Ctx, id: string, kind: "npc" | "visitor"): { x: number; z: number } {
   if (kind === "visitor") return ctx.position(id) ?? { x: 0, z: 0 };
   const eng = engagements(ctx.db).find((e) => e.npcId === id);
   return npcPlace(ctx, eng, id);
+}
+
+// Who holds the one unit of this SKU right now, for the "on hold for <name>"
+// line told to a customer who just lost the race for it (issue #3): the truth,
+// read off the reservation itself, not an invented "someone else".
+function holderNameOf(ctx: Ctx, product: string, colour: string, storage: string): string | null {
+  const row = ctx.db
+    .prepare("SELECT visitor_id FROM reservations WHERE product = ? AND colour = ? AND storage = ? AND status = 'held' AND expires_at > ? ORDER BY created_at DESC LIMIT 1")
+    .get(product, colour, storage, ctx.now) as { visitor_id: string } | undefined;
+  return row ? nameOf(ctx, row.visitor_id) : null;
 }
 
 // Turns the engine's "yes" into an order: the unit is held for them, a runner is
@@ -1228,7 +1298,10 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
       log(ctx, row.customer_id, "reserve_lost", { product, colour: sku.colour });
       const scene: Scene = { ...d.scene, ended: { how: "left", why: "sold out" } };
       saveTalkData(ctx, row, { ...d, scene });
-      const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
+      const holder = holderNameOf(ctx, product, sku.colour, sku.storage);
+      const sorry = holder
+        ? `Sorry, I've just checked and the ${sku.colour} ${sale.name} is on hold for ${holder}.`
+        : `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
       return [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sorry, [], true, "customer") } }, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
     }
     ctx.db
@@ -1317,6 +1390,83 @@ export function takeOrder(ctx: Ctx, staffId: string): Outgoing[] {
   return [...handOverBag(ctx, o), staffViewMessage(ctx)];
 }
 
+// The runner is close enough to hand over when it stands within this of the specialist.
+const HANDOVER_RANGE = TALK_RANGE - 0.2;
+const MAX_RUNNER_LEGS = 32; // a bound on one catch-up, never reached in a normal chase
+
+// Where an NPC specialist was at server time `t`, which may be in the past: with
+// whoever it is serving now if that began by then, else where its day put it.
+function npcPlaceAt(ctx: Ctx, npcId: string, eng: Engagement | undefined, t: number): { x: number; z: number } {
+  if (eng && t >= eng.since) {
+    const m = engagedMoment(npcId, eng, t);
+    return { x: m.x, z: m.z };
+  }
+  const n = NPCS.find((x) => x.id === npcId);
+  const p = n ? npcPose(n, t) : { x: 0, z: 0 };
+  return { x: p.x, z: p.z };
+}
+
+// The runner chasing the specialist, caught up to ctx.now (issue #25). Each leg
+// is judged at the moment the runner really got to the end of it, not whenever
+// the next request happens to arrive: did it find the specialist there, and
+// was the specialist still there a beat later to take the bag? If not, the
+// next leg starts at that same moment, towards where the specialist was then.
+// So the result is a pure function of the order row and server time, the same
+// whether the server is asked every 500 ms or every 20 s (an NPC specialist
+// keeps to its own day meanwhile, D1). A real specialist's position is only
+// known now, so their legs start now and they take the bag with E (takeOrder).
+function catchUpRunner(ctx: Ctx, o: OrderRow): Outgoing[] {
+  const npc = o.spec_kind === "npc";
+  const specEng = npc ? engagements(ctx.db).find((e) => e.npcId === o.spec_id) : undefined;
+  const specAt = (t: number) => (npc ? npcPlaceAt(ctx, o.spec_id, specEng, t) : (ctx.position(o.spec_id) ?? { x: 0, z: 0 }));
+  const original = o.runner;
+  let eng = runnerOf(o);
+  let arrivedAt = o.arrived_at;
+  const legFrom = (t: number, here: { x: number; z: number }): void => {
+    eng = { ...eng, since: t, from: here, at: specAt(t) };
+    arrivedAt = null;
+  };
+  const save = (): Outgoing[] => {
+    const moved = JSON.stringify(eng) !== original;
+    if (moved || arrivedAt !== o.arrived_at) saveRunner(ctx, o, eng, arrivedAt);
+    return moved ? [{ to: "all", message: { type: "engaged", ...eng } }] : [];
+  };
+  for (let leg = 0; leg < MAX_RUNNER_LEGS; leg++) {
+    const end = engagedArrival(o.stock_id, eng);
+    if (end.at > ctx.now) break; // still on the way
+    const here = { x: end.x, z: end.z };
+    if (arrivedAt === null) {
+      const t = npc ? end.at : ctx.now;
+      // the specialist has moved on: the runner follows from where it stopped
+      if (dist(specAt(t), here) > HANDOVER_RANGE) {
+        legFrom(t, here);
+        if (!npc) break;
+        continue;
+      }
+      arrivedAt = t;
+    }
+    if (!npc) {
+      // a real one presses E; if they wander off first, the runner follows
+      if (dist(specAt(ctx.now), here) > HANDOVER_RANGE) legFrom(ctx.now, here);
+      break;
+    }
+    // an NPC specialist takes the bag a beat after the runner arrives, once they are free
+    const beat = arrivedAt + CHECKOUT_BEAT_MS;
+    if (beat > ctx.now) break;
+    if (staffBusy(ctx, o.spec_id, "npc")) {
+      // busy with someone else: wait, or follow if they have walked off to them
+      if (dist(specAt(ctx.now), here) > HANDOVER_RANGE) legFrom(ctx.now, here);
+      break;
+    }
+    if (dist(specAt(beat), here) > HANDOVER_RANGE) {
+      legFrom(beat, here);
+      continue;
+    }
+    return [...save(), ...handOverBag(ctx, o)];
+  }
+  return save();
+}
+
 // Whatever has become due for an order: called off if the customer has gone or
 // it has taken too long, the runner following the specialist, the hand-over.
 function settleOrders(ctx: Ctx): Outgoing[] {
@@ -1334,24 +1484,7 @@ function settleOrders(ctx: Ctx): Outgoing[] {
       out.push(...cancelOrder(ctx, o, "specialist_left"));
       continue;
     }
-    if (o.stage !== "fetching") continue;
-    const eng = runnerOf(o);
-    const specAt = placeOf(ctx, o.spec_id, o.spec_kind);
-    const m = engagedMoment(o.stock_id, eng, ctx.now);
-    // the specialist has moved on: the runner follows from where it is
-    if (!m.walking && dist(specAt, { x: m.x, z: m.z }) > TALK_RANGE - 0.2) {
-      const next: Engagement = { ...eng, since: ctx.now, from: { x: m.x, z: m.z }, at: specAt };
-      saveRunner(ctx, o, next, null);
-      out.push({ to: "all", message: { type: "engaged", ...next } });
-      continue;
-    }
-    if (m.walking) continue;
-    if (o.arrived_at === null) {
-      saveRunner(ctx, o, eng, ctx.now);
-      continue;
-    }
-    // an NPC specialist takes the bag a beat after the runner arrives, once they are free; a real one presses E
-    if (o.spec_kind === "npc" && ctx.now - o.arrived_at >= CHECKOUT_BEAT_MS && !staffBusy(ctx, o.spec_id, "npc")) out.push(...handOverBag(ctx, o));
+    if (o.stage === "fetching") out.push(...catchUpRunner(ctx, o));
   }
   return out;
 }
@@ -1722,24 +1855,408 @@ export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
 // nobody waits for her: it is up to the customer to press E. Only the greeter
 // does this: every other role waits to be asked, which matches a real store
 // (a specialist doesn't stalk the floor; the greeter is the one who says hello).
+// ---- real staff users are offered waiting customers first (D47, D48, D53, D54; ADR 9; issue #1) ----
+//
+// The waiting list is not a table: it is every customer who is here, inside,
+// free and in a waiting state (just arrived, or asked for someone), oldest
+// wait first. The one thing it adds is the offer, kept on the customer's own
+// player_state row (its `data` JSON): who is being offered them and since
+// when, and which real staff users already let an offer of them pass. The
+// 15 s window is that stored timestamp, caught up by `settleOffers` on the
+// next request that touches it (any move, a join or leave, a settle poll);
+// nothing waits on a timer. Every offer made, passed on, withdrawn, claimed
+// or released writes an events row.
+
+export const OFFER_MS = 15_000; // D48: how long a real staff user has to claim the customer they are offered
+const WAITING_STATES: PlayerStateName[] = ["arriving", "waiting_for_help"];
+const TIE_M = 0.05; // nearer than this counts as equally near (D53: then whoever became free first)
+
+interface OfferData {
+  offer?: { to: string; at: number }; // the live offer
+  offered?: string[]; // real staff users who let an offer of this customer pass, this wait
+  claim?: { by: string; at: number; from: PlayerStateName; waitingSince: number }; // who has them, and where they stood on the list
+  waitingSince?: number; // their place on the list, kept when a claim was released
+  cpu?: CpuMark; // a timetable customer: the visit it was promoted on, and where it waits (issue #20)
+}
+
+const offerData = (st: StateRow): OfferData => (st.data ? (JSON.parse(st.data) as OfferData) : {});
+
+// Writes the offer fields of a customer's player_state data, leaving the rest (the note) alone.
+function patchOfferData(ctx: Ctx, id: string, patch: Partial<Record<keyof OfferData, unknown>>): void {
+  const st = stateOf(ctx.db, id);
+  if (!st) return;
+  const data = (st.data ? JSON.parse(st.data) : {}) as Record<string, unknown>;
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) delete data[k];
+    else data[k] = v;
+  }
+  ctx.db.prepare("UPDATE player_state SET data = ? WHERE visitor_id = ?").run(Object.keys(data).length > 0 ? JSON.stringify(data) : null, id);
+}
+
+// Whose E press would actually open a conversation: D54 asks for no skill or
+// duty match, so this is only "has a script at all" (a post without one would
+// be offered a customer they cannot claim, holding everyone else back 15 s for
+// nothing; orchestrator ruling, 2026-11-07). A no-op once every post has one.
+const canServe = (e: Employee): boolean => scriptFor(designationOfEmployee(e)) !== null;
+
+// D53: of two equally near, whoever became free first. Free since they joined,
+// or since their last conversation ended, whichever is later.
+function freeSince(ctx: Ctx, staffId: string): number {
+  const joined = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'join'").get(staffId) as { t: number | null }).t ?? 0;
+  const ended = (ctx.db.prepare("SELECT MAX(ended_at) AS t FROM conversations WHERE with_id = ? AND with_kind = 'visitor'").get(staffId) as { t: number | null }).t ?? 0;
+  return Math.max(joined, ended);
+}
+
+interface Waiting {
+  st: StateRow;
+  d: OfferData;
+  since: number;
+  at: { x: number; z: number };
+}
+
+// The internal waiting list (D47): oldest wait first.
+function waitingList(ctx: Ctx): Waiting[] {
+  const staff = new Set(ctx.employees.map((e) => e.id));
+  const rows = ctx.db.prepare(`SELECT * FROM player_state WHERE state IN (${WAITING_STATES.map(() => "?").join(",")})`).all(...WAITING_STATES) as StateRow[];
+  const out: Waiting[] = [];
+  for (const st of rows) {
+    if (staff.has(st.visitor_id) || !ctx.present.includes(st.visitor_id)) continue;
+    const at = ctx.position(st.visitor_id);
+    // someone still on the pavement outside has not come in yet
+    if (!at || zoneOf(at.x, at.z) === "outside" || !customerFree(ctx, st.visitor_id)) continue;
+    const d = offerData(st);
+    out.push({ st, d, since: d.waitingSince ?? st.since, at });
+  }
+  return out.sort((a, b) => a.since - b.since || (a.st.visitor_id < b.st.visitor_id ? -1 : 1));
+}
+
+const areaOf = (ctx: Ctx, st: StateRow, at: { x: number; z: number }): string => {
+  const spot = st.state === "waiting_for_help" && st.needs ? waitSpotFor(st.needs) : null;
+  if (spot) return spot.label;
+  return zoneOf(at.x, at.z) === "entrance" ? "the entrance" : "the shop floor";
+};
+
+// Catches the offers up with now: an offer whose customer or staff user is no
+// longer free is withdrawn, one whose 15 s ran out passes on, and every
+// waiting customer without one is offered to the nearest free real staff user
+// who has not already let them pass. Returns what to tell people.
+export function settleOffers(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  let changed = false;
+  const free = new Map(ctx.employees.filter((e) => canServe(e) && staffAvailable(ctx, e.id, "visitor") && ctx.position(e.id)).map((e) => [e.id, e]));
+
+  // 1. live offers that no longer stand
+  const waiting = waitingList(ctx);
+  const onList = new Set(waiting.map((w) => w.st.visitor_id));
+  const live = ctx.db.prepare("SELECT * FROM player_state WHERE data LIKE '%\"offer\":%'").all() as StateRow[];
+  for (const st of live) {
+    const d = offerData(st);
+    if (!d.offer) continue;
+    const customerId = st.visitor_id;
+    const { to } = d.offer;
+    // each row is written before the change it records (CLAUDE.md: the event log is load-bearing)
+    if (!onList.has(customerId)) {
+      log(ctx, customerId, "offer_withdrawn", { staffId: to, why: ctx.present.includes(customerId) ? "customer no longer waiting" : "customer left" });
+      patchOfferData(ctx, customerId, { offer: undefined });
+      changed = true;
+    } else if (!free.has(to)) {
+      log(ctx, customerId, "offer_withdrawn", { staffId: to, why: ctx.employees.some((e) => e.id === to) ? "staff busy" : "staff left" });
+      patchOfferData(ctx, customerId, { offer: undefined });
+      changed = true;
+    } else if (ctx.now - d.offer.at >= OFFER_MS) {
+      const offered = [...new Set([...(d.offered ?? []), to])];
+      log(ctx, customerId, "offer_expired", { staffId: to, offeredAt: d.offer.at });
+      patchOfferData(ctx, customerId, { offer: undefined, offered });
+      changed = true;
+    }
+  }
+
+  // 2. a free real staff user holds one offer at a time, across requests too:
+  // whoever already holds a live one is not free for another
+  const fresh = waitingList(ctx);
+  for (const w of fresh) if (w.d.offer) free.delete(w.d.offer.to);
+  const offer = (w: Waiting, pool: Employee[], again: boolean): void => {
+    const candidates = pool.map((e) => ({ e, d: dist(w.at, ctx.position(e.id)!) })).sort((a, b) => a.d - b.d);
+    const nearest = candidates.filter((c) => c.d - candidates[0]!.d <= TIE_M);
+    const pick = nearest.length === 1 ? nearest[0]!.e : nearest.map((c) => ({ e: c.e, t: freeSince(ctx, c.e.id) })).sort((a, b) => a.t - b.t)[0]!.e;
+    free.delete(pick.id);
+    const area = areaOf(ctx, w.st, w.at);
+    log(ctx, w.st.visitor_id, "offer_made", { staffId: pick.id, area, waitingSince: w.since, ...(again ? { again: true } : {}) });
+    patchOfferData(ctx, w.st.visitor_id, { offer: { to: pick.id, at: ctx.now } });
+    out.push(notice(pick.id, `Customer waiting at ${area}: ${nameOf(ctx, w.st.visitor_id)}. Walk up and press E.`));
+    changed = true;
+  };
+  // the longest-waiting customer goes to the nearest free staff user who has not let them pass (D48)
+  const passedByAll: Waiting[] = [];
+  for (const w of fresh) {
+    if (w.d.offer || free.size === 0) continue;
+    const passed = new Set(w.d.offered ?? []);
+    const pool = [...free.values()].filter((e) => !passed.has(e.id));
+    if (pool.length > 0) offer(w, pool, false);
+    else passedByAll.push(w);
+  }
+  // D57b (Ritesh, 2026-11-07): someone every free staff user has let pass, whom
+  // no CPU can take either (only the greeter takes anyone, and only at the
+  // door), is offered again to whoever is free rather than left for good. Only
+  // after everyone not yet offered has had their turn above, so a customer
+  // being looped back never starves a newcomer.
+  for (const w of passedByAll) {
+    if (free.size === 0) break;
+    if (greeterCanTake(ctx, w.st)) continue; // the greeter may take them: she does, in catchUpOffers
+    offer(w, [...free.values()], true);
+  }
+  if (changed) out.push(staffViewMessage(ctx));
+  return out;
+}
+
+// A customer who is leaving (or reconnecting, which leaves first) has any live
+// offer of them withdrawn, logged, so it never survives into their next visit
+// and expires there as if the staff user had let it pass.
+function withdrawOfferOf(ctx: Ctx, customerId: string, why: string): void {
+  const st = stateOf(ctx.db, customerId);
+  const o = st ? offerData(st).offer : undefined;
+  if (!o) return;
+  log(ctx, customerId, "offer_withdrawn", { staffId: o.to, why });
+  patchOfferData(ctx, customerId, { offer: undefined });
+}
+
+// A real staff user claimed this customer with E: the offer (theirs or
+// someone else's) is done, and the claim keeps the customer's place on the
+// list in case it is released. Call after the conversation has opened.
+function recordClaim(ctx: Ctx, customerId: string, staffId: string, before: StateRow): void {
+  const d = offerData(before);
+  patchOfferData(ctx, customerId, {
+    offer: undefined,
+    claim: { by: staffId, at: ctx.now, from: before.state, waitingSince: d.waitingSince ?? before.since },
+  });
+}
+
+// A real staff user is leaving with a customer they claimed still in
+// conversation, and no NPC of their post took it over (`handOverPost` runs
+// first; Ritesh, 2026-11-07, option A): the conversation ends, and the
+// customer goes back on the waiting list at the place they held. Call while
+// the staff user still counts as present, after `handOverPost`, and settle
+// the offers once they are gone.
+export function releaseClaimsOf(ctx: Ctx, staffId: string): Outgoing[] {
+  const row = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND with_id = ?").get(staffId) as ConvRow | undefined;
+  if (!row) return [];
+  const st = stateOf(ctx.db, row.customer_id);
+  const claim = st ? offerData(st).claim : undefined;
+  if (!claim || claim.by !== staffId) return [];
+  const out = ctx.db.transaction(() => {
+    log(ctx, row.customer_id, "claim_released", { staffId, why: "staff left", state: claim.from, waitingSince: claim.waitingSince });
+    const ended = finishEither(ctx, row, staffId, `${nameOf(ctx, staffId)} had to step away. Someone will be with you shortly.`, "staff left");
+    setState(ctx, row.customer_id, { state: claim.from, with_id: null });
+    patchOfferData(ctx, row.customer_id, { waitingSince: claim.waitingSince });
+    return ended;
+  })();
+  const sm = stateMessage(ctx, row.customer_id);
+  if (sm) out.push(sm);
+  out.push(staffViewMessage(ctx));
+  return out;
+}
+
+// Whether a free real staff user who can serve, and has not already let an
+// offer of this customer pass, is in the room: the greeter gives way to them
+// even before the offer is written (D47, criterion 5).
+function realStaffFor(ctx: Ctx, st: StateRow): boolean {
+  const d = offerData(st);
+  if (d.offer) return true;
+  // someone browsing (already served once) is never offered, so the greeter does not wait for anyone
+  if (!WAITING_STATES.includes(st.state)) return false;
+  const passed = new Set(d.offered ?? []);
+  return ctx.employees.some((e) => !passed.has(e.id) && canServe(e) && staffAvailable(ctx, e.id, "visitor") && !!ctx.position(e.id));
+}
+
+// The offers caught up with now, then the greeter tried for the waiting
+// customers no real staff user is offered: `first` (the customer who just
+// moved) before the rest, oldest wait first, so a customer standing still
+// inside the door is not left past the window for want of a step of their
+// own. She takes at most one. Called on every request that could change the
+// picture (a move, a join or leave, a settle poll).
+export function catchUpOffers(ctx: Ctx, first?: string): Outgoing[] {
+  const cpu = [...departCpuCustomers(ctx), ...promoteCpuCustomers(ctx)];
+  const out = [...cpu, ...settleOffers(ctx)];
+  const order = waitingList(ctx).map((w) => w.st.visitor_id);
+  const ids = first ? [first, ...order.filter((id) => id !== first)] : order;
+  for (const id of ids) {
+    const greeted = tryGreeterApproach(ctx, id);
+    if (greeted.length > 0) return [...out, ...greeted];
+  }
+  return out;
+}
+
+// ---- timetable customers join the waiting list (D55, D56; ADR 10 option B; issue #20) ----
+//
+// A timetable customer (storeday.ts's CAST, "cust-1" and on) is drawn from the
+// clock and has no row anywhere, and nearly all of them stay that way. The one
+// moment one needs a row is when it would go on the waiting list: it is on the
+// floor needing help (`ctx.present` says so; see cpuCustomersOnFloor for the
+// live bridge) and a real staff user who could serve it is free. A real user is
+// offered a customer before a CPU staff member is (D47), so with nobody free
+// the timetable's own specialist serves it, and nothing is written.
+//
+// Promotion gives it what `enter()` gives a real visitor who picks the customer
+// role: a visitors row and a player_state row in a waiting state. From then on
+// it is a customer like any other: the same waiting list, offer, claim and
+// leaving code reads the same row, with no human-vs-CPU branch in any of it.
+// What is different is only who decides, and the decisions made here are the
+// ones ADR 10 settles: it waits where it was promoted, and once served (or once
+// its visit is over) it leaves through `leaveStore`, and is never handed back
+// to the timetable or put on the list again on that visit. The day repeats
+// every CYCLE seconds with the same ids, so the next day's visit is a new visit
+// and may be promoted again (orchestrator ruling, 2026-11-08), the way a real
+// visitor coming back is greeted again. How it answers in a conversation is
+// issue #39.
+
+const CPU_CUSTOMER_IDS: ReadonlySet<string> = new Set(CAST.filter((c) => c.role === "customer").map((c) => c.id));
+const CPU_SPECIALISTS: ReadonlySet<string> = new Set(CAST.filter((c) => c.role === "specialist").map((c) => c.id));
+
+// Which day of the repeating timetable `now` falls in: one visit per customer per day.
+export const visitOf = (now: number): number => Math.floor(now / (CYCLE * 1000));
+
+// What the promotion keeps on the customer's own player_state data (alongside
+// the offer fields): which visit it is, and where it waits.
+interface CpuMark {
+  visit: number;
+  at: { x: number; z: number };
+  promotedAt: number;
+}
+
+const cpuMarkOf = (data: string | null): CpuMark | undefined => (data ? (JSON.parse(data) as { cpu?: CpuMark }).cpu : undefined);
+
+const cpuRows = (db: Database.Database): StateRow[] =>
+  (db.prepare("SELECT * FROM player_state WHERE data LIKE '%\"cpu\":%'").all() as StateRow[]).filter((r) => CPU_CUSTOMER_IDS.has(r.visitor_id) && !!cpuMarkOf(r.data));
+
+// Whether this timetable customer may be promoted now: never on this visit yet.
+// A row from an earlier visit counts only once that visit has been left.
+function promotable(db: Database.Database, id: string, now: number): boolean {
+  if (!CPU_CUSTOMER_IDS.has(id)) return false;
+  const st = stateOf(db, id);
+  if (!st) return true;
+  const mark = cpuMarkOf(st.data);
+  return !!mark && st.state === "leaving" && mark.visit !== visitOf(now);
+}
+
+// Whether a real staff user who could open a conversation is free and in the room.
+const realStaffFree = (ctx: Ctx): boolean => ctx.employees.some((e) => canServe(e) && staffAvailable(ctx, e.id, "visitor") && !!ctx.position(e.id));
+
+function promoteCpuCustomers(ctx: Ctx): Outgoing[] {
+  const due = ctx.present.filter((id) => {
+    if (!promotable(ctx.db, id, ctx.now)) return false;
+    const at = ctx.position(id);
+    return !!at && zoneOf(at.x, at.z) !== "outside";
+  });
+  if (due.length === 0 || !realStaffFree(ctx)) return [];
+  for (const id of due) {
+    const at = { ...ctx.position(id)! };
+    const who = castOf(id);
+    ctx.db.transaction(() => {
+      // the token is what a browser signs in with: a random one nobody holds, so
+      // no client can ever connect as a timetable customer
+      ctx.db
+        .prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET last_seen = excluded.last_seen")
+        .run(id, `cpu-${randomBytes(24).toString("base64url")}`, NPC_NAME[id] ?? id, who.shirt, ctx.now, ctx.now);
+      log(ctx, id, "cpu_customer_promoted", { purpose: who.purpose ?? null, visit: visitOf(ctx.now), at, state: "waiting_for_help" });
+      setState(ctx, id, { state: "waiting_for_help", want: who.purpose ?? null, needs: null, with_id: null });
+      const mark: CpuMark = { visit: visitOf(ctx.now), at, promotedAt: ctx.now };
+      patchOfferData(ctx, id, { cpu: mark });
+    })();
+  }
+  return [staffViewMessage(ctx)];
+}
+
+// A promoted timetable customer leaves, through the same `leaveStore` a real
+// visitor's departure runs: once its conversation is over and nothing it is part
+// of is still under way (served), or once the floor no longer has it (its visit
+// is over: the live bridge only keeps it while its timetable day has it in the
+// store, or while it is busy).
+function departCpuCustomers(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  for (const st of cpuRows(ctx.db)) {
+    const id = st.visitor_id;
+    if (st.state === "leaving") continue;
+    const gone = !ctx.present.includes(id);
+    const served = st.state === "browsing" && customerFree(ctx, id) && !orderOfCustomer(ctx.db, id);
+    if (!gone && !served) continue;
+    log(ctx, id, "cpu_customer_departed", { why: gone ? "visit over" : "served" });
+    out.push(...leaveStore(ctx, id));
+  }
+  return out;
+}
+
+// The live bridge from the timetable to the store's rules: which timetable
+// customers are on the floor now, and where. A pure function of the clock and
+// the rows, so nothing needs a timer.
+//  - promoted on this visit and not left: held where it was promoted, for as
+//    long as its timetable day still has it in the store, and longer while it
+//    is in a conversation or has an order under way (nobody is cut off);
+//  - not promoted on this visit: only while the timetable has it standing at a
+//    table waiting for a specialist to come over, the moment it would go on the
+//    waiting list. Every other moment it is ambient and the rules never see it.
+export function cpuCustomersOnFloor(db: Database.Database, now: number): Map<string, { x: number; z: number }> {
+  const floor = new Map<string, { x: number; z: number }>();
+  const visit = visitOf(now);
+  for (const st of cpuRows(db)) {
+    const mark = cpuMarkOf(st.data)!;
+    if (st.state === "leaving") continue;
+    const busy = !FREE_STATES.includes(st.state) || !!openConversationOf(db, st.visitor_id) || !!orderOfCustomer(db, st.visitor_id);
+    if (busy || (mark.visit === visit && momentOf(st.visitor_id, now).present)) floor.set(st.visitor_id, mark.at);
+  }
+  for (const id of CPU_CUSTOMER_IDS) {
+    if (floor.has(id) || !promotable(db, id, now) || !waitingForSpecialist(id, now)) continue;
+    const m = momentOf(id, now);
+    floor.set(id, { x: m.x, z: m.z });
+  }
+  return floor;
+}
+
+// Whether the timetable has this customer standing at a table waiting for a
+// specialist: in the run of standing that ends in their chat with one.
+export function waitingForSpecialist(id: string, now: number): boolean {
+  const segs = timelineOf(id);
+  const tau = (((now / 1000) % CYCLE) + CYCLE) % CYCLE;
+  const i = segs.findIndex((s) => s.t0 <= tau && tau < s.t1);
+  if (i < 0 || segs[i]!.kind !== "stand") return false;
+  let j = i;
+  while (j < segs.length && segs[j]!.kind === "stand") j++;
+  const next = segs[j];
+  return !!next && next.kind === "act" && !!next.with && CPU_SPECIALISTS.has(next.with);
+}
+
 export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
-  if (!st || (st.state !== "arriving" && st.state !== "browsing") || st.with_id) return [];
+  // a real staff user is (or is about to be) offered them: she gives way (D47); once
+  // every free one has let the 15 s pass, she may take them, and the takeover is logged
+  if (!st || realStaffFor(ctx, st)) return [];
+  const can = greeterCanTake(ctx, st);
+  if (!can) return [];
+  // she walks up to where they actually stand (the entrance zone is already inside the door), so she faces them;
+  // the real staff users who let their offer pass are named, so a takeover reads as one
+  const passedOver = offerData(st).offered ?? [];
+  log(ctx, customerId, "npc_approached", { npcId: "greeter-1", ...(passedOver.length > 0 ? { passedOver } : {}) });
+  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", can.script, can.here)];
+}
+
+// Whether the greeter could walk up to this customer now, setting aside who
+// else is free: what `tryGreeterApproach` acts on, and what the lone-staff
+// loop-back (D57b) asks before repeating an offer instead.
+function greeterCanTake(ctx: Ctx, st: StateRow): { script: ScriptId; here: { x: number; z: number } } | null {
+  const customerId = st.visitor_id;
+  if ((st.state !== "arriving" && st.state !== "browsing") || st.with_id) return null;
   // greeted already on THIS visit (the same person coming back another day is greeted again)
   const visitStart = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { t: number | null }).t ?? 0;
-  if (ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1' AND started_at >= ?").get(customerId, visitStart)) return [];
-  if (offDuty(ctx).includes("greeter-1")) return [];
+  if (ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1' AND started_at >= ?").get(customerId, visitStart)) return null;
+  if (offDuty(ctx).includes("greeter-1")) return null;
   const greeter = NPCS.find((n) => n.id === "greeter-1");
-  if (!greeter || !npcPose(greeter, ctx.now).present) return [];
+  if (!greeter || !npcPose(greeter, ctx.now).present) return null;
   // only someone standing just inside the entrance
   const here = ctx.position(customerId);
-  if (!here || here.x < ENTRANCE_ZONE.minX || here.x > ENTRANCE_ZONE.maxX || here.z < ENTRANCE_ZONE.minZ || here.z > ENTRANCE_ZONE.maxZ) return [];
+  if (!here || here.x < ENTRANCE_ZONE.minX || here.x > ENTRANCE_ZONE.maxX || here.z < ENTRANCE_ZONE.minZ || here.z > ENTRANCE_ZONE.maxZ) return null;
   const script = scriptFor("greeter");
-  if (!script || !customerFree(ctx, customerId)) return [];
-  if (staffBusy(ctx, "greeter-1", "npc")) return []; // someone else has her
-  // she walks up to where they actually stand (the entrance zone is already inside the door), so she faces them
-  log(ctx, customerId, "npc_approached", { npcId: "greeter-1" });
-  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", script, here)];
+  if (!script || !customerFree(ctx, customerId)) return null;
+  if (staffBusy(ctx, "greeter-1", "npc")) return null; // someone else has her
+  return { script, here };
 }
 
 // ---- taking turns ----

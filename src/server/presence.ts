@@ -26,6 +26,7 @@ import {
   rejoin,
   takeOrder,
   orderViews,
+  holdViews,
   leaveConversation,
   closeTalk,
   staffMove,
@@ -34,10 +35,12 @@ import {
   cancelEscort,
   seatedList,
   leaveStore,
+  releaseClaimsOf,
+  catchUpOffers,
+  cpuCustomersOnFloor,
   startInspect,
   startTalk,
   stateOf,
-  tryGreeterApproach,
   type Ctx,
   type Employee,
   type Outgoing,
@@ -132,19 +135,30 @@ const present = (s: Session): Present => ({
 
 // The store service (service.ts) holds the rules and takes a database; this
 // hands it who is online and where, and delivers what it returns.
+// Issue #20: timetable customers who need help join the store's rules (the
+// waiting list, offers, claims) as customers, through `cpuCustomersOnFloor`.
+// Off unless CPU_CUSTOMERS_LIVE=1, because the client cannot yet press E at,
+// mark or hold a timetable customer (Store.tsx's E hint and OfferMarker only
+// know real visitors; Npcs.tsx keeps walking them on their timetable), so a
+// staff user would be offered someone they cannot claim (orchestrator ruling,
+// 2026-11-08: build the bridge, leave it off, client follow-up issue).
+const CPU_CUSTOMERS_LIVE = process.env.CPU_CUSTOMERS_LIVE === "1";
+
 function serviceCtx(): Ctx {
   const all = [...sessions.values()];
   const employees: Employee[] = all
     .filter((s) => s.kind !== "customer")
     .map((s) => ({ id: s.id, name: s.name, kind: s.kind as Employee["kind"], specialty: s.specialty }));
+  const now = Date.now();
+  const cpu = CPU_CUSTOMERS_LIVE ? cpuCustomersOnFloor(db, now) : new Map<string, { x: number; z: number }>();
   return {
     db,
-    now: Date.now(),
+    now,
     employees,
-    present: all.map((s) => s.id),
+    present: [...all.map((s) => s.id), ...cpu.keys()],
     position: (id) => {
       const s = sessions.get(id);
-      return s ? { x: s.x, z: s.z } : undefined;
+      return s ? { x: s.x, z: s.z } : cpu.get(id);
     },
   };
 }
@@ -154,6 +168,7 @@ const staffViewFor = (ctx: Ctx): Outgoing[] => [{ to: "staff", message: { type: 
 // who is talking with whom, as last told to everyone: sent again only when it changes
 let lastChats = "[]";
 let lastOrders = "[]";
+let lastHolds = "[]";
 const lineCounts = new Map<string, { lines: number; since: number }>();
 
 function deliver(out: Outgoing[]): void {
@@ -172,6 +187,11 @@ function deliver(out: Outgoing[]): void {
   if (orders !== lastOrders) {
     lastOrders = orders;
     deliverAll([{ to: "all", message: { type: "orders", orders: JSON.parse(orders) } }]);
+  }
+  const holds = JSON.stringify(holdViews(serviceCtx()));
+  if (holds !== lastHolds) {
+    lastHolds = holds;
+    deliverAll([{ to: "all", message: { type: "holds", holds: JSON.parse(holds) } }]);
   }
   const pairs = JSON.stringify(stamped);
   if (pairs !== lastChats) {
@@ -213,24 +233,34 @@ function resolveVisitor(token: string | null): { visitor: VisitorInfo; token: st
   return { visitor, token: fresh };
 }
 
+// A live session ends: by "bye", by its socket closing, or by the same visitor
+// connecting again (a second tab, or a reconnect after a drop the server had
+// not noticed yet). Every way out runs the same cleanup, so a reconnect never
+// skips releasing a claim or withdrawing an offer (PR #27 review, finding 1).
+function depart(s: Session): void {
+  const pre = serviceCtx(); // while they still count as here
+  // an NPC of their post carries on their conversation if one is free; if not, a
+  // customer they had claimed goes back on the waiting list where they stood (issue #1)
+  const handed = [...handOverPost(pre, s.id), ...releaseClaimsOf(pre, s.id), ...handOverCustomer(pre, s.id)];
+  sessions.delete(s.id);
+  touchVisitor.run(Date.now(), s.id);
+  logEvent(s.id, "leave");
+  broadcast({ type: "left", id: s.id }, s.id);
+  // an NPC takes their place where they stood; their conversation (if any) carries on
+  // with it, and whatever they had put aside is given back
+  deliver(handed);
+  deliver(leaveStore(serviceCtx(), s.id));
+  // an offer to them, or of them, is withdrawn, and the customer is offered to the next nearest
+  deliver(catchUpOffers(serviceCtx()));
+}
+
 export function handleConnection(socket: WebSocket): void {
   let me: Session | null = null;
 
   // Idempotent: both an explicit "bye" and the socket closing land here, and
-  // a takeover may already have replaced this session.
+  // a takeover may already have replaced (and departed) this session.
   const leave = (): void => {
-    if (me && sessions.get(me.id)?.socket === socket) {
-      const pre = serviceCtx(); // while they still count as here
-      const handed = [...handOverPost(pre, me.id), ...handOverCustomer(pre, me.id)];
-      sessions.delete(me.id);
-      touchVisitor.run(Date.now(), me.id);
-      logEvent(me.id, "leave");
-      broadcast({ type: "left", id: me.id }, me.id);
-      // an NPC takes their place where they stood; their conversation (if any) carries on
-      // with it, and whatever they had put aside is given back
-      deliver(handed);
-      deliver(leaveStore(serviceCtx(), me.id));
-    }
+    if (me && sessions.get(me.id)?.socket === socket) depart(me);
   };
 
   const onMessage = (raw: RawData): void => {
@@ -255,8 +285,7 @@ export function handleConnection(socket: WebSocket): void {
       // over, and the older socket is closed so the client can say so.
       const existing = sessions.get(visitor.id);
       if (existing) {
-        sessions.delete(visitor.id);
-        broadcast({ type: "left", id: visitor.id }, visitor.id);
+        depart(existing); // the old session leaves properly first: claims released, offers withdrawn
         existing.socket.close(4000, "opened elsewhere");
       }
 
@@ -298,6 +327,7 @@ export function handleConnection(socket: WebSocket): void {
         inspecting: inspections(db),
         chats: chatPairs(db),
         orders: orderViews(ctx),
+        holds: holdViews(ctx),
         spawn: { x: me.x, z: me.z, ry: me.ry },
         seated: seatedList(db),
       });
@@ -305,6 +335,8 @@ export function handleConnection(socket: WebSocket): void {
       // someone has come in: the posts held, and the customers employees see
       deliver([dutyMessage(ctx)]);
       deliver(staffViewFor(ctx));
+      // a real staff user who has just come in is offered whoever is waiting (D47)
+      deliver(catchUpOffers(serviceCtx()));
       return;
     }
 
@@ -327,6 +359,7 @@ export function handleConnection(socket: WebSocket): void {
       return;
     }
     if (me && message.type === "settle") {
+      deliver(catchUpOffers(serviceCtx()));
       deliver(settleVisits(serviceCtx()));
       return;
     }
@@ -397,9 +430,10 @@ export function handleConnection(socket: WebSocket): void {
         me.zone = zone;
       }
       broadcast({ type: "moved", id: me.id, x: me.x, z: me.z, ry: me.ry }, me.id);
-      // a customer who hasn't been approached yet, checked on their own
-      // movement rather than any timer (D32/D40)
-      if (me.kind === "customer") deliver(tryGreeterApproach(serviceCtx(), me.id));
+      // the offers to real staff users caught up (an expired 15 s window passes on), then a
+      // customer who hasn't been approached yet, checked on their own movement rather than
+      // any timer (D32/D40); the greeter only takes someone no real staff user is offered (D47)
+      deliver(catchUpOffers(serviceCtx(), me.kind === "customer" ? me.id : undefined));
       deliver(settleVisits(serviceCtx()));
     }
   };

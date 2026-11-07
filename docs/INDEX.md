@@ -33,6 +33,7 @@ find every resource by reading this file, not by discovering it mid-task.
   "Atrium Stair") is represented in `Pose`, the protocol, persistence and
   `clampToWalkable`. Options laid out, nothing picked yet — read before
   touching `Pose`, `FLOOR`, `world.ts` or `presence.ts`'s move handling.
+- `docs/adr/0009-staff-assignment-priority.md` — ADR 9 (draft scaffold): real staff users are offered waiting customers before CPUs, nearest-free tie-break, no specialty matching for v1 (SCOPE D47, D48, D53, D54, issue #1). Consequences and costs are `[TK]`. Read before touching staff assignment.
 - `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
   the database, menu conversations, employees online see customers' states. Facts
   filled in, reasoning filled in. Read before touching `visitors`,
@@ -46,6 +47,18 @@ find every resource by reading this file, not by discovering it mid-task.
   Supersedes ADR 3's "character only talks if the visitor starts". **Option B
   confirmed and schema built 2026-10-13 (SCOPE D42)** — see the addendum.
   Reasoning filled in.
+- `scripts/bots/` (`pnpm bots`, `.claude/skills/bot-stress/`) — the bot-stress
+  harness (issue #13): 20-30 headless scripted clients over the real
+  WebSocket/HTTP protocol (built on `scripts/sim/`'s and
+  `spec/*-live.test.ts`'s patterns, generalised into `client.ts`/`flows.ts`),
+  against a local Docker image by default. Scenarios: S1, S2, S4, S11
+  (SCOPE.md 3d), a staff member joining mid-wave (D47), a disconnect and
+  reconnect, a server restart with state intact (checked by opening the
+  SQLite file directly, not over the protocol — see the file's own notes on
+  why), and 3 staff + 25 customers at once. Reports scenario/bots/
+  failures/p95 round trip; files no issues itself (`/bot-stress` does that
+  when run for real before a promote or after a freeze). Read before
+  extending it with a new scenario or latency mode.
 - `scripts/sim/` (`pnpm sim`, optional `--seed=N` to replay a run) — SCOPE
   D43: a throwaway terminal prototype of the loop/case/slot design, option B
   (cheap and disposable, not the shipped engine — `src/server/cases.ts`
@@ -145,3 +158,4 @@ find every resource by reading this file, not by discovering it mid-task.
 - `docs/conversation-model/README.md` — **start here** for the conversation model: status (phone, laptop and device-service scenes), where everything is, commands, what is not done. Siblings: `how-we-built-it.md` (the whole process, phone scene), `engine-reference.md` (covers all three scenes; section 11 is the device-service findings), `new-scene-playbook.md` (the real account of what's generic, post-extraction), `conversation-types.md` (every store conversation; G1/service and G3/laptop marked built), `prompts.md` (reusable subagent prompts), `review/` (automated review reports, phone scene only), `replay-findings.md`, `core-extraction-proposal.md` (the design doc behind the real `core/` extraction), `service-scene-proposal.md` (the design doc behind the device-service scene — the actual test of whether that extraction generalises).
 - `src/shared/talk/`, `spec/talk-*.test.ts`, `scripts/talk-transcripts.ts`, `poc/talk/` — the phone engine, its specs, the transcript tool and the playable page (`pnpm test:talk`, `pnpm poc`).
 - `src/shared/talk/core/`, `src/shared/talk/scenes/laptop/`, `scripts/talk-laptop-transcripts.ts` — the shared bits (`rng.ts`, `types.ts` only) and the laptop scene (duplicated, not shared, from the phone one — see engine-reference.md), its specs (`spec/talk-laptop-*.test.ts`) and its transcript tool. No page.
+- `docs/adr/0010-timetable-customers-join-player-state.md` — ADR 10 (draft): whether CPU/timetable customers (`storeday.ts`'s `momentOf`) get a real `player_state` row and rule-based decisions (D55), or stay a pure function of time until claimed/approached. Options laid out, nothing picked. Read before touching issue #20, the waiting list, or `tryNpcAutoClaim`/`tryGreeterApproach`.

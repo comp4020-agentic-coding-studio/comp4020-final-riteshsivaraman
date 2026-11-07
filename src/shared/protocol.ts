@@ -37,6 +37,10 @@ export interface CustomerView {
   sinceMs: number; // how long they have been in this state
   withName: string | null; // who is dealing with them now
   note: string | null; // a note left when they were handed on
+  // the real staff user this customer is being offered to (D48), and until
+  // when (server ms): what a marker over the customer is drawn from
+  offeredTo?: string;
+  offerUntil?: number;
 }
 
 // The menu a visitor is shown, and whose turn it is. `group` is optional and
@@ -106,6 +110,22 @@ export interface StaffMenuView {
     candidates: Array<{ name: string; screen: string; from: string; battery: string; note: string }>;
   };
   status: string; // what is happening when it is not your move
+}
+
+// A unit put aside for a visitor (reservations, status 'held'), shown to
+// everyone so the frustration of a missing colour is visible, not invented
+// (issue #3). `expiresAt` is the server's own `reservations.expires_at`, an
+// absolute epoch time: a client computes its own time-left from it, never the
+// other way round. `free` is how many of that exact SKU are still on the
+// shelf right now (0 when the held unit is the last one).
+export interface HoldView {
+  product: string;
+  colour: string;
+  storage: string;
+  holderId: string;
+  holderName: string;
+  expiresAt: number;
+  free: number;
 }
 
 // A sale after the chat is over: the phone is on its way in a bag, then with
@@ -184,6 +204,7 @@ export type ServerMessage =
       inspecting: Inspection[];
       chats: ChatPair[];
       orders: OrderView[];
+      holds: HoldView[];
       // where you start: the client puts your view there
       spawn: Pose;
       seated: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }>;
@@ -199,6 +220,7 @@ export type ServerMessage =
   | { type: "staff_view"; customers: CustomerView[] }
   | { type: "chats"; pairs: ChatPair[] }
   | { type: "orders"; orders: OrderView[] }
+  | { type: "holds"; holds: HoldView[] }
   // a line for a specialist's corner feed
   | { type: "update"; text: string }
   | { type: "duty"; offDuty: string[] }
