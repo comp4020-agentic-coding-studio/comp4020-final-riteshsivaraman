@@ -112,6 +112,10 @@ find every resource by reading this file, not by discovering it mid-task.
 - `LEARNINGS.md` — what Ritesh is learning about prompting/working with AI
   coding assistants, cited to commits (older entries predate this and are
   stack gotchas instead).
+- `docs/workflow.md` — the parallel agent build protocol: roles, labels, branches, gates, spend, audits, learning capture. Agents read this; visual version at https://claude.ai/artifact/NmTRCMo31RSpr6SjFynpEu.
+- `.claude/agents/` and `.claude/skills/` — the 12 workflow agents (orchestrator, scoper, triage, researcher, server/client builders, spec-writer, verifier, reviewer, integrator, steward, bot-tester) and the skills they run (`/sprint`, `/audit-workflow`, `/learn`, `/promote`, ...).
+- `scripts/audit-workflow.sh` — deterministic workflow self-audit; results append to `.agents/audit.log`.
+- `docs/learnings-inbox.md` — learning candidates captured after each exchange, before they are promoted into `LEARNINGS.md`. `docs/digests/` holds overnight and wave digests.
 - `CUTS.md` — what got cut under deadline pressure and why. Entries so far
   are the earlier app's (kept as marked history); none yet for the store project.
 - `.claude/agents/event-log-reviewer.md` — checks the event-log-write-

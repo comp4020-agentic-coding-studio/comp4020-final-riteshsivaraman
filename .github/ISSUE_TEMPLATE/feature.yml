@@ -1,0 +1,34 @@
+name: Feature
+description: A user-visible behaviour in the store (scoped with /scope-feature)
+labels: ["type:feature", "status:needs-triage"]
+body:
+  - type: textarea
+    id: behaviour
+    attributes:
+      label: Behaviour
+      description: What the visitor or staff member sees and does, in the customer or staff journey.
+    validations: { required: true }
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable, checkable lines.
+    validations: { required: true }
+  - type: input
+    id: spec
+    attributes:
+      label: Spec line
+      description: The one testable promise a spec/ check will protect.
+    validations: { required: true }
+  - type: dropdown
+    id: feeds
+    attributes:
+      label: Feeds
+      description: Which shared scarce thing this serves (CLAUDE.md "One idea"). If none, say why it should exist.
+      multiple: true
+      options: [Staff attention, Stock, Demo tables, Persistence, None]
+    validations: { required: true }
+  - type: textarea
+    id: out
+    attributes:
+      label: Out of scope and depends on

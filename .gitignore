@@ -32,3 +32,6 @@ references/*.jpeg
 
 # generated NPC conversation transcripts (scripts/talk-transcripts.ts)
 .talk-runs/
+
+# agent worktrees (created by subagents with isolation: worktree)
+.claude/worktrees/
