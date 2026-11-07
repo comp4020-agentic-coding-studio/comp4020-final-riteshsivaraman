@@ -59,9 +59,28 @@ orchestrator session, and recorded as `SCOPE.md` D53 and D54:
 - **Specialty/duty matching (D54):** not required for v1. Nearest free real
   staff member regardless of duty or specialty, per D48 as written.
 
+A review of issue #1's implementation (PR #27) found D54's literal wording
+produced dead offers to staff who structurally cannot open a conversation at
+all (no script for their post), burning the 15s window for nothing. D57
+(2026-11-07) amends this: D54 is read as a capability filter ("can they open
+a conversation at all"), not a skill/specialty match — the decision itself is
+unchanged, D54 already meant no skill matching, this just closes the gap
+between that intent and a staff member who cannot serve structurally. D57 also
+rules on a gap the review found: when the 15s window passes with no other free
+real staff user available, the same lone staff user is re-offered the
+customer, rather than leaving them stranded until a second staff member joins.
+
 ## Consequences
 
-[TK: Ritesh. Left blank.]
+- Dead offers (to a staff member with no conversation script) no longer occur;
+  only staff who can actually open a conversation are offered (D57a).
+- A lone staff member working alone does not permanently strand a customer
+  once the 15s window passes without a claim; the same customer loops back to
+  them (D57b).
+- A reconnect/takeover path that skips the normal `leave()` cleanup (found in
+  PR #27 review) must still release an active claim and withdraw a stale
+  offer — this is a correctness requirement of this ADR's claim/offer model,
+  not a new decision, and is being fixed in the same PR.
 
 ## Citations
 
