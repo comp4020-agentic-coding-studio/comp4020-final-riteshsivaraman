@@ -13,9 +13,30 @@ This project started as Seen, a mock email service. I scaffolded it on 6 October
 ([`168ca9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/168ca9b)) and wrote my crit 8 reflection about it. On 10 October I decided to start
 from a fresh idea and carry nothing over from Seen (D1 in `SCOPE.md`), and on 11 October
 the Seen app was replaced with the store stack
-([`b61f6c7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/b61f6c7)). I changed direction because [TK: Ritesh's reason].
+([`b61f6c7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/b61f6c7)). I changed direction because [TK, ~50-80 words,
+Ritesh: the actual reason for abandoning Seen on 10-11 October. Draw from D1
+in `SCOPE.md` (states the decision, not the reasoning) and
+`references/help-me-scope.md` if it records the scoping conversation that
+led here. Name what about Seen stopped working (scope, interest, feasibility)
+rather than leaving it unstated].
 The Seen version is kept on the `archive/previous-app` branch, and the crit 8
 reflection is left as I wrote it. The rest of this document describes the store.
+
+## The second pivot: away from a visible queue
+
+[TK, ~150-200 words, Ritesh: the reasoning behind D47 (2026-11-07, `SCOPE.md`
+line 113) — why the "Genius Bar queue is the shared state" idea from
+2026-10-10 (D2, superseded) was replaced with the internal waiting-list model
+where customers never see a line. Draw from: SCOPE.md D2 and D47's own text,
+`references/experience.md` section 1c (the "intended vs lived experience"
+gap noted at SCOPE.md lines 172-176), and any play-session note that prompted
+the change (check WORKLOG.md around 2026-11-07 for a dated observation, the
+way the 14 October "way too linear" note is cited elsewhere in this repo).
+Say what specifically was wrong with the visible-queue version — not just
+that it was replaced, but what playing it or thinking it through revealed.
+If no dated play-session note exists for this pivot specifically, say that
+gap outright rather than inventing one; it's a real gap in the evidence
+trail, not a style choice.]
 
 ## Why this stack
 
