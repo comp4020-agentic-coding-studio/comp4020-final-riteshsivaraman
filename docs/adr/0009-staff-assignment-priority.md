@@ -1,6 +1,6 @@
 ---
 status: draft
-what: ADR 9 --- who gets a waiting customer when real staff users and CPU staff are both free. Scaffold by the steward from SCOPE D47 and D48; the decision was Ritesh's, 2026-11-07. Prose beyond the quotes is his to write.
+what: ADR 9 --- who gets a waiting customer when real staff users and CPU staff are both free. Scaffold by the steward from SCOPE D47, D48, D53, D54; the decisions were Ritesh's, 2026-11-07. Prose beyond the quotes is his to write.
 date: 2026-11-07
 ---
 
@@ -52,15 +52,12 @@ then a CPU may take the customer. One staff member per customer, atomic claim.
 [TK: Ritesh to confirm this ADR carries D47/D48 unchanged, and to reword the Context and Decision in his own voice.]
 
 Two gaps D47/D48 left open were ruled on by Ritesh, 2026-11-07, relayed via the
-orchestrator session (not yet in `SCOPE.md`'s decision table as its own entry
-at time of writing):
+orchestrator session, and recorded as `SCOPE.md` D53 and D54:
 
-- **Equal-distance tie-break:** arbitrary / first-free (FIFO, whichever real
-  staff member became free first), no skill check.
-- **Specialty/duty matching:** not required for v1. Nearest free real staff
-  member regardless of duty or specialty, per D48 as written.
-
-[TK: SCOPE.md does not yet carry these two rulings as a dated decision row (D47/D48 only cover the core priority). If they should be numbered and added there, that is the orchestrator's or Ritesh's call, not this ADR's.]
+- **Equal-distance tie-break (D53):** arbitrary / first-free (FIFO, whichever
+  real staff member became free first), no skill check.
+- **Specialty/duty matching (D54):** not required for v1. Nearest free real
+  staff member regardless of duty or specialty, per D48 as written.
 
 ## Consequences
 
@@ -68,7 +65,7 @@ at time of writing):
 
 ## Citations
 
-- `SCOPE.md` D47, D48, section 5 (on `integration`).
+- `SCOPE.md` D47, D48, D53, D54, section 5.
 - Issue #1, "Real staff users are offered waiting customers before CPUs".
 - CLAUDE.md "No background processes" (the 15 s window must be a stored timestamp), "Event log is load-bearing" (offers, claims and takeovers write `events` rows). Both are in issue #1's acceptance criteria 7 and 8.
 - Related: ADR 3 (who may see and do what), ADR 4 (cases and moves).
