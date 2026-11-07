@@ -11,6 +11,7 @@
     "dev": "node scripts/dev.ts",
     "layout": "node scripts/layout-server.ts",
     "sim": "mise exec -- tsx scripts/sim/index.ts",
+    "bots": "tsx scripts/bots/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm typecheck && pnpm test",
     "check:evidence": "node scripts/check-evidence.ts",

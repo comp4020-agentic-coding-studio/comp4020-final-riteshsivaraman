@@ -47,6 +47,18 @@ find every resource by reading this file, not by discovering it mid-task.
   Supersedes ADR 3's "character only talks if the visitor starts". **Option B
   confirmed and schema built 2026-10-13 (SCOPE D42)** — see the addendum.
   Reasoning filled in.
+- `scripts/bots/` (`pnpm bots`, `.claude/skills/bot-stress/`) — the bot-stress
+  harness (issue #13): 20-30 headless scripted clients over the real
+  WebSocket/HTTP protocol (built on `scripts/sim/`'s and
+  `spec/*-live.test.ts`'s patterns, generalised into `client.ts`/`flows.ts`),
+  against a local Docker image by default. Scenarios: S1, S2, S4, S11
+  (SCOPE.md 3d), a staff member joining mid-wave (D47), a disconnect and
+  reconnect, a server restart with state intact (checked by opening the
+  SQLite file directly, not over the protocol — see the file's own notes on
+  why), and 3 staff + 25 customers at once. Reports scenario/bots/
+  failures/p95 round trip; files no issues itself (`/bot-stress` does that
+  when run for real before a promote or after a freeze). Read before
+  extending it with a new scenario or latency mode.
 - `scripts/sim/` (`pnpm sim`, optional `--seed=N` to replay a run) — SCOPE
   D43: a throwaway terminal prototype of the loop/case/slot design, option B
   (cheap and disposable, not the shipped engine — `src/server/cases.ts`
