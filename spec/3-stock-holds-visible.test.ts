@@ -297,6 +297,22 @@ describe("holdViews reads off the reservation (service layer)", () => {
     expect(eventTypes()).toContain("reserve_lost"); // the existing event for the lost race, unchanged
   });
 
+  it("names the current holder, not a stale released one, when a unit is re-held after being given back", () => {
+    // c1 holds the last Black 17, then leaves: the reservation row becomes
+    // 'released', the unit is free again, but the old row still exists.
+    selling("c1", "Pebble", "spec-phones");
+    service.leaveStore(ctx(), "c1");
+    expect(reservationRow("c1").status).toBe("released");
+    expect(stockOf(db, "iphone-17", "Black", STORAGE_17)).toBe(1);
+    // c2 re-holds the same, now-free unit.
+    selling("c2", "Moss", "spec-phones-2");
+    expect(reservationRow("c2").status).toBe("held");
+    // c3 loses the race against c2's hold: must be told c2 (current), never c1 (stale).
+    const out = selling("c3", "River", "spec-phones");
+    expect(turnSay(out, "c3")).toMatch(/on hold for Moss/);
+    expect(turnSay(out, "c3")).not.toMatch(/Pebble/);
+  });
+
   it("keeps the tag until the second the hold ends, then it is gone for everyone with no timer, and the unit is buyable", () => {
     selling("c1", "Pebble", "spec-phones");
     const endsAt = reservationRow("c1").expires_at;
