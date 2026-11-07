@@ -36,3 +36,10 @@ his words: "i think we should have an interfacing agent which is the usual agent
 lecture lesson: week 9, "two context windows" and matching model to task (Sonnet by default, the top model for the genuinely hard subtasks): the expensive agent should not be the one in the conversational loop (lessons-by-week.md week 9 lesson 1).
 evidence: files `.claude/agents/interface.md`, `.claude/skills/brief`, `.claude/skills/status`; uncommitted
 
+### 2026-11-07 Scoping by batched choices with a recommendation moves faster than open interviews
+status: candidate
+what happened: Scoping ran as batches of 3 to 4 multiple-choice questions, each with a recommended option and its cost, then immediately wrote drafts and filed approved ones as issues. Eleven decisions (D48 to D52) and 8 issues were produced in one sitting. Ritesh took the recommendation on almost every question and used the choice to override only where he cared (none overridden this round).
+his words: "sure lets get started on all those"
+lecture lesson: week 8, lay out the options and their costs before a choice that is expensive to reverse, and let the person choose; week 6, then compound it into the harness (decisions recorded in SCOPE with dates).
+evidence: SCOPE.md D48 to D52; issues #1 to #8; drafts in .agents/drafts/
+
