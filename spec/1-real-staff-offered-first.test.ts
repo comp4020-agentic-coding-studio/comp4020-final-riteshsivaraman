@@ -10,7 +10,7 @@ import type { ClientMessage, ServerMessage } from "../src/shared/protocol.ts";
 import type { Profile } from "../src/shared/profile.ts";
 import { migrate } from "../src/server/migrate.ts";
 import { seedStock } from "../src/server/stock.ts";
-import { catchUpOffers, customersView, enter, handOverPost, OFFER_MS, releaseClaimsOf, requestTalk, stateOf, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
+import { catchUpOffers, customersView, enter, handOverPost, OFFER_MS, rejoin, releaseClaimsOf, requestTalk, stateOf, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
 
 // Issue #1, SCOPE D47 and D48. Promise: given a waiting customer, a free real
 // staff user is offered the customer before any CPU, exactly one staff member
@@ -417,5 +417,107 @@ describe("the offer passes on, and a released claim keeps its place (store servi
     catchUpOffers(ctx(t + 10));
     expect(offeredTo("ann")).toBe("tia");
     expect(offeredTo("bo")).toBeUndefined();
+  });
+
+  // ---- PR #27 review findings ----
+
+  it("one offer per staff user across requests: a second customer arriving later is not also offered to them", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -3 });
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("sam");
+    // a separate request, later: Bo arrives while Sam still holds Ann's offer
+    add("bo", { x: 1, z: -3 });
+    catchUpOffers(ctx(NOW + 1000), "bo");
+    expect(offeredTo("bo"), "Sam was offered Bo while still holding Ann's offer").toBeUndefined();
+    expect(offeredTo("ann")).toBe("sam");
+    expect(eventsOf("bo").filter((e) => e.type === "offer_made")).toEqual([]);
+  });
+
+  it("the greeter still holds back for a newcomer at the door while the only free staff user holds someone else's offer", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -3 }); // on the floor, offered to Sam
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("sam");
+    add("bo", { x: 0, z: -8 }); // steps in at the door: no offer of his own yet, Sam is taken by Ann's
+    const out = catchUpOffers(ctx(NOW + 1000), "bo");
+    expect(turnTo(out, "bo"), "the greeter took Bo while a free real staff user was in the room").toBeUndefined();
+    expect(eventsOf("bo").filter((e) => e.type === "npc_approached")).toEqual([]);
+  });
+
+  it("a lone staff user who lets the window pass is offered the same customer again, not leaving them stranded (D57b)", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -3 }); // on the floor: the greeter only takes people at the door
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("sam");
+    catchUpOffers(ctx(NOW + OFFER_MS), "ann");
+    expect(offeredTo("ann"), "Ann was left with nobody offered her after Sam let the window pass").toBe("sam");
+    const made = eventsOf("ann").filter((e) => e.type === "offer_made");
+    expect(made).toHaveLength(2);
+    expect(made[1]!.data).toMatchObject({ staffId: "sam", again: true });
+    // and it keeps looping for as long as she waits
+    catchUpOffers(ctx(NOW + 2 * OFFER_MS), "ann");
+    catchUpOffers(ctx(NOW + 8 * OFFER_MS), "ann");
+    expect(offeredTo("ann")).toBe("sam");
+  });
+
+  it("a newcomer nobody has been offered comes before a customer being looped back (D57b does not starve them)", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -3 });
+    waitedSince("ann", NOW - 5000);
+    catchUpOffers(ctx(), "ann");
+    add("bo", { x: 1, z: -3 }); // waited less, but nobody has had a chance to help him yet
+    catchUpOffers(ctx(NOW + OFFER_MS), "ann");
+    expect(offeredTo("bo")).toBe("sam");
+    expect(offeredTo("ann")).toBeUndefined();
+  });
+
+  it("a staff user who comes back (reconnect or restart) with a claimed customer open releases them back to the list, logged (review finding 1a)", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -7 });
+    waitedSince("ann", NOW - 4000);
+    catchUpOffers(ctx(), "ann");
+    requestTalk(ctx(NOW + 10), "sam", "ann");
+    expect(stateOf(mem, "ann")?.state).toBe("in_conversation");
+    rejoin(ctx(NOW + 2000), "sam", { kind: "specialist", specialty: "phones" });
+    expect(stateOf(mem, "ann")?.state, "Ann was put out to browsing, off the waiting list").toBe("arriving");
+    expect(eventsOf("ann").find((e) => e.type === "claim_released")?.data).toMatchObject({ staffId: "sam", waitingSince: NOW - 4000 });
+    catchUpOffers(ctx(NOW + 2010));
+    expect(offeredTo("ann")).toBe("sam");
+  });
+
+  it("a customer's offer does not survive their own reconnect: it is withdrawn, and the free staff user is offered them afresh, not the greeter (review finding 1b)", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -8 });
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("sam");
+    const t = NOW + 20_000; // past the window, but Sam never had a chance: Ann went away and came back
+    rejoin(ctx(t), "ann", { kind: "customer" });
+    expect(eventsOf("ann").find((e) => e.type === "offer_withdrawn")?.data).toMatchObject({ staffId: "sam", why: "customer left" });
+    const out = catchUpOffers(ctx(t), "ann");
+    expect(turnTo(out, "ann"), "the greeter took Ann though Sam was free the whole time").toBeUndefined();
+    expect(eventsOf("ann").filter((e) => e.type === "offer_expired")).toEqual([]);
+    expect(offeredTo("ann")).toBe("sam");
+  });
+
+  it("every offer, withdrawal, expiry, claim and release row is written before the change it records", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("tia", { x: 0, z: -5 }, "specialist");
+    add("ann", { x: 0, z: -3 });
+    catchUpOffers(ctx(), "ann");
+    expect(offeredTo("ann")).toBe("tia");
+    // Sam (not offered) claims her: Tia's offer ends with its own row
+    positions.set("sam", { x: 0, z: -4 });
+    requestTalk(ctx(NOW + 10), "sam", "ann");
+    expect(eventsOf("ann").find((e) => e.type === "offer_withdrawn")?.data).toMatchObject({ staffId: "tia", why: "claimed by another", by: "sam" });
+    const order = eventsOf("ann").map((e) => e.type);
+    expect(order.indexOf("staff_approached")).toBeLessThan(order.indexOf("conversation_started"));
   });
 });
