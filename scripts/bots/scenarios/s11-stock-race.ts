@@ -55,12 +55,15 @@ export async function runS11(baseUrl: string, latency: LatencyMode): Promise<Sce
 
     const wonA = /brought out|come and find you/i.test(outA.say);
     const wonB = /brought out|come and find you/i.test(outB.say);
-    const lostA = /gone: someone else has the last one/i.test(outA.say);
-    const lostB = /gone: someone else has the last one/i.test(outB.say);
+    // PR #21 (visible stock holds) changed the loser's line from an invented
+    // "someone else has the last one" to naming the actual holder: "is on
+    // hold for <name>" (service.ts:1266) -- told the truth, per #3's spec.
+    const lostA = /is on hold for \S/i.test(outA.say);
+    const lostB = /is on hold for \S/i.test(outB.say);
 
     if (wonA && wonB) failures.push(`S11: BOTH customers were told they got the Night Sky iPhone Duo (A said "${outA.say}", B said "${outB.say}") -- stock race sold two units of one`);
     else if (!wonA && !wonB) failures.push(`S11: NEITHER customer got the unit (A said "${outA.say}", B said "${outB.say}")`);
-    else if (!(lostA || lostB)) failures.push(`S11: one customer won but the other's refusal didn't say "someone else has the last one" (A: "${outA.say}", B: "${outB.say}")`);
+    else if (!(lostA || lostB)) failures.push(`S11: one customer won but the other's refusal didn't name the holder (A: "${outA.say}", B: "${outB.say}")`);
     else notes.push(`S11: exactly one customer won the race, as expected (${wonA ? "A" : "B"} got it)`);
 
     return { scenario: "S11 stock race", bots: 2, failures, rtts: [{ label: "S11 simultaneous confirm", ms: rtt }], notes };
