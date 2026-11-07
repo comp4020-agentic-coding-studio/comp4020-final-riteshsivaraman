@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   begin,
   canMove,
@@ -21,7 +21,7 @@ import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
 import { TABLE_ASSIGNMENTS } from "../shared/assignments.ts";
 import { ENTRANCE_ZONE, clampToWalkable, COUNTER, zoneOf } from "../shared/world.ts";
-import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
+import { CAST, castOf, CYCLE, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
 import { stockOf, takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
@@ -1876,6 +1876,7 @@ interface OfferData {
   offered?: string[]; // real staff users who let an offer of this customer pass, this wait
   claim?: { by: string; at: number; from: PlayerStateName; waitingSince: number }; // who has them, and where they stood on the list
   waitingSince?: number; // their place on the list, kept when a claim was released
+  cpu?: CpuMark; // a timetable customer: the visit it was promoted on, and where it waits (issue #20)
 }
 
 const offerData = (st: StateRow): OfferData => (st.data ? (JSON.parse(st.data) as OfferData) : {});
@@ -2074,7 +2075,8 @@ function realStaffFor(ctx: Ctx, st: StateRow): boolean {
 // own. She takes at most one. Called on every request that could change the
 // picture (a move, a join or leave, a settle poll).
 export function catchUpOffers(ctx: Ctx, first?: string): Outgoing[] {
-  const out = settleOffers(ctx);
+  const cpu = [...departCpuCustomers(ctx), ...promoteCpuCustomers(ctx)];
+  const out = [...cpu, ...settleOffers(ctx)];
   const order = waitingList(ctx).map((w) => w.st.visitor_id);
   const ids = first ? [first, ...order.filter((id) => id !== first)] : order;
   for (const id of ids) {
@@ -2082,6 +2084,144 @@ export function catchUpOffers(ctx: Ctx, first?: string): Outgoing[] {
     if (greeted.length > 0) return [...out, ...greeted];
   }
   return out;
+}
+
+// ---- timetable customers join the waiting list (D55, D56; ADR 10 option B; issue #20) ----
+//
+// A timetable customer (storeday.ts's CAST, "cust-1" and on) is drawn from the
+// clock and has no row anywhere, and nearly all of them stay that way. The one
+// moment one needs a row is when it would go on the waiting list: it is on the
+// floor needing help (`ctx.present` says so; see cpuCustomersOnFloor for the
+// live bridge) and a real staff user who could serve it is free. A real user is
+// offered a customer before a CPU staff member is (D47), so with nobody free
+// the timetable's own specialist serves it, and nothing is written.
+//
+// Promotion gives it what `enter()` gives a real visitor who picks the customer
+// role: a visitors row and a player_state row in a waiting state. From then on
+// it is a customer like any other: the same waiting list, offer, claim and
+// leaving code reads the same row, with no human-vs-CPU branch in any of it.
+// What is different is only who decides, and the decisions made here are the
+// ones ADR 10 settles: it waits where it was promoted, and once served (or once
+// its visit is over) it leaves through `leaveStore`, and is never handed back
+// to the timetable or put on the list again on that visit. The day repeats
+// every CYCLE seconds with the same ids, so the next day's visit is a new visit
+// and may be promoted again (orchestrator ruling, 2026-11-08), the way a real
+// visitor coming back is greeted again. How it answers in a conversation is
+// issue #39.
+
+const CPU_CUSTOMER_IDS: ReadonlySet<string> = new Set(CAST.filter((c) => c.role === "customer").map((c) => c.id));
+const CPU_SPECIALISTS: ReadonlySet<string> = new Set(CAST.filter((c) => c.role === "specialist").map((c) => c.id));
+
+// Which day of the repeating timetable `now` falls in: one visit per customer per day.
+export const visitOf = (now: number): number => Math.floor(now / (CYCLE * 1000));
+
+// What the promotion keeps on the customer's own player_state data (alongside
+// the offer fields): which visit it is, and where it waits.
+interface CpuMark {
+  visit: number;
+  at: { x: number; z: number };
+  promotedAt: number;
+}
+
+const cpuMarkOf = (data: string | null): CpuMark | undefined => (data ? (JSON.parse(data) as { cpu?: CpuMark }).cpu : undefined);
+
+const cpuRows = (db: Database.Database): StateRow[] =>
+  (db.prepare("SELECT * FROM player_state WHERE data LIKE '%\"cpu\":%'").all() as StateRow[]).filter((r) => CPU_CUSTOMER_IDS.has(r.visitor_id) && !!cpuMarkOf(r.data));
+
+// Whether this timetable customer may be promoted now: never on this visit yet.
+// A row from an earlier visit counts only once that visit has been left.
+function promotable(db: Database.Database, id: string, now: number): boolean {
+  if (!CPU_CUSTOMER_IDS.has(id)) return false;
+  const st = stateOf(db, id);
+  if (!st) return true;
+  const mark = cpuMarkOf(st.data);
+  return !!mark && st.state === "leaving" && mark.visit !== visitOf(now);
+}
+
+// Whether a real staff user who could open a conversation is free and in the room.
+const realStaffFree = (ctx: Ctx): boolean => ctx.employees.some((e) => canServe(e) && staffAvailable(ctx, e.id, "visitor") && !!ctx.position(e.id));
+
+function promoteCpuCustomers(ctx: Ctx): Outgoing[] {
+  const due = ctx.present.filter((id) => {
+    if (!promotable(ctx.db, id, ctx.now)) return false;
+    const at = ctx.position(id);
+    return !!at && zoneOf(at.x, at.z) !== "outside";
+  });
+  if (due.length === 0 || !realStaffFree(ctx)) return [];
+  for (const id of due) {
+    const at = { ...ctx.position(id)! };
+    const who = castOf(id);
+    ctx.db.transaction(() => {
+      // the token is what a browser signs in with: a random one nobody holds, so
+      // no client can ever connect as a timetable customer
+      ctx.db
+        .prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET last_seen = excluded.last_seen")
+        .run(id, `cpu-${randomBytes(24).toString("base64url")}`, NPC_NAME[id] ?? id, who.shirt, ctx.now, ctx.now);
+      log(ctx, id, "cpu_customer_promoted", { purpose: who.purpose ?? null, visit: visitOf(ctx.now), at, state: "waiting_for_help" });
+      setState(ctx, id, { state: "waiting_for_help", want: who.purpose ?? null, needs: null, with_id: null });
+      const mark: CpuMark = { visit: visitOf(ctx.now), at, promotedAt: ctx.now };
+      patchOfferData(ctx, id, { cpu: mark });
+    })();
+  }
+  return [staffViewMessage(ctx)];
+}
+
+// A promoted timetable customer leaves, through the same `leaveStore` a real
+// visitor's departure runs: once its conversation is over and nothing it is part
+// of is still under way (served), or once the floor no longer has it (its visit
+// is over: the live bridge only keeps it while its timetable day has it in the
+// store, or while it is busy).
+function departCpuCustomers(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  for (const st of cpuRows(ctx.db)) {
+    const id = st.visitor_id;
+    if (st.state === "leaving") continue;
+    const gone = !ctx.present.includes(id);
+    const served = st.state === "browsing" && customerFree(ctx, id) && !orderOfCustomer(ctx.db, id);
+    if (!gone && !served) continue;
+    log(ctx, id, "cpu_customer_departed", { why: gone ? "visit over" : "served" });
+    out.push(...leaveStore(ctx, id));
+  }
+  return out;
+}
+
+// The live bridge from the timetable to the store's rules: which timetable
+// customers are on the floor now, and where. A pure function of the clock and
+// the rows, so nothing needs a timer.
+//  - promoted on this visit and not left: held where it was promoted, for as
+//    long as its timetable day still has it in the store, and longer while it
+//    is in a conversation or has an order under way (nobody is cut off);
+//  - not promoted on this visit: only while the timetable has it standing at a
+//    table waiting for a specialist to come over, the moment it would go on the
+//    waiting list. Every other moment it is ambient and the rules never see it.
+export function cpuCustomersOnFloor(db: Database.Database, now: number): Map<string, { x: number; z: number }> {
+  const floor = new Map<string, { x: number; z: number }>();
+  const visit = visitOf(now);
+  for (const st of cpuRows(db)) {
+    const mark = cpuMarkOf(st.data)!;
+    if (st.state === "leaving") continue;
+    const busy = !FREE_STATES.includes(st.state) || !!openConversationOf(db, st.visitor_id) || !!orderOfCustomer(db, st.visitor_id);
+    if (busy || (mark.visit === visit && momentOf(st.visitor_id, now).present)) floor.set(st.visitor_id, mark.at);
+  }
+  for (const id of CPU_CUSTOMER_IDS) {
+    if (floor.has(id) || !promotable(db, id, now) || !waitingForSpecialist(id, now)) continue;
+    const m = momentOf(id, now);
+    floor.set(id, { x: m.x, z: m.z });
+  }
+  return floor;
+}
+
+// Whether the timetable has this customer standing at a table waiting for a
+// specialist: in the run of standing that ends in their chat with one.
+export function waitingForSpecialist(id: string, now: number): boolean {
+  const segs = timelineOf(id);
+  const tau = (((now / 1000) % CYCLE) + CYCLE) % CYCLE;
+  const i = segs.findIndex((s) => s.t0 <= tau && tau < s.t1);
+  if (i < 0 || segs[i]!.kind !== "stand") return false;
+  let j = i;
+  while (j < segs.length && segs[j]!.kind === "stand") j++;
+  const next = segs[j];
+  return !!next && next.kind === "act" && !!next.with && CPU_SPECIALISTS.has(next.with);
 }
 
 export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {

@@ -37,6 +37,7 @@ import {
   leaveStore,
   releaseClaimsOf,
   catchUpOffers,
+  cpuCustomersOnFloor,
   startInspect,
   startTalk,
   stateOf,
@@ -134,19 +135,30 @@ const present = (s: Session): Present => ({
 
 // The store service (service.ts) holds the rules and takes a database; this
 // hands it who is online and where, and delivers what it returns.
+// Issue #20: timetable customers who need help join the store's rules (the
+// waiting list, offers, claims) as customers, through `cpuCustomersOnFloor`.
+// Off unless CPU_CUSTOMERS_LIVE=1, because the client cannot yet press E at,
+// mark or hold a timetable customer (Store.tsx's E hint and OfferMarker only
+// know real visitors; Npcs.tsx keeps walking them on their timetable), so a
+// staff user would be offered someone they cannot claim (orchestrator ruling,
+// 2026-11-08: build the bridge, leave it off, client follow-up issue).
+const CPU_CUSTOMERS_LIVE = process.env.CPU_CUSTOMERS_LIVE === "1";
+
 function serviceCtx(): Ctx {
   const all = [...sessions.values()];
   const employees: Employee[] = all
     .filter((s) => s.kind !== "customer")
     .map((s) => ({ id: s.id, name: s.name, kind: s.kind as Employee["kind"], specialty: s.specialty }));
+  const now = Date.now();
+  const cpu = CPU_CUSTOMERS_LIVE ? cpuCustomersOnFloor(db, now) : new Map<string, { x: number; z: number }>();
   return {
     db,
-    now: Date.now(),
+    now,
     employees,
-    present: all.map((s) => s.id),
+    present: [...all.map((s) => s.id), ...cpu.keys()],
     position: (id) => {
       const s = sessions.get(id);
-      return s ? { x: s.x, z: s.z } : undefined;
+      return s ? { x: s.x, z: s.z } : cpu.get(id);
     },
   };
 }
