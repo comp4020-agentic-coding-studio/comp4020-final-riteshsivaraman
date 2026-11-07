@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Home screen</title>
+
+</head>
+<body>
+
+
+<style>
+body{margin:0;background:#000}
+body[data-cutout=island] .notch,body[data-cutout=island] .punch,body[data-cutout=notch] .island,body[data-cutout=notch] .punch,body[data-cutout=punch] .island,body[data-cutout=punch] .notch{display:none}
+
+.glass{background:rgba(255,255,255,0.22);-webkit-backdrop-filter:blur(24px) saturate(1.6);backdrop-filter:blur(24px) saturate(1.6);border:1px solid rgba(255,255,255,0.26);box-shadow:inset 0 1px 0 rgba(255,255,255,0.5),inset 0 -1px 0 rgba(255,255,255,0.12),0 10px 28px rgba(10,8,40,0.28)}
+.app{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;letter-spacing:0.1px;text-shadow:0 1px 3px rgba(0,0,0,0.25)}
+.ico{width:60px;height:60px;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 0.5px rgba(255,255,255,0.35),0 1px 2px rgba(0,0,0,0.18)}
+.ico svg{width:30px;height:30px;fill:none;stroke:#fff;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+</style>
+
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; box-sizing: border-box; color: #fff; font-family: Arial, 'Liberation Sans', sans-serif; background: radial-gradient(120% 55% at 15% 8%, #ff8a5c 0%, rgba(255,138,92,0) 60%), radial-gradient(90% 60% at 95% 42%, #7a5cff 0%, rgba(122,92,255,0) 65%), radial-gradient(120% 70% at 25% 105%, #ffe29a 0%, rgba(255,226,154,0) 55%), #1c1a4d">
+
+<div class="cut island" style="position: absolute; top: 11px; left: 132px; width: 126px; height: 37px; border-radius: 19px; background: #000"></div>
+<div class="cut notch" style="position: absolute; top: 0; left: 87px; width: 216px; height: 32px; border-radius: 0 0 20px 20px; background: #000"></div>
+<div class="cut punch" style="position: absolute; top: 14px; left: 182px; width: 26px; height: 26px; border-radius: 13px; background: #000"></div>
+
+<!-- status bar -->
+<div style="position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; align-items: center; justify-content: space-between; padding: 6px 30px 0 34px; box-sizing: border-box">
+<span style="font-size: 17px; font-weight: 600; letter-spacing: 0.1px; font-variant-numeric: tabular-nums">11:24</span>
+<div style="display: flex; align-items: center; gap: 6px">
+<svg width="18" height="12" viewBox="0 0 18 12" fill="#fff" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="0.8"/><rect x="5" y="5.5" width="3" height="6.5" rx="0.8"/><rect x="10" y="3" width="3" height="9" rx="0.8"/><rect x="15" y="0" width="3" height="12" rx="0.8"/></svg>
+<svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M1.5 4.2a9.5 9.5 0 0 1 13 0"/><path d="M4 7a6 6 0 0 1 8 0"/><circle cx="8" cy="10" r="1" fill="#fff" stroke="none"/></svg>
+<svg width="27" height="13" viewBox="0 0 27 13" aria-hidden="true"><rect x="0.5" y="0.5" width="23" height="12" rx="3.8" fill="none" stroke="#fff" stroke-opacity="0.45"/><rect x="2" y="2" width="17" height="9" rx="2.4" fill="#fff"/><rect x="25" y="4.2" width="1.6" height="4.6" rx="0.8" fill="#fff" fill-opacity="0.5"/></svg>
+</div>
+</div>
+
+<!-- weather widget (medium) -->
+<div class="glass" style="position: absolute; top: 70px; left: 27px; width: 336px; height: 154px; border-radius: 24px; box-sizing: border-box; padding: 16px 18px; display: flex; flex-direction: column; justify-content: space-between">
+<div style="display: flex; justify-content: space-between; align-items: flex-start">
+<div>
+<div style="font-size: 15px; font-weight: 600">Canberra</div>
+<div style="font-size: 44px; font-weight: 300; line-height: 50px; letter-spacing: -1px">18°</div>
+</div>
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="#ffe29a" stroke-width="2.4" stroke-linecap="round" aria-label="Clear" role="img"><circle cx="20" cy="20" r="7.5" fill="#ffe29a" fill-opacity="0.9" stroke="none"/><path d="M20 4v5M20 31v5M4 20h5M31 20h5M8.7 8.7l3.5 3.5M27.8 27.8l3.5 3.5M31.3 8.7l-3.5 3.5M12.2 27.8l-3.5 3.5"/></svg>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 500">
+<div style="text-align: center"><div style="opacity: 0.8">Now</div><div style="font-size: 15px; font-weight: 600; margin-top: 2px">18°</div></div>
+<div style="text-align: center"><div style="opacity: 0.8">12pm</div><div style="font-size: 15px; font-weight: 600; margin-top: 2px">20°</div></div>
+<div style="text-align: center"><div style="opacity: 0.8">2pm</div><div style="font-size: 15px; font-weight: 600; margin-top: 2px">22°</div></div>
+<div style="text-align: center"><div style="opacity: 0.8">4pm</div><div style="font-size: 15px; font-weight: 600; margin-top: 2px">21°</div></div>
+<div style="text-align: center"><div style="opacity: 0.8">6pm</div><div style="font-size: 15px; font-weight: 600; margin-top: 2px">17°</div></div>
+</div>
+</div>
+
+<!-- app grid: 4 columns, 84pt pitch -->
+<div style="position: absolute; top: 248px; left: 27px; right: 27px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 22px; justify-items: center">
+
+<div class="app"><div class="ico" style="background: linear-gradient(#ffb347,#ff7b5c)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="3.2"/><path d="M4 19l5-6 3.5 4 2.5-3 5 5z"/></svg></div>Photos</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#3a3a46,#14141a)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></div>Clock</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#ffffff,#e9e9ee)"><div style="text-align: center; color: #1c1c1e; line-height: 1; text-shadow: none"><div style="font-size: 10px; font-weight: 700; color: #ff3b30; letter-spacing: 0.4px">SUN</div><div style="font-size: 30px; font-weight: 300; margin-top: 1px">11</div></div></div>Calendar</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#fff3a8,#ffd84a)"><svg viewBox="0 0 24 24" style="stroke: #7a5a00" aria-hidden="true"><path d="M6 3.5h12v17H6z"/><path d="M9 8.5h6M9 12h6M9 15.5h3.5"/></svg></div>Notes</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#5ac8fa,#2a7de1)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></div>Weather</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#ff6b8b,#d6285a)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 17.5V6.5l9-2v11"/><circle cx="7.2" cy="17.5" r="2.3"/><circle cx="16.2" cy="15.5" r="2.3"/></svg></div>Music</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#5b8cff,#3a4fe0)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 8.5h13l-1 12h-11z"/><path d="M9 8.5a3 3 0 0 1 6 0"/></svg></div>Store</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#2c2c34,#0c0c10)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6.5" width="17" height="12" rx="2.5"/><path d="M3.5 10.5h17"/><path d="M6.5 15.5h4"/></svg></div>Wallet</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#a3a3ad,#6c6c76)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8" stroke-dasharray="3.2 2.6"/></svg></div>Settings</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#ff9f43,#e8590c)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2.5"/><rect x="8" y="6.5" width="8" height="3" rx="0.8"/><path d="M8.5 13.5h.01M12 13.5h.01M15.5 13.5h.01M8.5 17h.01M12 17h.01M15.5 17h.01"/></svg></div>Calculator</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#4fb3ff,#2377d9)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg></div>Files</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#ffffff,#e9e9ee)"><svg viewBox="0 0 24 24" style="stroke: #ff3b30" aria-hidden="true"><circle cx="8" cy="7.5" r="2"/><circle cx="8" cy="12.5" r="2"/><circle cx="8" cy="17.5" r="2"/><path d="M13 7.5h6M13 12.5h6M13 17.5h6"/></svg></div>Reminders</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#5fb2ff,#2b6fe0)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12.5" rx="2.5"/><path d="M4 8l8 5.5L20 8"/></svg></div>Mail</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#5ac8fa,#1f8fe5)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5c-2.6 2.4-3.6 5.4-3.6 8.5s1 6.1 3.6 8.5c2.6-2.4 3.6-5.4 3.6-8.5s-1-6.1-3.6-8.5zM3.8 12h16.4"/></svg></div>Web</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#b4b4bd,#7c7c88)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19.5c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5"/></svg></div>Contacts</div>
+
+<div class="app"><div class="ico" style="background: linear-gradient(#ffffff,#ececf1)"><svg viewBox="0 0 24 24" style="stroke: #ff2d55" aria-hidden="true"><path d="M12 19.5s-7-4.3-7-9.2A4 4 0 0 1 12 8a4 4 0 0 1 7 2.3c0 4.9-7 9.2-7 9.2z"/></svg></div>Health</div>
+
+</div>
+
+<!-- page dots -->
+<div style="position: absolute; top: 676px; left: 0; right: 0; display: flex; justify-content: center; gap: 9px">
+<span style="width: 7px; height: 7px; border-radius: 4px; background: #fff"></span>
+<span style="width: 7px; height: 7px; border-radius: 4px; background: rgba(255,255,255,0.4)"></span>
+<span style="width: 7px; height: 7px; border-radius: 4px; background: rgba(255,255,255,0.4)"></span>
+</div>
+
+<!-- dock -->
+<div class="glass" style="position: absolute; left: 12px; right: 12px; top: 718px; height: 92px; border-radius: 34px; box-sizing: border-box; padding: 0 12px; display: flex; align-items: center; justify-content: space-around">
+<div class="ico" style="background: linear-gradient(#5ee07a,#1fae4b)"><svg viewBox="0 0 24 24" aria-label="Phone" role="img"><path d="M6.6 3.5h3l1.3 4-2 1.3a11 11 0 0 0 5.3 5.3l1.3-2 4 1.3v3a2 2 0 0 1-2.2 2A15.5 15.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z"/></svg></div>
+<div class="ico" style="background: linear-gradient(#5ee07a,#1fae4b)"><svg viewBox="0 0 24 24" aria-label="Messages" role="img"><path d="M4 5.5h16v11H9.5L5 20.5v-4H4z"/></svg></div>
+<div class="ico" style="background: linear-gradient(#6fd0a0,#2b9d6b)"><svg viewBox="0 0 24 24" aria-label="Maps" role="img"><path d="M12 21s-6-5.5-6-10a6 6 0 0 1 12 0c0 4.5-6 10-6 10z"/><circle cx="12" cy="11" r="2.2"/></svg></div>
+<div class="ico" style="background: linear-gradient(#8e8e98,#4a4a54)"><svg viewBox="0 0 24 24" aria-label="Camera" role="img"><path d="M3 8.5h4l1.5-2.5h7L17 8.5h4V19H3z"/><circle cx="12" cy="13.5" r="3.6"/></svg></div>
+</div>
+
+<!-- home indicator -->
+<div style="position: absolute; bottom: 8px; left: 130px; width: 134px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.92)"></div>
+
+</div>
+
+
+<script>document.body.dataset.cutout=new URLSearchParams(location.search).get("cutout")||"island"</script>
+</body>
+</html>

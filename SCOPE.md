@@ -1,7 +1,7 @@
 ---
 status: draft
 what: Working scope for the new final-project idea (parody 3D retail store). Decisions, tiers, open items. Not a marked document.
-date: 2026-10-10
+date: 2026-11-07
 source: references/help-me-scope.md plus the scoping conversation of 2026-10-10
 ---
 
@@ -13,11 +13,24 @@ logos, no real product names, never presented as official.
 
 ## 0. The one idea
 
-A shared 3D store where **the Genius Bar queue is the shared state**. You can
-see who is ahead of you, in the room, and they are a mix of real visitors and
-CPU players. Everything in the MVP serves that. A feature that does not feed or
-read the queue, the room's crowding, or what visitors leave behind is a cut
-candidate.
+A shared 3D store where **staff attention, stock and demo tables are the
+scarce things real and CPU people share** (D47, 2026-11-07, replacing the
+"Genius Bar queue is the shared state" idea of 2026-10-10). Customers do not
+line up. They browse until a staff member walks over to them, as on a
+traditional retail floor. Everything in the MVP serves that. A feature that
+does not feed or read staff attention, stock, tables, the room's crowding, or
+what visitors leave behind is a cut candidate.
+
+**The waiting list (internal, never a visible line).** The server keeps a
+list of unattended customers, oldest first. Staff are the resource: when a
+staff member is free, they are assigned the longest-waiting customer they can
+help and walk over. **A real user behind a screen is always offered the
+customer before a CPU staff member** (a short human-first grace window before a
+CPU may take it; length open, see section 7). One staff member per customer,
+claimed atomically on the server. A claim is released if the staff member
+leaves, and a customer who is claimed by a human is never taken by a CPU.
+Status of the code: unbuilt (as of 2026-11-07 only the greeter approach and
+E-to-talk exist); a real staff user is not assigned arriving customers today.
 
 ## 0b. Direction for "what good means" (Ritesh's argument, 2026-10-10)
 
@@ -29,7 +42,8 @@ Not README text. The README prose is Ritesh's. This is the direction as stated:
   storage and memory options, being asked if you want to try other products
   (earbuds), swiping a card, being handed a bag.
 - Frustration examples given: a problem not resolved, a colour or configuration
-  out of stock, prices out of budget, long waits.
+  out of stock, prices out of budget, long waits (for a staff member to come
+  over, not in a line).
 - Source material: real visitor accounts collected in `references/accounts.md` (links
   only; contents not yet verified by the agent, see below).
 
@@ -37,13 +51,13 @@ What this implies for scope (inference, to confirm):
 
 - Products need **configurations** (colour, storage) with **shared, finite
   stock** that other visitors can deplete. That is a second shared resource
-  beside Genius Bar slots, which partly reopens D2's "exactly one".
+  beside staff attention (D2 originally named Genius Bar slots; see D47).
 - A visitor needs a **budget**, so "out of budget" is a state the store can
   produce. The budget comes from the customer's own answer to the budget question in the conversation, not from the entry screen.
 - Frustrations must be **designed, deterministic and visible** (a displayed
   wait, a stock count), not random punishments. Testable: an out-of-stock
   configuration cannot be bought. Judged: whether it feels frustrating.
-- Real-time contention is now on the product, not only the queue: two visitors
+- Real-time contention is now on the product, not only staff attention: two visitors
   racing for the last unit is the best concurrency test and the best moment.
 
 ## 1. Decisions made (by Ritesh)
@@ -51,7 +65,7 @@ What this implies for scope (inference, to confirm):
 | # | Decision | Date |
 |---|---|---|
 | D1 | Fresh idea on branch `new-idea`; nothing carried over from Seen | 2026-10-10 |
-| D2 | Scarce shared resource = Genius Bar appointment slots + visible queue | 2026-10-10 |
+| D2 | Scarce shared resource = Genius Bar appointment slots + visible queue. **Superseded by D47 (the visible queue part)** | 2026-10-10 |
 | D3 | Both real visitors and CPU players share the store | 2026-10-10 |
 | D4 | Movement: tap-to-walk first; joystick + drag-look is the second version | 2026-10-10 |
 | D5 | Client: React Three Fiber (+ drei) | 2026-10-10 |
@@ -96,6 +110,12 @@ What this implies for scope (inference, to confirm):
 | D44 | Apple's own assets and OS names (Ritesh, 2026-10-17): no Apple Design Resources (SF Pro, SF Symbols, UI kits, templates) in the repo or the shipped app, because the Apple Design Resources licence (2023-06-21) only permits mock-ups of UIs for Apple-platform software and bars embedding, extraction and distribution (sections 2A to 2C, 3); the downloaded files live outside the repo at `Final/apple-design-resources-reference-only/` as visual reference only. Everything on the phone screens stays procedural (D20 spirit, `docs/graphics-brief.md`). Extends D37: real OS and first-party app names (iOS, iPadOS, watchOS, "Dynamic Island") may be used the same way as real product and model names, sourced and dated; Apple's logo, wordmark and artwork stay invented. OS and app names are not yet sourced from Apple's pages; copy them from there before using | 2026-10-17 |
 | D45 | Poster and signage pictures are generated with the course image proxy and shipped as image files (Ritesh, 2026-10-19: "replace all handmade graphics posters with actual stuff using the image generation tool"). This is an explicit exception to the procedural-only rule (D20 spirit, `docs/graphics-brief.md`) and to CLAUDE.md's "reference only" note, for wall posters only: prompts ask for no text, logos or brand names, files are `src/client/public/posters/*.webp`, the old canvas posters remain as the fallback until each picture loads. Devices, furniture and everything else stay procedural | 2026-10-19 |
 | D46 | Talking has no handshake (Ritesh, 2026-10-21, after crit 10, where everyone was stuck behind one greeting and "Maya wants to talk" floated over every head): E at a free person opens the conversation at once, E at a busy one is refused with "with someone else", and nothing queues. The greeter opens a conversation with whoever is first inside the entrance while she is free; anyone she misses is left for E. An employee can press E at a free customer. Asking for help names the area and who is free; nobody is sent for the customer. Supersedes the intent-to-talk handshake (2026-10-19). The payment visit is the one thing that still travels: the specialist walks the phone to the customer and the payment opens on arrival | 2026-10-21 |
+| D47 | No visible queue, and customers never line up (Ritesh, 2026-11-07): a real Apple Store lets you browse until staff find you, and payment is taken on the spot by a staff handheld. The server keeps an internal waiting list of unattended customers with staff as the resource; a free staff member is assigned the next waiting customer and walks over. **A real user behind a screen is always prioritised over a CPU staff member** when assigning. Scarce shared things are staff attention, stock and demo tables. Supersedes the visible queue half of D2 and the queue wording in Tier 1 items 6 to 8 | 2026-11-07 |
+| D48 | Staff offers (Ritesh, 2026-11-07): a free real staff user is offered the longest-waiting customer with a marker over them and a HUD ping, nearest user first. They claim it by walking up and pressing E. The offer holds 15 seconds, then passes to the next nearest real user, then a CPU may take the customer. One staff member per customer, atomic claim. Issue #1 | 2026-11-07 |
+| D49 | Payment is on the staff handheld (Ritesh, 2026-11-07): every staff avatar carries a phone in a card-reader case. Beats: scan the box, total on the handheld and the customer's HUD, customer taps, receipt on the customer's phone (the receipt waits for the demo phone work). No register, no counter. Issue #2 | 2026-11-07 |
+| D50 | Stock holds are shown (Ritesh, 2026-11-07): the existing 5 minute hold at choice stays; add an "on hold for <name>, time left" tag and a live free-unit count for everyone. Hold is not moved to the scan. Issue #3 | 2026-11-07 |
+| D51 | Demo phones (Ritesh, 2026-11-07): screen state is shared per demo slot on the server; lock, home and three apps (Camera, Settings, Photos) drawn in canvas code; Camera shows a live low-res render of the store. Resolves the PNG question of D44: the pilot is redrawn as code, PNGs stay as design reference only. Issues 4a to 4c | 2026-11-07 |
+| D52 | After payment the customer opens the box by tapping it at a table and the phone becomes theirs; then a setup demo of five short steps, staff drives and the customer taps on the shared screen (Ritesh, 2026-11-07). Setup is a stretch goal if wave 2 slips | 2026-11-07 |
 
 **2026-10-14 follow-up, live feedback:** Ritesh played it and flagged the customer-POV flow as "way too linear" — the model was picked by a hidden dice roll and only revealed at checkout, there was no "not sure" option anywhere, and no compare/demo step at all; a fixed menu tree, no matter how many branches, was still "only like 1% of the possibilities." Fixed by making product choice its own first move (never hidden, `scripts/sim/product.ts`'s real two-candidate shortlist-by-budget replaces the silent pre-roll) and by wiring an **optional free-tier Gemini bridge** (`scripts/sim/ai.ts`, same shape as D8: env-var key, scripted fallback when missing or failed) so the human side of a conversation takes free text instead of a menu — answer, say "not sure" and get a real suggestion explained, ask a question back and have the same question stand until actually answered, or volunteer several facts in one breath (T7) and have them all land. The model only classifies/narrates; `setFact`/`handOff` stay in the deterministic engine, same AI boundary D8 already drew for the real game. Grounded against invented specs: the prompt is told to hedge on anything beyond name/tier/price (mirroring Dan's own "I don't want to guess" in T3), and `[verify]` Google's current free-tier data-use terms, checked live this session — free-tier content is used to improve Google's products, paid tier isn't; resolves the question this left open in section 6. With no key, every path still falls back to the original menu flow, so this is additive, not a replacement. The employee POV's NPC-customer side has **not** been upgraded to the same free-text engagement yet — an explicit next step, not silently finished.
 
@@ -212,11 +232,14 @@ confused customer.
    a token. No PII collected.
 5. **Live presence** over WebSocket: positions about 10 Hz, interpolated on the
    client, never persisted.
-6. **Genius Bar queue and slots**: join, leave, book a slot, cancel.
-   Server-authoritative; humans and CPUs go through the same code path.
-7. **CPU players**: take real slots and queue positions; behaviour is a pure
+6. **Staff assignment**: unattended customers sit on an internal waiting
+   list; a free staff member is assigned the longest-waiting one, real users
+   before CPUs (D47). Server-authoritative; humans and CPUs go through the
+   same code path. Genius Bar slot booking (join, book, cancel) is separate
+   and not yet confirmed as built.
+7. **CPU players**: take real slots and fill staff duty when no real user is free; behaviour is a pure
    function of server time and persisted state (no server tick).
-8. **Staff NPCs (2)**: scripted dialogue that reads live queue state.
+8. **Staff NPCs (2)**: scripted dialogue that reads live stock and who is free.
 9. **Customer NPCs (3 archetypes)**: arrive and leave on a time schedule,
    occupy devices, yield to humans (see D7 rules below).
 10. **One device interaction** that leaves a persistent trace for the next
@@ -252,14 +275,14 @@ dialogue variants. Behaviour is a state machine driven by server time.
 
 | Role | Can do | Cannot do | Evidence | Tier |
 |---|---|---|---|---|
-| Greeter / check-in | Welcome, ask need, put you on the list, call someone over | Sell, pay, check stock | Reel 1, A3 | 1 |
+| Greeter / check-in | Welcome, ask need, call someone over (the internal waiting list is the server's, not a sign-in) | Sell, pay, check stock | Reel 1, A3 | 1 |
 | Specialist (per product line: phone, laptop, tablet/watch, accessories) | Demo, recommend configs, offer extras, ask runner to check stock, start a sale | Help a different product line (hands you off); take payment | Reel 1, A2, careers pages | 1 (2 lines) |
 | Checkout handler | Take card, give receipt and bag | Know stock or product details | A1, Reel 1 | 1 |
 | Stock runner (back room) | Fetch an item, report real stock | Talk to the customer | A1 ("brought over"), Reel 1 | 1 |
 | Technician (repair/diagnosis role) | Diagnose, give an outcome (fixed, can't, replace) | Sell | Careers pages; accounts 4, 5, 7 unread | 1 |
 | Pickup / orders | Hand over a pre-paid order | Sell | A3 | 2 |
 | Manager | Take an escalation: apologise, "not much we can do" | Fix payment limbo | A1, A2 | 2 |
-| Session host | Run a time-scheduled group event | Serve a queue | Not sourced (my idea) | 3 |
+| Session host | Run a time-scheduled group event | Serve customers | Not sourced (my idea) | 3 |
 
 Staff verbs: greet, ask need, check in, call over, hand off, escort, demo,
 recommend, upsell, request stock check, fetch, quote, take payment, hand over
@@ -270,7 +293,7 @@ later (A2), say "help yourself" (reel 2), escalate, announce closing.
 
 Walk; look and tap a device to inspect/rotate; compare two; configure (colour,
 storage, memory) against live stock, price and budget; ask staff via option
-menus; check in; browse while waiting and watch the queue; accept or decline an
+menus; browse until staff come over; accept or decline an
 extra; pay (swipe or tap); take receipt and bag; leave happy; leave for a
 competitor; say a phrase to another visitor (D10). Later: trade in, drop off a
 device for repair, pick up an order.
@@ -358,7 +381,7 @@ whether stock is shared across stores.
 |---|---|---|
 | Visitor identity (id, name, colour, last seen) | Yes | No |
 | Genius Bar slots and bookings | Yes | Yes, to all sessions |
-| Queue order | Yes | Yes |
+| Waiting list of unattended customers (derived from presence and claims) | No: rebuilt from who is in the room | Yes, to staff |
 | Device trace (what the last visitor left) | Yes | Yes, to viewers of that device |
 | Events log | Yes | Optional feed |
 | Positions, presence, who is in the room | No (memory) | Yes |
@@ -367,14 +390,14 @@ whether stock is shared across stores.
 
 ## 5. Rules decided so far
 
-- **Server is authoritative** for slots, queue, device claims. Single Node
+- **Server is authoritative** for slots, staff claims, device claims. Single Node
   process with synchronous SQLite writes; claims and bookings use
   `BEGIN IMMEDIATE`. Schema constraints (unique slot, one active booking per
   visitor) enforce what code might forget.
 - **No background timers** for anything that must happen. The machine stops
   when idle; store deadlines in columns and catch up on the next request.
-- **Humans win over CPUs** for slots, devices and capacity. A CPU gives way,
-  never a human.
+- **Humans win over CPUs** for slots, devices, capacity and, above all, for
+  being assigned a waiting customer (D47). A CPU gives way, never a human.
 - **CPUs are labelled** (visibly, and in the README). Not disguised.
 - **Per-frame work stays in `useFrame`/refs**, not React state (phone perf).
 - **Phone first for rendering budget**: pixel ratio capped, no heavy
@@ -394,7 +417,7 @@ Proposed boundary, **not yet agreed**:
 2. Calls are made server-side only. The key lives in a Fly secret
    (`fly secrets set`) and in `mise.local.toml` (gitignored) for local dev.
    Never in a file in the repo, never in chat.
-3. AI output is flavour only. It can never change slots, queue, devices or any
+3. AI output is flavour only. It can never change slots, staff claims, devices or any
    persisted state.
 4. Per-visitor and global rate limits; short max input and output length.
 5. Conversation text is not stored.
@@ -425,7 +448,7 @@ app works. Not testable: whether the AI lines are good (judged).
   (humans waiting? CPUs despawn first?).
 - Open: the phrase pool for visitor-to-visitor talk (D10), and what the
   "AI suggests" step is allowed to see.
-- Open: what expires and what is kept for good (queue entries, bookings,
+- Open: what expires and what is kept for good (staff claims, bookings,
   device traces). The marker returns the next day, so this decides what they
   find.
 - Closed by D25: characters are procedural humans, so the creature vs human spike (D11) was not needed.
@@ -435,7 +458,8 @@ app works. Not testable: whether the AI lines are good (judged).
 - Open: device interaction and the persistent trace it leaves.
 - Open: the three customer archetypes (children/adults were suggested; if
   creatures, what are the types).
-- Open: how many CPU players, and what a CPU does when the queue is empty.
+- Open: how many CPU players, and what a CPU does when no customer is waiting.
+- Open: the human-first grace window before a CPU staff member may take a waiting customer (proposed 10 to 15 seconds), and whether a real user also gets first pick among several waiting customers.
 - Everything is procedural except generated posters and the logo (D45); no downloaded assets.
 - Crit group is **Dachi** (Wed 10:30 to 12:00, cutoff Wed 08:30, no
   exceptions listed): crit 9 cutoff **Wed 14 Oct 08:30**, crit 10 cutoff
@@ -447,7 +471,7 @@ app works. Not testable: whether the AI lines are good (judged).
 |---|---|---|
 | M0 | Placeholder deployed to Fly from this branch | `/` and `/readme/` live; deploy path proven |
 | M1 | Empty room, tap-to-walk, two browsers see each other | Both viewports; two Chrome profiles |
-| M2 | Queue + slots, atomic, persisted | Concurrent-claim test passes; survives restart |
+| M2 | Staff assignment + slots, atomic, persisted | Concurrent-claim test passes (two staff, one customer); survives restart |
 | M3 | CPU players + staff NPCs + cap | CPUs use the same path; cap enforced server-side |
 | M4 | Customer NPCs + device trace | Schedule is time-derived; trace persists |
 | M5 | README (Ritesh's prose), `CLAUDE.md`, spec traced to promises | `pnpm check` + `check:evidence` pass |
@@ -456,7 +480,8 @@ app works. Not testable: whether the AI lines are good (judged).
 ## 9. Harness skeleton (to be turned into real files later)
 
 Testable promises (candidates for `spec/`): two concurrent claims on one slot
-yield exactly one success; occupancy never exceeds the cap; CPUs never hold a
+yield exactly one success; two staff claiming the same waiting customer yield
+exactly one success; a CPU never takes a customer a real user can still claim; occupancy never exceeds the cap; CPUs never hold a
 slot a human requested first; a visitor id survives reconnect; data survives a
 server restart (may be manual or a documented crit-time check); with the AI key
 unset, dialogue falls back and nothing breaks.
@@ -470,4 +495,5 @@ they were judged.
 1. Phone viewport (touch, rendering budget).
 2. Visual quality without visual feedback; programmer-art look.
 3. NPC content (looks, dialogue, personalities) growing faster than the
-   queue mechanic, which is the thing that is marked.
+   shared-scarcity mechanics (staff assignment, stock), which are the things
+   that are marked.

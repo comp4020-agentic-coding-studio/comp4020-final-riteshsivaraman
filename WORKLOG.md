@@ -10,6 +10,16 @@ Read CLAUDE.md first --- it's the index of everything else ("Where things
 live"). This file is the current state; LEARNINGS.md and CUTS.md are the
 append-only history of gotchas and deliberate scope cuts.
 
+## Noted from play-testing, not started (2026-10-21)
+
+Ritesh's list, written down as he said it. Nothing here is built yet.
+
+1. After checking out the iPhone Air and going back to the table, the specialist asks again "do you want to demo the iPhone Air".
+2. When standing up to demo, then putting the device down, the specialist asks again straight away "do you want to demo the device".
+3. Sitting down at a table, getting up and demoing should be part of the conversation model properly (today they sit beside it as separate stages: the seat offer, the escort walk, the demo).
+4. It is awkward when Theo says "Theo will be with you soon" (a character naming themselves in the third person).
+5. The stock person meets the phone specialist at a specific spot, which looks odd. The stock person should come to wherever the specialist is.
+
 ## Talking without a handshake (2026-10-21)
 
 After crit 10 (everyone stuck behind one greeting, "Maya wants to talk" over every head) the intent

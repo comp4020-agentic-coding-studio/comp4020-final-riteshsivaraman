@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en" data-wallpaper="sequoia" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<title>macOS mini-reimplementation demo</title>
+<style>
+  :root {
+    --screen-w: 1120px;
+    --screen-h: 700px;
+    --menubar-h: 26px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0a0c;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .rig { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+  /* ---------- Laptop body ---------- */
+  .laptop {
+    position: relative;
+    padding: 16px 16px 0;
+    background: linear-gradient(170deg, #d7d9dc, #aeb1b6 55%, #9a9da3);
+    border-radius: 16px 16px 6px 6px;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .bezel {
+    position: relative;
+    width: var(--screen-w);
+    height: var(--screen-h);
+    background: #000;
+    border-radius: 7px;
+    padding: 3px;
+    box-shadow: inset 0 0 0 1px #2b2b2d;
+  }
+  .camera-notch {
+    position: absolute;
+    top: 9px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #050506;
+    box-shadow: 0 0 0 1px #1c1c1e, inset 0 0 1px rgba(100,130,170,0.5);
+    z-index: 500;
+  }
+  .deck {
+    width: calc(var(--screen-w) + 32px);
+    height: 18px;
+    margin-left: -16px;
+    background: linear-gradient(180deg, #c7c9cd, #9a9da3);
+    border-radius: 0 0 10px 10px;
+    position: relative;
+  }
+  .deck::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 130px; height: 6px;
+    background: #85888e;
+    border-radius: 0 0 8px 8px;
+  }
+  .hinge-shadow {
+    height: 10px;
+    width: calc(var(--screen-w) + 60px);
+    margin: -6px auto 0;
+    background: radial-gradient(60% 100% at 50% 0%, rgba(0,0,0,0.35), transparent 70%);
+  }
+
+  /* ---------- Screen ---------- */
+  .screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 5px;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .view {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.35s ease-out;
+  }
+  .view.active { opacity: 1; pointer-events: auto; }
+
+  /* ---------- Wake gate ---------- */
+  #off {
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  #off .wake-label {
+    color: #4a4a4e;
+    font-size: 13px;
+    text-align: center;
+    line-height: 1.8;
+    letter-spacing: 0.2px;
+  }
+  #off .wake-label b { color: #8a8a8e; display: block; font-size: 15px; font-weight: 500; }
+  #off:hover .wake-label b { color: #aaa; }
+
+  /* ---------- Shared wallpaper layer ---------- */
+  .wallpaper { background-color: #1b3a5c; }
+  .wallpaper::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+    opacity: 0.035;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+
+  /* --- Wallpaper: "sequoia" — fanned warm/cool rays from a high point, as in the real
+     macOS Sequoia default (reference: Wikipedia "Screenshot of macOS Sequoia.png" — a
+     sunburst of orange/gold through blue bands). Recreated as layered conic + radial
+     gradients, not the literal photographic artwork. */
+  [data-wallpaper="sequoia"] .wallpaper {
+    background:
+      radial-gradient(60% 50% at 50% -6%, rgba(255,226,170,0.9), rgba(255,180,90,0.5) 30%, transparent 62%),
+      conic-gradient(from 200deg at 50% -10%,
+        #1d4f8c 0deg, #2f6fb0 35deg, #ffb25c 60deg, #fff3d6 90deg,
+        #ffb25c 120deg, #2f6fb0 150deg, #163a63 180deg, #1d4f8c 220deg,
+        #2f6fb0 260deg, #163a63 300deg, #1d4f8c 360deg),
+      linear-gradient(180deg, #11335c, #0b2444);
+    background-blend-mode: screen, normal, normal;
+  }
+
+  /* --- Wallpaper: "sonoma" — concentric soft rings of colour, evoking the real macOS
+     Sonoma default "Radial" family (soft overlapping colour discs on a dark field),
+     recreated procedurally rather than copied. */
+  [data-wallpaper="sonoma"] .wallpaper {
+    background:
+      radial-gradient(38% 46% at 30% 28%, rgba(255,140,170,0.75), transparent 68%),
+      radial-gradient(42% 50% at 70% 24%, rgba(130,150,255,0.7), transparent 68%),
+      radial-gradient(50% 60% at 50% 62%, rgba(255,190,110,0.55), transparent 70%),
+      radial-gradient(60% 70% at 24% 78%, rgba(120,210,200,0.5), transparent 70%),
+      radial-gradient(70% 80% at 50% 50%, rgba(30,20,55,0.0), rgba(10,8,22,0.9) 85%),
+      linear-gradient(160deg, #241a3e, #120d22);
+    animation: sonomaDrift 80s ease-in-out infinite alternate;
+  }
+  @keyframes sonomaDrift {
+    0%   { background-position: 30% 28%, 70% 24%, 50% 62%, 24% 78%, 0 0, 0 0; }
+    100% { background-position: 34% 24%, 66% 28%, 52% 58%, 28% 74%, 0 0, 0 0; }
+  }
+
+  /* --- Wallpaper: "ventura" — a deep-blue layered wave horizon, evoking the stock
+     macOS Ventura/Big Sur wave-on-dark-water family. Procedural layered sine-ish
+     blobs, no downloaded art. */
+  [data-wallpaper="ventura"] .wallpaper {
+    background:
+      radial-gradient(120% 60% at 50% 0%, rgba(120,170,255,0.25), transparent 60%),
+      radial-gradient(90% 50% at 20% 60%, rgba(40,90,160,0.8), transparent 65%),
+      radial-gradient(100% 55% at 85% 72%, rgba(20,150,150,0.5), transparent 65%),
+      linear-gradient(195deg, #0d2847 0%, #081b33 45%, #050f1f 100%);
+    animation: venturaDrift 95s ease-in-out infinite alternate;
+  }
+  @keyframes venturaDrift {
+    0%   { background-position: 50% 0%, 20% 60%, 85% 72%, 0 0; }
+    100% { background-position: 50% 4%, 26% 56%, 80% 76%, 0 0; }
+  }
+
+  /* ---------- Lock / login screen ---------- */
+  #lock { display: flex; flex-direction: column; align-items: center; color: #fff; }
+  #lock .wallpaper-blur {
+    position: absolute; inset: 0;
+    filter: blur(34px) brightness(0.62) saturate(1.1);
+    transform: scale(1.08);
+  }
+  #lock-time {
+    position: relative;
+    margin-top: 58px;
+    font-size: 66px;
+    font-weight: 600;
+    letter-spacing: -1px;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+    font-variant-numeric: tabular-nums;
+  }
+  #lock-date { position: relative; font-size: 16px; font-weight: 500; opacity: 0.92; margin-top: 2px; text-shadow: 0 1px 8px rgba(0,0,0,0.3); }
+  .lock-avatar {
+    position: relative;
+    margin-top: 34px;
+    width: 84px; height: 84px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8a8f99, #4b4f58);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.25);
+  }
+  .lock-name { position: relative; margin-top: 12px; font-size: 15px; font-weight: 600; text-shadow: 0 1px 6px rgba(0,0,0,0.3); }
+  .lock-pw-row {
+    position: relative;
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .lock-pw {
+    width: 220px;
+    height: 32px;
+    border-radius: 16px;
+    border: none;
+    outline: none;
+    background: rgba(255,255,255,0.18);
+    backdrop-filter: blur(16px) saturate(1.5);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    color: #fff;
+    font-size: 13px;
+    padding: 0 14px;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.3), 0 4px 12px rgba(0,0,0,0.2);
+  }
+  .lock-pw::placeholder { color: rgba(255,255,255,0.65); }
+  .lock-pw-go {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.22);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.3);
+  }
+  .lock-pw-go:hover { background: rgba(255,255,255,0.32); }
+  .lock-hint { position: relative; margin-top: 46px; font-size: 12px; opacity: 0.7; text-shadow: 0 1px 6px rgba(0,0,0,0.3); }
+
+  /* ---------- Desktop ---------- */
+  #desktop { }
+  #desktop-icons {
+    position: absolute;
+    top: calc(var(--menubar-h) + 20px);
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    z-index: 2;
+  }
+  .desk-icon { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 68px; cursor: default; }
+  .desk-icon .di-glyph { width: 40px; height: 40px; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
+  .desk-icon span { color: #fff; font-size: 11px; text-shadow: 0 1px 2px rgba(0,0,0,0.6); text-align: center; }
+
+  /* Menu bar */
+  .menubar {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: var(--menubar-h);
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(24px) saturate(1.8);
+    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    z-index: 300;
+    font-size: 13px;
+    color: #1d1d1f;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.06);
+  }
+  [data-theme="dark"] .menubar { background: rgba(28,28,30,0.55); color: #f2f2f3; }
+  .menubar-left { display: flex; align-items: center; gap: 16px; height: 100%; }
+  .mb-apple { display: flex; align-items: center; cursor: pointer; padding: 0 2px; height: 100%; border-radius: 4px; }
+  .mb-apple:hover, .mb-apple.open { background: rgba(0,0,0,0.08); }
+  [data-theme="dark"] .mb-apple:hover, [data-theme="dark"] .mb-apple.open { background: rgba(255,255,255,0.14); }
+  .mb-apple svg { display: block; }
+  .mb-app-name { font-weight: 700; }
+  .mb-menu-word { cursor: default; opacity: 0.92; }
+  .menubar-right { display: flex; align-items: center; gap: 13px; height: 100%; }
+  .menubar-right svg { display: block; cursor: default; }
+  .mb-clock { font-variant-numeric: tabular-nums; cursor: default; white-space: nowrap; }
+
+  .apple-menu {
+    position: absolute;
+    top: var(--menubar-h);
+    left: 6px;
+    width: 230px;
+    background: rgba(246,246,248,0.88);
+    backdrop-filter: blur(26px) saturate(1.8);
+    -webkit-backdrop-filter: blur(26px) saturate(1.8);
+    border-radius: 9px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3), inset 0 0 0 0.5px rgba(255,255,255,0.4);
+    padding: 5px;
+    z-index: 301;
+    display: none;
+    font-size: 13.5px;
+    color: #1d1d1f;
+  }
+  [data-theme="dark"] .apple-menu { background: rgba(50,50,53,0.88); color: #f2f2f3; }
+  .apple-menu.open { display: block; }
+  .am-item { padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+  .am-item:hover { background: #0a84ff; color: #fff; }
+  .am-sep { height: 1px; background: rgba(0,0,0,0.12); margin: 4px 6px; }
+  [data-theme="dark"] .am-sep { background: rgba(255,255,255,0.14); }
+
+  /* Dock */
+  .dock-wrap {
+    position: absolute;
+    bottom: 8px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 290;
+    pointer-events: none;
+  }
+  .dock {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 7px;
+    padding: 6px 8px;
+    height: 56px;
+    background: rgba(255,255,255,0.28);
+    backdrop-filter: blur(22px) saturate(1.7);
+    -webkit-backdrop-filter: blur(22px) saturate(1.7);
+    border-radius: 16px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 0 0 0.5px rgba(255,255,255,0.3), 0 10px 26px rgba(0,0,0,0.35);
+  }
+  [data-theme="dark"] .dock { background: rgba(40,40,44,0.38); }
+  .dock-item {
+    position: relative;
+    width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s ease-out;
+    flex-shrink: 0;
+  }
+  .dock-item:hover { transform: translateY(-9px) scale(1.18); }
+  .dock-item .glyph { width: 100%; height: 100%; clip-path: url(#squircle); position: relative; overflow: hidden; }
+  .dock-item .glyph::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.25), rgba(255,255,255,0) 35%, rgba(0,0,0,0.08) 100%);
+    pointer-events: none;
+  }
+  .dock-item .run-dot {
+    position: absolute;
+    bottom: -7px; left: 50%;
+    transform: translateX(-50%);
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: #6b6b6f;
+    opacity: 0;
+  }
+  [data-theme="dark"] .dock-item .run-dot { background: #d0d0d5; }
+  .dock-item.running .run-dot { opacity: 1; }
+  .dock-sep { width: 1px; align-self: stretch; margin: 4px 3px; background: rgba(0,0,0,0.18); }
+  [data-theme="dark"] .dock-sep { background: rgba(255,255,255,0.22); }
+
+  /* ---------- Windows ---------- */
+  .mac-window {
+    position: absolute;
+    display: none;
+    flex-direction: column;
+    background: #ececec;
+    border-radius: 10px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(0,0,0,0.3);
+    overflow: hidden;
+  }
+  [data-theme="dark"] .mac-window { background: #2b2b2e; }
+  .mac-window.shown { display: flex; }
+  .mac-window.maxed { top: calc(var(--menubar-h) + 4px) !important; left: 4px !important; width: calc(var(--screen-w) - 8px) !important; height: calc(var(--screen-h) - var(--menubar-h) - 8px) !important; }
+  .win-titlebar {
+    height: 36px;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, #ececec, #dedede);
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    position: relative;
+    cursor: default;
+    border-bottom: 1px solid #cfcfd1;
+  }
+  [data-theme="dark"] .win-titlebar { background: linear-gradient(180deg, #38383b, #2e2e31); border-bottom-color: #1c1c1e; }
+  .mac-window.focused .win-titlebar { background: linear-gradient(180deg, #f5f5f5, #e6e6e8); }
+  [data-theme="dark"] .mac-window.focused .win-titlebar { background: linear-gradient(180deg, #45454a, #3a3a3d); }
+  .traffic-lights { display: flex; gap: 8px; }
+  .tl {
+    width: 12px; height: 12px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .tl svg { opacity: 0; width: 7px; height: 7px; }
+  .traffic-lights:hover .tl svg { opacity: 1; }
+  .tl-close { background: #ff5f57; }
+  .tl-min { background: #febc2e; }
+  .tl-zoom { background: #28c840; }
+  .mac-window:not(.focused) .tl { background: #d6d6d6 !important; }
+  [data-theme="dark"] .mac-window:not(.focused) .tl { background: #4a4a4d !important; }
+  .win-title {
+    position: absolute; left: 0; right: 0; text-align: center;
+    font-size: 13px; font-weight: 600; color: #3a3a3c; pointer-events: none;
+  }
+  [data-theme="dark"] .win-title { color: #e4e4e6; }
+  .win-body { flex: 1; display: flex; overflow: hidden; background: #fff; color: #1d1d1f; }
+  [data-theme="dark"] .win-body { background: #262628; color: #f0f0f1; }
+
+  /* Finder */
+  .fd-sidebar { width: 170px; flex-shrink: 0; background: #f3f3f4; border-right: 1px solid #e0e0e1; padding: 10px 0; overflow-y: auto; }
+  [data-theme="dark"] .fd-sidebar { background: #2a2a2d; border-right-color: #1c1c1e; }
+  .fd-section-label { font-size: 11px; font-weight: 600; color: #8e8e93; padding: 10px 14px 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .fd-row { display: flex; align-items: center; gap: 7px; padding: 4px 14px; font-size: 13px; cursor: pointer; border-radius: 6px; margin: 0 6px; }
+  .fd-row:hover { background: rgba(0,0,0,0.05); }
+  [data-theme="dark"] .fd-row:hover { background: rgba(255,255,255,0.08); }
+  .fd-row.on { background: #0a84ff; color: #fff; }
+  .fd-row svg { flex-shrink: 0; }
+  .fd-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .fd-toolbar { height: 38px; flex-shrink: 0; border-bottom: 1px solid #e0e0e1; display: flex; align-items: center; padding: 0 12px; font-size: 13px; font-weight: 600; color: #3a3a3c; gap: 8px; }
+  [data-theme="dark"] .fd-toolbar { border-bottom-color: #1c1c1e; color: #e4e4e6; }
+  .fd-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .fd-file { display: flex; align-items: center; gap: 9px; padding: 5px 14px; font-size: 13px; }
+  .fd-file:hover { background: rgba(10,132,255,0.1); }
+  .fd-file .fname { flex: 1; }
+  .fd-file .fmeta { color: #8e8e93; font-size: 12px; width: 90px; text-align: right; }
+
+  /* System Settings */
+  .st-sidebar { width: 215px; flex-shrink: 0; background: #ebebec; border-right: 1px solid #dcdcdd; overflow-y: auto; padding: 8px 0 8px; }
+  [data-theme="dark"] .st-sidebar { background: #262629; border-right-color: #1a1a1c; }
+  .st-search { margin: 4px 10px 8px; height: 26px; border-radius: 7px; background: rgba(0,0,0,0.06); display: flex; align-items: center; gap: 6px; padding: 0 8px; font-size: 12.5px; color: #8e8e93; }
+  [data-theme="dark"] .st-search { background: rgba(255,255,255,0.08); }
+  .st-profile { display: flex; align-items: center; gap: 9px; padding: 6px 10px; margin: 0 4px 8px; border-radius: 8px; cursor: default; }
+  .st-profile .av { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg,#9a9ea5,#5b5e64); flex-shrink: 0; }
+  .st-profile .lbl { font-size: 12.5px; line-height: 1.3; }
+  .st-profile .lbl b { display: block; font-size: 13px; color: #0a84ff; font-weight: 600; }
+  .st-row { display: flex; align-items: center; gap: 8px; padding: 5px 12px; margin: 0 6px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .st-row:hover { background: rgba(0,0,0,0.05); }
+  [data-theme="dark"] .st-row:hover { background: rgba(255,255,255,0.08); }
+  .st-row.on { background: #0a84ff; color: #fff; }
+  .st-icon { width: 22px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .st-main { flex: 1; overflow-y: auto; padding: 18px 26px; }
+  .st-page-title { font-size: 22px; font-weight: 700; margin-bottom: 14px; }
+  .st-card {
+    display: flex; align-items: center; gap: 12px;
+    background: #fff; border: 1px solid #e4e4e5; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 8px; font-size: 13px; cursor: default;
+  }
+  [data-theme="dark"] .st-card { background: #313134; border-color: #1f1f21; }
+  .st-card .sc-label { flex: 1; }
+  .st-card .sc-value { color: #8e8e93; font-size: 12.5px; }
+  .st-card .sc-chev { color: #c2c2c4; font-size: 14px; }
+  .st-card.clickable { cursor: pointer; }
+  .st-card.clickable:hover { background: #f5f5f6; }
+  [data-theme="dark"] .st-card.clickable:hover { background: #38383b; }
+  .st-wp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 6px; }
+  .st-wp-thumb { aspect-ratio: 16/10; border-radius: 9px; cursor: pointer; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.25); overflow: hidden; }
+  .st-wp-thumb .wallpaper { position: absolute; inset: 0; }
+  .st-wp-thumb.selected { box-shadow: 0 0 0 3px #0a84ff, 0 2px 8px rgba(0,0,0,0.25); }
+  .st-wp-name { font-size: 11.5px; text-align: center; margin-top: 5px; color: #6e6e73; }
+  [data-theme="dark"] .st-wp-name { color: #9a9a9e; }
+  .st-appearance-row { display: flex; gap: 14px; margin-top: 6px; }
+  .st-appear-opt { flex: 1; text-align: center; cursor: pointer; }
+  .st-appear-swatch { height: 56px; border-radius: 9px; margin-bottom: 6px; box-shadow: 0 0 0 0.5px rgba(0,0,0,0.1); }
+  .st-appear-opt.selected .st-appear-swatch { box-shadow: 0 0 0 3px #0a84ff; }
+  .toggle-sw { width: 38px; height: 22px; border-radius: 11px; background: #d0d0d2; position: relative; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }
+  .toggle-sw.on { background: #34c759; }
+  .toggle-sw .kn { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+  .toggle-sw.on .kn { transform: translateX(16px); }
+
+  /* Notes (split view) */
+  .nt-sidebar { width: 220px; flex-shrink: 0; background: #f6f3ea; border-right: 1px solid #e3e0d5; overflow-y: auto; }
+  [data-theme="dark"] .nt-sidebar { background: #2a2824; border-right-color: #1c1b18; }
+  .nt-row { padding: 9px 14px; border-bottom: 1px solid #ece8da; cursor: pointer; }
+  [data-theme="dark"] .nt-row { border-bottom-color: #37352f; }
+  .nt-row.on { background: #ffd93d33; }
+  .nt-row .nt-title { font-size: 13px; font-weight: 600; }
+  .nt-row .nt-meta { font-size: 11.5px; color: #9a968a; margin-top: 1px; }
+  .nt-editor { flex: 1; padding: 20px 26px; outline: none; font-size: 15px; line-height: 1.5; overflow-y: auto; background: #fffdf6; }
+  [data-theme="dark"] .nt-editor { background: #1f1e1b; }
+  .nt-editor b { font-size: 19px; display: block; margin-bottom: 8px; }
+
+  /* Calculator */
+  #win-calculator .win-body { background: #1c1c1e; flex-direction: column; }
+  .calc-display { color: #fff; font-size: 44px; font-weight: 300; text-align: right; padding: 18px 16px 6px; min-height: 60px; }
+  .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; flex: 1; background: #000; }
+  .calc-btn { display: flex; align-items: center; justify-content: center; font-size: 19px; color: #fff; background: #333336; cursor: pointer; user-select: none; }
+  .calc-btn:active { filter: brightness(1.3); }
+  .calc-btn.op { background: #ff9f0a; }
+  .calc-btn.fn { background: #a5a5aa; color: #1c1c1e; }
+  .calc-btn.zero { grid-column: span 2; justify-content: flex-start; padding-left: 28px; }
+
+  .toast {
+    position: absolute;
+    top: 42px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(40,40,40,0.92);
+    color: #fff;
+    font-size: 12.5px;
+    padding: 7px 16px;
+    border-radius: 12px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 900;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  .caption {
+    color: #999;
+    text-align: center;
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    max-width: 520px;
+    line-height: 1.5;
+  }
+  .caption b { color: #ccc; }
+  .sleep-link { color: #777; font-size: 13px; cursor: pointer; text-align: center; }
+  .sleep-link:hover { color: #aaa; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <clipPath id="squircle" clipPathUnits="objectBoundingBox">
+      <path d="M 1.0,0.5 L 0.9998,0.6445 L 0.9992,0.6905 L 0.9982,0.7239 L 0.9968,0.751 L 0.9949,0.7741 L 0.9927,0.7944 L 0.9901,0.8126 L 0.987,0.8291 L 0.9835,0.8441 L 0.9796,0.858 L 0.9752,0.8709 L 0.9704,0.8828 L 0.9651,0.8939 L 0.9594,0.9043 L 0.9531,0.9139 L 0.9464,0.9229 L 0.9391,0.9313 L 0.9313,0.9391 L 0.9229,0.9464 L 0.9139,0.9531 L 0.9043,0.9594 L 0.8939,0.9651 L 0.8828,0.9704 L 0.8709,0.9752 L 0.858,0.9796 L 0.8441,0.9835 L 0.8291,0.987 L 0.8126,0.9901 L 0.7944,0.9927 L 0.7741,0.9949 L 0.751,0.9968 L 0.7239,0.9982 L 0.6905,0.9992 L 0.6445,0.9998 L 0.5,1.0 L 0.3555,0.9998 L 0.3095,0.9992 L 0.2761,0.9982 L 0.249,0.9968 L 0.2259,0.9949 L 0.2056,0.9927 L 0.1874,0.9901 L 0.1709,0.987 L 0.1559,0.9835 L 0.142,0.9796 L 0.1291,0.9752 L 0.1172,0.9704 L 0.1061,0.9651 L 0.0957,0.9594 L 0.0861,0.9531 L 0.0771,0.9464 L 0.0687,0.9391 L 0.0609,0.9313 L 0.0536,0.9229 L 0.0469,0.9139 L 0.0406,0.9043 L 0.0349,0.8939 L 0.0296,0.8828 L 0.0248,0.8709 L 0.0204,0.858 L 0.0165,0.8441 L 0.013,0.8291 L 0.0099,0.8126 L 0.0073,0.7944 L 0.0051,0.7741 L 0.0032,0.751 L 0.0018,0.7239 L 0.0008,0.6905 L 0.0002,0.6445 L 0.0,0.5 L 0.0002,0.3555 L 0.0008,0.3095 L 0.0018,0.2761 L 0.0032,0.249 L 0.0051,0.2259 L 0.0073,0.2056 L 0.0099,0.1874 L 0.013,0.1709 L 0.0165,0.1559 L 0.0204,0.142 L 0.0248,0.1291 L 0.0296,0.1172 L 0.0349,0.1061 L 0.0406,0.0957 L 0.0469,0.0861 L 0.0536,0.0771 L 0.0609,0.0687 L 0.0687,0.0609 L 0.0771,0.0536 L 0.0861,0.0469 L 0.0957,0.0406 L 0.1061,0.0349 L 0.1172,0.0296 L 0.1291,0.0248 L 0.142,0.0204 L 0.1559,0.0165 L 0.1709,0.013 L 0.1874,0.0099 L 0.2056,0.0073 L 0.2259,0.0051 L 0.249,0.0032 L 0.2761,0.0018 L 0.3095,0.0008 L 0.3555,0.0002 L 0.5,0.0 L 0.6445,0.0002 L 0.6905,0.0008 L 0.7239,0.0018 L 0.751,0.0032 L 0.7741,0.0051 L 0.7944,0.0073 L 0.8126,0.0099 L 0.8291,0.013 L 0.8441,0.0165 L 0.858,0.0204 L 0.8709,0.0248 L 0.8828,0.0296 L 0.8939,0.0349 L 0.9043,0.0406 L 0.9139,0.0469 L 0.9229,0.0536 L 0.9313,0.0609 L 0.9391,0.0687 L 0.9464,0.0771 L 0.9531,0.0861 L 0.9594,0.0957 L 0.9651,0.1061 L 0.9704,0.1172 L 0.9752,0.1291 L 0.9796,0.142 L 0.9835,0.1559 L 0.987,0.1709 L 0.9901,0.1874 L 0.9927,0.2056 L 0.9949,0.2259 L 0.9968,0.249 L 0.9982,0.2761 L 0.9992,0.3095 L 0.9998,0.3555 Z" />
+    </clipPath>
+  </defs>
+</svg>
+
+<div class="rig" id="rig">
+  <div class="laptop" id="laptop">
+    <div class="camera-notch"></div>
+    <div class="bezel">
+      <div class="screen" id="screen">
+
+        <!-- Wake gate -->
+        <div class="view active" id="off">
+          <div class="wake-label"><b>Click to wake</b>Display is asleep<br>(this is the gate the real feature needs)</div>
+        </div>
+
+        <!-- Lock / login screen -->
+        <div class="view wallpaper" id="lock">
+          <div class="wallpaper-blur wallpaper"></div>
+          <div id="lock-time">9:41</div>
+          <div id="lock-date">Monday, 12 October</div>
+          <div class="lock-avatar" id="lock-avatar">R</div>
+          <div class="lock-name">Ritesh</div>
+          <div class="lock-pw-row">
+            <input class="lock-pw" id="lock-pw" type="password" placeholder="Enter Password" autocomplete="off" />
+            <div class="lock-pw-go" id="lock-pw-go">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M7 4l10 8-10 8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+          </div>
+          <div class="lock-hint">Click or press Enter to continue &mdash; nothing here is actually checked</div>
+        </div>
+
+        <!-- Desktop -->
+        <div class="view wallpaper" id="desktop">
+          <div class="menubar">
+            <div class="menubar-left">
+              <div class="mb-apple" id="mb-apple">
+                <svg width="15" height="15" viewBox="0 0 170 170"><path fill="currentColor" d="M150.4 129.8c-2.7 6.3-6 12.1-9.8 17.5-5.2 7.4-9.5 12.5-12.8 15.4-5.1 4.8-10.6 7.2-16.5 7.4-4.2.1-9.3-1.2-15.2-3.9-5.9-2.7-11.4-3.9-16.3-3.9-5.2 0-10.8 1.3-16.9 3.9-6.1 2.7-11 4-14.9 4.2-5.6.2-11.3-2.3-16.8-7.6-3.6-3.2-8.1-8.5-13.5-16.1-5.8-8.1-10.6-17.5-14.4-28.2-4-11.6-6.1-22.8-6.1-33.7 0-12.4 2.7-23.2 8.1-32.2 4.3-7.3 10-13 17.1-17.3 7.1-4.3 14.8-6.5 23.1-6.6 4.5 0 10.4 1.4 17.7 4.1 7.3 2.8 12 4.2 14 4.2 1.5 0 6.7-1.6 15.5-4.9 8.3-3 15.3-4.3 21-3.8 15.5 1.3 27.1 7.3 34.9 18.3-13.9 8.4-20.8 20.2-20.6 35.3.1 11.7 4.4 21.5 12.8 29.2 3.8 3.6 8.1 6.4 12.8 8.4-1 3-2.1 5.9-3.2 8.7zM119.1 2.9c0 9.3-3.4 18-10.2 25.9-8.2 9.4-18.1 14.9-28.9 14-.1-1.1-.2-2.3-.2-3.6 0-8.9 3.9-18.5 10.7-26.3 3.4-3.9 7.7-7.2 13-9.8 5.2-2.6 10.2-4 14.9-4.2.1 1.3.2 2.7.2 4z"/></svg>
+              </div>
+              <div class="mb-app-name" id="mb-active-app">Finder</div>
+              <div class="mb-menu-word">File</div>
+              <div class="mb-menu-word">Edit</div>
+              <div class="mb-menu-word">View</div>
+              <div class="mb-menu-word">Window</div>
+              <div class="mb-menu-word">Help</div>
+            </div>
+            <div class="menubar-right" id="mb-right">
+              <svg width="15" height="11" viewBox="0 0 16 12" fill="currentColor"><path d="M8 10.2a1.1 1.1 0 1 1 0-2.2 1.1 1.1 0 0 1 0 2.2zM5.3 7.4a3.8 3.8 0 0 1 5.4 0l-1.1 1.1a2.3 2.3 0 0 0-3.2 0zM2.9 5a7.2 7.2 0 0 1 10.2 0l-1.1 1.1a5.7 5.7 0 0 0-8 0z"/></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke-linecap="round"/></svg>
+              <svg width="15" height="12" viewBox="0 0 20 14" fill="currentColor"><rect x="1" y="2" width="12" height="4.6" rx="1.3"/><rect x="1" y="7.4" width="12" height="4.6" rx="1.3"/></svg>
+              <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="2.5" fill="none" stroke="currentColor" opacity="0.45"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="currentColor"/><rect x="22.5" y="4" width="1.6" height="4" rx="0.8" fill="currentColor" opacity="0.45"/></svg>
+              <span class="mb-clock" id="mb-clock">Mon 12 Oct 9:41 AM</span>
+            </div>
+            <div class="apple-menu" id="apple-menu">
+              <div class="am-item" id="am-about">About This Mac</div>
+              <div class="am-sep"></div>
+              <div class="am-item" id="am-settings">System Settings&hellip;</div>
+              <div class="am-sep"></div>
+              <div class="am-item" id="am-lock">Lock Screen</div>
+              <div class="am-item" id="am-sleep">Sleep Display</div>
+            </div>
+          </div>
+
+          <div id="desktop-icons"></div>
+
+          <!-- Windows mount here -->
+          <div id="windows"></div>
+
+          <div class="dock-wrap">
+            <div class="dock" id="dock"></div>
+          </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+    <div class="deck"></div>
+  </div>
+  <div class="hinge-shadow"></div>
+  <div class="sleep-link" id="sleep-link">&#9680; put Mac to sleep</div>
+  <div class="caption">Mini macOS re-implementation: wake, log in, use Finder, System Settings, Notes and Calculator. Nothing here is a real OS &mdash; it's DOM/CSS standing in for what a desktop computer's screen texture would need to do in the actual 3D scene.</div>
+</div>
+
+<script>
+/* =======================================================================
+   Fit the fixed-size laptop rig to the viewport (macOS is widescreen and
+   can't shrink to a safely-small fixed box the way the iOS phone could).
+   ======================================================================= */
+const rig = document.getElementById('rig');
+// The rig's unscaled size is fixed by --screen-w/--screen-h and never changes at
+// runtime (windows are positioned absolutely inside the screen, not part of the
+// rig's own box), so it only needs measuring once. Earlier this reset the live
+// transform to scale(1), measured, then rescaled on every call including on
+// 'resize' — a forced-reflow race that could be caught mid-flight by a resize
+// event or a screenshot, producing a transient one-frame layout glitch (seen
+// during verification). Measuring once up front removes that race entirely.
+let rigNaturalRect = null;
+function fitToViewport() {
+  if (!rigNaturalRect) {
+    const prevTransform = rig.style.transform;
+    rig.style.transform = 'scale(1)';
+    rigNaturalRect = rig.getBoundingClientRect();
+    rig.style.transform = prevTransform;
+  }
+  const availW = window.innerWidth * 0.95;
+  const availH = window.innerHeight * 0.95;
+  const scale = Math.min(1, availW / rigNaturalRect.width, availH / rigNaturalRect.height);
+  rig.style.transform = `scale(${scale})`;
+}
+window.addEventListener('resize', fitToViewport);
+
+/* =======================================================================
+   Wallpaper config — same pattern as the iOS demo file: an id + label
+   here, the actual gradient recipe lives in CSS under [data-wallpaper].
+   ======================================================================= */
+const WALLPAPERS = {
+  sequoia: { label: 'Sequoia' },
+  sonoma:  { label: 'Sonoma' },
+  ventura: { label: 'Ventura' },
+};
+const WALLPAPER_ORDER = Object.keys(WALLPAPERS);
+let currentWallpaper = document.documentElement.dataset.wallpaper || WALLPAPER_ORDER[0];
+function setWallpaper(id) {
+  if (!WALLPAPERS[id]) return;
+  currentWallpaper = id;
+  document.documentElement.dataset.wallpaper = id;
+  document.querySelectorAll('.st-wp-thumb').forEach(t => t.classList.toggle('selected', t.dataset.wp === id));
+}
+
+let currentTheme = document.documentElement.dataset.theme || 'light';
+function setTheme(id) {
+  currentTheme = id;
+  document.documentElement.dataset.theme = id;
+  document.querySelectorAll('.st-appear-opt').forEach(o => o.classList.toggle('selected', o.dataset.theme === id));
+}
+
+/* =======================================================================
+   Toast
+   ======================================================================= */
+const toast = document.getElementById('toast');
+function flashToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(flashToast._t);
+  flashToast._t = setTimeout(() => toast.classList.remove('show'), 1400);
+}
+
+/* =======================================================================
+   Power state: off -> lock -> desktop
+   ======================================================================= */
+const views = { off: document.getElementById('off'), lock: document.getElementById('lock'), desktop: document.getElementById('desktop') };
+function showView(name) {
+  Object.values(views).forEach(v => v.classList.remove('active'));
+  views[name].classList.add('active');
+}
+document.getElementById('off').addEventListener('click', () => {
+  showView('lock');
+  document.getElementById('lock-pw').value = '';
+  setTimeout(() => document.getElementById('lock-pw').focus(), 50);
+});
+function proceedToDesktop() {
+  showView('desktop');
+  document.getElementById('lock-pw').value = '';
+}
+document.getElementById('lock-pw-go').addEventListener('click', proceedToDesktop);
+document.getElementById('lock-pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') proceedToDesktop(); });
+document.getElementById('lock').addEventListener('click', (e) => {
+  if (e.target.closest('.lock-pw-row')) return;
+  proceedToDesktop();
+});
+document.getElementById('sleep-link').addEventListener('click', () => {
+  closeAllWindows();
+  showView('off');
+});
+
+/* Apple menu */
+const appleBtn = document.getElementById('mb-apple');
+const appleMenu = document.getElementById('apple-menu');
+appleBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  appleMenu.classList.toggle('open');
+  appleBtn.classList.toggle('open', appleMenu.classList.contains('open'));
+});
+document.addEventListener('click', () => { appleMenu.classList.remove('open'); appleBtn.classList.remove('open'); });
+document.getElementById('am-about').addEventListener('click', () => flashToast('A Mac About Box — not built in this demo'));
+document.getElementById('am-settings').addEventListener('click', () => openWindow('settings'));
+document.getElementById('am-lock').addEventListener('click', () => { closeAllWindows(); showView('lock'); });
+document.getElementById('am-sleep').addEventListener('click', () => { closeAllWindows(); showView('off'); });
+
+/* =======================================================================
+   Clock
+   ======================================================================= */
+function tick() {
+  const now = new Date();
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const longDays = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  let h = now.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const m = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('lock-time').textContent = `${h}:${m}`;
+  document.getElementById('lock-date').textContent = `${longDays[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}`;
+  document.getElementById('mb-clock').textContent = `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${h}:${m} ${ampm}`;
+}
+setInterval(tick, 1000 * 10);
+
+/* =======================================================================
+   Desktop icons (just a couple, inert except for a label — real macOS
+   desktops usually only show a Mac HD / mounted volumes)
+   ======================================================================= */
+const DESK_ICONS = [
+  { label: 'Macintosh HD', icon: `<svg viewBox="0 0 40 40"><rect x="4" y="8" width="32" height="24" rx="3" fill="#c9cdd3"/><rect x="4" y="8" width="32" height="24" rx="3" fill="none" stroke="#9a9ea5" stroke-width="1"/><rect x="9" y="27" width="22" height="2.4" rx="1.2" fill="#9a9ea5"/></svg>` },
+];
+const deskIconsEl = document.getElementById('desktop-icons');
+DESK_ICONS.forEach(d => {
+  const el = document.createElement('div');
+  el.className = 'desk-icon';
+  el.innerHTML = `<div class="di-glyph">${d.icon}</div><span>${d.label}</span>`;
+  el.addEventListener('dblclick', () => openWindow('finder'));
+  deskIconsEl.appendChild(el);
+});
+
+/* =======================================================================
+   Dock icon glyphs
+   ======================================================================= */
+const DOCK_ICONS = {
+  finder: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="fdg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6fc6ff"/><stop offset="1" stop-color="#0a66d8"/></linearGradient></defs><rect width="24" height="24" fill="url(#fdg)"/><path d="M12 2a10 10 0 0 1 0 20z" fill="#fff" opacity="0.92"/><circle cx="8.6" cy="9.4" r="1.15" fill="#0a66d8"/><circle cx="8.6" cy="14.6" r="1.15" fill="#0a66d8"/></svg>`,
+  launchpad: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#1c1c1e"/><g fill="#fff" opacity="0.9"><circle cx="7" cy="7" r="1.6"/><circle cx="12" cy="7" r="1.6"/><circle cx="17" cy="7" r="1.6"/><circle cx="7" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="17" cy="12" r="1.6"/><circle cx="7" cy="17" r="1.6"/><circle cx="12" cy="17" r="1.6"/><circle cx="17" cy="17" r="1.6"/></g></svg>`,
+  safari: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="safbg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6fd6ff"/><stop offset="0.5" stop-color="#1a9bdb"/><stop offset="1" stop-color="#0b5fa8"/></linearGradient></defs><rect width="24" height="24" fill="url(#safbg2)"/><circle cx="12" cy="12" r="9.6" fill="#f4f6f8"/><path d="M12 12l5.6-5.6-2.3 7-3.3-1.4z" fill="#ff3b30"/><path d="M12 12l-5.6 5.6 2.3-7 3.3 1.4z" fill="#c7cad0"/></svg>`,
+  messages: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#30d158"/><path d="M12 5c-4.4 0-8 3-8 6.6 0 2 1.1 3.8 2.9 5l-.8 3 3.1-1.7c.9.2 1.8.3 2.8.3 4.4 0 8-3 8-6.6S16.4 5 12 5z" fill="#fff"/></svg>`,
+  mail: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="ag2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fc2ff"/><stop offset="1" stop-color="#0a84ff"/></linearGradient></defs><rect width="24" height="24" fill="url(#ag2)"/><rect x="3.5" y="7" width="17" height="11" rx="1.5" fill="#fff"/><path d="M3.5 7.8l8.5 6 8.5-6" stroke="#0a84ff" stroke-width="1.3" fill="none"/></svg>`,
+  notes: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#fff"/><path d="M0 0h24v3.4a1.5 1.5 0 0 1-1.5 1.5H1.5A1.5 1.5 0 0 1 0 3.4z" fill="#ffcc00"/><line x1="6" y1="10" x2="18" y2="10" stroke="#8e8e93" stroke-width="0.8"/><line x1="6" y1="13.2" x2="18" y2="13.2" stroke="#e5e5ea" stroke-width="0.8"/><line x1="6" y1="16.4" x2="13" y2="16.4" stroke="#e5e5ea" stroke-width="0.8"/></svg>`,
+  calculator: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#1c1c1e"/><rect x="4" y="3" width="16" height="5" rx="1.2" fill="#ff9f0a"/><g fill="#5a5a5e"><rect x="4" y="10" width="3.6" height="3.2" rx="0.6"/><rect x="10.2" y="10" width="3.6" height="3.2" rx="0.6"/><rect x="16.4" y="10" width="3.6" height="3.2" rx="0.6"/><rect x="4" y="14.6" width="3.6" height="3.2" rx="0.6"/><rect x="10.2" y="14.6" width="3.6" height="3.2" rx="0.6"/><rect x="16.4" y="14.6" width="3.6" height="3.2" rx="0.6"/><rect x="4" y="19.2" width="3.6" height="1.6" rx="0.6"/><rect x="10.2" y="19.2" width="3.6" height="1.6" rx="0.6"/><rect x="16.4" y="19.2" width="3.6" height="1.6" rx="0.6"/></g></svg>`,
+  settings: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="setg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9aa0"/><stop offset="1" stop-color="#646468"/></linearGradient></defs><rect width="24" height="24" fill="url(#setg2)"/><path d="M12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm8 2.5l1.5-1.2-1.6-2.8-1.7.6a7.5 7.5 0 0 0-1.6-1l-.3-1.9h-3.2l-.3 1.9c-.6.2-1.1.5-1.6 1l-1.7-.6-1.6 2.8 1.5 1.2a7.6 7.6 0 0 0 0 1.9l-1.5 1.2 1.6 2.8 1.7-.6c.5.4 1 .7 1.6 1l.3 1.9h3.2l.3-1.9c.6-.2 1.1-.5 1.6-1l1.7.6 1.6-2.8-1.5-1.2a7.6 7.6 0 0 0 0-1.9z" fill="#3a3a3c"/></svg>`,
+  trash: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="trg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6d8db"/><stop offset="1" stop-color="#a6a9ae"/></linearGradient></defs><path d="M6 8h12l-1 13.5A1.5 1.5 0 0 1 15.5 23h-7A1.5 1.5 0 0 1 7 21.5z" fill="url(#trg)"/><rect x="4.5" y="5.5" width="15" height="2.2" rx="1" fill="#8d9096"/><rect x="9.5" y="3" width="5" height="2" rx="1" fill="#8d9096"/><line x1="9.5" y1="11" x2="9.8" y2="19" stroke="#8d9096" stroke-width="1"/><line x1="12" y1="11" x2="12" y2="19" stroke="#8d9096" stroke-width="1"/><line x1="14.5" y1="11" x2="14.2" y2="19" stroke="#8d9096" stroke-width="1"/></svg>`,
+};
+
+/* =======================================================================
+   Window registry: each entry says how to build + what app-name shows in
+   the menu bar when it's focused, plus default geometry.
+   ======================================================================= */
+const APPS = {
+  finder:     { name: 'Finder',          w: 680, h: 420, x: 90,  y: 50 },
+  settings:   { name: 'System Settings', w: 700, h: 470, x: 200, y: 70 },
+  notes:      { name: 'Notes',           w: 620, h: 420, x: 310, y: 90 },
+  calculator: { name: 'Calculator',      w: 260, h: 380, x: 500, y: 40 },
+};
+let zTop = 10;
+const windowState = {}; // id -> {open, el}
+const windowsMount = document.getElementById('windows');
+
+function buildWindowShell(id, cfg, bodyHtml) {
+  const win = document.createElement('div');
+  win.className = 'mac-window';
+  win.id = `win-${id}`;
+  win.style.width = cfg.w + 'px';
+  win.style.height = cfg.h + 'px';
+  win.style.left = cfg.x + 'px';
+  win.style.top = cfg.y + 'px';
+  win.innerHTML = `
+    <div class="win-titlebar">
+      <div class="traffic-lights">
+        <div class="tl tl-close" data-act="close"><svg viewBox="0 0 10 10"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="#7a0000" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+        <div class="tl tl-min" data-act="min"><svg viewBox="0 0 10 10"><path d="M1.5 5h7" stroke="#7a4a00" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+        <div class="tl tl-zoom" data-act="zoom"><svg viewBox="0 0 10 10"><path d="M1.5 5h7M5 1.5v7" stroke="#0a5c00" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+      </div>
+      <div class="win-title">${cfg.name}</div>
+    </div>
+    <div class="win-body">${bodyHtml}</div>
+  `;
+  windowsMount.appendChild(win);
+
+  win.addEventListener('mousedown', () => focusWindow(id));
+  win.querySelector('[data-act="close"]').addEventListener('click', (e) => { e.stopPropagation(); closeWindow(id); });
+  win.querySelector('[data-act="min"]').addEventListener('click', (e) => { e.stopPropagation(); minimizeWindow(id); });
+  win.querySelector('[data-act="zoom"]').addEventListener('click', (e) => { e.stopPropagation(); win.classList.toggle('maxed'); });
+  return win;
+}
+
+function focusWindow(id) {
+  document.querySelectorAll('.mac-window').forEach(w => w.classList.remove('focused'));
+  const win = windowState[id].el;
+  win.classList.add('focused');
+  win.style.zIndex = ++zTop;
+  document.getElementById('mb-active-app').textContent = APPS[id].name;
+  const dockItem = document.querySelector(`.dock-item[data-app="${id}"]`);
+  if (dockItem) dockItem.classList.add('running');
+}
+
+function openWindow(id) {
+  if (!windowState[id]) {
+    windowState[id] = { open: false, el: buildWindowShell(id, APPS[id], APP_BUILDERS[id]()) };
+    APP_INIT[id] && APP_INIT[id](windowState[id].el);
+  }
+  const win = windowState[id].el;
+  win.classList.add('shown');
+  windowState[id].open = true;
+  focusWindow(id);
+}
+
+function closeWindow(id) {
+  const st = windowState[id];
+  if (!st) return;
+  st.el.classList.remove('shown');
+  st.open = false;
+  const dockItem = document.querySelector(`.dock-item[data-app="${id}"]`);
+  if (dockItem) dockItem.classList.remove('running');
+}
+
+function minimizeWindow(id) {
+  const st = windowState[id];
+  if (!st) return;
+  st.el.classList.remove('shown');
+  // stays "running" (dock dot persists) — clicking the dock icon again restores it
+}
+
+function closeAllWindows() {
+  Object.keys(windowState).forEach(id => closeWindow(id));
+}
+
+function toggleApp(id) {
+  const st = windowState[id];
+  if (st && st.open) {
+    focusWindow(id);
+  } else {
+    openWindow(id);
+  }
+}
+
+/* =======================================================================
+   Dock
+   ======================================================================= */
+const DOCK_LAYOUT = [
+  { id: 'finder', label: 'Finder', built: true },
+  { id: 'launchpad', label: 'Launchpad', built: false },
+  { id: 'safari', label: 'Safari', built: false },
+  { id: 'messages', label: 'Messages', built: false },
+  { id: 'mail', label: 'Mail', built: false },
+  { id: 'notes', label: 'Notes', built: true },
+  { id: 'calculator', label: 'Calculator', built: true },
+  { id: 'settings', label: 'System Settings', built: true },
+];
+const dockEl = document.getElementById('dock');
+DOCK_LAYOUT.forEach(d => {
+  const item = document.createElement('div');
+  item.className = 'dock-item';
+  item.dataset.app = d.id;
+  item.title = d.label;
+  item.innerHTML = `<div class="glyph">${DOCK_ICONS[d.id]}</div><div class="run-dot"></div>`;
+  item.addEventListener('click', () => {
+    if (d.built) toggleApp(d.id);
+    else flashToast(`${d.label}: not built in this demo`);
+  });
+  dockEl.appendChild(item);
+});
+const sep = document.createElement('div');
+sep.className = 'dock-sep';
+dockEl.appendChild(sep);
+const trashItem = document.createElement('div');
+trashItem.className = 'dock-item';
+trashItem.title = 'Trash';
+trashItem.innerHTML = `<div class="glyph">${DOCK_ICONS.trash}</div><div class="run-dot"></div>`;
+trashItem.addEventListener('click', () => flashToast('Trash is empty'));
+dockEl.appendChild(trashItem);
+
+/* =======================================================================
+   Finder body
+   ======================================================================= */
+const FINDER_LOCATIONS = {
+  airdrop: { label: 'AirDrop', files: [] },
+  desktop: { label: 'Desktop', files: [['macos-mockup-demo.html', '14 KB'], ['Screenshot 2026-10-13.png', '820 KB']] },
+  documents: { label: 'Documents', files: [['SCOPE.md', '18 KB'], ['docs', '--'], ['references', '--']] },
+  downloads: { label: 'Downloads', files: [['product-line.pdf', '1.1 MB'], ['sequoia-wallpaper-ref.png', '96 KB']] },
+  applications: { label: 'Applications', files: [['Safari.app', '--'], ['Notes.app', '--'], ['System Settings.app', '--'], ['Calculator.app', '--']] },
+};
+function fdIcon(isFolder) {
+  return isFolder
+    ? `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M2 6a1.5 1.5 0 0 1 1.5-1.5h5l2 2h10A1.5 1.5 0 0 1 22 8v10a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 18z" fill="#5bb4f2"/></svg>`
+    : `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="#dfe1e4"/><path d="M15 2v5h5z" fill="#b7bac0"/></svg>`;
+}
+function finderBody() {
+  return `
+    <div class="fd-sidebar" id="fd-sidebar">
+      <div class="fd-section-label">Favourites</div>
+      <div class="fd-row" data-loc="airdrop"><svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#0a84ff" stroke-width="2"/></svg>AirDrop</div>
+      <div class="fd-row on" data-loc="desktop"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="1.5" fill="#0a84ff"/><rect x="9" y="18" width="6" height="2" rx="1" fill="#0a84ff"/></svg>Desktop</div>
+      <div class="fd-row" data-loc="documents"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="#8e8e93"/></svg>Documents</div>
+      <div class="fd-row" data-loc="downloads"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M12 3v11m0 0l-4-4m4 4l4-4" stroke="#0a84ff" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="17" width="16" height="3" rx="1" fill="#0a84ff"/></svg>Downloads</div>
+      <div class="fd-row" data-loc="applications"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4" fill="#8e8e93"/></svg>Applications</div>
+      <div class="fd-section-label">iCloud</div>
+      <div class="fd-row"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M7 16a4 4 0 0 1-.6-7.96A5 5 0 0 1 16 8.3 3.5 3.5 0 0 1 17 15z" fill="#0a84ff"/></svg>iCloud Drive</div>
+      <div class="fd-section-label">Locations</div>
+      <div class="fd-row"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="1.5" fill="#c9cdd3"/></svg>Macintosh HD</div>
+    </div>
+    <div class="fd-main">
+      <div class="fd-toolbar" id="fd-toolbar">Desktop</div>
+      <div class="fd-list" id="fd-list"></div>
+    </div>
+  `;
+}
+function initFinder(win) {
+  const sidebar = win.querySelector('#fd-sidebar');
+  const list = win.querySelector('#fd-list');
+  const toolbar = win.querySelector('#fd-toolbar');
+  function render(locId) {
+    const loc = FINDER_LOCATIONS[locId];
+    toolbar.textContent = loc.label;
+    sidebar.querySelectorAll('.fd-row[data-loc]').forEach(r => r.classList.toggle('on', r.dataset.loc === locId));
+    list.innerHTML = '';
+    if (!loc.files.length) {
+      list.innerHTML = `<div style="padding:16px;color:#8e8e93;font-size:13px;">No items</div>`;
+      return;
+    }
+    loc.files.forEach(([name, meta]) => {
+      const row = document.createElement('div');
+      row.className = 'fd-file';
+      row.innerHTML = `${fdIcon(meta === '--')}<div class="fname">${name}</div><div class="fmeta">${meta}</div>`;
+      list.appendChild(row);
+    });
+  }
+  sidebar.querySelectorAll('.fd-row[data-loc]').forEach(r => r.addEventListener('click', () => render(r.dataset.loc)));
+  render('desktop');
+}
+
+/* =======================================================================
+   System Settings body
+   ======================================================================= */
+const SETTINGS_SECTIONS = [
+  { id: 'wifi', label: 'Wi-Fi', bg: '#0a84ff', icon: '📶' },
+  { id: 'bluetooth', label: 'Bluetooth', bg: '#0a84ff', icon: '🔵' },
+  { id: 'network', label: 'Network', bg: '#0a84ff', icon: '🌐' },
+  { id: 'general', label: 'General', bg: '#8e8e93', icon: '⚙️' },
+  { id: 'appearance', label: 'Appearance', bg: '#1c1c1e', icon: '🌓' },
+  { id: 'accessibility', label: 'Accessibility', bg: '#0a84ff', icon: '♿' },
+  { id: 'controlcenter', label: 'Control Center', bg: '#8e8e93', icon: '🎛️' },
+  { id: 'siri', label: 'Siri & Spotlight', bg: '#5856d6', icon: '✨' },
+  { id: 'privacy', label: 'Privacy & Security', bg: '#0a84ff', icon: '🛡️' },
+  { id: 'desktopdock', label: 'Desktop & Dock', bg: '#5856d6', icon: '🖥️' },
+  { id: 'displays', label: 'Displays', bg: '#0a84ff', icon: '🖵' },
+  { id: 'wallpaper', label: 'Wallpaper', bg: '#34c759', icon: '🖼️' },
+  { id: 'notifications', label: 'Notifications', bg: '#ff3b30', icon: '🔔' },
+];
+function settingsBody() {
+  const rows = SETTINGS_SECTIONS.map(s => `
+    <div class="st-row${s.id === 'general' ? ' on' : ''}" data-sec="${s.id}">
+      <div class="st-icon" style="background:${s.bg};font-size:13px;">${s.icon}</div>
+      <div>${s.label}</div>
+    </div>`).join('');
+  return `
+    <div class="st-sidebar" id="st-sidebar">
+      <div class="st-search">🔍 Search</div>
+      <div class="st-profile"><div class="av"></div><div class="lbl"><b>Ritesh Sivaraman</b>Sign in with your Apple Account</div></div>
+      ${rows}
+    </div>
+    <div class="st-main" id="st-main"></div>
+  `;
+}
+function stGeneralPage() {
+  return `
+    <div class="st-page-title">General</div>
+    <div class="st-card clickable"><div class="sc-label">About</div><span class="sc-chev">›</span></div>
+    <div class="st-card clickable"><div class="sc-label">Software Update</div><div class="sc-value">macOS Sequoia 15.0</div><span class="sc-chev">›</span></div>
+    <div class="st-card clickable"><div class="sc-label">Storage</div><span class="sc-chev">›</span></div>
+    <div class="st-card clickable"><div class="sc-label">AirDrop &amp; Handoff</div><span class="sc-chev">›</span></div>
+    <div class="st-card clickable"><div class="sc-label">AutoFill &amp; Passwords</div><span class="sc-chev">›</span></div>
+    <div class="st-card clickable"><div class="sc-label">Date &amp; Time</div><span class="sc-chev">›</span></div>
+    <div class="st-card clickable"><div class="sc-label">Language &amp; Region</div><span class="sc-chev">›</span></div>
+  `;
+}
+function stWallpaperPage() {
+  const thumbs = WALLPAPER_ORDER.map(id => `
+    <div>
+      <div class="st-wp-thumb${id === currentWallpaper ? ' selected' : ''}" data-wp="${id}" data-wallpaper="${id}">
+        <div class="wallpaper"></div>
+      </div>
+      <div class="st-wp-name">${WALLPAPERS[id].label}</div>
+    </div>`).join('');
+  return `
+    <div class="st-page-title">Wallpaper</div>
+    <div style="font-size:12.5px;color:#8e8e93;margin-bottom:4px;">Click a wallpaper to apply it to the desktop and lock screen.</div>
+    <div class="st-wp-grid">${thumbs}</div>
+  `;
+}
+function stAppearancePage() {
+  return `
+    <div class="st-page-title">Appearance</div>
+    <div class="st-appearance-row">
+      <div class="st-appear-opt${currentTheme === 'light' ? ' selected' : ''}" data-theme="light"><div class="st-appear-swatch" style="background:linear-gradient(135deg,#fff,#e4e4e6);"></div>Light</div>
+      <div class="st-appear-opt${currentTheme === 'dark' ? ' selected' : ''}" data-theme="dark"><div class="st-appear-swatch" style="background:linear-gradient(135deg,#3a3a3c,#1c1c1e);"></div>Dark</div>
+    </div>
+  `;
+}
+function stTogglePage(label, items) {
+  const rows = items.map((it, i) => `
+    <div class="st-card">
+      <div class="sc-label">${it}</div>
+      <div class="toggle-sw${i === 0 ? ' on' : ''}" data-idx="${i}"><div class="kn"></div></div>
+    </div>`).join('');
+  return `<div class="st-page-title">${label}</div>${rows}`;
+}
+function stSimplePage(label) {
+  return `<div class="st-page-title">${label}</div><div class="st-card"><div class="sc-label">Nothing further is built for this section in the demo</div></div>`;
+}
+function initSettings(win) {
+  const sidebar = win.querySelector('#st-sidebar');
+  const main = win.querySelector('#st-main');
+  function render(secId) {
+    sidebar.querySelectorAll('.st-row').forEach(r => r.classList.toggle('on', r.dataset.sec === secId));
+    if (secId === 'general') main.innerHTML = stGeneralPage();
+    else if (secId === 'wallpaper') main.innerHTML = stWallpaperPage();
+    else if (secId === 'appearance') main.innerHTML = stAppearancePage();
+    else if (secId === 'wifi') main.innerHTML = stTogglePage('Wi-Fi', ['eduroam', 'Known Networks']);
+    else if (secId === 'bluetooth') main.innerHTML = stTogglePage('Bluetooth', ['Bluetooth']);
+    else if (secId === 'notifications') main.innerHTML = stTogglePage('Notifications', ['Allow Notifications']);
+    else main.innerHTML = stSimplePage(SETTINGS_SECTIONS.find(s => s.id === secId).label);
+
+    main.querySelectorAll('.st-wp-thumb').forEach(t => t.addEventListener('click', () => { setWallpaper(t.dataset.wp); flashToast(`Wallpaper: ${WALLPAPERS[t.dataset.wp].label}`); }));
+    main.querySelectorAll('.st-appear-opt').forEach(o => o.addEventListener('click', () => { setTheme(o.dataset.theme); flashToast(`Appearance: ${o.dataset.theme === 'dark' ? 'Dark' : 'Light'}`); }));
+    main.querySelectorAll('.toggle-sw').forEach(t => t.addEventListener('click', () => t.classList.toggle('on')));
+  }
+  sidebar.querySelectorAll('.st-row').forEach(r => r.addEventListener('click', () => render(r.dataset.sec)));
+  render('general');
+}
+
+/* =======================================================================
+   Notes body (split view — the real macOS Notes layout, distinct from
+   the iOS Notes list->editor push navigation already built in the sibling
+   iOS demo)
+   ======================================================================= */
+const NOTES_DATA = [
+  { title: 'Floor plan ideas', body: 'Genius Bar queue should be visible from the entrance so waiting feels social, not hidden.', meta: 'Today' },
+  { title: 'Crit 9 prep', body: 'Walk through the feel-vs-function split before the live demo.', meta: 'Yesterday' },
+  { title: 'Grocery list', body: 'Oat milk, coffee, something for dinner Thursday.', meta: 'Monday' },
+];
+function notesBody() {
+  const rows = NOTES_DATA.map((n, i) => `
+    <div class="nt-row${i === 0 ? ' on' : ''}" data-idx="${i}">
+      <div class="nt-title">${n.title}</div>
+      <div class="nt-meta">${n.meta} &middot; ${n.body.slice(0, 32)}</div>
+    </div>`).join('');
+  return `
+    <div class="nt-sidebar" id="nt-sidebar">${rows}</div>
+    <div class="nt-editor" id="nt-editor" contenteditable="true" spellcheck="false"></div>
+  `;
+}
+function initNotes(win) {
+  const sidebar = win.querySelector('#nt-sidebar');
+  const editor = win.querySelector('#nt-editor');
+  function render(i) {
+    sidebar.querySelectorAll('.nt-row').forEach(r => r.classList.toggle('on', Number(r.dataset.idx) === i));
+    const n = NOTES_DATA[i];
+    editor.innerHTML = `<b>${n.title}</b>${n.body}`;
+  }
+  sidebar.querySelectorAll('.nt-row').forEach(r => r.addEventListener('click', () => render(Number(r.dataset.idx))));
+  render(0);
+}
+
+/* =======================================================================
+   Calculator body — a genuinely working basic calculator (no faking: it
+   really computes).
+   ======================================================================= */
+function calculatorBody() {
+  return `
+    <div class="calc-display" id="calc-display">0</div>
+    <div class="calc-grid" id="calc-grid"></div>
+  `;
+}
+function initCalculator(win) {
+  const display = win.querySelector('#calc-display');
+  const grid = win.querySelector('#calc-grid');
+  const KEYS = [
+    ['C','fn'], ['±','fn'], ['%','fn'], ['÷','op'],
+    ['7',''], ['8',''], ['9',''], ['×','op'],
+    ['4',''], ['5',''], ['6',''], ['−','op'],
+    ['1',''], ['2',''], ['3',''], ['+','op'],
+    ['0','zero'], ['.',''], ['=','op'],
+  ];
+  let acc = null, pendingOp = null, cur = '0', fresh = true;
+  function updateDisplay() { display.textContent = cur.length > 9 ? Number(cur).toExponential(4) : cur; }
+  function applyOp(a, b, op) {
+    switch (op) {
+      case '+': return a + b;
+      case '−': return a - b;
+      case '×': return a * b;
+      case '÷': return b === 0 ? NaN : a / b;
+      default: return b;
+    }
+  }
+  KEYS.forEach(([label, cls]) => {
+    const btn = document.createElement('div');
+    btn.className = `calc-btn ${cls}`;
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      if (label === 'C') { acc = null; pendingOp = null; cur = '0'; fresh = true; }
+      else if (label === '±') { cur = String(Number(cur) * -1); }
+      else if (label === '%') { cur = String(Number(cur) / 100); }
+      else if (label === '.') { if (!cur.includes('.')) cur += '.'; fresh = false; }
+      else if (['+','−','×','÷'].includes(label)) {
+        if (acc !== null && pendingOp && !fresh) { acc = applyOp(acc, Number(cur), pendingOp); cur = String(acc); }
+        else { acc = Number(cur); }
+        pendingOp = label; fresh = true;
+      } else if (label === '=') {
+        if (pendingOp !== null) { acc = applyOp(acc, Number(cur), pendingOp); cur = String(acc); pendingOp = null; fresh = true; }
+      } else {
+        cur = fresh ? label : (cur === '0' ? label : cur + label);
+        fresh = false;
+      }
+      updateDisplay();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+const APP_BUILDERS = { finder: finderBody, settings: settingsBody, notes: notesBody, calculator: calculatorBody };
+const APP_INIT = { finder: initFinder, settings: initSettings, notes: initNotes, calculator: initCalculator };
+
+/* =======================================================================
+   Boot
+   ======================================================================= */
+tick();
+fitToViewport();
+setTimeout(fitToViewport, 50);
+</script>
+
+</body>
+</html>

@@ -1,37 +1,35 @@
 # Store sim — agent harness
 
-COMP4020 final project, branch `new-idea`: an obvious parody of a famous
+COMP4020 final project, on `main`: an obvious parody of a famous
 fruit-themed retail store, as a shared first-person 3D shop (React Three
 Fiber client, Hono + ws + SQLite server). Real visitors and CPU players share
-one room, and the Genius Bar queue is the shared state. The store has a logo and no brand name.
-Scope, decisions D1 to D24, tiers and open items: `SCOPE.md`.
+one room. There is no queue of customers: they browse until a staff member
+approaches them. Internally the store keeps a waiting list of unattended
+customers, staff are the resource, and a free staff member is assigned to the
+next waiting customer and walks over (a traditional retail floor, not a
+line). A real user behind a screen is always offered a waiting customer
+before a CPU staff member (SCOPE D47). Scarce shared things: staff attention, stock, demo tables. The store
+has a logo and no brand name.
+Scope, decisions D1 to D46, tiers and open items: `SCOPE.md`.
 
 ## Don't invent, don't guess through ambiguity
-No made-up copy, stats, sources, or feature details. If a decision isn't
-pinned (see `SCOPE.md`'s open items), say so and ask rather than
-guessing plausibly. This extends to implementation: never build through an
-ambiguous requirement by picking the most plausible reading and proceeding —
-stop and ask. A wrong guess built on top of other code is more expensive to
-unwind than a short pause would have cost.
+No made-up copy, stats, sources or feature details. If a decision isn't pinned
+(`SCOPE.md` open items), say so and ask; never build through an ambiguous
+requirement by picking the most plausible reading. A wrong guess under other
+code costs more than a pause.
 
-A confident negative claim ("X isn't built", "there's no mechanism for Y") is
-exactly the kind of thing this rule is for: before writing one into a design
-doc or SCOPE.md, grep the whole subsystem it's about, not just the one file
-already open — a claim that's wrong in the stronger direction ("doesn't exist
-at all" when a narrower version does) can survive into a published decision
-before anyone reads the code that disproves it (LEARNINGS, `9e511ca`,
-corrected `e3ab3cb`).
+A confident negative ("X isn't built") must be checked first: grep the whole
+subsystem, not the one file open, before writing it into a doc (LEARNINGS,
+`9e511ca`, corrected `e3ab3cb`).
 
-For a decision affecting multiple users or expensive to reverse (per the week
-8 lecture: stack, user/person definition, persistence, real-time mechanism —
-see the ADR note below), lay out the real options and their costs first,
-without picking one, and let Ritesh choose before anything gets built or
-written up. Don't collapse straight to a recommendation on these. Once he
-chooses, record it in `SCOPE.md`'s decision table with the date.
+For decisions affecting multiple users or expensive to reverse (week 8: stack,
+person definition, persistence, real-time mechanism; records in `docs/adr/`),
+lay out the options and costs first, pick none, and let Ritesh choose. Then
+record it in `SCOPE.md`'s decision table with the date.
 
 ## Event log is load-bearing
 Every state-changing action (today: join, leave, role switch in
-`src/server/presence.ts`; later queue join/leave, slot booking, stock
+`src/server/presence.ts`; later staff assignment, slot booking, stock
 changes, device interactions) writes an `events` row (`ts, visitor_id, type,
 data`, table from migration 1 in `src/server/migrate.ts`) first. The crit 10
 server-log reads, and any debugging of "did this actually happen", read this
@@ -51,40 +49,25 @@ request that touches it, never a timer. The presence loop only exists while
 someone is connected.
 
 ## Verification: checked for real, not reported
-- **Feel, not just function.** The store's whole value is a feel (the
-  calm, hotel-lobby intent against the lived queue; satisfaction and
-  frustration both simulated end to end, SCOPE.md 0b) that `pnpm check`
-  cannot measure. A harness
-  that only checks stills (screenshots, static DOM, settled-state asserts)
-  makes the quality nothing measures decay to zero. No feature is done until
-  someone has sat in two browser profiles as two different visitors, at 1920x1080
-  and 390x844, and felt the thing happen — not just read a green test name. Every checkpoint asks two
-  separate questions: is it broken (automated) vs how does it feel (human,
-  live, never a described screenshot).
-- **State claims get checked against the real thing.** "Did it save?" means
-  opening the actual SQLite file (`/data/app.db` in the container, or the
-  local `.data/` path) directly, never trusted from the agent's own report.
-  "A visitor can't do X" means a second, genuinely different browser
-  profile (not the same session re-rendered, and not a second tab of one
-  profile, which shares the cookie jar) confirms it — the back room being
-  staff-only (D18, enforced by server clamping), and an out-of-stock
-  configuration being unbuyable, specifically.
-- **Sensor admission bar.** A check only goes into the blocking `pnpm check`
-  suite if it's specific, fast, automatic, and trustworthy. Anything fuzzier
-  stays advisory (or becomes a manual crit-time check) instead of being
-  forced into a flaky gate. Whether a wait "feels" frustrating or the room feels calm and
-  crowded are the canonical advisory-only examples — don't try to assert those
-  in `spec/`. The drawings-match-the-model check (D20) is the opposite kind:
-  specific, fast, blocking.
-- **Spec traceability.** `SCOPE.md` section 3d lists the end-to-end
-  scenarios (S1 to S11), and each Tier 1 one is meant to be a scripted-bot
-  check in `spec/` over the real protocol. Each either has a matching
-  `spec/*.test.ts`, or an explicit note in PROCESS.md saying why it's
-  advisory-only — don't let one quietly fall off the list under deadline
-  pressure.
-- **Cut the feature, never cut the harness.** When behind schedule, the
-  answer is smaller scope, not a skipped feel-check or a merged red test.
-  The verification discipline above is the thing that doesn't flex.
+- **Feel, not just function.** The store's value is a feel (calm, hotel-lobby;
+  satisfaction and frustration simulated end to end, SCOPE.md 0b) that
+  `pnpm check` cannot measure. No feature is done until someone has used it as
+  two different visitors in two browser profiles, at 1920x1080 and 390x844.
+  Every checkpoint asks two questions: is it broken (automated), and how does
+  it feel (human, live, never a described screenshot).
+- **State claims are checked against the real thing.** "Did it save?" means
+  opening the SQLite file (`/data/app.db`, or local `.data/`). "A visitor can't
+  do X" means a second, genuinely different profile (not a second tab, which
+  shares cookies) confirms it: the staff-only back room (D18) and an
+  out-of-stock configuration being unbuyable, specifically.
+- **Sensor admission bar.** A check joins the blocking `pnpm check` only if
+  specific, fast, automatic and trustworthy. Fuzzy ones (does a wait feel
+  frustrating, is the room calm) stay advisory. The drawings-match-model check
+  (D20) is the opposite kind.
+- **Spec traceability.** `SCOPE.md` 3d lists scenarios S1 to S11; each Tier 1
+  one has a `spec/*.test.ts` or a note in PROCESS.md saying why it's advisory.
+- **Cut the feature, never the harness.** Behind schedule, the answer is smaller
+  scope, not a skipped feel-check or a merged red test.
 
 ## The defect loop
 When something's wrong: report the symptom, not your diagnosis of it. Add
@@ -93,7 +76,7 @@ right reason. Name the bug class, not just the instance. For code written
 without Ritesh watching it get written, mutate it afterward to confirm the
 suite would actually catch it broken — apply this especially to
 the server-authoritative rules where a subtly wrong implementation looks
-identical to a correct one in every normal run: queue and slot booking,
+identical to a correct one in every normal run: staff assignment (one staff member per customer), slot booking,
 finite stock (two visitors racing for the last unit, S11), the occupancy cap,
 and the staff-only back-room clamp.
 
@@ -140,17 +123,39 @@ secret goes in Fly secrets (`fly secrets set`), never in a file, never asked
 for in chat.
 
 ## Session handoff
-Keep `WORKLOG.md` current in the repo (not `~/.claude/plans/`, which is
-local-only and won't survive a fresh session or machine). Append to
-`LEARNINGS.md` as Ritesh learns something about prompting or working with AI
-coding assistants — not stack gotchas; that's what the file tracked before
-this was flagged and is being redirected (see the file's own header). Every
-entry must tie to a named lesson from a COMP4020 lecture (say which week and
-what it said); if it doesn't, it isn't an entry. Cite the commit(s) each
-entry is about. Every reply says whether that turn added a
-LEARNINGS.md entry. Log cuts as they happen in `CUTS.md` (what, why, when)
-rather than reconstructing them from memory later — a cut made under
-deadline pressure is real process evidence, not just a loose end.
+Keep `WORKLOG.md` current in the repo (`/worklog`). `LEARNINGS.md` is about
+prompting and working with AI assistants, not stack gotchas; every entry ties to
+a named COMP4020 lecture lesson (which week, what it said) and cites its
+commit(s). Candidates are captured with `/learn capture` into
+`docs/learnings-inbox.md` after each exchange with Ritesh, and promoted with
+`/learn promote`; every reply says whether it captured a candidate. Log cuts in
+`CUTS.md` as they happen (`/cuts-log`): a cut under pressure is process evidence.
+
+## Workflow: parallel agents and the GitHub board
+Protocol: `docs/workflow.md`. Binding rules:
+- **The issue board is the source of truth** for pending, in-progress and done
+  work (labels `status:*`); WORKLOG.md is only the handoff. No work without an
+  issue, no PR without `Fixes #n`.
+- **Only the orchestrator assigns; builders never self-claim.** One issue, one
+  branch `agent/<n>-<slug>`, one worktree. No two issues sharing a hot spot
+  (`touches:` labels; migrations are single lane).
+- **Ritesh talks to the `interface` agent** (fast, sonnet), which refines his
+  requests into work orders (`/brief`, `.agents/inbox/`) for the slow ultracode
+  `orchestrator`. Worker agents message only the orchestrator and comment
+  progress on their own issue. Questions for Ritesh go in one batched digest
+  (`/clarify`).
+- **Context comes from records, not memory:** agents find it via
+  `docs/INDEX.md` and read the binding ADRs and docs before editing. A decision
+  that is expensive to reverse gets an ADR first (`needs-adr`; Ritesh chooses).
+- **Spec first:** a failing check, red for the right reason, before the builder.
+  Reviewer is a fresh, read-only context. Max 2 fix loops, then cut or split.
+- **PRs target `integration`.** Only Ritesh approves a promote to `main`
+  (`main` deploys). Never amend, rebase published history, or force-push.
+- **The workflow audits itself:** `/audit-workflow` (script + judgment) at
+  session start, before each wave, before a promote, and on a 30 minute loop.
+  A repeated finding means tighten this section or the skill, not just fix it.
+- **Spend:** `/budget` each wave; pause at 70%, stop at 85%.
+- **Ritesh's prose stays his:** agents leave scaffolds and `[TK]`.
 
 ## Where things live
 Full index: `docs/INDEX.md`. Read it when you need to find a decision or a
@@ -172,33 +177,21 @@ building starts, restate the complete settled list for one explicit
 sign-off, since a quick "yes" on a big question shouldn't be stretched to
 cover more than was actually seen.
 
-## Known gotchas (carried from crit 7, LEARNINGS.md)
-- `pnpm check` can pass/fail on a stale `dist/`, not your code — clear it
-  after a route/page rewrite, not just the DB.
-- better-sqlite3 defaults foreign keys ON; migrations that rebuild a table
-  need `PRAGMA foreign_keys = OFF` before `migrate()`, `ON` + a
-  `foreign_key_check` after.
-- Stop every dev server you start before finishing a task; check `lsof -i`
-  on this project's ports before any destructive cleanup.
-- A weak assertion (bare substring match) can pass for the wrong reason when
-  the same text also appears elsewhere on the page — assert on markup unique
-  to the thing under test.
-- Node's `readline/promises` drops lines when driven by a bulk, non-TTY pipe
-  (printed/`yes`-fed input): a real terminal (and a pseudo-tty, e.g. Python's
-  `pty`) works fine. Don't trust a piped smoke test of an interactive CLI
-  (`scripts/sim/`) that hangs or shows a shifted answer — verify through a
-  real pty before concluding the tool itself is broken.
-- A rotation, heading or camera-offset sign that "looks right on a
-  read-through" isn't evidence — three separate bugs in one session (idle-staff
-  heading, phone-lean tilt, inspect camera pitch) all had correct-looking trig
-  next to a backwards sign. The only acceptable check is an actual render, or
-  a test made to fail against the old code first (LEARNINGS, `2ed2c7a`,
-  `a3b8070`, `df52978`).
-- A defect check that only measures one direction of the defect (e.g. "mark
-  hidden behind the surface") passes while the opposite failure (mark
-  floating off the surface) ships silently. For any "X pokes through/into Y"
-  check, assert both directions, not just the one the first bug happened to
-  be (LEARNINGS, `0f564d4`, `9b74a21`).
+## Known gotchas
+- `pnpm start` serves the gitignored `static/` build, not a dev server: run
+  `pnpm build` after editing client source.
+- better-sqlite3 has foreign keys ON; a migration that rebuilds a table needs
+  `PRAGMA foreign_keys = OFF` before `migrate()`, `ON` + `foreign_key_check` after.
+- Stop every dev server you start; check `lsof -i` before destructive cleanup.
+- A bare-substring assertion can pass for the wrong reason: assert on markup
+  unique to the thing under test.
+- Node `readline/promises` drops lines from a bulk non-TTY pipe: test
+  interactive CLIs (`scripts/sim/`) through a real pty.
+- A rotation, heading or camera sign that "looks right" isn't evidence (three
+  backwards-sign bugs in one session; LEARNINGS `2ed2c7a`, `a3b8070`,
+  `df52978`). Render it, or write a test that fails against the old code.
+- A defect check that measures one direction passes while the opposite ships
+  ("pokes through" vs "floats off"): assert both (LEARNINGS `0f564d4`, `9b74a21`).
 
 ## Keep this file honest
 When a new rule is needed, integrate it into an existing section rather than
@@ -214,31 +207,21 @@ quietly repeating the ad hoc version each time. Consistency here matters
 more than cleverness.
 
 ## Reporting: teach, open what he has to read, close with a lecture lesson
-When reporting finished work, explain how that part of the app works — the
-mechanism, not just the diff — since this is Ritesh's app to understand and
-defend at a crit, not just to have built. A status update that only says what
-changed is a missed opportunity if the underlying structure is new to him.
-
-When a report's "what I need from you" list involves reading something (a
-file, a diff, a commit, a drawing, a running page), open all of it for him
-before sending the list: `code <path>` in VS Code, `open <path>` otherwise,
-the diff written to a scratch file and opened, the dev server's URL if it
-needs a browser. Never hand him a path or hash to go and find. Say in the
-report what was opened. **Any URL or page opens in Safari, never Brave or the
-default browser:** `open -a Safari <url>`, not a bare `open <url>`.
+Explain the mechanism, not just the diff: this is Ritesh's app to defend at a
+crit. If "what I need from you" involves reading something (file, diff, commit,
+drawing, running page), open all of it first (`code <path>`, else `open`; a
+diff goes to a scratch file; a dev server's URL opens) and say what was opened.
+Never hand him a path or hash. **Any URL opens in Safari:** `open -a Safari <url>`.
 
 End every response with one or two lessons from the COMP4020 lecture notes
-relevant to whatever comes next, each tied to a specific lesson a lecture
-taught, preferably from the latest weeks (8 to 10); an earlier week only when
-it fits better. Don't recall them from memory: the lectures are already
-summarised outside the repo in
-`~/Documents/ANU/3RD_YEAR/SEMESTER 2/COMP4020/Lectures/` — `lessons-by-week.md`
-(two lessons per week, matched against `LEARNINGS.md`), `final-checklist.md`
-(what to land in the final), and `week-1.md` to `week-10.md` (the lecture text
-itself, to quote from). Read those first; use the `comp4020:handbook` skill
-only for course admin (dates, marking, policy) or a week not yet in that
-folder.
+relevant to what comes next, preferably weeks 8 to 10. Don't recall them from
+memory: read `~/Documents/ANU/3RD_YEAR/SEMESTER 2/COMP4020/Lectures/`
+(`lessons-by-week.md`, `final-checklist.md`, `week-N.md`). Use the
+`comp4020:handbook` skill only for course admin or a week not yet there.
 
 ## One idea, carried all the way
-Every feature serves "someone's always watching." A feature that doesn't tie
-back to that is a cut candidate, not a maybe.
+Every feature serves the scarce things real and CPU people share in one room:
+staff attention, stock, and demo tables. A feature that doesn't feed or read
+one of them is a cut candidate, not a maybe. (Replaces the old "someone's
+always watching" line, which was the previous email-app idea. Wording to be
+confirmed by Ritesh.)

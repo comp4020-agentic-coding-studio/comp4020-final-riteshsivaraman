@@ -1,0 +1,321 @@
+[
+  {
+    "type": "turn",
+    "conversationId": "c12c3a7c-2bd8-491a-a969-9609eea44d7a",
+    "withId": "spec-phones",
+    "withName": "the phones specialist",
+    "say": "Hi, welcome in. I'm on the phones table. What brings you in today?",
+    "choices": [
+      {
+        "id": "opt:know",
+        "label": "I already have a phone in mind"
+      },
+      {
+        "id": "opt:line",
+        "label": "I know the range, not the model"
+      },
+      {
+        "id": "opt:help",
+        "label": "I need help choosing"
+      },
+      {
+        "id": "opt:browse",
+        "label": "Just browsing"
+      },
+      {
+        "id": "opt:other",
+        "label": "I'm here about something else (repair, accessory)"
+      },
+      {
+        "id": "act:0",
+        "label": "Ask for a demo of the iPhone Duo",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:1",
+        "label": "Go with the iPhone Duo",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:2",
+        "label": "Ask for a demo of the iPhone 18 Pro",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:3",
+        "label": "Go with the iPhone 18 Pro",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:4",
+        "label": "Ask for a demo of the iPhone 18 Pro Max",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:5",
+        "label": "Go with the iPhone 18 Pro Max",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:6",
+        "label": "Ask for a demo of the iPhone Air",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:7",
+        "label": "Go with the iPhone Air",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:8",
+        "label": "Ask for a demo of the iPhone 17",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:9",
+        "label": "Go with the iPhone 17",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:10",
+        "label": "Ask for a demo of the iPhone 17e",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:11",
+        "label": "Go with the iPhone 17e",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:12",
+        "label": "Ask for a demo of the iPhone 16",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:13",
+        "label": "Go with the iPhone 16",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:14",
+        "label": "Leave"
+      }
+    ],
+    "ended": false,
+    "awaiting": "customer"
+  },
+  {
+    "type": "turn",
+    "conversationId": "c12c3a7c-2bd8-491a-a969-9609eea44d7a",
+    "withId": "spec-phones",
+    "withName": "the phones specialist",
+    "say": "Lovely. Here it is. It has a folding design, 2 rear camera lines, a 7.6\" screen inside and a 5.4\" screen outside and a titanium frame and starts from A$3,499. The demo unit might not be the colour we'd get you, and I'd have to check what's in stock. What do you think?",
+    "choices": [
+      {
+        "id": "opt:happy",
+        "label": "Leaning towards this one"
+      },
+      {
+        "id": "opt:another",
+        "label": "Ask to see another one you offered"
+      },
+      {
+        "id": "opt:others",
+        "label": "Ask about other phones"
+      },
+      {
+        "id": "opt:expensive",
+        "label": "Say it's too expensive"
+      },
+      {
+        "id": "opt:notforme",
+        "label": "Say it's not for me"
+      },
+      {
+        "id": "opt:unsure",
+        "label": "Undecided"
+      },
+      {
+        "id": "act:0",
+        "label": "Ask for a demo of the iPhone Duo",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:1",
+        "label": "Go with the iPhone Duo",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:2",
+        "label": "Ask for a demo of the iPhone 18 Pro",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:3",
+        "label": "Go with the iPhone 18 Pro",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:4",
+        "label": "Ask for a demo of the iPhone 18 Pro Max",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:5",
+        "label": "Go with the iPhone 18 Pro Max",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:6",
+        "label": "Ask for a demo of the iPhone Air",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:7",
+        "label": "Go with the iPhone Air",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:8",
+        "label": "Ask for a demo of the iPhone 17",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:9",
+        "label": "Go with the iPhone 17",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:10",
+        "label": "Ask for a demo of the iPhone 17e",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:11",
+        "label": "Go with the iPhone 17e",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:12",
+        "label": "Ask for a demo of the iPhone 16",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:13",
+        "label": "Go with the iPhone 16",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:14",
+        "label": "Leave"
+      }
+    ],
+    "ended": false,
+    "awaiting": "customer"
+  },
+  {
+    "type": "turn",
+    "conversationId": "c12c3a7c-2bd8-491a-a969-9609eea44d7a",
+    "withId": "spec-phones",
+    "withName": "the phones specialist",
+    "say": "It comes in 256GB, 512GB, 1TB or 2TB. Which would you like?",
+    "choices": [
+      {
+        "id": "opt:storage:256GB",
+        "label": "Storage: 256GB (A$3,499)"
+      },
+      {
+        "id": "opt:storage:512GB",
+        "label": "Storage: 512GB (A$3,899)"
+      },
+      {
+        "id": "opt:storage:1TB",
+        "label": "Storage: 1TB (A$4,699)"
+      },
+      {
+        "id": "opt:storage:2TB",
+        "label": "Storage: 2TB (A$5,899)"
+      },
+      {
+        "id": "opt:notsure",
+        "label": "Not sure about this"
+      },
+      {
+        "id": "act:0",
+        "label": "Ask for a demo of the iPhone Duo",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:1",
+        "label": "Go with the iPhone Duo",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:2",
+        "label": "Ask for a demo of the iPhone 18 Pro",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:3",
+        "label": "Go with the iPhone 18 Pro",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:4",
+        "label": "Ask for a demo of the iPhone 18 Pro Max",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:5",
+        "label": "Go with the iPhone 18 Pro Max",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:6",
+        "label": "Ask for a demo of the iPhone Air",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:7",
+        "label": "Go with the iPhone Air",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:8",
+        "label": "Ask for a demo of the iPhone 17",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:9",
+        "label": "Go with the iPhone 17",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:10",
+        "label": "Ask for a demo of the iPhone 17e",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:11",
+        "label": "Go with the iPhone 17e",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:12",
+        "label": "Ask for a demo of the iPhone 16",
+        "group": "Ask for a demo"
+      },
+      {
+        "id": "act:13",
+        "label": "Go with the iPhone 16",
+        "group": "Choose a different phone"
+      },
+      {
+        "id": "act:14",
+        "label": "Leave"
+      }
+    ],
+    "ended": false,
+    "awaiting": "customer"
+  }
+]

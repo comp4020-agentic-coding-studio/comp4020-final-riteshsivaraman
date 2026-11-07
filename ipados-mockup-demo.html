@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en" data-wallpaper="horizon">
+<head>
+<meta charset="UTF-8" />
+<title>iPadOS mini-reimplementation demo</title>
+<style>
+  :root {
+    /* Landscape is the default orientation — the single most identity-defining
+       difference from the iPhone mockup. Aspect ratio ~1.44:1, close to an
+       11" iPad Pro/Air in landscape (1194x834 native). */
+    --screen-w: 900px;
+    --screen-h: 625px;
+  }
+  html[data-orientation="portrait"] {
+    --screen-w: 625px;
+    --screen-h: 900px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #101012;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Helvetica, Arial, sans-serif;
+    padding: 24px;
+  }
+  .rig { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+  /* ---------- Desk stand / pickup gate (same mechanic as the iOS file) ---------- */
+  .surface {
+    position: relative;
+    width: var(--screen-w);
+    height: var(--screen-h);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: calc(100vw - 48px);
+  }
+  .ipad-rest {
+    width: 320px;
+    height: 200px;
+    background: #050505;
+    border-radius: 24px;
+    border: 1px solid #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    transition: transform 0.15s ease;
+  }
+  .ipad-rest:active { transform: scale(0.97); }
+  .ipad-rest .label { color: #555; font-size: 13px; text-align: center; line-height: 1.6; }
+  .ipad-rest .label b { color: #999; display:block; font-size: 14px; }
+
+  .ipad {
+    position: relative;
+    width: var(--screen-w);
+    height: var(--screen-h);
+    max-width: calc(100vw - 48px);
+    background: #141416;
+    border-radius: 38px;
+    padding: 18px;
+    box-shadow: 0 0 0 2px #333, 0 30px 70px rgba(0,0,0,0.6);
+    display: none;
+  }
+  .ipad.held { display: block; }
+  .ipad .lens {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #060608;
+    box-shadow: inset 0 0 0 1px #2a2a2e;
+    z-index: 60;
+  }
+  .screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 22px;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .put-down {
+    display: none;
+    color: #777;
+    font-size: 13px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .put-down.shown { display: block; }
+  .put-down:hover { color: #aaa; }
+
+  /* ---------- Views ---------- */
+  .view {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease-out, transform 0.42s cubic-bezier(0.34, 1.42, 0.64, 1);
+    transform: scale(1.04);
+  }
+  .view.active { opacity: 1; pointer-events: auto; transform: scale(1); }
+
+  /* Status bar shared — iPad convention: time left, wifi+battery right, no cellular bars
+     (this mockup models a Wi-Fi-only iPad). */
+  .statusbar {
+    position: absolute;
+    top: 14px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 26px;
+    z-index: 40;
+    pointer-events: none;
+  }
+  .statusbar .sb-left { display: flex; align-items: baseline; gap: 10px; }
+  .statusbar .sb-time { font-size: 14px; font-weight: 600; color: #fff; letter-spacing: 0.1px; }
+  .statusbar .sb-date { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); }
+  .statusbar .glyphs { display: flex; align-items: center; gap: 7px; }
+  .statusbar .batt-pct { font-size: 13px; color: #fff; opacity: 0.9; }
+
+  /* Shared wallpaper layout: full-bleed, plus faint grain so nothing reads as a flat vector. */
+  .wallpaper {
+    background-color: #0c2749;
+  }
+  .wallpaper::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+    opacity: 0.045;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+
+  /* --- Wallpaper: "horizon" — a calm wide blue/teal light-field for the landscape canvas,
+     evoking Apple's abstract gradient stock wallpapers (not any specific one): soft
+     continuous light banding left-to-right instead of the portrait file's top-to-bottom
+     "petal" recipe, since a 1.44:1 canvas reads a gradient very differently. */
+  [data-wallpaper="horizon"] .wallpaper {
+    background:
+      radial-gradient(60% 90% at 8% 50%, rgba(255,255,255,0.26), transparent 60%),
+      radial-gradient(70% 100% at 30% 20%, rgba(86,176,255,0.6), transparent 60%),
+      radial-gradient(80% 110% at 68% 85%, rgba(32,205,180,0.46), transparent 62%),
+      radial-gradient(90% 100% at 100% 40%, rgba(10,30,60,0.6), transparent 65%),
+      linear-gradient(100deg, #15375e 0%, #123a63 35%, #0c2749 68%, #071527 100%);
+    background-size: 140% 140%, 150% 150%, 160% 160%, 140% 140%, 100% 100%;
+    animation: horizonDrift 75s ease-in-out infinite alternate;
+  }
+  @keyframes horizonDrift {
+    0%   { background-position: 8% 50%, 28% 18%, 66% 86%, 100% 38%, 0 0; }
+    100% { background-position: 10% 54%, 32% 22%, 70% 82%, 96% 42%, 0 0; }
+  }
+
+  /* --- Wallpaper: "ember" — a single glowing ribbon laid diagonally across the wide
+     canvas (same recipe family as a Flow-style wallpaper: blurred glow stroke, sharper
+     mid stroke, bright core — redrawn on a landscape path instead of a portrait one). */
+  [data-wallpaper="ember"] .wallpaper {
+    background:
+      radial-gradient(55% 70% at 55% 45%, rgba(255,70,30,0.1), transparent 70%),
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1180' height='820' viewBox='0 0 1180 820'><defs><linearGradient id='eg' x1='0' y1='0' x2='1' y2='0.4'><stop offset='0' stop-color='%23fff2c0'/><stop offset='0.18' stop-color='%23ffb347'/><stop offset='0.45' stop-color='%23ff5a2b'/><stop offset='0.72' stop-color='%23ff1e3d'/><stop offset='1' stop-color='%238e0026'/></linearGradient><filter id='gl' x='-80%25' y='-80%25' width='260%25' height='260%25'><feGaussianBlur stdDeviation='18' result='b1'/><feGaussianBlur in='SourceGraphic' stdDeviation='6' result='b2'/><feMerge><feMergeNode in='b1'/><feMergeNode in='b2'/></feMerge></filter></defs><rect width='1180' height='820' fill='%23030303'/><path d='M 60,760 C 220,700 260,560 430,540 C 600,520 640,660 820,620 C 1000,580 980,420 1150,360' fill='none' stroke='url(%23eg)' stroke-width='44' stroke-linecap='round' filter='url(%23gl)' opacity='0.95'/><path d='M 60,760 C 220,700 260,560 430,540 C 600,520 640,660 820,620 C 1000,580 980,420 1150,360' fill='none' stroke='url(%23eg)' stroke-width='11' stroke-linecap='round' opacity='0.95'/><path d='M 60,760 C 220,700 260,560 430,540 C 600,520 640,660 820,620 C 1000,580 980,420 1150,360' fill='none' stroke='%23fff6e2' stroke-width='2.6' stroke-linecap='round' opacity='0.9'/></svg>") center/135% 135% no-repeat;
+    background-color: #030303;
+    animation: emberDrift 95s ease-in-out infinite alternate;
+  }
+  @keyframes emberDrift {
+    0%   { background-position: 50% 50%, 48% 46%; }
+    100% { background-position: 50% 50%, 53% 50%; }
+  }
+
+  /* ---------- Lock screen ---------- */
+  #lock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 54px;
+    color: #fff;
+  }
+  #lock-time { font-size: 86px; font-weight: 600; line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; text-shadow: 0 1px 18px rgba(0,0,0,0.35); }
+  #lock .date { font-size: 19px; font-weight: 600; opacity: 0.92; margin-top: 4px; text-shadow: 0 1px 8px rgba(0,0,0,0.25); }
+  #lock .lock-row {
+    margin-top: 30px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 0 16px;
+  }
+  #lock .notif, #lock .lockwidget {
+    width: 230px;
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(20px) saturate(1.6);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    border-radius: 18px;
+    padding: 11px 13px;
+    text-align: left;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.3),
+      inset 0 0 0 0.5px rgba(255,255,255,0.15),
+      0 6px 18px rgba(0,0,0,0.22);
+  }
+  #lock .notif .nhead { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  #lock .notif .nglyph {
+    width: 18px; height: 18px; border-radius: 5px;
+    background: #34c759;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  #lock .notif .nglyph svg { width: 11px; height: 11px; }
+  #lock .notif .napp { font-size: 12.5px; font-weight: 600; opacity: 0.85; letter-spacing: 0.1px; }
+  #lock .notif .ntime { margin-left: auto; font-size: 12px; opacity: 0.6; }
+  #lock .notif .nbody { font-size: 14.5px; line-height: 1.3; }
+  #lock .notif .nbody b { font-weight: 600; }
+  #lock .lockwidget .lw-head { font-size: 12px; font-weight: 700; opacity: 0.75; letter-spacing: 0.3px; }
+  #lock .lockwidget .lw-main { font-size: 26px; font-weight: 500; margin-top: 4px; }
+  #lock .lockwidget .lw-sub { font-size: 12.5px; opacity: 0.8; margin-top: 10px; }
+  #lock .hint {
+    position: absolute;
+    bottom: 16px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 13px;
+    opacity: 0.75;
+  }
+  #lock .swipe-bar {
+    position: absolute;
+    bottom: 38px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 140px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.85);
+  }
+
+  /* ---------- Home screen ---------- */
+  #home { padding-top: 40px; }
+  .widget-cluster {
+    display: grid;
+    grid-template-columns: 118px 166px 166px;
+    grid-template-rows: 70px 70px;
+    gap: 11px;
+    padding: 0 22px;
+    margin-bottom: 14px;
+    width: fit-content;
+  }
+  .widget {
+    border-radius: 18px;
+    padding: 9px 11px;
+    color: #fff;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+  .widget-clockface {
+    grid-column: 1; grid-row: 1;
+    background: linear-gradient(160deg, #3a3a3e, #1c1c1e);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .widget-clockface svg { width: 68px; height: 68px; }
+  .widget-notes-mini {
+    grid-column: 1; grid-row: 2;
+    background: #ffd84d; color: #3a2e00;
+    display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  .widget-notes-mini .wn-label { font-size: 9.5px; font-weight: 700; opacity: 0.75; }
+  .widget-notes-mini .wn-text { font-size: 10.5px; margin-top: 3px; line-height: 1.25; }
+  .widget-calendar-med {
+    grid-column: 2; grid-row: 1 / span 2;
+    background: #fff; color: #000;
+  }
+  .widget-calendar-med .w-day { color: #ff3b30; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; }
+  .widget-calendar-med .w-date { font-size: 27px; font-weight: 500; line-height: 1.1; }
+  .widget-calendar-med .w-event-list { margin-top: 6px; font-size: 10.5px; color: #1c1c1e; display:flex; flex-direction:column; gap:5px; }
+  .widget-calendar-med .w-event-list .ev { display:flex; gap:6px; align-items:flex-start; }
+  .widget-calendar-med .w-event-list .ev .bar { width:3px; align-self:stretch; border-radius:2px; background:#0a84ff; flex-shrink:0; }
+  .widget-reminders {
+    grid-column: 3; grid-row: 1 / span 2;
+    background: #fff; color: #000;
+  }
+  .widget-reminders .wr-head { display:flex; align-items:center; gap:6px; font-size: 12px; font-weight: 700; color: #5856d6; }
+  .widget-reminders .wr-list { margin-top: 6px; display:flex; flex-direction:column; gap: 5px; font-size: 10.5px; }
+  .widget-reminders .wr-list div { display:flex; gap:7px; align-items:center; }
+  .widget-reminders .wr-list .dot { width:11px;height:11px;border-radius:50%; border:1.4px solid #c7c7cc; flex-shrink:0; }
+
+  .app-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    row-gap: 14px;
+    padding: 0 26px;
+    max-width: 640px;
+  }
+  html[data-orientation="portrait"] .app-grid {
+    grid-template-columns: repeat(4, 1fr);
+    max-width: 440px;
+  }
+  .search-pill {
+    margin: 10px auto 0; width: fit-content;
+    background: rgba(255,255,255,0.22); color: #fff; font-size: 12px;
+    padding: 6px 16px; border-radius: 13px;
+  }
+  .app-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .app-icon:active { transform: scale(0.88); }
+  .glyph-wrap {
+    width: 48px; height: 48px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+  }
+  .app-icon .glyph {
+    width: 100%; height: 100%;
+    clip-path: url(#squircle);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .app-icon .glyph::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 40%, rgba(0,0,0,0.06) 100%);
+    pointer-events: none;
+  }
+  .app-icon span { color: #fff; font-size: 10.5px; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+
+  /* Floating pill dock — visually distinct from the iPhone dock: narrower than full width,
+     centered, with a divider separating pinned apps from a "recently used" suggestion
+     cluster, matching real iPadOS. */
+  .dock {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 62px;
+    width: fit-content;
+    padding: 0 13px;
+    background: rgba(255,255,255,0.16);
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.35),
+      inset 0 0 0 0.5px rgba(255,255,255,0.18),
+      0 8px 24px rgba(0,0,0,0.25);
+  }
+  .dock-pinned { display: flex; align-items: center; gap: 13px; }
+  .dock-divider { width: 1px; align-self: stretch; margin: 10px 0; background: rgba(255,255,255,0.28); }
+  .dock-suggested { display: flex; align-items: center; gap: 8px; }
+  .dock-suggested .glyph-wrap { width: 40px; height: 40px; }
+  .dock-mini-stack { display: flex; flex-direction: column; gap: 5px; }
+  .dock-mini-stack .glyph-wrap { width: 18px; height: 18px; }
+  .page-dots { position:absolute; bottom: 82px; left:0; right:0; display:flex; justify-content:center; gap:6px; }
+  .page-dots span { width:6px; height:6px; border-radius:50%; background: rgba(255,255,255,0.45); }
+  .page-dots span.on { background: rgba(255,255,255,0.95); }
+
+  /* ---------- Shared app chrome ---------- */
+  .app-header {
+    position: absolute;
+    top: 52px;
+    left: 0; right: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 45;
+    height: 40px;
+  }
+  .app-header .title {
+    font-weight: 700;
+    font-size: 20px;
+  }
+  .app-body-full { position: absolute; top: 92px; bottom: 0; left: 0; right: 0; overflow-y: auto; }
+
+  /* Split-view chrome shared by Settings / Notes / Messages — the real structural
+     difference from the iPhone file: a persistent sidebar list next to a persistent
+     detail pane, both visible at once, neither one navigated away from the other. */
+  .split {
+    position: absolute;
+    top: 0; bottom: 0; left: 0; right: 0;
+    display: flex;
+  }
+  .split-sidebar {
+    width: 320px;
+    flex-shrink: 0;
+    border-right: 1px solid rgba(255,255,255,0.08);
+    overflow-y: auto;
+    padding-top: 92px;
+  }
+  html[data-orientation="portrait"] .split-sidebar { width: 240px; }
+  .split-detail {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    position: relative;
+    padding-top: 92px;
+  }
+  .split-sidebar .app-header, .split-detail .app-header { padding: 0 16px; }
+
+  /* Messages app */
+  #messages { background: #000; color: #fff; }
+  .conv-row { display:flex; gap: 12px; padding: 10px 16px; align-items:flex-start; cursor:pointer; border-bottom: 1px solid #1c1c1e; }
+  .conv-row.selected { background: #1c1c1e; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg,#636366,#3a3a3c); display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+  .conv-main { flex: 1; min-width: 0; }
+  .conv-top { display:flex; justify-content: space-between; }
+  .conv-name { font-weight: 600; font-size: 15px; }
+  .conv-time { color: #8e8e93; font-size: 13px; }
+  .conv-preview { color: #8e8e93; font-size: 13px; margin-top: 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .thread { padding: 14px 20px 86px; display:flex; flex-direction:column; gap:9px; }
+  .bubble { max-width: 60%; padding: 9px 14px; border-radius: 18px; font-size: 15px; line-height: 1.3; }
+  .bubble.in { background:#26262a; align-self:flex-start; border-bottom-left-radius:6px; }
+  .bubble.out { background:#0a84ff; align-self:flex-end; border-bottom-right-radius:6px; }
+  .thread-composer {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 10px 16px 16px;
+    display: flex; gap: 10px;
+    background: linear-gradient(0deg, #000 60%, transparent);
+  }
+  .thread-composer input {
+    flex: 1; background: #1c1c1e; border: 1px solid #333; border-radius: 18px;
+    color: #fff; font-size: 14px; padding: 9px 14px; outline: none; font-family: inherit;
+  }
+  .thread-composer button {
+    background: #0a84ff; border: none; color: #fff; border-radius: 16px;
+    padding: 0 16px; font-size: 14px; cursor: pointer;
+  }
+  .no-selection { padding: 40px; color: #8e8e93; font-size: 15px; }
+
+  /* Settings app */
+  #settings { background: #000; color: #fff; }
+  .settings-cat-row { display:flex; align-items:center; gap: 12px; padding: 9px 16px; cursor: pointer; }
+  .settings-cat-row.selected { background: #1c1c1e; }
+  .settings-cat-row:hover { background: #161618; }
+  .settings-group { margin: 0 16px 24px; border-radius: 12px; overflow: hidden; background: #1c1c1e; }
+  .settings-row { display:flex; align-items:center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #2c2c2e; }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-icon { width: 29px; height: 29px; border-radius: 7px; display:flex; align-items:center; justify-content:center; flex-shrink: 0; font-size: 15px; }
+  .settings-label { flex: 1; font-size: 16px; }
+  .settings-value { color: #8e8e93; font-size: 15px; }
+  .switch { width: 51px; height: 31px; border-radius: 16px; background: #39393d; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink:0; }
+  .switch.on { background: #34c759; }
+  .switch .knob { position:absolute; top:2px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  .switch.on .knob { transform: translateX(20px); }
+  .profile-row { display:flex; align-items:center; gap:14px; padding: 12px 16px; margin: 0 16px 16px; background:#1c1c1e; border-radius:12px; }
+  .profile-row .avatar { width: 50px; height: 50px; font-size:18px; }
+  .profile-name { font-size: 16px; font-weight: 600; }
+  .profile-sub { font-size: 12px; color: #8e8e93; }
+  .detail-heading { font-size: 28px; font-weight: 700; padding: 0 16px 16px; }
+  .orient-toggle { display:flex; gap: 2px; background:#2c2c2e; border-radius: 8px; padding: 2px; }
+  .orient-toggle button {
+    border: none; background: transparent; color: #8e8e93; font-size: 13px; padding: 6px 12px;
+    border-radius: 6px; cursor: pointer; font-family: inherit;
+  }
+  .orient-toggle button.on { background: #48484a; color: #fff; }
+
+  /* Weather app */
+  #weather { background: linear-gradient(120deg,#4a90d9,#1e5fa8 55%,#163f73); color:#fff; }
+  .weather-layout { display:flex; height:100%; padding-top: 92px; }
+  .weather-main-col { flex: 1; text-align:center; padding-top: 24px; }
+  .weather-city { font-size: 28px; font-weight: 500; }
+  .weather-temp { font-size: 100px; font-weight: 200; line-height:1; margin-top: 4px; }
+  .weather-cond { font-size: 18px; opacity: 0.9; }
+  .weather-hilo { font-size: 15px; opacity: 0.85; margin-top: 2px; }
+  .weather-hourly {
+    margin-top: 34px; margin-inline: 24px; background: rgba(255,255,255,0.14); backdrop-filter: blur(10px);
+    border-radius: 14px; padding: 14px 10px; display:flex; justify-content: space-between;
+  }
+  .hour-col { display:flex; flex-direction:column; align-items:center; gap:8px; font-size: 13px; }
+  .weather-side-col {
+    width: 300px; flex-shrink:0; padding: 24px 20px 24px 0;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-content:start;
+  }
+  .weather-card { background: rgba(255,255,255,0.14); backdrop-filter: blur(10px); border-radius: 14px; padding: 12px 14px; }
+  .weather-card .wc-label { font-size: 11px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.4px; }
+  .weather-card .wc-value { font-size: 22px; font-weight: 500; margin-top: 6px; }
+  .weather-card .wc-sub { font-size: 11.5px; opacity: 0.75; margin-top: 2px; }
+
+  /* Clock app */
+  #clock { background: #000; color: #fff; }
+  .clock-grid { display:grid; grid-template-columns: 1fr 1fr; }
+  .clock-row { display:flex; justify-content:space-between; align-items:center; padding: 16px 22px; border-bottom: 1px solid #1c1c1e; }
+  .clock-city { font-size: 16px; }
+  .clock-diff { font-size: 13px; color: #8e8e93; }
+  .clock-time { font-size: 32px; font-weight: 200; }
+
+  /* Notes app */
+  #notes { background: #000; color: #fff; }
+  .note-row { padding: 12px 16px; border-bottom: 1px solid #1c1c1e; cursor:pointer; }
+  .note-row.selected { background: #1c1c1e; }
+  .note-title { font-size: 16px; font-weight: 600; }
+  .note-meta { font-size: 13px; color: #8e8e93; margin-top: 2px; }
+  .notes-text { margin: 0 28px; font-size: 16px; line-height: 1.5; min-height: 300px; outline: none; }
+
+  .toast {
+    position: absolute;
+    top: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(40,40,40,0.92);
+    color: #fff;
+    font-size: 13px;
+    padding: 8px 16px;
+    border-radius: 14px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 90;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Home indicator: swipe-up bar, same convention as the iOS file. */
+  .home-indicator {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 140px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.92);
+    z-index: 200;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.12s cubic-bezier(0.34,1.56,0.64,1), width 0.12s;
+  }
+  .home-indicator.shown { opacity: 0.85; pointer-events: auto; }
+  .home-indicator.shown:hover { opacity: 1; }
+  .home-indicator:active { transform: translateX(-50%) scaleY(1.3); width: 116px; }
+
+  .caption {
+    color: #999;
+    text-align: center;
+    font-family: -apple-system, sans-serif;
+    font-size: 13px;
+    max-width: 560px;
+    line-height: 1.5;
+  }
+  .caption b { color: #ccc; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <clipPath id="squircle" clipPathUnits="objectBoundingBox">
+      <path d="M 1.0,0.5 L 0.9998,0.6445 L 0.9992,0.6905 L 0.9982,0.7239 L 0.9968,0.751 L 0.9949,0.7741 L 0.9927,0.7944 L 0.9901,0.8126 L 0.987,0.8291 L 0.9835,0.8441 L 0.9796,0.858 L 0.9752,0.8709 L 0.9704,0.8828 L 0.9651,0.8939 L 0.9594,0.9043 L 0.9531,0.9139 L 0.9464,0.9229 L 0.9391,0.9313 L 0.9313,0.9391 L 0.9229,0.9464 L 0.9139,0.9531 L 0.9043,0.9594 L 0.8939,0.9651 L 0.8828,0.9704 L 0.8709,0.9752 L 0.858,0.9796 L 0.8441,0.9835 L 0.8291,0.987 L 0.8126,0.9901 L 0.7944,0.9927 L 0.7741,0.9949 L 0.751,0.9968 L 0.7239,0.9982 L 0.6905,0.9992 L 0.6445,0.9998 L 0.5,1.0 L 0.3555,0.9998 L 0.3095,0.9992 L 0.2761,0.9982 L 0.249,0.9968 L 0.2259,0.9949 L 0.2056,0.9927 L 0.1874,0.9901 L 0.1709,0.987 L 0.1559,0.9835 L 0.142,0.9796 L 0.1291,0.9752 L 0.1172,0.9704 L 0.1061,0.9651 L 0.0957,0.9594 L 0.0861,0.9531 L 0.0771,0.9464 L 0.0687,0.9391 L 0.0609,0.9313 L 0.0536,0.9229 L 0.0469,0.9139 L 0.0406,0.9043 L 0.0349,0.8939 L 0.0296,0.8828 L 0.0248,0.8709 L 0.0204,0.858 L 0.0165,0.8441 L 0.013,0.8291 L 0.0099,0.8126 L 0.0073,0.7944 L 0.0051,0.7741 L 0.0032,0.751 L 0.0018,0.7239 L 0.0008,0.6905 L 0.0002,0.6445 L 0.0,0.5 L 0.0002,0.3555 L 0.0008,0.3095 L 0.0018,0.2761 L 0.0032,0.249 L 0.0051,0.2259 L 0.0073,0.2056 L 0.0099,0.1874 L 0.013,0.1709 L 0.0165,0.1559 L 0.0204,0.142 L 0.0248,0.1291 L 0.0296,0.1172 L 0.0349,0.1061 L 0.0406,0.0957 L 0.0469,0.0861 L 0.0536,0.0771 L 0.0609,0.0687 L 0.0687,0.0609 L 0.0771,0.0536 L 0.0861,0.0469 L 0.0957,0.0406 L 0.1061,0.0349 L 0.1172,0.0296 L 0.1291,0.0248 L 0.142,0.0204 L 0.1559,0.0165 L 0.1709,0.013 L 0.1874,0.0099 L 0.2056,0.0073 L 0.2259,0.0051 L 0.249,0.0032 L 0.2761,0.0018 L 0.3095,0.0008 L 0.3555,0.0002 L 0.5,0.0 L 0.6445,0.0002 L 0.6905,0.0008 L 0.7239,0.0018 L 0.751,0.0032 L 0.7741,0.0051 L 0.7944,0.0073 L 0.8126,0.0099 L 0.8291,0.013 L 0.8441,0.0165 L 0.858,0.0204 L 0.8709,0.0248 L 0.8828,0.0296 L 0.8939,0.0349 L 0.9043,0.0406 L 0.9139,0.0469 L 0.9229,0.0536 L 0.9313,0.0609 L 0.9391,0.0687 L 0.9464,0.0771 L 0.9531,0.0861 L 0.9594,0.0957 L 0.9651,0.1061 L 0.9704,0.1172 L 0.9752,0.1291 L 0.9796,0.142 L 0.9835,0.1559 L 0.987,0.1709 L 0.9901,0.1874 L 0.9927,0.2056 L 0.9949,0.2259 L 0.9968,0.249 L 0.9982,0.2761 L 0.9992,0.3095 L 0.9998,0.3555 Z" />
+    </clipPath>
+  </defs>
+</svg>
+
+<div class="rig">
+<div class="surface" id="surface">
+  <div class="ipad-rest" id="pickup">
+    <div class="label"><b>Tap to pick up iPad</b>Screen is off / inactive until held<br>(same pickup gate as the iOS demo)</div>
+  </div>
+</div>
+
+<div class="ipad" id="ipad">
+  <div class="lens"></div>
+  <div class="screen" id="screen">
+
+    <!-- Lock screen -->
+    <div class="view wallpaper active" id="lock">
+      <div class="statusbar">
+        <div class="sb-left"><div class="sb-time" id="sb-time-lock">9:41 AM</div><div class="sb-date" id="sb-date-lock">Mon 12 Oct</div></div>
+        <div class="glyphs" id="sb-glyphs-lock"></div>
+      </div>
+      <div id="lock-time">9:41</div>
+      <div class="date" id="lock-date">Monday, 12 October</div>
+      <div class="lock-row">
+        <div class="lockwidget">
+          <div class="lw-head">WEATHER</div>
+          <div class="lw-main">17&deg;</div>
+          <div class="lw-sub">Canberra &middot; Partly cloudy</div>
+        </div>
+        <div class="notif">
+          <div class="nhead">
+            <div class="nglyph">
+              <svg viewBox="0 0 24 24" fill="#fff"><path d="M12 5c-4.4 0-8 3-8 6.6 0 2 1.1 3.8 2.9 5l-.8 3 3.1-1.7c.9.2 1.8.3 2.8.3 4.4 0 8-3 8-6.6S16.4 5 12 5z"/></svg>
+            </div>
+            <div class="napp">Messages</div>
+            <div class="ntime">2m ago</div>
+          </div>
+          <div class="nbody"><b>Priya:</b> see you at 6?</div>
+        </div>
+        <div class="lockwidget">
+          <div class="lw-head">REMINDERS</div>
+          <div class="lw-main" style="font-size:16px; font-weight:600;">3 today</div>
+          <div class="lw-sub">Next: Crit prep notes</div>
+        </div>
+      </div>
+      <div class="swipe-bar"></div>
+      <div class="hint">Swipe up to unlock (click anywhere)</div>
+    </div>
+
+    <!-- Home screen -->
+    <div class="view wallpaper" id="home">
+      <div class="statusbar">
+        <div class="sb-left"><div class="sb-time" id="sb-time-home">9:41 AM</div><div class="sb-date" id="sb-date-home">Mon 12 Oct</div></div>
+        <div class="glyphs" id="sb-glyphs-home"></div>
+      </div>
+      <div class="widget-cluster">
+        <div class="widget widget-clockface" id="widget-clockface">
+          <svg width="112" height="112" viewBox="0 0 112 112">
+            <circle cx="56" cy="56" r="52" fill="#fff" />
+            <circle cx="56" cy="56" r="52" fill="none" stroke="#000" stroke-width="0.6" />
+            <line id="hand-hour" x1="56" y1="56" x2="56" y2="34" stroke="#000" stroke-width="3.6" stroke-linecap="round"/>
+            <line id="hand-min" x1="56" y1="56" x2="56" y2="22" stroke="#000" stroke-width="2.6" stroke-linecap="round"/>
+            <line id="hand-sec" x1="56" y1="56" x2="56" y2="20" stroke="#ff9f0a" stroke-width="1.2" stroke-linecap="round"/>
+            <circle cx="56" cy="56" r="2.6" fill="#000"/>
+          </svg>
+        </div>
+        <div class="widget widget-notes-mini" id="widget-notes-mini">
+          <div class="wn-label">Floor plan ideas</div>
+          <div class="wn-text">Genius Bar queue visible from the entrance&hellip;</div>
+        </div>
+        <div class="widget widget-calendar-med" id="widget-calendar">
+          <div class="w-day" id="widget-day">MON</div>
+          <div class="w-date" id="widget-date">12</div>
+          <div class="w-event-list">
+            <div class="ev"><div class="bar" style="background:#ff3b30;"></div>Crit prep &middot; 2pm</div>
+            <div class="ev"><div class="bar" style="background:#0a84ff;"></div>Studio session &middot; 4pm</div>
+          </div>
+        </div>
+        <div class="widget widget-reminders" id="widget-reminders">
+          <div class="wr-head">&#9989; Reminders</div>
+          <div class="wr-list">
+            <div><div class="dot"></div>Write ADR 4 reasoning</div>
+            <div><div class="dot"></div>Mutation-check queue code</div>
+            <div><div class="dot"></div>Update WORKLOG</div>
+          </div>
+        </div>
+      </div>
+      <div class="app-grid" id="app-grid"></div>
+      <div class="search-pill">&#128269; Search</div>
+      <div class="page-dots"><span class="on"></span><span></span><span></span></div>
+      <div class="dock" id="dock">
+        <div class="dock-pinned" id="dock-pinned"></div>
+        <div class="dock-divider"></div>
+        <div class="dock-suggested" id="dock-suggested"></div>
+      </div>
+    </div>
+
+    <!-- Messages app (split view: conversation list + thread, both always visible) -->
+    <div class="view" id="messages">
+      <div class="split">
+        <div class="split-sidebar" id="messages-sidebar">
+          <div class="app-header"><div class="title">Messages</div></div>
+          <div id="conv-list"></div>
+        </div>
+        <div class="split-detail" id="messages-detail">
+          <div class="app-header"><div class="title" id="thread-title">Select a conversation</div></div>
+          <div id="thread-body-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings app (split view: category sidebar + detail, macOS/iPadOS master-detail) -->
+    <div class="view" id="settings">
+      <div class="split">
+        <div class="split-sidebar" id="settings-sidebar">
+          <div class="app-header"><div class="title">Settings</div></div>
+          <div class="profile-row" style="margin-top:4px;">
+            <div class="avatar">R</div>
+            <div><div class="profile-name">Ritesh Sivaraman</div><div class="profile-sub">Apple Account, iCloud</div></div>
+          </div>
+          <div id="settings-cats"></div>
+        </div>
+        <div class="split-detail" id="settings-detail"></div>
+      </div>
+    </div>
+
+    <!-- Weather app -->
+    <div class="view" id="weather">
+      <div class="statusbar">
+        <div class="sb-left"><div class="sb-time" id="sb-time-weather">9:41 AM</div><div class="sb-date" id="sb-date-weather">Mon 12 Oct</div></div>
+        <div class="glyphs" id="sb-glyphs-weather"></div>
+      </div>
+      <div class="weather-layout">
+        <div class="weather-main-col">
+          <div class="weather-city">Canberra</div>
+          <div class="weather-temp">17&deg;</div>
+          <div class="weather-cond">Partly cloudy</div>
+          <div class="weather-hilo">H:19&deg; L:9&deg;</div>
+          <div class="weather-hourly" id="weather-hourly"></div>
+        </div>
+        <div class="weather-side-col" id="weather-side"></div>
+      </div>
+    </div>
+
+    <!-- Clock app -->
+    <div class="view" id="clock">
+      <div class="app-header"><div class="title">World Clock</div></div>
+      <div class="app-body-full" id="clock-list"></div>
+    </div>
+
+    <!-- Notes app (split view: note list + open note content, both always visible) -->
+    <div class="view" id="notes">
+      <div class="split">
+        <div class="split-sidebar" id="notes-sidebar">
+          <div class="app-header"><div class="title">Notes</div></div>
+          <div id="notes-list"></div>
+        </div>
+        <div class="split-detail" id="notes-detail">
+          <div class="app-header"></div>
+          <div contenteditable="true" id="notes-text" class="notes-text" spellcheck="false" style="margin-top:92px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <div class="home-indicator" id="home-indicator" title="Go home"></div>
+  </div>
+</div>
+<div class="put-down" id="put-down">&#8681; put iPad down</div>
+<div class="caption">Mini iPadOS re-implementation: landscape by default, a 6-column home grid, a floating pill
+dock with a recents divider, and Messages/Settings/Notes built as real split views (sidebar + detail both
+visible at once) rather than an iPhone's push-and-back navigation stretched bigger. Nothing here is a real OS
+&mdash; it's DOM/CSS standing in for what a held device's screen texture would need to do in the actual 3D scene.</div>
+</div>
+
+<script>
+/* ---------- Icon SVGs (same procedural icon-design language as the iOS demo — these are
+   generic app glyphs, not iPhone-specific, so they're reused rather than redrawn) ---------- */
+const ICONS = {
+  messages: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#30d158"/><path d="M12 5c-4.4 0-8 3-8 6.6 0 2 1.1 3.8 2.9 5l-.8 3 3.1-1.7c.9.2 1.8.3 2.8.3 4.4 0 8-3 8-6.6S16.4 5 12 5z" fill="#fff"/></svg>`,
+  facetime: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#30d158"/><path d="M4 8a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 14 8v8a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 4 16z" fill="#fff"/><path d="M14 10.5l5.3-3.1c.5-.3 1.2.1 1.2.7v9.8c0 .6-.7 1-1.2.7L14 15.5z" fill="#fff"/></svg>`,
+  settings: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="setg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9a9aa0"/><stop offset="1" stop-color="#646468"/></linearGradient></defs><rect width="24" height="24" fill="url(#setg)"/><path d="M12 8.2a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6zm8 2.5l1.5-1.2-1.6-2.8-1.7.6a7.5 7.5 0 0 0-1.6-1l-.3-1.9h-3.2l-.3 1.9c-.6.2-1.1.5-1.6 1l-1.7-.6-1.6 2.8 1.5 1.2a7.6 7.6 0 0 0 0 1.9l-1.5 1.2 1.6 2.8 1.7-.6c.5.4 1 .7 1.6 1l.3 1.9h3.2l.3-1.9c.6-.2 1.1-.5 1.6-1l1.7.6 1.6-2.8-1.5-1.2a7.6 7.6 0 0 0 0-1.9z" fill="#3a3a3c"/></svg>`,
+  music: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fd6f8e"/><stop offset="1" stop-color="#fa233b"/></linearGradient></defs><rect width="24" height="24" fill="url(#mg)"/><path d="M10 16.2a2 2 0 1 1-1.3-1.9V7.8l6-1.2V13a2 2 0 1 1-1.3-1.9V8.4l-3.4.7z" fill="#fff"/></svg>`,
+  weather: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="wg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fc3ff"/><stop offset="1" stop-color="#0a5fb0"/></linearGradient></defs><rect width="24" height="24" fill="url(#wg)"/><circle cx="9" cy="9" r="3.4" fill="#ffd94a"/><ellipse cx="14" cy="15" rx="6" ry="3.6" fill="#fff"/></svg>`,
+  clock: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#1c1c1e"/><circle cx="12" cy="12" r="8.6" fill="#fff"/><circle cx="12" cy="12" r="7.6" fill="#fff" stroke="#000" stroke-width="0.4"/><line x1="12" y1="12" x2="12" y2="7.2" stroke="#000" stroke-width="1"/><line x1="12" y1="12" x2="15.2" y2="13" stroke="#ff9f0a" stroke-width="1"/></svg>`,
+  health: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#fff"/><path d="M12 19s-6.5-4-6.5-8.6A3.4 3.4 0 0 1 9 7a3.3 3.3 0 0 1 3 1.9A3.3 3.3 0 0 1 15 7a3.4 3.4 0 0 1 3.5 3.4C18.5 15 12 19 12 19z" fill="#ff375f"/></svg>`,
+  mail: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5fc2ff"/><stop offset="1" stop-color="#0a84ff"/></linearGradient></defs><rect width="24" height="24" fill="url(#ag)"/><rect x="3.5" y="7" width="17" height="11" rx="1.5" fill="#fff"/><path d="M3.5 7.8l8.5 6 8.5-6" stroke="#0a84ff" stroke-width="1.3" fill="none"/></svg>`,
+  safari: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="safbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6fd6ff"/><stop offset="0.5" stop-color="#1a9bdb"/><stop offset="1" stop-color="#0b5fa8"/></linearGradient><linearGradient id="safring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff5c4d"/><stop offset="0.25" stop-color="#ffb24d"/><stop offset="0.5" stop-color="#e8e8ea"/><stop offset="0.75" stop-color="#8a8a8f"/><stop offset="1" stop-color="#ff5c4d"/></linearGradient></defs><rect width="24" height="24" fill="url(#safbg)"/><circle cx="12" cy="12" r="9.6" fill="url(#safring)"/><circle cx="12" cy="12" r="8.5" fill="#f4f6f8"/><circle cx="12" cy="12" r="8.5" fill="none" stroke="#c9ccd1" stroke-width="0.3"/><text x="12" y="6.1" font-size="1.9" font-weight="700" text-anchor="middle" fill="#8e8e93" font-family="Helvetica,Arial,sans-serif">N</text><text x="12" y="19.3" font-size="1.9" font-weight="700" text-anchor="middle" fill="#8e8e93" font-family="Helvetica,Arial,sans-serif">S</text><text x="5.3" y="12.7" font-size="1.9" font-weight="700" text-anchor="middle" fill="#8e8e93" font-family="Helvetica,Arial,sans-serif">W</text><text x="18.7" y="12.7" font-size="1.9" font-weight="700" text-anchor="middle" fill="#8e8e93" font-family="Helvetica,Arial,sans-serif">E</text><path d="M12 12l5.6-5.6-2.3 7-3.3-1.4z" fill="#ff3b30"/><path d="M12 12l-5.6 5.6 2.3-7 3.3 1.4z" fill="#c7cad0"/><circle cx="12" cy="12" r="1" fill="#fff" stroke="#9a9a9f" stroke-width="0.25"/></svg>`,
+  maps: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#eef0e8"/><path d="M0 8l6-2.4v18L0 26z" fill="#dce6c8"/><path d="M6 5.6l6 2v18l-6-2z" fill="#f4ede0"/><path d="M12 7.6l6-2v18l-6 2z" fill="#dce6c8"/><path d="M18 5.6l6-2v18l-6 2z" fill="#eef0e8"/><circle cx="12" cy="12.5" r="3.4" fill="#007aff"/><path d="M12 10l1.8 3.6h-3.6z" fill="#fff"/></svg>`,
+  notes: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#fff"/><path d="M0 0h24v3.4a1.5 1.5 0 0 1-1.5 1.5H1.5A1.5 1.5 0 0 1 0 3.4z" fill="#ffcc00"/><line x1="6" y1="10" x2="18" y2="10" stroke="#8e8e93" stroke-width="0.8"/><line x1="6" y1="13.2" x2="18" y2="13.2" stroke="#e5e5ea" stroke-width="0.8"/><line x1="6" y1="16.4" x2="13" y2="16.4" stroke="#e5e5ea" stroke-width="0.8"/></svg>`,
+  calendar: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#fff"/><rect x="2.5" y="2.5" width="19" height="4.5" fill="#ff3b30"/><text x="12" y="6" font-size="2.6" font-weight="700" text-anchor="middle" fill="#fff" id="cal-icon-day">MON</text><text x="12" y="18.5" font-size="9.5" font-weight="500" text-anchor="middle" fill="#1c1c1e" id="cal-icon-date">12</text></svg>`,
+  photos: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#fff"/><path d="M12 2 a10 10 0 0 1 8.7 5 l-8.7 5z" fill="#ff9500"/><path d="M12 2 a10 10 0 0 1 8.7 15 l-8.7-10z" fill="#ff3b30"/><path d="M20.7 17 a10 10 0 0 1 -17.4 0 l8.7-5z" fill="#af52de"/><path d="M3.3 17 a10 10 0 0 1 8.7-15 l-8.7 10z" fill="#34aadc"/></svg>`,
+  reminders: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#fff"/><circle cx="6" cy="7" r="1.6" fill="#0a84ff"/><line x1="9.5" y1="7" x2="19" y2="7" stroke="#d1d1d6" stroke-width="1"/><circle cx="6" cy="12" r="1.6" fill="#ff3b30"/><line x1="9.5" y1="12" x2="19" y2="12" stroke="#d1d1d6" stroke-width="1"/><circle cx="6" cy="17" r="1.6" fill="#ff9500"/><line x1="9.5" y1="17" x2="16" y2="17" stroke="#d1d1d6" stroke-width="1"/></svg>`,
+  news: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#fff"/><rect x="3" y="3" width="18" height="18" rx="2" fill="#fa2d48"/><path d="M7 7l10 10M11 7l6 10" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>`,
+  tv: `<svg width="30" height="30" viewBox="0 0 24 24"><rect width="24" height="24" fill="#111114"/><text x="12" y="15" font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="700" text-anchor="middle" fill="#fff">tv</text></svg>`,
+  podcasts: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><radialGradient id="pcg" cx="0.3" cy="0.25" r="1"><stop offset="0" stop-color="#cf7dff"/><stop offset="0.55" stop-color="#9b3ff5"/><stop offset="1" stop-color="#6b1fd6"/></radialGradient></defs><rect width="24" height="24" fill="url(#pcg)"/><circle cx="12" cy="11.3" r="7.3" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-width="1"/><circle cx="12" cy="11.3" r="4.6" fill="none" stroke="#fff" stroke-opacity="0.65" stroke-width="1"/><circle cx="12" cy="11.3" r="2.1" fill="#fff"/><path d="M12 15.6c2.6 0 4 1.7 4 2 0 .6-1.9 1.5-4 1.5s-4-.9-4-1.5c0-.3 1.4-2 4-2z" fill="#fff"/></svg>`,
+  appstore: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="asg" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="#5fcfff"/><stop offset="0.5" stop-color="#1f9dfb"/><stop offset="1" stop-color="#0a5fd8"/></linearGradient></defs><rect width="24" height="24" fill="url(#asg)"/><path d="M12.9 5.4a1.1 1.1 0 1 0-1.8 1.1l.5.86-4.9 8.5a1.1 1.1 0 1 0 1.9 1.1l1.2-2.1h4.4l.68 1.2a1.1 1.1 0 1 0 1.9-1.1z" fill="#fff"/><path d="M10.6 13l1.4-2.5 1.4 2.5z" fill="#1f9dfb"/><path d="M6.1 16.9a1.1 1.1 0 0 0 1.5.4 1.1 1.1 0 0 0 .4-1.5l-.9-1.6-1.9 1.1z" fill="#fff"/></svg>`,
+  wallet: `<svg width="30" height="30" viewBox="0 0 24 24"><defs><linearGradient id="wc1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3ddc84"/><stop offset="1" stop-color="#1fae63"/></linearGradient><linearGradient id="wc2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffb648"/><stop offset="1" stop-color="#ff8a00"/></linearGradient><linearGradient id="wc3" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4fb3ff"/><stop offset="1" stop-color="#0a66d8"/></linearGradient></defs><rect width="24" height="24" fill="#17171a"/><rect x="2.5" y="12.8" width="19" height="5.6" rx="2" fill="url(#wc1)"/><rect x="2.5" y="8.6" width="19" height="5.6" rx="2" fill="url(#wc2)"/><rect x="2.5" y="16.6" width="19" height="5.6" rx="2" fill="url(#wc3)"/><rect x="2.5" y="8.6" width="19" height="1.6" rx="0.8" fill="#fff" opacity="0.25"/></svg>`,
+};
+
+function iconEl(name, label) {
+  const div = document.createElement('div');
+  div.className = 'app-icon';
+  div.innerHTML = `<div class="glyph-wrap"><div class="glyph">${ICONS[name]}</div></div>${label ? `<span>${label}</span>` : ''}`;
+  return div;
+}
+
+/* ---------- Status bar glyphs: wifi + battery only — a Wi-Fi-only iPad has no cellular
+   bars, which is the honest difference from the iPhone file's signal/wifi/battery trio. ---------- */
+function statusGlyphs() {
+  return `
+  <svg width="16" height="12" viewBox="0 0 16 12" fill="#fff"><path d="M8 10.2a1.1 1.1 0 1 1 0-2.2 1.1 1.1 0 0 1 0 2.2zM5.3 7.4a3.8 3.8 0 0 1 5.4 0l-1.1 1.1a2.3 2.3 0 0 0-3.2 0zM2.9 5a7.2 7.2 0 0 1 10.2 0l-1.1 1.1a5.7 5.7 0 0 0-8 0z"/></svg>
+  <span class="batt-pct">100%</span>
+  <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0.5" y="0.5" width="21" height="11" rx="2.5" fill="none" stroke="#fff" opacity="0.4"/><rect x="2" y="2" width="18" height="8" rx="1.5" fill="#fff"/><rect x="22.5" y="4" width="1.6" height="4" rx="0.8" fill="#fff" opacity="0.4"/></svg>`;
+}
+['lock','home','weather'].forEach(ctx => {
+  document.getElementById(`sb-glyphs-${ctx}`).innerHTML = statusGlyphs();
+});
+
+/* ---------- Wallpaper config ----------
+   Same pattern as the iOS file: an id+label registry plus matching CSS under
+   [data-wallpaper="<id>"] .wallpaper. setWallpaper() only swaps a data-attribute. */
+const WALLPAPERS = {
+  horizon: { label: 'Horizon (wide blue/teal)' },
+  ember:   { label: 'Ember (diagonal glow ribbon)' },
+};
+const WALLPAPER_ORDER = Object.keys(WALLPAPERS);
+let currentWallpaper = document.documentElement.dataset.wallpaper || WALLPAPER_ORDER[0];
+function setWallpaper(id) {
+  if (!WALLPAPERS[id]) return;
+  currentWallpaper = id;
+  document.documentElement.dataset.wallpaper = id;
+}
+setWallpaper(currentWallpaper);
+
+/* ---------- Orientation (landscape default; portrait toggle from Settings) ---------- */
+let currentOrientation = 'landscape';
+function setOrientation(o) {
+  currentOrientation = o;
+  document.documentElement.dataset.orientation = o;
+}
+setOrientation(currentOrientation);
+
+/* ---------- Pickup / put-down gate ---------- */
+const surface = document.getElementById('surface');
+const ipad = document.getElementById('ipad');
+const putDownBtn = document.getElementById('put-down');
+
+document.getElementById('pickup').addEventListener('click', () => {
+  ipad.classList.add('held');
+  surface.style.display = 'none';
+  putDownBtn.classList.add('shown');
+  showView(lock);
+  flashToast('iPad picked up — screen active');
+});
+
+putDownBtn.addEventListener('click', () => {
+  ipad.classList.remove('held');
+  surface.style.display = 'flex';
+  putDownBtn.classList.remove('shown');
+  showView(lock);
+});
+
+/* ---------- View routing ---------- */
+const views = ['lock','home','messages','settings','weather','clock','notes'].reduce((o,id) => { o[id] = document.getElementById(id); return o; }, {});
+const lock = views.lock, home = views.home;
+const toast = document.getElementById('toast');
+
+const homeIndicator = document.getElementById('home-indicator');
+function showView(view) {
+  Object.values(views).forEach(v => v.classList.remove('active'));
+  view.classList.add('active');
+  homeIndicator.classList.toggle('shown', view !== lock);
+}
+homeIndicator.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (views.home.classList.contains('active')) return;
+  showView(home);
+});
+
+function flashToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(flashToast._t);
+  flashToast._t = setTimeout(() => toast.classList.remove('show'), 1300);
+}
+
+lock.addEventListener('click', () => showView(home));
+
+/* ---------- Home grid + dock ---------- */
+const grid = document.getElementById('app-grid');
+const gridApps = [
+  { id: 'facetime', icon: 'facetime', label: 'FaceTime' },
+  { id: 'reminders', icon: 'reminders', label: 'Reminders' },
+  { id: 'maps', icon: 'maps', label: 'Maps' },
+  { id: 'health', icon: 'health', label: 'Health' },
+  { id: 'wallet', icon: 'wallet', label: 'Wallet' },
+  { id: 'appstore', icon: 'appstore', label: 'App Store' },
+  { id: 'podcasts', icon: 'podcasts', label: 'Podcasts' },
+  { id: 'tv', icon: 'tv', label: 'TV' },
+  { id: 'news', icon: 'news', label: 'News' },
+  { id: 'settings', icon: 'settings', label: 'Settings' },
+];
+gridApps.forEach(a => {
+  const el = iconEl(a.icon, a.label);
+  el.addEventListener('click', () => {
+    if (views[a.id]) showView(views[a.id]);
+    else flashToast(`${a.label}: not built in this demo`);
+  });
+  grid.appendChild(el);
+});
+
+/* Dock: pinned row (incl. two built apps) + divider + a "recently used" suggestion
+   cluster (Weather/Clock) — the floating-pill-with-divider shape is the real
+   structural difference from the iPhone dock. */
+const dockPinned = document.getElementById('dock-pinned');
+[
+  ['messages', 'messages'],
+  ['safari', null],
+  ['music', null],
+  ['mail', null],
+  ['calendar', null],
+  ['photos', null],
+  ['notes', 'notes'],
+].forEach(([icon, viewId]) => {
+  const el = iconEl(icon, null);
+  el.addEventListener('click', () => {
+    if (viewId && views[viewId]) showView(views[viewId]);
+    else flashToast(`${icon}: not built in this demo`);
+  });
+  dockPinned.appendChild(el);
+});
+
+const dockSuggested = document.getElementById('dock-suggested');
+const miniStack = document.createElement('div');
+miniStack.className = 'dock-mini-stack';
+[['weather','weather'],['clock','clock']].forEach(([icon, viewId]) => {
+  const el = iconEl(icon, null);
+  el.addEventListener('click', () => showView(views[viewId]));
+  miniStack.appendChild(el);
+});
+dockSuggested.appendChild(miniStack);
+
+document.getElementById('widget-clockface').addEventListener('click', () => showView(views.clock));
+document.getElementById('widget-calendar').addEventListener('click', () => flashToast('Calendar: not built in this demo'));
+document.getElementById('widget-notes-mini').addEventListener('click', () => showView(views.notes));
+document.getElementById('widget-reminders').addEventListener('click', () => flashToast('Reminders: not built in this demo'));
+
+/* ---------- Clock tick (also drives the analog clock-face widget) ---------- */
+function tick() {
+  const now = new Date();
+  const h24 = now.getHours();
+  const h12 = h24 % 12 || 12;
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const meridiem = h24 < 12 ? 'AM' : 'PM';
+  const t12 = `${h12}:${m}`;
+  const tStatus = `${h12}:${m} ${meridiem}`;
+  document.getElementById('lock-time').textContent = t12;
+  ['lock','home','weather'].forEach(ctx => {
+    const el = document.getElementById(`sb-time-${ctx}`);
+    if (el) el.textContent = tStatus;
+  });
+  const shortDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const shortMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const longDays = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  document.getElementById('lock-date').textContent = `${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()]}, ${now.getDate()} ${['January','February','March','April','May','June','July','August','September','October','November','December'][now.getMonth()]}`;
+  const shortDateLabel = `${shortDays[now.getDay()]} ${now.getDate()} ${shortMonths[now.getMonth()]}`;
+  ['lock','home','weather'].forEach(ctx => {
+    const el = document.getElementById(`sb-date-${ctx}`);
+    if (el) el.textContent = shortDateLabel;
+  });
+  document.getElementById('widget-day').textContent = longDays[now.getDay()];
+  document.getElementById('widget-date').textContent = now.getDate();
+  const calIconDay = document.getElementById('cal-icon-day');
+  const calIconDate = document.getElementById('cal-icon-date');
+  if (calIconDay) calIconDay.textContent = shortDays[now.getDay()].toUpperCase();
+  if (calIconDate) calIconDate.textContent = now.getDate();
+
+  // Analog clock-face widget hands — computed from real time, not a static graphic.
+  const sec = now.getSeconds();
+  const hourDeg = ((h24 % 12) + now.getMinutes() / 60) * 30;
+  const minDeg = (now.getMinutes() + sec / 60) * 6;
+  const secDeg = sec * 6;
+  const handHour = document.getElementById('hand-hour');
+  const handMin = document.getElementById('hand-min');
+  const handSec = document.getElementById('hand-sec');
+  if (handHour) handHour.setAttribute('transform', `rotate(${hourDeg} 56 56)`);
+  if (handMin) handMin.setAttribute('transform', `rotate(${minDeg} 56 56)`);
+  if (handSec) handSec.setAttribute('transform', `rotate(${secDeg} 56 56)`);
+
+  renderClockList(now);
+}
+setInterval(tick, 1000);
+
+/* ---------- Messages app: split view, list + thread always both visible ---------- */
+const convos = [
+  { name: 'Priya', preview: 'see you at 6?', time: '2m', msgs: [
+    { from: 'in', text: 'Hey, still on for today?' },
+    { from: 'out', text: 'Yep! Heading over now' },
+    { from: 'in', text: 'see you at 6?' },
+  ]},
+  { name: 'Dev Team', preview: 'Pushed the glossy-materials fix', time: '41m', msgs: [
+    { from: 'in', text: 'Pushed the glossy-materials fix to the iPad build too' },
+    { from: 'out', text: 'Nice, checking now' },
+  ]},
+  { name: 'Mum', preview: 'Call me when free', time: '2h', msgs: [
+    { from: 'in', text: 'Call me when free' },
+  ]},
+];
+const convList = document.getElementById('conv-list');
+const threadTitle = document.getElementById('thread-title');
+const threadBodyWrap = document.getElementById('thread-body-wrap');
+let selectedConvo = null;
+
+function renderConvList() {
+  convList.innerHTML = '';
+  convos.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'conv-row' + (selectedConvo === i ? ' selected' : '');
+    row.innerHTML = `<div class="avatar">${c.name[0]}</div>
+      <div class="conv-main">
+        <div class="conv-top"><div class="conv-name">${c.name}</div><div class="conv-time">${c.time}</div></div>
+        <div class="conv-preview">${c.preview}</div>
+      </div>`;
+    row.addEventListener('click', () => selectConvo(i));
+    convList.appendChild(row);
+  });
+}
+function selectConvo(i) {
+  selectedConvo = i;
+  renderConvList();
+  renderThread();
+}
+function renderThread() {
+  if (selectedConvo === null) {
+    threadTitle.textContent = 'Select a conversation';
+    threadBodyWrap.innerHTML = `<div class="no-selection">Pick a conversation on the left — on iPad, Messages always shows the list and the open thread side by side.</div>`;
+    return;
+  }
+  const c = convos[selectedConvo];
+  threadTitle.textContent = c.name;
+  threadBodyWrap.innerHTML = `<div class="thread" id="thread-body"></div>
+    <div class="thread-composer"><input id="thread-input" placeholder="Text Message" /><button id="thread-send">Send</button></div>`;
+  const threadBody = document.getElementById('thread-body');
+  c.msgs.forEach(m => {
+    const b = document.createElement('div');
+    b.className = `bubble ${m.from}`;
+    b.textContent = m.text;
+    threadBody.appendChild(b);
+  });
+  const input = document.getElementById('thread-input');
+  const send = () => {
+    const val = input.value.trim();
+    if (!val) return;
+    c.msgs.push({ from: 'out', text: val });
+    input.value = '';
+    renderThread();
+    convos[selectedConvo].preview = val;
+    renderConvList();
+  };
+  document.getElementById('thread-send').addEventListener('click', send);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+}
+renderConvList();
+renderThread();
+
+/* ---------- Settings app: split view, category sidebar + detail pane ---------- */
+const SETTINGS_CATS = [
+  { id: 'airplane', icon: '✈️', bg: '#ff9f0a', label: 'Airplane Mode', rows: [
+    { icon: '✈️', bg: '#ff9f0a', label: 'Airplane Mode', toggle: false },
+  ]},
+  { id: 'wifi', icon: '📶', bg: '#0a84ff', label: 'Wi-Fi', rows: [
+    { icon: '📶', bg: '#0a84ff', label: 'Wi-Fi', value: 'eduroam' },
+  ]},
+  { id: 'bluetooth', icon: '🔵', bg: '#0a84ff', label: 'Bluetooth', rows: [
+    { icon: '🔵', bg: '#0a84ff', label: 'Bluetooth', value: 'On' },
+  ]},
+  { id: 'notifications', icon: '🔔', bg: '#ff3b30', label: 'Notifications', rows: [
+    { icon: '🔔', bg: '#ff3b30', label: 'Allow Notifications', toggle: true },
+  ]},
+  { id: 'sounds', icon: '🔊', bg: '#ff2d55', label: 'Sounds', rows: [
+    { icon: '🔊', bg: '#ff2d55', label: 'Ringer and Alerts', toggle: true },
+  ]},
+  { id: 'focus', icon: '🌙', bg: '#5856d6', label: 'Focus', rows: [
+    { icon: '🌙', bg: '#5856d6', label: 'Do Not Disturb', toggle: false },
+  ]},
+  { id: 'display', icon: '🔆', bg: '#8e8e93', label: 'Display & Brightness', rows: [], custom: 'orientation' },
+  { id: 'wallpaper', icon: '🖼️', bg: '#0a84ff', label: 'Wallpaper', rows: [], custom: 'wallpaper' },
+];
+const settingsCats = document.getElementById('settings-cats');
+const settingsDetail = document.getElementById('settings-detail');
+let selectedCat = 'display';
+
+function renderSettingsCats() {
+  settingsCats.innerHTML = '';
+  SETTINGS_CATS.forEach(cat => {
+    const row = document.createElement('div');
+    row.className = 'settings-cat-row' + (selectedCat === cat.id ? ' selected' : '');
+    row.innerHTML = `<div class="settings-icon" style="background:${cat.bg}">${cat.icon}</div><div class="settings-label">${cat.label}</div>`;
+    row.addEventListener('click', () => { selectedCat = cat.id; renderSettingsCats(); renderSettingsDetail(); });
+    settingsCats.appendChild(row);
+  });
+}
+function renderSettingsDetail() {
+  const cat = SETTINGS_CATS.find(c => c.id === selectedCat);
+  settingsDetail.innerHTML = `<div class="detail-heading">${cat.label}</div>`;
+  if (cat.custom === 'orientation') {
+    const box = document.createElement('div');
+    box.className = 'settings-group';
+    box.innerHTML = `<div class="settings-row">
+        <div class="settings-icon" style="background:#8e8e93;">📱</div>
+        <div class="settings-label">Orientation</div>
+        <div class="orient-toggle" id="orient-toggle">
+          <button data-o="landscape" class="${currentOrientation==='landscape'?'on':''}">Landscape</button>
+          <button data-o="portrait" class="${currentOrientation==='portrait'?'on':''}">Portrait</button>
+        </div>
+      </div>`;
+    settingsDetail.appendChild(box);
+    box.querySelectorAll('.orient-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setOrientation(btn.dataset.o);
+        renderSettingsDetail();
+        flashToast(`Orientation: ${btn.dataset.o}`);
+      });
+    });
+    return;
+  }
+  if (cat.custom === 'wallpaper') {
+    const box = document.createElement('div');
+    box.className = 'settings-group';
+    WALLPAPER_ORDER.forEach(id => {
+      const row = document.createElement('div');
+      row.className = 'settings-row';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `<div class="settings-icon" style="background:#0a84ff;">🖼️</div><div class="settings-label">${WALLPAPERS[id].label}</div><div style="color:${currentWallpaper===id ? '#0a84ff' : '#48484a'};">${currentWallpaper===id ? '✓' : ''}</div>`;
+      row.addEventListener('click', () => {
+        setWallpaper(id);
+        renderSettingsDetail();
+        flashToast(`Wallpaper: ${WALLPAPERS[id].label}`);
+      });
+      box.appendChild(row);
+    });
+    settingsDetail.appendChild(box);
+    return;
+  }
+  const group = document.createElement('div');
+  group.className = 'settings-group';
+  cat.rows.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'settings-row';
+    const right = r.toggle !== undefined
+      ? `<div class="switch ${r.toggle ? 'on' : ''}"><div class="knob"></div></div>`
+      : `<div class="settings-value">${r.value || ''}</div>`;
+    row.innerHTML = `<div class="settings-icon" style="background:${r.bg}">${r.icon}</div><div class="settings-label">${r.label}</div>${right}`;
+    if (r.toggle !== undefined) {
+      row.querySelector('.switch').addEventListener('click', (e) => e.currentTarget.classList.toggle('on'));
+    }
+    group.appendChild(row);
+  });
+  settingsDetail.appendChild(group);
+}
+renderSettingsCats();
+renderSettingsDetail();
+
+/* ---------- Weather: main column + a side column of detail cards (iPad has the room) ---------- */
+const hourly = document.getElementById('weather-hourly');
+const hoursData = [
+  ['Now','⛅','17°'], ['1PM','🌤️','18°'], ['2PM','☀️','19°'], ['3PM','☀️','18°'],
+  ['4PM','⛅','16°'], ['5PM','🌥️','14°'], ['6PM','🌙','12°'], ['7PM','🌙','11°'],
+];
+hoursData.forEach(([h, icon, t]) => {
+  const col = document.createElement('div');
+  col.className = 'hour-col';
+  col.innerHTML = `<div>${h}</div><div style="font-size:20px;">${icon}</div><div>${t}</div>`;
+  hourly.appendChild(col);
+});
+const weatherSide = document.getElementById('weather-side');
+[
+  ['WIND', '9 km/h', 'From the SW'],
+  ['HUMIDITY', '58%', 'Dew point 9°'],
+  ['UV INDEX', '2', 'Low'],
+  ['VISIBILITY', '10 km', 'Clear'],
+].forEach(([label, value, sub]) => {
+  const card = document.createElement('div');
+  card.className = 'weather-card';
+  card.innerHTML = `<div class="wc-label">${label}</div><div class="wc-value">${value}</div><div class="wc-sub">${sub}</div>`;
+  weatherSide.appendChild(card);
+});
+
+/* ---------- World clock list (2 columns — the wider canvas can show more at once) ---------- */
+const cities = [
+  { name: 'Canberra', offset: 0 },
+  { name: 'Tokyo', offset: -2 },
+  { name: 'London', offset: -10 },
+  { name: 'New York', offset: -15 },
+];
+const clockList = document.getElementById('clock-list');
+function renderClockList(now) {
+  clockList.innerHTML = '<div class="clock-grid" id="clock-grid"></div>';
+  const g = document.getElementById('clock-grid');
+  cities.forEach(c => {
+    const d = new Date(now.getTime() + c.offset * 3600 * 1000);
+    const h = String(d.getHours()).padStart(2,'0');
+    const m = String(d.getMinutes()).padStart(2,'0');
+    const diffLabel = c.offset === 0 ? 'Local time' : `${c.offset > 0 ? '+' : ''}${c.offset} hr today`;
+    const row = document.createElement('div');
+    row.className = 'clock-row';
+    row.innerHTML = `<div><div class="clock-city">${c.name}</div><div class="clock-diff">${diffLabel}</div></div><div class="clock-time">${h}:${m}</div>`;
+    g.appendChild(row);
+  });
+}
+
+/* ---------- Notes app: split view, list + open note content always both visible ---------- */
+const notesData = [
+  { title: 'Floor plan ideas', body: 'Genius Bar queue should be visible from the entrance so waiting feels social, not hidden.', meta: 'Today' },
+  { title: 'Crit 9 prep', body: 'Walk through the feel-vs-function split before the live demo.', meta: 'Yesterday' },
+  { title: 'iPad layout notes', body: 'Split view everywhere: Messages, Settings, Notes. Dock floats and has a recents cluster.', meta: 'Yesterday' },
+];
+const notesList = document.getElementById('notes-list');
+const notesText = document.getElementById('notes-text');
+let selectedNote = 0;
+
+function saveOpenNote() {
+  if (selectedNote === null || !notesData[selectedNote]) return;
+  const text = notesText.innerText.split('\n');
+  notesData[selectedNote].title = text[0] || notesData[selectedNote].title;
+  notesData[selectedNote].body = text.slice(1).join(' ').trim() || notesData[selectedNote].body;
+}
+function renderNotesList() {
+  notesList.innerHTML = '';
+  notesData.forEach((n, i) => {
+    const row = document.createElement('div');
+    row.className = 'note-row' + (selectedNote === i ? ' selected' : '');
+    row.innerHTML = `<div class="note-title">${n.title || 'New Note'}</div><div class="note-meta">${n.meta} &middot; ${(n.body||'').slice(0,46)}</div>`;
+    row.addEventListener('click', () => {
+      saveOpenNote();
+      selectedNote = i;
+      renderNotesList();
+      renderOpenNote();
+    });
+    notesList.appendChild(row);
+  });
+}
+function renderOpenNote() {
+  const n = notesData[selectedNote];
+  notesText.innerHTML = `<b>${n.title}</b><br>${n.body}`;
+}
+renderNotesList();
+renderOpenNote();
+
+tick();
+</script>
+
+</body>
+</html>

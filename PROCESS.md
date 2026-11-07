@@ -6,6 +6,17 @@ I built a shared first-person 3D store that is an obvious parody of a fruit-them
 retail store. Real visitors and CPU staff share one room, and customers talk to
 staff through menus. Nothing in the room is a downloaded model.
 
+## The pivot
+
+This project started as Seen, a mock email service. I scaffolded it on 6 October
+([`8bbe52e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8bbe52e)), wrote the harness before any app code
+([`168ca9b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/168ca9b)) and wrote my crit 8 reflection about it. On 10 October I decided to start
+from a fresh idea and carry nothing over from Seen (D1 in `SCOPE.md`), and on 11 October
+the Seen app was replaced with the store stack
+([`b61f6c7`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/b61f6c7)). I changed direction because [TK: Ritesh's reason].
+The Seen version is kept on the `archive/previous-app` branch, and the crit 8
+reflection is left as I wrote it. The rest of this document describes the store.
+
 ## Why this stack
 
 The brief fixes one small Fly machine that stops when idle, and one volume, so I

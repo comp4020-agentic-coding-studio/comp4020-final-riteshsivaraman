@@ -396,3 +396,9 @@ question comes up at a crit.
 [`a60962b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a60962b)
 
 Every state change already wrote an `events` row, so the app looked well logged, but the only stdout line was "listening on". Crit 10 reads logs with `flyctl logs`, which shows stdout and never the SQLite file. Lesson (week 10 tl;dr: "logs help only when a command the agent can run prints them"): a record nobody can read with the command in hand is not yet a log. The fix put one line per event on stdout beside the existing insert, and the check was two real WebSocket clients plus a search of the output for every session token.
+
+## The scope moved, so the README and CLAUDE.md were still describing a store with a queue
+
+[TK: commit of the hygiene pass; none yet]
+
+On 2026-11-07 I said that a real Apple Store has no queue: you browse until staff find you, and payment happens on the spot. Our README, CLAUDE.md and SCOPE.md all still said "the Genius Bar queue is the shared state". Nothing had failed, since the code and the docs had drifted apart quietly, so I decided to do a hygiene check of README.md and CLAUDE.md against what the app now does, removing outdated assumptions and adding missing ones. Lesson (week 6: a correction written into the harness is permanent, then prune): writing a rule into the harness is only half of compounding. When the idea changes, the old rules keep being read every turn and now point the agent the wrong way, and the README is marked against them. So a scope change gets a hygiene pass over the harness files in the same sitting, not at the deadline. (Draft written by Claude at Ritesh's request; Ritesh to check and reword. Commit hash still to add.)
