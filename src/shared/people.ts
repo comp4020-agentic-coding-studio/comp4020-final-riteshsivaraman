@@ -84,8 +84,15 @@ export function settledPeople(nowMs: number, visitors: ReadonlyArray<{ x: number
 // Where the people who are not visitors stand at server time `nowMs`, after
 // colliding with each other. The ground-floor walkers are a floor below and
 // cannot be bumped into.
-export function nonVisitorPeople(nowMs: number, engaged: ReadonlyMap<string, Settled> = new Map()): Array<{ x: number; z: number }> {
-  const s = settledPeople(nowMs, [], engaged);
+export function nonVisitorPeople(
+  nowMs: number,
+  engaged: ReadonlyMap<string, Settled> = new Map(),
+  visitors: ReadonlyArray<{ x: number; z: number }> = [],
+): Array<{ x: number; z: number }> {
+  // issue #38: pass the real visitor list through, so an NPC's position here
+  // matches the visitor-aware position it is actually drawn at (Npcs.tsx) --
+  // not a "nobody's around" fallback that disagreed with the real picture.
+  const s = settledPeople(nowMs, visitors, engaged);
   return [...s.npc.values(), ...s.walkway.values()];
 }
 
@@ -98,5 +105,5 @@ export function avoidPeople(
   nowMs: number,
   engaged: ReadonlyMap<string, Settled> = new Map(),
 ): { x: number; z: number } {
-  return separateFromPeople(x, z, [...visitors, ...nonVisitorPeople(nowMs, engaged)]);
+  return separateFromPeople(x, z, [...visitors, ...nonVisitorPeople(nowMs, engaged, visitors)]);
 }
