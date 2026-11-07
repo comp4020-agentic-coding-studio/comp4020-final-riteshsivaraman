@@ -9,6 +9,7 @@ import { CharacterStage } from "./gfx/CharacterStage.tsx";
 import { DeviceStage } from "./gfx/DeviceStage.tsx";
 import { net, useNet } from "./net.ts";
 import type { Profile } from "../../shared/profile.ts";
+import { productById } from "../../shared/catalogue.ts";
 import "./styles.css";
 
 const Q = new URLSearchParams(location.search);
@@ -63,6 +64,20 @@ function Hud() {
         </div>
       )}
       {live.state === "in_purchase" && <div className="chip-status">Your phone is set aside. Pay at the Genius Bar.</div>}
+      {live.holds.length > 0 && (
+        <div className="holds-panel" aria-live="polite">
+          <b>On hold</b>
+          {live.holds.map((h) => {
+            const left = h.expiresAt - live.serverNow();
+            return (
+              <div key={`${h.product}:${h.colour}:${h.storage}`} className="chip-status">
+                {h.colour} {productById(h.product)?.name ?? h.product}: on hold for {h.holderName}, {mmss(Math.max(0, left))} left
+                {h.free > 0 ? ` · ${h.free} more free` : ""}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {DEV && live.status === "open" && (
         <button className="hud-dev" onClick={() => net.setRole(live.role === "staff" ? "customer" : "staff")}>
           DEV: walking as {live.role === "staff" ? "staff" : "a customer"} (click to switch)
