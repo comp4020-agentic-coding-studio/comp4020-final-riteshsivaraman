@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrate } from "../src/server/migrate.ts";
 import { seedStock } from "../src/server/stock.ts";
-import { catchUpOffers, customersView, enter, leaveStore, requestTalk, stateOf, type Ctx, type Employee } from "../src/server/service.ts";
+import { catchUpOffers, cpuCustomersOnFloor, customersView, enter, leaveConversation, leaveStore, requestTalk, stateOf, waitingForSpecialist, type Ctx, type Employee } from "../src/server/service.ts";
 
 // Issue #20, ADR 0010 (decided: Option B, lazy materialization), SCOPE D55/D56.
 // Promise: a CPU/timetable customer (storeday.ts's CAST, e.g. "cust-1") is not
@@ -205,5 +205,112 @@ describe("a CPU/timetable customer joins the real waiting list (issue #20, ADR 0
     // in the room -- promoting cust-1 must not change this ordering
     expect(offeredTo("ann"), "the real visitor was not offered the only free staff member").toBe("sam");
     expect(offeredTo("cust-1"), "the CPU customer was offered the staff member ahead of the longer-waiting real visitor").toBeUndefined();
+  });
+});
+
+// Added by the #20 builder: the parts of the mechanism the block above never
+// reaches, so that breaking any of them turns the suite red (CLAUDE.md defect
+// loop: promotion is the kind of rule a subtly wrong version passes every
+// normal run). The bridge is `cpuCustomersOnFloor`, the function presence.ts
+// merges into ctx.present/position (behind CPU_CUSTOMERS_LIVE until the client
+// can claim a timetable customer).
+describe("the timetable bridge, the D47 gate and the visit rule (issue #20, builder's sensors)", () => {
+  const CYCLE_MS = 480_000; // storeday.ts CYCLE
+  // cust-1's timetable has it standing at a phones table, waiting for spec-phones, from about 25.9 s into the day
+  const WAITING_AT = 27_000;
+  let mem: Database.Database;
+  const positions = new Map<string, { x: number; z: number }>();
+  const employees: Employee[] = [];
+  let present: string[] = [];
+  const ctx = (now: number): Ctx => ({ db: mem, now, employees, present, position: (id) => positions.get(id) });
+  const fresh = (): void => {
+    mem = new Database(":memory:");
+    mem.pragma("foreign_keys = ON");
+    migrate(mem);
+    seedStock(mem);
+    positions.clear();
+    employees.length = 0;
+    present = [];
+  };
+  afterEach(() => mem?.close());
+  const addStaff = (id: string, at: { x: number; z: number }): void => {
+    mem.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES (?, ?, ?, '#fff', 0, 0)").run(id, `tok-${id}`, id);
+    positions.set(id, at);
+    present.push(id);
+    enter(ctx(0), id, { kind: "specialist" });
+    employees.push({ id, name: id, kind: "specialist", specialty: "phones" });
+  };
+  // what presence.ts does with the bridge: the floor's timetable customers join present/position
+  const bridge = (now: number): void => {
+    const floor = cpuCustomersOnFloor(mem, now);
+    present = [...present.filter((id) => !id.startsWith("cust-")), ...floor.keys()];
+    for (const id of [...positions.keys()]) if (id.startsWith("cust-")) positions.delete(id);
+    for (const [id, at] of floor) positions.set(id, at);
+  };
+  const types = (id: string): string[] => (mem.prepare("SELECT type FROM events WHERE visitor_id = ? ORDER BY id").all(id) as Array<{ type: string }>).map((r) => r.type);
+
+  it("puts a timetable customer on the floor only while its timetable has it waiting for a specialist, and never someone ambient", () => {
+    fresh();
+    expect(waitingForSpecialist("cust-1", WAITING_AT)).toBe(true);
+    expect(cpuCustomersOnFloor(mem, WAITING_AT).has("cust-1"), "cust-1 is waiting for a specialist but the bridge left it off the floor").toBe(true);
+    expect(cpuCustomersOnFloor(mem, 5_000).has("cust-1"), "cust-1 has not even arrived but the bridge put it on the floor").toBe(false);
+    expect(cpuCustomersOnFloor(mem, 15_000).has("cust-1"), "cust-1 is only being greeted but the bridge put it on the floor").toBe(false);
+    expect(cpuCustomersOnFloor(mem, 40_000).has("cust-1"), "cust-1 is chatting with its timetable specialist but the bridge put it on the floor").toBe(false);
+  });
+
+  it("with no free real staff user, nothing is promoted: the timetable's own specialist serves them (D47, D56)", () => {
+    fresh();
+    bridge(WAITING_AT);
+    catchUpOffers(ctx(WAITING_AT));
+    expect(stateOf(mem, "cust-1"), "a timetable customer got a row with no real staff user to serve it").toBeUndefined();
+    expect(mem.prepare("SELECT 1 FROM visitors WHERE id = ?").get("cust-1")).toBeUndefined();
+  });
+
+  it("a promoted customer is held where it was promoted, then leaves when its visit is over, through leaveStore, logged", () => {
+    fresh();
+    addStaff("sam", { x: 4, z: -2 });
+    bridge(WAITING_AT);
+    const spot = positions.get("cust-1")!;
+    catchUpOffers(ctx(WAITING_AT));
+    expect(stateOf(mem, "cust-1")?.state).toBe("waiting_for_help");
+    // later the timetable would have walked it on: it stays where it was promoted
+    expect(cpuCustomersOnFloor(mem, 60_000).get("cust-1"), "a promoted customer was not held at its promotion spot").toEqual(spot);
+    // after its day has it out of the store, the bridge drops it and the next catch-up sees it off
+    expect(cpuCustomersOnFloor(mem, 470_000).has("cust-1"), "a promoted customer whose visit is over is still on the floor").toBe(false);
+    bridge(470_000);
+    catchUpOffers(ctx(470_000));
+    expect(stateOf(mem, "cust-1")?.state, "a promoted customer whose visit ended never left").toBe("leaving");
+    expect(types("cust-1")).toContain("cpu_customer_departed");
+  });
+
+  it("served and released by the staff user, it leaves at once and is off the floor for the rest of that visit, but its next day's visit can be promoted again", () => {
+    fresh();
+    addStaff("sam", { x: 4, z: -2 });
+    bridge(WAITING_AT);
+    const at = positions.get("cust-1")!;
+    positions.set("sam", { x: at.x + 1, z: at.z });
+    catchUpOffers(ctx(WAITING_AT));
+    requestTalk(ctx(WAITING_AT + 10), "sam", "cust-1");
+    expect(stateOf(mem, "cust-1")?.state).toBe("in_conversation");
+    // the staff user ends it: the customer is back to browsing, then leaves on the next catch-up
+    leaveConversation(ctx(WAITING_AT + 20), "sam");
+    expect(stateOf(mem, "cust-1")?.state).toBe("browsing");
+    bridge(WAITING_AT + 30);
+    catchUpOffers(ctx(WAITING_AT + 30));
+    expect(stateOf(mem, "cust-1")?.state, "a served timetable customer did not leave").toBe("leaving");
+    expect(types("cust-1").filter((t) => t === "cpu_customer_departed")).toHaveLength(1);
+    // same visit: its timetable still has it at the table, but it never comes back onto the floor or the list
+    expect(cpuCustomersOnFloor(mem, WAITING_AT + 500).has("cust-1"), "a released customer came back onto the floor in the same visit").toBe(false);
+    present.push("cust-1");
+    positions.set("cust-1", at);
+    catchUpOffers(ctx(WAITING_AT + 600));
+    expect(stateOf(mem, "cust-1")?.state, "a released customer was promoted again in the same visit").toBe("leaving");
+    // the next day: a new visit, promoted afresh
+    const nextDay = CYCLE_MS + WAITING_AT;
+    bridge(nextDay);
+    expect(positions.has("cust-1"), "the next day's visit never reached the floor").toBe(true);
+    catchUpOffers(ctx(nextDay));
+    expect(stateOf(mem, "cust-1")?.state, "the next day's visit was not promoted").toBe("waiting_for_help");
+    expect(types("cust-1").filter((t) => t === "cpu_customer_promoted")).toHaveLength(2);
   });
 });
