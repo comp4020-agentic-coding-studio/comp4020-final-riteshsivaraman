@@ -395,7 +395,10 @@ const stateMessage = (ctx: Ctx, id: string): Outgoing | null => {
 // they left half done is cleaned up first, so they are never stuck behind "finish what you
 // are doing first" for a chat nobody can see any more, then their visit begins afresh.
 export function rejoin(ctx: Ctx, visitorId: string, profile: { kind: string; specialty?: string; look?: unknown }, name?: string): Outgoing[] {
-  const out = [...retireStandIn(ctx, visitorId), ...leaveStore(ctx, visitorId)];
+  // a staff user coming back (a reconnect, or the server restarted under them) with a
+  // customer they had claimed still open: that customer goes back on the waiting list
+  // at their place, as when they leave (issue #1 criterion 6), not out to browsing
+  const out = [...releaseClaimsOf(ctx, visitorId), ...retireStandIn(ctx, visitorId), ...leaveStore(ctx, visitorId)];
   enter(ctx, visitorId, profile, name);
   return out;
 }
@@ -527,6 +530,7 @@ export function handOverPost(ctx: Ctx, leaverId: string): Outgoing[] {
 
 export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
   const out: Outgoing[] = [];
+  withdrawOfferOf(ctx, visitorId, "customer left");
   const open = openConversationOf(ctx.db, visitorId);
   const carriedOn = open && isTalkData(anyDataOf(open)) && !!(anyDataOf(open) as TalkConvData).standIn; // an NPC is already standing in
   if (open && !carriedOn) out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left"));
@@ -843,10 +847,17 @@ function staffTalk(ctx: Ctx, staffId: string, customerId: string): Outgoing[] {
   // offer only decides who is told, and holds the CPUs back.
   const before = st;
   const offer = offerData(before).offer;
-  const putDown = endInspect(ctx, customerId, "an employee started a conversation");
-  log(ctx, customerId, "staff_approached", { staffId, offer: offer ? (offer.to === staffId ? "theirs" : "another's") : "none", ...(offer && offer.to !== staffId ? { offeredTo: offer.to } : {}) });
-  const opened = open(ctx, customerId, staffId, "visitor", script, cpos);
-  recordClaim(ctx, customerId, staffId, before);
+  // one transaction: the conversation, the claim and their rows land together or
+  // not at all, so a throw midway never leaves a conversation no release can find
+  const { putDown, opened } = ctx.db.transaction(() => {
+    log(ctx, customerId, "staff_approached", { staffId, offer: offer ? (offer.to === staffId ? "theirs" : "another's") : "none", ...(offer && offer.to !== staffId ? { offeredTo: offer.to } : {}) });
+    // a rival's offer ends with its own row, so the offer lifecycle reads whole by type
+    if (offer && offer.to !== staffId) log(ctx, customerId, "offer_withdrawn", { staffId: offer.to, why: "claimed by another", by: staffId });
+    const putDown = endInspect(ctx, customerId, "an employee started a conversation");
+    const opened = open(ctx, customerId, staffId, "visitor", script, cpos);
+    recordClaim(ctx, customerId, staffId, before);
+    return { putDown, opened };
+  })();
   // someone else who was being offered this customer is told it is taken
   const told = offer && offer.to !== staffId ? [notice(offer.to, `${nameOf(ctx, customerId)} is being looked after by ${nameOf(ctx, staffId)}.`)] : [];
   return [...putDown, ...opened, ...told, ...settleOffers(ctx)];
@@ -1882,45 +1893,70 @@ export function settleOffers(ctx: Ctx): Outgoing[] {
     if (!d.offer) continue;
     const customerId = st.visitor_id;
     const { to } = d.offer;
+    // each row is written before the change it records (CLAUDE.md: the event log is load-bearing)
     if (!onList.has(customerId)) {
-      patchOfferData(ctx, customerId, { offer: undefined });
       log(ctx, customerId, "offer_withdrawn", { staffId: to, why: ctx.present.includes(customerId) ? "customer no longer waiting" : "customer left" });
+      patchOfferData(ctx, customerId, { offer: undefined });
       changed = true;
     } else if (!free.has(to)) {
-      patchOfferData(ctx, customerId, { offer: undefined });
       log(ctx, customerId, "offer_withdrawn", { staffId: to, why: ctx.employees.some((e) => e.id === to) ? "staff busy" : "staff left" });
+      patchOfferData(ctx, customerId, { offer: undefined });
       changed = true;
     } else if (ctx.now - d.offer.at >= OFFER_MS) {
       const offered = [...new Set([...(d.offered ?? []), to])];
-      patchOfferData(ctx, customerId, { offer: undefined, offered });
       log(ctx, customerId, "offer_expired", { staffId: to, offeredAt: d.offer.at });
+      patchOfferData(ctx, customerId, { offer: undefined, offered });
       changed = true;
     }
   }
 
-  // 2. a free real staff user holds one offer at a time; the longest-waiting
-  // customer goes to the nearest of them
+  // 2. a free real staff user holds one offer at a time, across requests too:
+  // whoever already holds a live one is not free for another
   const fresh = waitingList(ctx);
   for (const w of fresh) if (w.d.offer) free.delete(w.d.offer.to);
-  for (const w of fresh) {
-    if (w.d.offer || free.size === 0) continue;
-    const passed = new Set(w.d.offered ?? []);
-    const candidates = [...free.values()]
-      .filter((e) => !passed.has(e.id))
-      .map((e) => ({ e, d: dist(w.at, ctx.position(e.id)!) }))
-      .sort((a, b) => a.d - b.d);
-    if (candidates.length === 0) continue;
+  const offer = (w: Waiting, pool: Employee[], again: boolean): void => {
+    const candidates = pool.map((e) => ({ e, d: dist(w.at, ctx.position(e.id)!) })).sort((a, b) => a.d - b.d);
     const nearest = candidates.filter((c) => c.d - candidates[0]!.d <= TIE_M);
     const pick = nearest.length === 1 ? nearest[0]!.e : nearest.map((c) => ({ e: c.e, t: freeSince(ctx, c.e.id) })).sort((a, b) => a.t - b.t)[0]!.e;
     free.delete(pick.id);
-    patchOfferData(ctx, w.st.visitor_id, { offer: { to: pick.id, at: ctx.now } });
     const area = areaOf(ctx, w.st, w.at);
-    log(ctx, w.st.visitor_id, "offer_made", { staffId: pick.id, area, waitingSince: w.since });
+    log(ctx, w.st.visitor_id, "offer_made", { staffId: pick.id, area, waitingSince: w.since, ...(again ? { again: true } : {}) });
+    patchOfferData(ctx, w.st.visitor_id, { offer: { to: pick.id, at: ctx.now } });
     out.push(notice(pick.id, `Customer waiting at ${area}: ${nameOf(ctx, w.st.visitor_id)}. Walk up and press E.`));
     changed = true;
+  };
+  // the longest-waiting customer goes to the nearest free staff user who has not let them pass (D48)
+  const passedByAll: Waiting[] = [];
+  for (const w of fresh) {
+    if (w.d.offer || free.size === 0) continue;
+    const passed = new Set(w.d.offered ?? []);
+    const pool = [...free.values()].filter((e) => !passed.has(e.id));
+    if (pool.length > 0) offer(w, pool, false);
+    else passedByAll.push(w);
+  }
+  // D57b (Ritesh, 2026-11-07): someone every free staff user has let pass, whom
+  // no CPU can take either (only the greeter takes anyone, and only at the
+  // door), is offered again to whoever is free rather than left for good. Only
+  // after everyone not yet offered has had their turn above, so a customer
+  // being looped back never starves a newcomer.
+  for (const w of passedByAll) {
+    if (free.size === 0) break;
+    if (greeterCanTake(ctx, w.st)) continue; // the greeter may take them: she does, in catchUpOffers
+    offer(w, [...free.values()], true);
   }
   if (changed) out.push(staffViewMessage(ctx));
   return out;
+}
+
+// A customer who is leaving (or reconnecting, which leaves first) has any live
+// offer of them withdrawn, logged, so it never survives into their next visit
+// and expires there as if the staff user had let it pass.
+function withdrawOfferOf(ctx: Ctx, customerId: string, why: string): void {
+  const st = stateOf(ctx.db, customerId);
+  const o = st ? offerData(st).offer : undefined;
+  if (!o) return;
+  log(ctx, customerId, "offer_withdrawn", { staffId: o.to, why });
+  patchOfferData(ctx, customerId, { offer: undefined });
 }
 
 // A real staff user claimed this customer with E: the offer (theirs or
@@ -1946,10 +1982,13 @@ export function releaseClaimsOf(ctx: Ctx, staffId: string): Outgoing[] {
   const st = stateOf(ctx.db, row.customer_id);
   const claim = st ? offerData(st).claim : undefined;
   if (!claim || claim.by !== staffId) return [];
-  const out = finishEither(ctx, row, staffId, `${nameOf(ctx, staffId)} had to step away. Someone will be with you shortly.`, "staff left");
-  setState(ctx, row.customer_id, { state: claim.from, with_id: null });
-  patchOfferData(ctx, row.customer_id, { waitingSince: claim.waitingSince });
-  log(ctx, row.customer_id, "claim_released", { staffId, why: "staff left", state: claim.from, waitingSince: claim.waitingSince });
+  const out = ctx.db.transaction(() => {
+    log(ctx, row.customer_id, "claim_released", { staffId, why: "staff left", state: claim.from, waitingSince: claim.waitingSince });
+    const ended = finishEither(ctx, row, staffId, `${nameOf(ctx, staffId)} had to step away. Someone will be with you shortly.`, "staff left");
+    setState(ctx, row.customer_id, { state: claim.from, with_id: null });
+    patchOfferData(ctx, row.customer_id, { waitingSince: claim.waitingSince });
+    return ended;
+  })();
   const sm = stateMessage(ctx, row.customer_id);
   if (sm) out.push(sm);
   out.push(staffViewMessage(ctx));
@@ -1989,25 +2028,35 @@ export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
   // a real staff user is (or is about to be) offered them: she gives way (D47); once
   // every free one has let the 15 s pass, she may take them, and the takeover is logged
-  if (st && realStaffFor(ctx, st)) return [];
-  if (!st || (st.state !== "arriving" && st.state !== "browsing") || st.with_id) return [];
-  // greeted already on THIS visit (the same person coming back another day is greeted again)
-  const visitStart = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { t: number | null }).t ?? 0;
-  if (ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1' AND started_at >= ?").get(customerId, visitStart)) return [];
-  if (offDuty(ctx).includes("greeter-1")) return [];
-  const greeter = NPCS.find((n) => n.id === "greeter-1");
-  if (!greeter || !npcPose(greeter, ctx.now).present) return [];
-  // only someone standing just inside the entrance
-  const here = ctx.position(customerId);
-  if (!here || here.x < ENTRANCE_ZONE.minX || here.x > ENTRANCE_ZONE.maxX || here.z < ENTRANCE_ZONE.minZ || here.z > ENTRANCE_ZONE.maxZ) return [];
-  const script = scriptFor("greeter");
-  if (!script || !customerFree(ctx, customerId)) return [];
-  if (staffBusy(ctx, "greeter-1", "npc")) return []; // someone else has her
+  if (!st || realStaffFor(ctx, st)) return [];
+  const can = greeterCanTake(ctx, st);
+  if (!can) return [];
   // she walks up to where they actually stand (the entrance zone is already inside the door), so she faces them;
   // the real staff users who let their offer pass are named, so a takeover reads as one
   const passedOver = offerData(st).offered ?? [];
   log(ctx, customerId, "npc_approached", { npcId: "greeter-1", ...(passedOver.length > 0 ? { passedOver } : {}) });
-  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", script, here)];
+  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", can.script, can.here)];
+}
+
+// Whether the greeter could walk up to this customer now, setting aside who
+// else is free: what `tryGreeterApproach` acts on, and what the lone-staff
+// loop-back (D57b) asks before repeating an offer instead.
+function greeterCanTake(ctx: Ctx, st: StateRow): { script: ScriptId; here: { x: number; z: number } } | null {
+  const customerId = st.visitor_id;
+  if ((st.state !== "arriving" && st.state !== "browsing") || st.with_id) return null;
+  // greeted already on THIS visit (the same person coming back another day is greeted again)
+  const visitStart = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { t: number | null }).t ?? 0;
+  if (ctx.db.prepare("SELECT 1 FROM conversations WHERE customer_id = ? AND with_id = 'greeter-1' AND started_at >= ?").get(customerId, visitStart)) return null;
+  if (offDuty(ctx).includes("greeter-1")) return null;
+  const greeter = NPCS.find((n) => n.id === "greeter-1");
+  if (!greeter || !npcPose(greeter, ctx.now).present) return null;
+  // only someone standing just inside the entrance
+  const here = ctx.position(customerId);
+  if (!here || here.x < ENTRANCE_ZONE.minX || here.x > ENTRANCE_ZONE.maxX || here.z < ENTRANCE_ZONE.minZ || here.z > ENTRANCE_ZONE.maxZ) return null;
+  const script = scriptFor("greeter");
+  if (!script || !customerFree(ctx, customerId)) return null;
+  if (staffBusy(ctx, "greeter-1", "npc")) return null; // someone else has her
+  return { script, here };
 }
 
 // ---- taking turns ----

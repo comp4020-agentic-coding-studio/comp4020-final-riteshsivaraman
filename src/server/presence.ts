@@ -221,28 +221,34 @@ function resolveVisitor(token: string | null): { visitor: VisitorInfo; token: st
   return { visitor, token: fresh };
 }
 
+// A live session ends: by "bye", by its socket closing, or by the same visitor
+// connecting again (a second tab, or a reconnect after a drop the server had
+// not noticed yet). Every way out runs the same cleanup, so a reconnect never
+// skips releasing a claim or withdrawing an offer (PR #27 review, finding 1).
+function depart(s: Session): void {
+  const pre = serviceCtx(); // while they still count as here
+  // an NPC of their post carries on their conversation if one is free; if not, a
+  // customer they had claimed goes back on the waiting list where they stood (issue #1)
+  const handed = [...handOverPost(pre, s.id), ...releaseClaimsOf(pre, s.id), ...handOverCustomer(pre, s.id)];
+  sessions.delete(s.id);
+  touchVisitor.run(Date.now(), s.id);
+  logEvent(s.id, "leave");
+  broadcast({ type: "left", id: s.id }, s.id);
+  // an NPC takes their place where they stood; their conversation (if any) carries on
+  // with it, and whatever they had put aside is given back
+  deliver(handed);
+  deliver(leaveStore(serviceCtx(), s.id));
+  // an offer to them, or of them, is withdrawn, and the customer is offered to the next nearest
+  deliver(catchUpOffers(serviceCtx()));
+}
+
 export function handleConnection(socket: WebSocket): void {
   let me: Session | null = null;
 
   // Idempotent: both an explicit "bye" and the socket closing land here, and
-  // a takeover may already have replaced this session.
+  // a takeover may already have replaced (and departed) this session.
   const leave = (): void => {
-    if (me && sessions.get(me.id)?.socket === socket) {
-      const pre = serviceCtx(); // while they still count as here
-      // an NPC of their post carries on their conversation if one is free; if not, a
-      // customer they had claimed goes back on the waiting list where they stood (issue #1)
-      const handed = [...handOverPost(pre, me.id), ...releaseClaimsOf(pre, me.id), ...handOverCustomer(pre, me.id)];
-      sessions.delete(me.id);
-      touchVisitor.run(Date.now(), me.id);
-      logEvent(me.id, "leave");
-      broadcast({ type: "left", id: me.id }, me.id);
-      // an NPC takes their place where they stood; their conversation (if any) carries on
-      // with it, and whatever they had put aside is given back
-      deliver(handed);
-      deliver(leaveStore(serviceCtx(), me.id));
-      // an offer to them, or of them, is withdrawn, and the customer is offered to the next nearest
-      deliver(catchUpOffers(serviceCtx()));
-    }
+    if (me && sessions.get(me.id)?.socket === socket) depart(me);
   };
 
   const onMessage = (raw: RawData): void => {
@@ -267,8 +273,7 @@ export function handleConnection(socket: WebSocket): void {
       // over, and the older socket is closed so the client can say so.
       const existing = sessions.get(visitor.id);
       if (existing) {
-        sessions.delete(visitor.id);
-        broadcast({ type: "left", id: visitor.id }, visitor.id);
+        depart(existing); // the old session leaves properly first: claims released, offers withdrawn
         existing.socket.close(4000, "opened elsewhere");
       }
 
