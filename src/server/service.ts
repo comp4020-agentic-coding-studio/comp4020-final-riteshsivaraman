@@ -14,7 +14,7 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
-import { FLOOR, type ChatPair, type CustomerView, type Engagement, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
+import { FLOOR, type ChatPair, type CustomerView, type Engagement, type HoldView, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
 import { engagedMoment } from "../shared/engage.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
@@ -23,7 +23,7 @@ import { TABLE_ASSIGNMENTS } from "../shared/assignments.ts";
 import { ENTRANCE_ZONE, clampToWalkable, COUNTER } from "../shared/world.ts";
 import { CAST, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
-import { takeOne } from "./stock.ts";
+import { stockOf, takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
 import { advanceStaff, beginHumanTalk, payScene, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, standInAnswer, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import type { Scene } from "../shared/talk/types.ts";
@@ -1206,12 +1206,45 @@ export function orderViews(ctx: Ctx): OrderView[] {
   });
 }
 
+// Every unit currently held (reservations, status 'held', not yet expired at
+// ctx.now), for everyone to see (issue #3): who holds it, the reservation's
+// own `expires_at` (never a relative countdown — a client computes its own
+// time-left from this absolute server time) and how many of that exact SKU
+// are still on the shelf. Read-only: showing a hold is not a state change, so
+// this writes no `events` row (CLAUDE.md); appearance and clearance are read
+// off the `reserved` / `reservation_expired` / `reservation_released` / sale
+// events that already exist.
+export function holdViews(ctx: Ctx): HoldView[] {
+  const rows = ctx.db
+    .prepare("SELECT visitor_id, product, colour, storage, expires_at FROM reservations WHERE status = 'held' AND expires_at > ? ORDER BY created_at, rowid")
+    .all(ctx.now) as Array<{ visitor_id: string; product: string; colour: string; storage: string; expires_at: number }>;
+  return rows.map((r) => ({
+    product: r.product,
+    colour: r.colour,
+    storage: r.storage,
+    holderId: r.visitor_id,
+    holderName: nameOf(ctx, r.visitor_id),
+    expiresAt: r.expires_at,
+    free: stockOf(ctx.db, r.product, r.colour, r.storage),
+  }));
+}
+
 // Where someone is right now: a real user where they stand; an NPC where it is
 // drawn (with a visitor, or at its place in the day).
 function placeOf(ctx: Ctx, id: string, kind: "npc" | "visitor"): { x: number; z: number } {
   if (kind === "visitor") return ctx.position(id) ?? { x: 0, z: 0 };
   const eng = engagements(ctx.db).find((e) => e.npcId === id);
   return npcPlace(ctx, eng, id);
+}
+
+// Who holds the one unit of this SKU right now, for the "on hold for <name>"
+// line told to a customer who just lost the race for it (issue #3): the truth,
+// read off the reservation itself, not an invented "someone else".
+function holderNameOf(ctx: Ctx, product: string, colour: string, storage: string): string | null {
+  const row = ctx.db
+    .prepare("SELECT visitor_id FROM reservations WHERE product = ? AND colour = ? AND storage = ? AND status = 'held' AND expires_at > ? ORDER BY created_at DESC LIMIT 1")
+    .get(product, colour, storage, ctx.now) as { visitor_id: string } | undefined;
+  return row ? nameOf(ctx, row.visitor_id) : null;
 }
 
 // Turns the engine's "yes" into an order: the unit is held for them, a runner is
@@ -1228,7 +1261,10 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
       log(ctx, row.customer_id, "reserve_lost", { product, colour: sku.colour });
       const scene: Scene = { ...d.scene, ended: { how: "left", why: "sold out" } };
       saveTalkData(ctx, row, { ...d, scene });
-      const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
+      const holder = holderNameOf(ctx, product, sku.colour, sku.storage);
+      const sorry = holder
+        ? `Sorry, I've just checked and the ${sku.colour} ${sale.name} is on hold for ${holder}.`
+        : `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
       return [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sorry, [], true, "customer") } }, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
     }
     ctx.db
