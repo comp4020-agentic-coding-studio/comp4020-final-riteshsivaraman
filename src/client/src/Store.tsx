@@ -13,7 +13,7 @@ import { wrap } from "../../shared/steering.ts";
 import { designationOf, EMPLOYEE_COLOUR, STAFF_SHIRT } from "../../shared/profile.ts";
 import { avoidPeople, engagedPlaces } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
-import { clampToWalkable, resolveCollisions, TABLE_H } from "../../shared/world.ts";
+import { clampToWalkable, resolveCollisions, TABLE_H, zoneOf } from "../../shared/world.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
 import { NameFloat } from "./NameFloat.tsx";
 import { modelById } from "../../shared/talk/data.ts";
@@ -26,6 +26,8 @@ import { Device } from "./gfx/Device.tsx";
 import { slotDevice } from "./gfx/furniture.tsx";
 import { Room } from "./Room.tsx";
 import { net, useNet } from "./net.ts";
+import { sound } from "./audio.ts";
+import type { SoundSource } from "./sound.ts";
 
 const EYE_HEIGHT = 1.6;
 const WALK_SPEED = 3.2; // metres per second
@@ -96,6 +98,12 @@ function Player() {
   const talkStandPose = useRef({ ry: 0, pitch: 0 });
   const talkExiting = useRef(false);
   const wasThird = useRef(false);
+  // sound (#11): metres walked since the last footstep cue, and the zone you
+  // were in last frame (a step from "outside"/"entrance" into "shop_floor"
+  // plays the door chime; stepping back out does not — a shop door is heard
+  // walking in, not walking away from it)
+  const strideDistance = useRef(0);
+  const lastZone = useRef<ReturnType<typeof zoneOf> | null>(null);
 
   useEffect(() => {
     // `?at=x,z,yawDegrees` starts the camera elsewhere, for screenshots and
@@ -392,6 +400,21 @@ function Player() {
     // people are solid too: other visitors, staff, customers, walkers
     ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow(), engagedPlaces(net.engaged.values(), net.serverNow())));
     ({ x, z } = clampToWalkable(net.role, x, z));
+    // sound (#11): a footstep every stride length actually covered, and a
+    // door chime the one time you cross from outside/the entrance onto the
+    // shop floor (not every time you cross back and forth over the sill)
+    const moved = Math.hypot(x - net.me.x, z - net.me.z);
+    if (moved > 0.001) {
+      strideDistance.current += moved;
+      const STRIDE_M = 0.75;
+      if (strideDistance.current >= STRIDE_M) {
+        strideDistance.current %= STRIDE_M;
+        sound.playFootstep();
+      }
+    }
+    const zone = zoneOf(x, z);
+    if (lastZone.current !== null && lastZone.current !== "shop_floor" && zone === "shop_floor") sound.playDoorChime();
+    lastZone.current = zone;
     net.me.x = x;
     net.me.z = z;
     if (net.thirdPerson) camera.position.set(x - fx * 2.4, STORE_Y + EYE_HEIGHT + 0.5, z - fz * 2.4);
@@ -820,6 +843,30 @@ export function Reflections() {
   return null;
 }
 
+// Feeds the pure mixer (sound.ts) every frame: the listener is the local
+// player, sources are every other visible person (other real visitors, and
+// NPCs who are actually present right now). No rendering, no state: this
+// only exists to call into audio.ts.
+const AMBIENCE_EVERY_MS = 150; // the mixer doesn't need to run at 60fps
+function Ambience() {
+  const lastRun = useRef(0);
+  useFrame(() => {
+    const now = performance.now();
+    if (now - lastRun.current < AMBIENCE_EVERY_MS) return;
+    lastRun.current = now;
+    const sources: SoundSource[] = [];
+    for (const r of net.remotes.values()) sources.push({ id: r.info.id, x: r.x, z: r.z });
+    const serverNow = net.serverNow();
+    for (const def of NPCS) {
+      if (net.offDuty.has(def.id)) continue;
+      const pose = npcPose(def, serverNow);
+      if (pose.present) sources.push({ id: def.id, x: pose.x, z: pose.z });
+    }
+    sound.updateAmbience(net.me, sources);
+  });
+  return null;
+}
+
 export function Store() {
   return (
     <Canvas
@@ -849,6 +896,7 @@ export function Store() {
       <DeviceHintGlow />
       <GuideMarkers />
       <Player />
+      <Ambience />
     </Canvas>
   );
 }

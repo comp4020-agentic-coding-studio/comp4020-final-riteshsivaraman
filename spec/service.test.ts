@@ -263,9 +263,9 @@ describe("stock at the moment of sale", () => {
     const black = { model: "17", storage: storageOf17, colour: "Black", price: 1399 };
     selling("c1", "spec-phones", black);
     expect(stockOf(db, "iphone-17", "Black", storageOf17)).toBe(0);
-    // a second customer, with the other specialist: the last unit is gone
+    // a second customer, with the other specialist: told the truth (issue #3: "on hold for <name>", not an invented "someone else")
     const { out } = selling("c2", "spec-phones-2", black);
-    expect(last(out, "c2", "turn")?.say).toMatch(/has gone/);
+    expect(last(out, "c2", "turn")?.say).toMatch(/on hold for/);
     expect(db.prepare("SELECT COUNT(*) AS n FROM reservations WHERE visitor_id = 'c2'").get()).toEqual({ n: 0 });
   });
 });

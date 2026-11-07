@@ -108,6 +108,22 @@ export interface StaffMenuView {
   status: string; // what is happening when it is not your move
 }
 
+// A unit put aside for a visitor (reservations, status 'held'), shown to
+// everyone so the frustration of a missing colour is visible, not invented
+// (issue #3). `expiresAt` is the server's own `reservations.expires_at`, an
+// absolute epoch time: a client computes its own time-left from it, never the
+// other way round. `free` is how many of that exact SKU are still on the
+// shelf right now (0 when the held unit is the last one).
+export interface HoldView {
+  product: string;
+  colour: string;
+  storage: string;
+  holderId: string;
+  holderName: string;
+  expiresAt: number;
+  free: number;
+}
+
 // A sale after the chat is over: the phone is on its way in a bag, then with
 // the specialist, who takes payment. Everyone sees it (the bag is carried).
 export interface OrderView {
@@ -184,6 +200,7 @@ export type ServerMessage =
       inspecting: Inspection[];
       chats: ChatPair[];
       orders: OrderView[];
+      holds: HoldView[];
       // where you start: the client puts your view there
       spawn: Pose;
       seated: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }>;
@@ -199,6 +216,7 @@ export type ServerMessage =
   | { type: "staff_view"; customers: CustomerView[] }
   | { type: "chats"; pairs: ChatPair[] }
   | { type: "orders"; orders: OrderView[] }
+  | { type: "holds"; holds: HoldView[] }
   // a line for a specialist's corner feed
   | { type: "update"; text: string }
   | { type: "duty"; offDuty: string[] }

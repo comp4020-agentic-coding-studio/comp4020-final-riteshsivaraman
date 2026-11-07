@@ -10,6 +10,7 @@ import type {
   Identity,
   ChatPair,
   OrderView,
+  HoldView,
   Inspection,
   Present,
   Role,
@@ -122,6 +123,8 @@ class Net {
   thirdPerson = false;
   // sales after the chat: the bag on its way, then with the specialist (everyone sees who carries it)
   orders: OrderView[] = [];
+  // units on hold right now (issue #3): who for, the server's own expiry, how many are still free
+  holds: HoldView[] = [];
   // the stock person has come to you and you may take the bag (set by the scene)
   runnerNear = false;
   // told where to go for the help you asked for: the spot of the post you need
@@ -239,6 +242,7 @@ class Net {
         this.inspections = new Map(message.inspecting.map((i) => [i.slotId, i]));
         this.setChats(message.chats);
         this.orders = message.orders;
+        this.holds = message.holds;
         this.spawn = message.spawn;
         this.seats = new Map(message.seated.map((s) => [s.visitorId, { x: s.at.x, z: s.at.z, fx: s.face.x, fz: s.face.z }]));
         this.pollSettle();
@@ -291,6 +295,9 @@ class Net {
       case "orders":
         this.orders = message.orders;
         this.pollSettle();
+        return true;
+      case "holds":
+        this.holds = message.holds;
         return true;
       case "update":
         this.pushUpdate(message.text);
