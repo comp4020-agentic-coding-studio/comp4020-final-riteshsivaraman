@@ -9,7 +9,15 @@ import { CharacterStage } from "./gfx/CharacterStage.tsx";
 import { DeviceStage } from "./gfx/DeviceStage.tsx";
 import { net, useNet } from "./net.ts";
 import type { Profile } from "../../shared/profile.ts";
+import { armAutoplayGate, wireUiClicks } from "./audio.ts";
+import { SoundToggle } from "./SoundToggle.tsx";
 import "./styles.css";
+
+// Sound (#11): arm the autoplay gate and the UI click cue once, as soon as
+// this module loads — before React even mounts, so the very first tap
+// anywhere (including the entry screen) is what unlocks audio.
+armAutoplayGate();
+wireUiClicks();
 
 const Q = new URLSearchParams(location.search);
 const STAGE = Q.has("stage");
@@ -148,6 +156,7 @@ function App() {
           <Talk />
           <StaffTalk />
           <StaffPanel />
+          <SoundToggle />
         </>
       )}
     </>
