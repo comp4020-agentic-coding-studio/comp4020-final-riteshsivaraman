@@ -97,7 +97,14 @@ function turnFor(s: ConvState, world: World): Turn {
       case "pickup":
         return ask("Orders are collected at the Genius Bar at the back of the shop.", [{ id: "ok", label: "Thanks" }]);
       case "help_asked":
-        return end("Of course. Someone from the phones team will come to you. Have a look around while you wait.");
+        // issue #37: this put the customer on the real waiting list
+        // (request_help/waiting_for_help above), so a free real staff user
+        // CAN be offered them (#1/#27). But nothing proactively approaches
+        // on their behalf (tryNpcAutoClaim is deliberately unwired, D40),
+        // so the old "will come to you" line overpromised. This wording
+        // matches what actually happens: they may be found by staff, but
+        // going to find someone themselves also works.
+        return end("Of course. The phones team is along the left of the shop -- someone should find you, or go find whoever's free.");
       case "browsing":
         return end("No problem. Ask if you need anything.");
       case "to_bar":
