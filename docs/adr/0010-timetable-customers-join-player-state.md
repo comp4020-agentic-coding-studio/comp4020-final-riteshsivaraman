@@ -1,10 +1,9 @@
 ---
-status: draft
+status: accepted
 what: ADR 10 --- whether CPU/timetable customers get a real `player_state` row
   and rule-based decision logic, so they are indistinguishable in the data
-  model from real-visitor customers (differing only in input source). Options
-  and costs laid out per CLAUDE.md's "expensive to reverse" rule; decision
-  left to Ritesh.
+  model from real-visitor customers (differing only in input source).
+  Decided: Option B, lazy materialization on first interaction (SCOPE D56).
 date: 2026-11-07
 ---
 
@@ -297,8 +296,40 @@ pure timetable."
 
 ## Decision
 
-[TK: decision, Ritesh]
+Option B, Ritesh, 2026-11-07, relayed via the orchestrator session: lazily
+materialize a `player_state` row for a timetable customer only the first
+time they're interacted with — entering the waiting list, or a staff
+offer/approach/claim — not upfront for every customer `storeday.ts` would
+ever render. Recorded as SCOPE D56.
+
+On release (served, sold to, or abandoned), the promoted customer simply
+leaves the store. It does not rejoin `storeday.ts`'s schedule the way a
+released staff NPC rejoins duty (ADR 3/D1/D34's carve-out) — a served or
+abandoned customer does not naturally "resume browsing" the way staff
+resume duty, so there is no id-collision risk to resolve: once promoted and
+released, that id is done, not handed back to `momentOf`.
 
 ## Consequences
 
-[TK]
+- `storeday.ts`'s pure-function-of-time property is preserved for the
+  ambient majority of CPU customers, who are never interacted with and so
+  never get a row — restart changes nothing for them, same as today.
+- The promotion trigger must fire no later than the moment a customer would
+  appear on the waiting list, not only on claim — otherwise issue #1's
+  offer-scan (which runs before any claim happens) still sees nothing for
+  CPU customers. This is the one piece of precise timing a builder must get
+  right; stated explicitly on issue #20.
+- The "rejoin vs. leave" id-collision question this ADR raised is resolved
+  by "leave": once a CPU customer is promoted and later released, nothing
+  hands that id back to `storeday.ts` to keep walking its original schedule
+  segment. No reconciliation code is needed for that case.
+- The rule engine itself (what makes a CPU customer's answers "sensible, not
+  erratic," per D55) is real, non-trivial design and build work, independent
+  of this storage decision, and is not scoped by this ADR. It is issue #20's
+  (and any follow-up issue's) job to size and build.
+- `tryNpcAutoClaim`'s own open wiring question (D40: should an idle on-duty
+  NPC ever claim a waiting customer, and under what condition) is unrelated
+  to this decision and remains open.
+- Every promotion, interaction and eventual departure of a promoted CPU
+  customer writes its own `events` row, same as a real visitor (CLAUDE.md's
+  event-log invariant; no new exemption is created by this ADR).
