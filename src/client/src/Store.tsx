@@ -124,7 +124,6 @@ function Player() {
         net.changed();
       }
       if ((e.code === "Escape" || e.code === "KeyE") && net.myInspectSlot) net.inspectEnd();
-      else if (e.code === "Escape" && net.escort) net.escortCancel();
     };
     const up = (e: KeyboardEvent) => keys.delete(e.code);
     const blur = () => keys.clear();
