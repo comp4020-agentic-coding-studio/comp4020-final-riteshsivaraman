@@ -33,6 +33,7 @@ find every resource by reading this file, not by discovering it mid-task.
   "Atrium Stair") is represented in `Pose`, the protocol, persistence and
   `clampToWalkable`. Options laid out, nothing picked yet — read before
   touching `Pose`, `FLOOR`, `world.ts` or `presence.ts`'s move handling.
+- `docs/adr/0009-staff-assignment-priority.md` — ADR 9 (draft scaffold): real staff users are offered waiting customers before CPUs (SCOPE D47, D48, issue #1). Tie-break and costs are `[TK]`. Read before touching staff assignment.
 - `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
   the database, menu conversations, employees online see customers' states. Facts
   filled in, reasoning filled in. Read before touching `visitors`,
