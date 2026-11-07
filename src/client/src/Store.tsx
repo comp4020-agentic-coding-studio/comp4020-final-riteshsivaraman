@@ -16,6 +16,7 @@ import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions, TABLE_H, zoneOf } from "../../shared/world.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
 import { NameFloat } from "./NameFloat.tsx";
+import { OfferMarker } from "./OfferMarker.tsx";
 import { modelById } from "../../shared/talk/data.ts";
 import { TABLE_ASSIGNMENTS } from "../../shared/assignments.ts";
 import { productById } from "../../shared/catalogue.ts";
@@ -505,6 +506,7 @@ function Remotes() {
             getState={() => speeds.current.get(r.info.id) ?? { walking: false, mode: "idle", mood: "neutral" }}
           />
           <NameFloat id={r.info.id} name={r.info.name} npc={false} y={2.0} />
+          {r.identity.kind === "customer" && <OfferMarker id={r.info.id} y={2.5} />}
         </group>
       ))}
     </group>

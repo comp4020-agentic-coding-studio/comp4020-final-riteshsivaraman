@@ -415,6 +415,34 @@ kbd {
 .name-float.player {
   color: #8cf0b4;
 }
+/* issue #1: a marker over a customer offered to the current real staff
+   user, with the server's countdown. Bounces gently so it reads as "look
+   here" without being noisy (feel-check, SCOPE D48). */
+.offer-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
+  animation: offer-marker-bounce 1.1s ease-in-out infinite;
+}
+.offer-marker-arrow {
+  font-size: 22px;
+  line-height: 1;
+  color: #ffd23f;
+  text-shadow: 0 0 4px #000, 0 0 4px #000;
+}
+.offer-marker-label {
+  margin-top: 2px;
+  font: 700 13px/1.1 system-ui, sans-serif;
+  color: #ffd23f;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+@keyframes offer-marker-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
 .name-float i {
   font: 600 10px system-ui, sans-serif;
   font-style: normal;
