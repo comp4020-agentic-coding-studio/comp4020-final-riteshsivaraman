@@ -45,6 +45,7 @@ Failing-first spec (red for the right reason) → builder green → `/run-checks
 ```
 ROLE        <agent> (<model>, <effort>). You work alone in worktree <path>
 ISSUE       #<n> "<title>" (read the full issue first)
+READ FIRST  docs/INDEX.md, <ADR numbers and docs that bind this issue>, SCOPE D<nn>
 GOAL        <one sentence; the spec file that is already red>
 MAY EDIT    <globs>          MUST NOT EDIT  <globs, docs, README, PROCESS>
 RULES       * Read CLAUDE.md and the SCOPE decision(s) cited. First: git fetch && git merge origin/integration
@@ -58,6 +59,9 @@ DONE WHEN   pnpm check and check:evidence pass in your worktree; PR against inte
             with "Fixes #<n>", how-it-works paragraph, test evidence.
 STOP IF     you need a file outside MAY EDIT, a second migration, or a decision on SCOPE.
 ```
+
+## Context pack and records
+Every agent finds context through `docs/INDEX.md` and reads the binding records before editing: ADRs in `docs/adr/`, `docs/graphics-brief.md`, `docs/customer-journeys.md`, `docs/conversation-model/decisions.md`, `spec/README.md`, SCOPE decisions. The brief's READ FIRST line names the ones that apply to the issue. Decisions that are expensive to reverse (storage, data model, real-time mechanism, person definition) get an ADR first: label `needs-adr`, options and costs, Ritesh chooses, steward scaffolds `docs/adr/NNNN-<slug>.md` with `[TK]` for the decision. Likely candidates now: #1 waiting list and claims, #4 shared demo state, shifts.
 
 ## Spend
 `/budget` at each wave start and every ~10 agents. Pause and ask at 70%, hard stop at 85% (proposed; calibrate on wave 1). ultracode removes the concurrency cap and warning, so every wave caps its own agent count (6 builders).

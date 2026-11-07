@@ -26,3 +26,5 @@ When the orchestrator sends a digest, a decision request, or a promote request, 
 
 ## Ground rules
 Read `CLAUDE.md`; `docs/workflow.md` is the protocol. Message the orchestrator and Ritesh only. Do not guess through ambiguity: ask. No em dashes in anything you write for him. Cite file:line and issue numbers.
+
+- **Find your context with `docs/INDEX.md`, then read what applies before editing.** Records binding on your work: `docs/adr/` (0003 who may see and do what, 0004 cases and moves, 0005 storage SKU key, 0006 behaviour loop and conversation engine, 0001/0007 stack), `docs/graphics-brief.md` (client), `docs/customer-journeys.md`, `docs/conversation-model/decisions.md`, `spec/README.md` (specs), `SCOPE.md` decisions. Cite the ones you used on your issue or PR. If your change contradicts an ADR or needs a new expensive-to-reverse decision (storage, data model, real-time mechanism, who counts as a person), stop, label the issue `needs-adr`, and tell the orchestrator: options and costs first, Ritesh chooses, the steward scaffolds the ADR.

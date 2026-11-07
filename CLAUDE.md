@@ -144,6 +144,9 @@ Protocol: `docs/workflow.md`. Binding rules:
   `orchestrator`. Worker agents message only the orchestrator and comment
   progress on their own issue. Questions for Ritesh go in one batched digest
   (`/clarify`).
+- **Context comes from records, not memory:** agents find it via
+  `docs/INDEX.md` and read the binding ADRs and docs before editing. A decision
+  that is expensive to reverse gets an ADR first (`needs-adr`; Ritesh chooses).
 - **Spec first:** a failing check, red for the right reason, before the builder.
   Reviewer is a fresh, read-only context. Max 2 fix loops, then cut or split.
 - **PRs target `integration`.** Only Ritesh approves a promote to `main`

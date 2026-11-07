@@ -43,3 +43,10 @@ his words: "sure lets get started on all those"
 lecture lesson: week 8, lay out the options and their costs before a choice that is expensive to reverse, and let the person choose; week 6, then compound it into the harness (decisions recorded in SCOPE with dates).
 evidence: SCOPE.md D48 to D52; issues #1 to #8; drafts in .agents/drafts/
 
+### 2026-11-07 Ask whether the new workflow knows the old records
+status: candidate
+what happened: After the workflow was built, Ritesh asked whether it knew to use the project's other files such as ADRs. Checking showed agents only named CLAUDE.md, SCOPE and ADR 3; none pointed to docs/INDEX.md or the other six ADRs, and nothing made a new expensive decision produce an ADR. Added a shared context-pack ground rule to all 13 agents, a READ FIRST line in the brief, a `needs-adr` label and a steward duty.
+his words: "does this workflow know to interact ewith other files in this project like adr etc"
+lecture lesson: week 8, lay out options and write a decision record before a choice that is expensive to reverse; week 9, a subagent knows only its delegation message, so what it must read has to be in the brief.
+evidence: uncommitted edits to .claude/agents/*, docs/workflow.md, CLAUDE.md
+

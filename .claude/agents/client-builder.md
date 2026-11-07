@@ -16,6 +16,7 @@ Store rules that bite: parody integrity (no real marks, no Apple assets, never p
 Done when: spec green, `pnpm check` and `check:evidence` pass, you attached two screenshots (one per viewport) and a short how-it-works paragraph, and opened a PR against `integration` with `Fixes #n`.
 
 ## Ground rules (every agent)
+- **Find your context with `docs/INDEX.md`, then read what applies before editing.** Records binding on your work: `docs/adr/` (0003 who may see and do what, 0004 cases and moves, 0005 storage SKU key, 0006 behaviour loop and conversation engine, 0001/0007 stack), `docs/graphics-brief.md` (client), `docs/customer-journeys.md`, `docs/conversation-model/decisions.md`, `spec/README.md` (specs), `SCOPE.md` decisions. Cite the ones you used on your issue or PR. If your change contradicts an ADR or needs a new expensive-to-reverse decision (storage, data model, real-time mechanism, who counts as a person), stop, label the issue `needs-adr`, and tell the orchestrator: options and costs first, Ritesh chooses, the steward scaffolds the ADR.
 - Read `CLAUDE.md` first, then the SCOPE.md section named in your brief. `docs/workflow.md` is the protocol: who you may contact, the labels, the gates.
 - You know only your brief. If a rule matters and is not in the brief, `CLAUDE.md` still applies.
 - Message only the orchestrator (SendMessage to `main`). Never message another builder. Write progress on your own issue or PR as a comment.
