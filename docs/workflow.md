@@ -35,6 +35,13 @@ Model by `size:` label: `l` or concurrency-sensitive = opus high builder; `s`/`m
 - Hot spots are single lane via `touches:` labels: `migration` (numbered migrations collide), `conversation`, `world-layout`, `service`. Spec files are one per issue.
 - Pushing any branch needs Ritesh's yes (CLAUDE.md).
 
+## What level are we parallelising at? (Ritesh, 2026-11-07, after wave 1's post-mortem)
+Running 4-7 builders at once sped up building, not shipping: every PR still funnelled through one serial gate, so "parallel" just meant PRs queued up faster than Ritesh (the actual bottleneck, not the agents) could review and feel-check them. Parallelism is available at four separate levels, and only picking it for one of them (builders) while defaulting the rest to serial out of habit is the mistake, not parallelism itself:
+1. **Issues/builders.** Parallel only for work that doesn't need Ritesh's judgment to call done: doc scaffolds, mechanical follow-ups, test-harness work, anything with no feel-check and low blast radius. **For anything a real person needs to look at and trust (most feature work, anything touching the customer/staff flow) default to one issue at a time**, with parallelism used *inside* that one issue instead (spec-writer and research run concurrently, several mutation checks run at once, one reviewer checks several angles in one pass).
+2. **The gate.** Typecheck/test/check:evidence/build for several independent PRs are mutually read-only — batch them instead of one full serial pipeline per PR. Only the final merge (state-mutating, order-dependent) must be serial.
+3. **An investigation.** When a bug needs root-causing, split it into named independent sub-questions up front and ask them in parallel, rather than one broad research prompt, then another broad one when the first comes back wrong or incomplete, then a third.
+4. **Visibility to Ritesh.** Ship the first mergeable thing for him to look at; don't treat "the whole wave is done" as the delivery unit.
+
 ## Labels
 type: `bug feature doc harness` · status: `needs-triage needs-user ready in-progress in-review verified merged shipped blocked` (exactly one) · area: `server client shared spec docs` · touches: `migration conversation world-layout service` · wave: `w1..w4` · size: `s m l` · `needs-feel-check`.
 

@@ -139,6 +139,15 @@ Protocol: `docs/workflow.md`. Binding rules:
 - **Only the orchestrator assigns; builders never self-claim.** One issue, one
   branch `agent/<n>-<slug>`, one worktree. No two issues sharing a hot spot
   (`touches:` labels; migrations are single lane).
+- **Default to one issue at a time if it needs Ritesh's judgment to call
+  done** (most feature work, anything touching the customer/staff flow) —
+  parallelise inside that issue instead (spec-writer and research together,
+  several mutation checks at once). Parallel issues are for work nobody has
+  to feel-check: doc scaffolds, mechanical follow-ups, harness work. Wave 1's
+  post-mortem (2026-11-07, `docs/workflow.md`): parallel builders queued PRs
+  faster than Ritesh could review them, which is a serial-gate bottleneck
+  dressed up as a parallelism problem. Ship the first mergeable thing rather
+  than waiting for a whole wave.
 - **Ritesh talks to the `interface` agent** (fast, sonnet), which refines his
   requests into work orders (`/brief`, `.agents/inbox/`) for the slow ultracode
   `orchestrator`. Worker agents message only the orchestrator and comment
