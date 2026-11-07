@@ -1,11 +1,12 @@
 import { Html } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PMREMGenerator, PerspectiveCamera, Vector3 } from "three";
-import type { Camera } from "three";
+import type { Camera, DirectionalLight as DirectionalLightType, Object3D } from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { engagedMoment } from "../../shared/engage.ts";
+import { sunStateAt } from "../../shared/sun.ts";
 import { NPC_DESIGNATION, NPC_LABEL, scriptFor } from "../../shared/duty.ts";
 import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { poseChanged } from "../../shared/pose.ts";
@@ -802,6 +803,84 @@ function InspectMarkers() {
   );
 }
 
+// The store's sun (issue #12): direction and colour come from `sunStateAt`,
+// a pure function of the server clock (`src/shared/sun.ts`), so every
+// viewer's light matches at the same instant and a marker back tomorrow at a
+// different hour sees a different store. Nothing here is a client-side
+// timer: each frame just reads the server clock the app already keeps
+// (`net.serverNow()`) and recomputes from scratch (CLAUDE.md, "No background
+// processes").
+//
+// Frame budget (issue #12 AC3): a low-quality fallback — a smaller shadow
+// map, shadows off altogether under real pressure — is chosen automatically
+// from a smoothed measurement of this canvas's own recent frame time, not a
+// device/platform guess, with hysteresis so it does not flap between the two
+// every frame near the boundary.
+const SUN_DISTANCE = 16; // metres from the room's centre to the light
+const FRAME_MS_DOWNGRADE = 30; // sustained frames slower than this (≈33fps): drop quality
+const FRAME_MS_UPGRADE = 19; // sustained frames faster than this (≈53fps): it's safe to go back up
+const FRAME_SMOOTHING = 0.06; // exponential smoothing factor per frame
+
+type ShadowQuality = "soft" | "low" | "off";
+
+function SunLight() {
+  const light = useRef<DirectionalLightType>(null);
+  const target = useRef<Object3D>(null);
+  const avgFrameMs = useRef(16.7);
+  const [quality, setQuality] = useState<ShadowQuality>("soft");
+  const qualityRef = useRef<ShadowQuality>("soft");
+
+  useFrame((_, delta) => {
+    // --- frame budget: decide the shadow quality for *next* frame ---
+    const dtMs = Math.min(delta, 0.25) * 1000;
+    avgFrameMs.current += (dtMs - avgFrameMs.current) * FRAME_SMOOTHING;
+    if (qualityRef.current === "soft" && avgFrameMs.current > FRAME_MS_DOWNGRADE) {
+      qualityRef.current = "low";
+      setQuality("low");
+    } else if (qualityRef.current === "low" && avgFrameMs.current > FRAME_MS_DOWNGRADE * 1.4) {
+      qualityRef.current = "off";
+      setQuality("off");
+    } else if (qualityRef.current !== "soft" && avgFrameMs.current < FRAME_MS_UPGRADE) {
+      qualityRef.current = "soft";
+      setQuality("soft");
+    }
+
+    // --- the sun itself: a pure function of server time ---
+    const sun = sunStateAt(net.serverNow());
+    const l = light.current;
+    const t = target.current;
+    if (!l || !t) return;
+    l.position.set(sun.direction.x * SUN_DISTANCE, STORE_Y + sun.direction.y * SUN_DISTANCE, sun.direction.z * SUN_DISTANCE);
+    t.position.set(0, STORE_Y, 0);
+    l.target = t;
+    l.color.set(sun.colour);
+    // below the horizon (night): the sun itself fades toward nothing — the
+    // room's own ceiling panels (always on) carry the "interior lights"
+    // claim, not this light pretending to be one.
+    const day = Math.max(0, Math.min(1, (sun.direction.y + 0.05) / 0.4));
+    l.intensity = 0.05 + day * 1.3;
+  });
+
+  return (
+    <>
+      <directionalLight
+        ref={light}
+        castShadow={quality !== "off"}
+        shadow-mapSize={quality === "soft" ? [1024, 1024] : [384, 384]}
+        shadow-camera-left={-9}
+        shadow-camera-right={9}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+        shadow-camera-near={1}
+        shadow-camera-far={40}
+        shadow-bias={-0.0018}
+        shadow-radius={quality === "soft" ? 3 : 1}
+      />
+      <object3D ref={target} />
+    </>
+  );
+}
+
 // Soft reflections on glass, metal and the polished floor, from a small
 // procedural room (no image download, so it costs nothing to load).
 export function Reflections() {
@@ -825,15 +904,17 @@ export function Store() {
     <Canvas
       camera={{ fov: FOV, near: 0.1, far: 120 }}
       dpr={[1, 1.5]}
+      shadows="soft"
       gl={{ antialias: true }}
       style={{ position: "fixed", inset: 0 }}
     >
       <color attach="background" args={["#dfe3e7"]} />
       <Reflections />
-      <hemisphereLight args={["#ffffff", "#d3d6da", 1.25]} />
-      <directionalLight position={[4, 8, -3]} intensity={0.6} />
-      {/* daylight through the glass front */}
-      <directionalLight position={[0, 6, -14]} intensity={0.5} />
+      <hemisphereLight args={["#ffffff", "#d3d6da", 1.1]} />
+      {/* fixed, low fill so nothing goes pitch black at night; the sun itself
+          tracks the server clock, see SunLight above */}
+      <directionalLight position={[0, 6, -14]} intensity={0.22} />
+      <SunLight />
       <group position={[0, STORE_Y, 0]}>
         <Room />
       </group>
