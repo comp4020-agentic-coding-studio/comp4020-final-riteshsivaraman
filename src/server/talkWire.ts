@@ -154,10 +154,10 @@ export function talkChoices(sc: Scene): Array<{ id: string; label: string }> {
 // Returns an error the same shape as the old engine's step() on an
 // off-menu or out-of-turn pick, so service.ts's call sites don't need to
 // branch on which engine produced the error.
-export function stepTalk(sc: Scene, conversationId: string, choiceId: string, humanStaff = false): { scene: Scene; turn: TalkTurn } | { error: string } {
+export function stepTalk(sc: Scene, conversationId: string, choiceId: string, humanStaff = false, tone: Tone = DEFAULT_TONE): { scene: Scene; turn: TalkTurn } | { error: string } {
   const menu = customerMenu(sc);
   if (!menu) return { error: "it is not the customer's turn" };
-  const reply = replyFor(menu, choiceId);
+  const reply = replyFor(menu, choiceId, tone);
   if (!reply) return { error: `"${choiceId}" is not an option here` };
   const applied = applyCustomer(sc, reply.reply);
   if ("error" in applied) return applied;
@@ -175,17 +175,17 @@ export function stepTalk(sc: Scene, conversationId: string, choiceId: string, hu
 // axis 3 option B).
 const DEFAULT_TONE: Tone = "neutral";
 
-function replyFor(menu: CustomerMenu, choiceId: string): { reply: CustomerReply } | null {
+function replyFor(menu: CustomerMenu, choiceId: string, tone: Tone): { reply: CustomerReply } | null {
   if (choiceId.startsWith(OPTION)) {
     const id = choiceId.slice(OPTION.length);
     if (!menu.options.some((o) => o.id === id)) return null;
-    return { reply: { picks: [id], tone: DEFAULT_TONE } };
+    return { reply: { picks: [id], tone } };
   }
   if (choiceId.startsWith(ACTION)) {
     const i = Number(choiceId.slice(ACTION.length));
     const a = menu.actions[i];
     if (!a) return null;
-    return { reply: { action: a.action, tone: DEFAULT_TONE } };
+    return { reply: { action: a.action, tone } };
   }
   return null;
 }

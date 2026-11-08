@@ -647,7 +647,11 @@ export function leaveStore(ctx: Ctx, visitorId: string): Outgoing[] {
   withdrawOfferOf(ctx, visitorId, "customer left");
   const open = openConversationOf(ctx.db, visitorId);
   const carriedOn = open && isTalkData(anyDataOf(open)) && !!(anyDataOf(open) as TalkConvData).standIn; // an NPC is already standing in
-  if (open && !carriedOn) out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left"));
+  if (open && !carriedOn) {
+    // "Ben left" is for whoever Ben was talking to. Ben himself is leaving (or reconnecting, which leaves first), so it is not sent to him:
+    // it showed up in his own chat as a stranger telling him, in the third person, that he had left
+    out.push(...finishEither(ctx, open, visitorId, `${nameOf(ctx, visitorId)} left`, "left").filter((o) => !(o.to === visitorId && o.message.type === "turn")));
+  }
   out.push(...closeTalk(ctx, visitorId));
   out.push(...cancelIntentsOf(ctx, visitorId));
   const leaving = liveEscortOf(ctx.db, visitorId);
@@ -3004,9 +3008,9 @@ export function closeTalk(ctx: Ctx, customerId: string): Outgoing[] {
   return [...(trip ?? [{ to: "all" as const, message: { type: "released" as const, npcId: row.with_id } }]), ...settleVisits(ctx)];
 }
 
-function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgoing[] {
+function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string, tone?: Tone): Outgoing[] {
   const humanStaff = row.with_kind === "visitor";
-  const result = stepTalk(from, row.id, choiceId, humanStaff);
+  const result = stepTalk(from, row.id, choiceId, humanStaff, tone);
   if ("error" in result) return [notice(row.customer_id, "That is not one of the options.")];
   const { scene, turn } = result;
   logTalkTurn(ctx, row, from, choiceId, scene);
@@ -3042,7 +3046,7 @@ export function beginSale(ctx: Ctx, conversationId: string, sku: { model: string
   return startCheckout(ctx, row, d, sku, "Great choice. I'll take you across to the till so someone there can sort the payment.");
 }
 
-export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string, choiceId: string): Outgoing[] {
+export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string, choiceId: string, tone?: Tone): Outgoing[] {
   releaseExpired(ctx);
   const row = getConv(ctx.db, conversationId);
   if (!row || row.customer_id !== customerId || row.ended_at !== null) return [notice(customerId, "That conversation is over.")];
@@ -3055,7 +3059,7 @@ export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string,
     if (choiceId.startsWith("seat:")) return handleSeatChoice(ctx, row, anyData, choiceId);
     if (anyData.stage === "seat_offer") return [notice(customerId, "Sit down or stay standing first.")];
     if (!talkChoices(anyData.scene).some((c) => c.id === choiceId)) return [notice(customerId, "That is not one of the options.")];
-    return applyTalk(ctx, row, anyData.scene, choiceId);
+    return applyTalk(ctx, row, anyData.scene, choiceId, tone);
   }
   const data = anyData;
   if (data.awaiting !== "customer") return [notice(customerId, `Waiting for ${nameOf(ctx, row.with_id)}.`)];

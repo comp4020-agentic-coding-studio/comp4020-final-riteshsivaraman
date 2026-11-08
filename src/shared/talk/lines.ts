@@ -256,6 +256,14 @@ const NOT_SURE: Record<Tone, string> = {
   unsure: "Um... I'm really not sure.",
 };
 
+// How a customer opens an answer in each tone. Each lead ends its own sentence, so the answer behind it needs no change.
+const CUSTOMER_LEAD: Record<Tone, string[]> = {
+  friendly: ["Sure! ", "Lovely. ", "Of course! ", "Great. "],
+  neutral: [],
+  impatient: ["Right. ", "Fine. ", "Okay, yes. ", "Look. "],
+  unsure: ["Um... ", "Hmm. ", "Er, okay. ", "Well... "],
+};
+
 const optionLabel = (opts: Option[], pick: string): string => {
   const o = opts.find((x) => x.id === pick);
   if (o) return o.label;
@@ -389,11 +397,19 @@ export function customerLine(reply: CustomerReply, opts: Option[], ctx: Ctx, tur
     const sentences = qid === "use_case" || qid === "colour_prefs" || qid === "colour_pick" || qid === "hardware_features" ? [say(reply.picks[0]!, reply.picks, optionLabel(opts, reply.picks[0]!), qid, pending.kind, reply.tone, lab, onlyOne)] : reply.picks.map((p) => say(p, reply.picks!, optionLabel(opts, p), qid, pending.kind, reply.tone, lab, onlyOne));
     body = body ? `${sentences.join(" ")} ${body}` : sentences.join(" ");
   }
-  // A little tone on the end of a plain answer: always grammatical, never after an action (a leave) or a refusal.
+  // The tone they answer in colours the answer (what the specialist picked, or the chip a customer chose): a warm, a curt or a
+  // hesitant lead-in on a plain answer, so the same pick reads differently in each. Always grammatical (every lead ends its own
+  // sentence), never on an action (a leave), and a warm "Sure!" never in front of a refusal.
   const sureAnswer = reply.picks?.every((p) => !NEGATIVE.has(p) && !REJECT.has(p)) ?? false;
-  if (body && /\.$/.test(body) && !reply.throwback && !reply.action && reply.picks?.length) {
-    if (reply.tone === "friendly" && sureAnswer && turn % 3 === 0) body += " Thanks!";
-    if (reply.tone === "impatient" && sureAnswer && turn % 3 === 0) body += turn % 2 === 0 ? " What's next?" : " Can we move on?";
+  if (body && !reply.throwback && !reply.action && reply.picks?.length) {
+    const leads = CUSTOMER_LEAD[reply.tone];
+    // (not on "not sure", which already has a line for each tone, nor in front of a line that already opens in its own voice)
+    const hasOwnVoice = reply.picks.some((p) => p === "notsure" || p === "unsure") || /^(Um|Hmm|Er|Well|Sure|Right|Fine|Look|Lovely|Of course|Great|Okay|OK|Yes|No)\b/.test(body);
+    if (leads.length > 0 && !hasOwnVoice && (reply.tone !== "friendly" || sureAnswer)) body = leads[turn % leads.length]! + body;
+    if (/\.$/.test(body)) {
+      if (reply.tone === "friendly" && sureAnswer && turn % 3 === 0) body += " Thanks!";
+      if (reply.tone === "impatient" && sureAnswer && turn % 3 === 0) body += turn % 2 === 0 ? " What's next?" : " Can we move on?";
+    }
   }
   if (reply.throwback) body = `${body ? stop(body) + " " : ""}${throwbackSaid(reply.throwback, ctx)}`;
   // Their first words back are a hello.

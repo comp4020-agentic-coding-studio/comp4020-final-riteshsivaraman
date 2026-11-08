@@ -22,6 +22,9 @@ const asked = (qid: string): Scene => {
 };
 const said = (qid: string, picks: string[], tone: Tone): string => ok(applyCustomer(asked(qid), { picks, tone })).log.at(-1)!.text;
 
+// the lead-in a tone puts in front of an answer ("Sure! ", "Right. ", "Um... "), taken off to see the answer itself
+const withoutLead = (t: string): string => t.replace(/^(Sure! |Lovely\. |Of course! |Great\. |Right\. |Fine\. |Okay, yes\. |Look\. |Um\.\.\. |Hmm\. |Er, okay\. |Well\.\.\. )/, "");
+
 describe("customer wording", () => {
   it("says 'not sure' as a sentence in every tone, with nothing in front of it", () => {
     for (const tone of TONES) {
@@ -32,16 +35,25 @@ describe("customer wording", () => {
 
   it("says a budget, a colour and a model as sentences in every tone", () => {
     for (const tone of TONES) {
-      expect(said("budget_ceiling", ["ceiling:1200"], tone), tone).toMatch(/^(My budget is around A\$1,200\.|No more than A\$1,200\.|A\$1,200 at the most\.|Maybe around A\$1,200\?)$/);
+      expect(withoutLead(said("budget_ceiling", ["ceiling:1200"], tone)), tone).toMatch(/^(My budget is around A\$1,200\.|No more than A\$1,200\.|A\$1,200 at the most\.|Maybe around A\$1,200\?)$/);
     }
     let sc = ok(applyStaff(newScene(), { t: "ask", qid: "known_model" }, "neutral"));
     sc = ok(applyCustomer(sc, { picks: ["model:17"], tone: "friendly" }));
-    expect(sc.log[1]!.text).toBe("Hi. The iPhone 17, please.");
+    expect(sc.log[1]!.text).toBe("Hi. Of course! The iPhone 17, please."); // (a friendly answer opens warmly)
+  });
+
+  it("the tone a customer answers in changes the words, not just the face", () => {
+    const bySay = (tone: (typeof TONES)[number]) => said("budget_ceiling", ["ceiling:1200"], tone);
+    const lines = TONES.map((t) => bySay(t));
+    expect(new Set(lines).size, `the four tones read alike: ${lines.join(" | ")}`).toBeGreaterThanOrEqual(3);
+    expect(bySay("friendly")).toMatch(/^(Sure!|Lovely\.|Of course!|Great\.)/);
+    expect(bySay("impatient")).toMatch(/^(Right\.|Fine\.|Okay, yes\.|Look\.)/);
+    expect(bySay("unsure")).toMatch(/^(Um\.\.\.|Hmm\.|Er, okay\.|Well\.\.\.)|\?$/);
   });
 
   it("joins several answers into one sentence", () => {
     const t = said("use_case", ["photos", "video", "travel"], "friendly");
-    expect(t).toBe("Mostly photos, video and travel.");
+    expect(withoutLead(t)).toBe("Mostly photos, video and travel.");
   });
 });
 

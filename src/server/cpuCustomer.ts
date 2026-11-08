@@ -1,3 +1,4 @@
+import { npcTone } from "../shared/emotions.ts";
 import { applyCustomer, customerMenu } from "../shared/talk/scene.ts";
 import { customerMove, randomPersona, type Memory, type Persona } from "../shared/talk/npc.ts";
 import { makeRng, pickOne, type Rng } from "../shared/talk/rng.ts";
@@ -88,6 +89,10 @@ export function cpuReply(sc: Scene, t: CpuTalk): { scene: Scene; talk: CpuTalk; 
       reply = LEAVE; // a menu the model cannot read: it leaves rather than says something odd
     }
   }
+  // the specialist's tone sets the customer's: warmth is answered warmly, impatience with unease or curtness (the same bias an NPC
+  // face uses), so what a real specialist chooses changes the way the customer talks back, not just whether it stays
+  const staffTone = [...sc.log].reverse().find((l) => l.who === "staff")?.tone;
+  if (staffTone && !reply.action) reply = { ...reply, tone: npcTone(staffTone, rngOf(t.seed, sc.turn + 500)) };
   let next = applyCustomer(sc, reply);
   if ("error" in next) {
     reply = LEAVE;

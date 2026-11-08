@@ -404,7 +404,7 @@ export function handleConnection(socket: WebSocket): void {
     if (me && message.type === "talk_choose" && typeof message.conversationId === "string" && typeof message.choice === "string") {
       // the tone a customer picked for this answer shows on their face, like a specialist's
       if (isTone(message.tone)) deliver(setTone(serviceCtx(), me.id, message.tone));
-      deliver(chooseTurn(serviceCtx(), me.id, message.conversationId, message.choice));
+      deliver(chooseTurn(serviceCtx(), me.id, message.conversationId, message.choice, isTone(message.tone) ? message.tone : undefined));
       deliver(reactTo(serviceCtx(), me.id)); // the NPC across from them shows how it took that
       return;
     }

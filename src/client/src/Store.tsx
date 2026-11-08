@@ -118,6 +118,8 @@ function Player() {
     // a fourth number is the pitch in degrees (negative looks down)
     const start = at && (at.length === 3 || at.length === 4) && at.every(Number.isFinite) ? at : null;
     camera.position.set(start ? start[0] : SPAWN.x, STORE_Y + EYE_HEIGHT, start ? start[1] : SPAWN.z);
+    // `?camdebug` exposes the camera to the page, for checking where the view points
+    if (new URLSearchParams(location.search).has("camdebug")) (window as unknown as { __cam: unknown }).__cam = camera;
     camera.rotation.order = "YXZ";
     camera.rotation.set(start && start.length === 4 ? (start[3] * Math.PI) / 180 : 0, start ? (start[2] * Math.PI) / 180 : SPAWN.ry, 0);
     const down = (e: KeyboardEvent) => {
@@ -317,11 +319,20 @@ function Player() {
       const m = away ? engagedMoment(talkWithId, away, net.serverNow()) : null;
       if (m && Math.hypot(m.x - net.me.x, m.z - net.me.z) > 8) talkWithId = null;
     }
+    // an NPC that has been let go (the chat ended early: "the team on that desk will look after you") is walking back to its post: with
+    // nothing holding it here the view must not swing off to its default position and follow it
+    if (talkWithId) {
+      const id = talkWithId;
+      const held = net.engaged.has(id) || net.remotes.has(id) || net.heldCpu().has(id);
+      if (!held || net.released.has(id)) talkWithId = null;
+    }
     // someone who is walking off (a specialist going to fetch the phone you just confirmed) is not followed with the view: once the
     // last line is up, standing, the lock-on lets go of them; sat down, the view just stays where it is
     const partner = talkWithId ? net.engaged.get(talkWithId) : undefined;
     const walkingAway = !!partner && engagedMoment(talkWithId!, partner, net.serverNow()).walking;
-    if (talkWithId && walkingAway && net.talking?.ended && !(net.you && net.seats.has(net.you.id))) talkWithId = null;
+    // and once the chat has ended and you are on your feet (the stool you were on just let you go) the view is not held on them any
+    // more: the lock-on would otherwise switch from the seated view to the standing one and lean in towards their face
+    if (talkWithId && net.talking?.ended && !(net.you && net.seats.has(net.you.id))) talkWithId = null;
     if (talkWithId) {
       const eng = net.engaged.get(talkWithId);
       const remote = net.remotes.get(talkWithId);

@@ -629,6 +629,33 @@ describe("walking away mid-conversation (Esc, either side)", () => {
   });
 });
 
+describe("leaving the store (or reconnecting, which leaves first)", () => {
+  it("does not send the leaver the 'X left' line that is meant for whoever they were talking to", () => {
+    addVisitor("c1", "Ben", { x: 0, z: -8 });
+    later(tryGreeterApproach(ctx(), "c1"));
+    expect(stateOf(db, "c1")?.state).toBe("in_conversation");
+    const out = leaveStore(ctx(), "c1");
+    expect(messagesTo(out, "c1", "turn"), "Ben was told, in the third person, that he had left").toEqual([]);
+  });
+});
+
+describe("the tone a customer answers in shows in the words (chat chips)", () => {
+  it("the same pick comes back worded differently in a friendly, an impatient and an unsure tone", () => {
+    const say = (id: string, npcId: string, tone: string): string => {
+      const p = npc(npcId);
+      addVisitor(id, id, { x: p.x + 1, z: p.z });
+      db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = ?").run(id);
+      const t = talkAt(later(tryNpcAutoClaim(ctx(), id)), id);
+      const pick = t.choices.find((c) => !c.standing && c.id.startsWith("opt:"))!;
+      return last(chooseTurn(ctx(), id, t.conversationId, pick.id, tone as never), id, "turn")!.youSaid ?? "";
+    };
+    const friendly = say("cf", "spec-phones", "friendly");
+    const impatient = say("ci", "spec-phones-2", "impatient");
+    expect(friendly).toBeTruthy();
+    expect(friendly, "tone had no effect on the words").not.toBe(impatient);
+  });
+});
+
 describe("what the customer said, in words", () => {
   it("a customer's menu pick comes back as the line the engine says for it, for the chat log", () => {
     const s = npc("spec-phones");

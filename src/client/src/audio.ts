@@ -218,6 +218,10 @@ class SoundEngine {
   private musicSources = new Set<AudioBufferSourceNode>();
   private track = -1;
   private trackBag: number[] = [];
+  // the last couple of rendered tracks, kept so that turning the music off and on again starts at once instead of after a
+  // few seconds of silence while a track is rendered again
+  private rendered = new Map<number, { buffer: AudioBuffer; body: number }>();
+  private restartFromCache = false;
 
   // Subscribe to mute changes (for the toggle button's React state).
   subscribe(fn: () => void): () => void {
@@ -313,6 +317,7 @@ class SoundEngine {
     this.musicBus.gain.setTargetAtTime(MUSIC_LEVEL, ctx.currentTime, 1.2); // fades in
     this.musicActive = true;
     this.musicEnds = 0;
+    this.restartFromCache = true;
     this.pumpMusic();
   }
 
@@ -339,11 +344,17 @@ class SoundEngine {
     const ctx = this.ctx;
     if (!ctx || !this.musicBus || !this.musicActive || this.musicRendering) return;
     if (this.musicEnds > ctx.currentTime + 20) return;
+    // coming back on after being switched off: the most recent track we still have, straight away
+    const cached = this.restartFromCache ? [...this.rendered.keys()].at(-1) : undefined;
+    this.restartFromCache = false;
+    this.track = cached ?? this.nextTrack(this.track);
     this.musicRendering = true;
-    this.track = this.nextTrack(this.track);
-    renderTrack(ctx, this.track)
+    (cached !== undefined ? Promise.resolve(this.rendered.get(cached)!) : renderTrack(ctx, this.track))
       .then(({ buffer, body }) => {
         this.musicRendering = false;
+        this.rendered.delete(this.track);
+        this.rendered.set(this.track, { buffer, body });
+        for (const key of [...this.rendered.keys()].slice(0, -2)) this.rendered.delete(key); // keep only the latest two
         if (!this.ctx || !this.musicBus || !this.musicActive) return;
         const at = Math.max(this.musicEnds, this.ctx.currentTime + 0.05);
         const src = this.ctx.createBufferSource();
@@ -577,6 +588,8 @@ class SoundEngine {
 }
 
 export const sound = new SoundEngine();
+// `?camdebug` also exposes the engine, for checking what the audio is doing
+if (typeof location !== "undefined" && new URLSearchParams(location.search).has("camdebug")) (window as unknown as { __sound: unknown }).__sound = sound;
 
 // Unlock on the very first user gesture anywhere on the page, then stop
 // listening — this satisfies the "muted until first click or tap" rule
