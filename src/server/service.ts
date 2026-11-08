@@ -1648,7 +1648,11 @@ function openPay(ctx: Ctx, r: IntentRow): Outgoing[] {
   const sale = saleOf(o);
   const id = randomUUID();
   const row: ConvRow = { id, customer_id: r.customer_id, with_id: r.staff_id, with_kind: r.staff_kind, script: "phones", node: "talk", data: null, started_at: ctx.now, ended_at: null };
-  const eng: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since: r.opened_at ?? ctx.now, at: cpos };
+  // an NPC carries on from exactly where it is drawn now (the end of its walk
+  // over): a fresh engagement with no `from` re-plans from its timetable spot
+  // and every client would see it jump to a new side of the customer (#54)
+  const here = r.staff_kind === "npc" ? engagedMoment(r.staff_id, intentEngagement(r), ctx.now) : null;
+  const eng: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since: ctx.now, at: cpos, ...(here ? { from: { x: here.x, z: here.z } } : {}) };
   const data: TalkConvData = { engine: "talk", scene: payScene(), at: cpos, checkout: { stage: "pay", sale, beat: "scanned", beatAt: ctx.now }, ...(r.staff_kind === "npc" ? { eng } : {}) };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
