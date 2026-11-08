@@ -188,6 +188,60 @@ describe("the greeter, end to end", () => {
   });
 });
 
+// Promise (issue #10): the greeter's hello line is chosen from the token's own
+// stored visit and order history -- new, returning, or returning with a
+// purchase -- never from anything the client sent. A "returning" token here
+// is simulated the way a real reconnect produces one: `enter()` runs again
+// (as `rejoin()` does on every "hello"), which logs a second "profile" event
+// for the same visitor id without touching the database directly.
+describe("returning customers: the greeter knows your name and your last purchase (issue #10)", () => {
+  function comesBackAgain(id: string): void {
+    enter(ctx(), id, { kind: "customer" });
+  }
+  function paidOrderFor(id: string, sale: { name: string; colour: string; storage: string; price: number }): void {
+    db.prepare(
+      "INSERT INTO orders (id, customer_id, spec_id, spec_kind, stock_id, stage, sale, created_at, expires_at, ended_at) VALUES (?, ?, 'spec-phones', 'npc', 'stock-1', 'done', ?, 0, 1000, 500)",
+    ).run(`order-${id}`, id, JSON.stringify(sale));
+  }
+
+  it("a brand-new token gets today's existing greeting", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say;
+    expect(say).toBe("Welcome in. What brings you here today?");
+  });
+
+  it("a returning token with no prior order is greeted by name only, not the old line", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    comesBackAgain("c1");
+    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say ?? "";
+    expect(say).toMatch(/\bPebble\b/);
+    expect(say.toLowerCase()).toMatch(/welcome back/);
+    expect(say).not.toBe("Welcome in. What brings you here today?");
+    expect(say.toLowerCase()).not.toMatch(/how(?:'s| is)/);
+  });
+
+  it("a returning token with a prior paid order gets the purchase line", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    paidOrderFor("c1", { name: "iPhone 18 Pro", colour: "Glacier", storage: "256GB", price: 1999 });
+    comesBackAgain("c1");
+    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say ?? "";
+    expect(say).toMatch(/\bPebble\b/);
+    expect(say).toMatch(/Glacier/);
+    expect(say).toMatch(/iPhone 18 Pro/);
+  });
+
+  it("a returning token's greeting comes from the visitors table, never from client-supplied text", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    comesBackAgain("c1");
+    // whatever a client might claim in a "hello" payload never reaches the greeting:
+    // enter() only ever takes name from validateProfile's cleaned `name` field, and
+    // the greeting itself is built from nameOf(ctx, id), which reads the visitors row
+    db.prepare("UPDATE visitors SET name = ? WHERE id = ?").run("Pebble", "c1");
+    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say ?? "";
+    expect(say).toMatch(/\bPebble\b/);
+  });
+});
+
 describe("stock at the moment of sale", () => {
   const storageOf18Pro = defaultStorage(productById("iphone-18-pro")!);
   const storageOf17 = defaultStorage(productById("iphone-17")!);
