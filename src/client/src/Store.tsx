@@ -317,6 +317,11 @@ function Player() {
       const m = away ? engagedMoment(talkWithId, away, net.serverNow()) : null;
       if (m && Math.hypot(m.x - net.me.x, m.z - net.me.z) > 8) talkWithId = null;
     }
+    // someone who is walking off (a specialist going to fetch the phone you just confirmed) is not followed with the view: once the
+    // last line is up, standing, the lock-on lets go of them; sat down, the view just stays where it is
+    const partner = talkWithId ? net.engaged.get(talkWithId) : undefined;
+    const walkingAway = !!partner && engagedMoment(talkWithId!, partner, net.serverNow()).walking;
+    if (talkWithId && walkingAway && net.talking?.ended && !(net.you && net.seats.has(net.you.id))) talkWithId = null;
     if (talkWithId) {
       const eng = net.engaged.get(talkWithId);
       const remote = net.remotes.get(talkWithId);
@@ -342,12 +347,13 @@ function Player() {
       const ease = 1 - Math.exp(-5 * dt); // slower than the device pan: a lean, not a snap-zoom
       if (mySeat) {
         // sitting: the view is fixed at your seat, looking straight at them
-        const tx = mySeat.x + (at.x - mySeat.x) * 0.1;
-        const tz = mySeat.z + (at.z - mySeat.z) * 0.1;
+        const lean = walkingAway ? 0 : 0.1; // (and no leaning after someone who is walking off)
+        const tx = mySeat.x + (at.x - mySeat.x) * lean;
+        const tz = mySeat.z + (at.z - mySeat.z) * lean;
         camera.position.x += (tx - camera.position.x) * ease;
         camera.position.y += (STORE_Y + seatEyeY(seatHeightAt(mySeat.x, mySeat.z)) - camera.position.y) * ease; // eye level for the stool you are on
         camera.position.z += (tz - camera.position.z) * ease;
-        turnToward(camera, TALK_TARGET, ease);
+        if (!walkingAway) turnToward(camera, TALK_TARGET, ease); // (a specialist walking off is not tracked)
         net.me.x = mySeat.x;
         net.me.z = mySeat.z;
         faceToward(mySeat.fx, mySeat.fz); // the body sits turned a little towards them, as everyone else sees
