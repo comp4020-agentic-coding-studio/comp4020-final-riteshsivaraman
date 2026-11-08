@@ -49,6 +49,7 @@ import {
 } from "./service.ts";
 import { avoidPeople, engagedPlaces } from "../shared/people.ts";
 import { heldPlaces } from "../shared/heldCpu.ts";
+import { cpuCustomersLive } from "./cpuCustomer.ts";
 import { clampToWalkable, zoneOf, type Zone } from "../shared/world.ts";
 import { db } from "./db.ts";
 import { emitError, emitEvent, makeFolder, setNameLookup } from "./eventlog.ts";
@@ -140,12 +141,11 @@ const present = (s: Session): Present => ({
 // hands it who is online and where, and delivers what it returns.
 // Issue #20: timetable customers who need help join the store's rules (the
 // waiting list, offers, claims) as customers, through `cpuCustomersOnFloor`.
-// Off unless CPU_CUSTOMERS_LIVE=1. The client can now press E at, mark and
-// hold a promoted timetable customer (issue #41: the `held_cpu` message below),
-// but nothing answers for the customer in a conversation yet: that is the rule
-// engine, issue #39, and a staff user would be talking to nobody. The flag
-// stays off until #39 lands (orchestrator ruling, 2026-11-08).
-const CPU_CUSTOMERS_LIVE = process.env.CPU_CUSTOMERS_LIVE === "1";
+// The client draws, marks and lets staff press E at a promoted one (issue #41:
+// the `held_cpu` message below), and it answers in the conversation by rule
+// (issue #39, cpuCustomer.ts), so it is on by default: a real staff user with no
+// real customers around has someone to serve. CPU_CUSTOMERS_LIVE=0 turns it off.
+const CPU_CUSTOMERS_LIVE = cpuCustomersLive(process.env);
 // the promoted timetable customers every client holds in place, as last sent
 const heldNow = (): ReturnType<typeof heldCpuCustomers> => (CPU_CUSTOMERS_LIVE ? heldCpuCustomers(db, Date.now()) : []);
 let lastHeldCpu = "[]";
