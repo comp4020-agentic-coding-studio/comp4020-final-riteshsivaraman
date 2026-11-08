@@ -1547,7 +1547,9 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
       const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
       const scene = offerSoldOut(d.scene, sku.model, sorry);
       const next: TalkConvData = { ...d, scene };
-      saveTalkData(ctx, row, next);
+      // choosing "yes" had ended the scene as a sale, and applyTalk saved the row as ended before this stock check ran; the chat
+      // goes on (there is a real choice now), so the row is open again: otherwise every choice they make is refused
+      saveTalkConv(ctx, row, next, false);
       const turn = currentTurn(scene);
       const humanStaff = row.with_kind === "visitor";
       const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, false, "customer") } }];
@@ -2340,7 +2342,7 @@ function sitAtBar(ctx: Ctx, row: ConvRow, data: ConvData): { id: string; out: Ou
   return { id: free.id, out: [{ to: "all", message: { type: "seated", visitorId: row.customer_id, at: free.at, face: free.face } }, { to: "all", message: { type: "engaged", ...eng } }] };
 }
 
-export const NPC_AFTER_HUMAN_MS = 30_000; // how long a customer waits for a real staff user before an NPC takes them
+export const NPC_AFTER_HUMAN_MS = 15_000; // how long a customer waits for a real staff user before an NPC takes them
 
 export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);

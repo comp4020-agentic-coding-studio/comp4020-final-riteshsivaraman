@@ -303,6 +303,21 @@ describe("stock at the moment of sale", () => {
     expect(stockOf(db, "iphone-18-pro", "Silver", storageOf18Pro)).toBe(0);
   });
 
+  it("a unit that is gone at the last moment leaves the chat open, so the customer's next choice works (issue #36, found by the bot harness)", () => {
+    db.prepare("UPDATE stock SET qty = 0 WHERE product = 'iphone-18-pro' AND colour = 'Silver' AND storage = ?").run(storageOf18Pro);
+    const p = npc("spec-phones");
+    addVisitor("c1", "c1", { x: p.x + 1, z: p.z });
+    const hello = talkAt(startTalk(ctx(), "c1", "spec-phones"), "c1");
+    // choosing "yes" ends the engine's scene as a sale, which marks the conversation row ended before the stock check runs
+    db.prepare("UPDATE conversations SET ended_at = ? WHERE id = ?").run(NOW, hello.conversationId);
+    const turn = last(beginSale(ctx(), hello.conversationId, { ...glacier, colour: "Silver" }), "c1", "turn")!;
+    expect(turn.say).toMatch(/has gone/);
+    const carryOn = turn.choices.find((c) => /continue/.test(c.id))!;
+    const next = chooseTurn(ctx(), "c1", hello.conversationId, carryOn.id);
+    expect(last(next, "c1", "notice")?.text ?? "", "the next choice was refused").not.toMatch(/conversation is over/);
+    expect(last(next, "c1", "turn")).toBeDefined();
+  });
+
   it("gives a held unit back when the time is up, with no timer (the next call catches up)", () => {
     const before = stockOf(db, "iphone-18-pro", "Glacier", storageOf18Pro);
     selling("c1", "spec-phones", glacier);

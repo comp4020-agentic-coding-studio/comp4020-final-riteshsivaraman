@@ -8,7 +8,7 @@
 // specialist NPC runs the talk engine through to a sale, a stock runner is
 // sent, and the customer pays.
 import { BotClient, wsUrlFor, type LatencyMode } from "../client.ts";
-import { choiceById, driveConversationToEnd, walkToEntrance, walkToNpc, waitForGreeter, waitSettling, type Turn } from "../flows.ts";
+import { choiceById, driveConversationToEnd, reachSpecialist, walkToEntrance, waitForGreeter, waitSettling, type Turn } from "../flows.ts";
 import type { ScenarioResult } from "../report.ts";
 
 export async function runS1(baseUrl: string, latency: LatencyMode): Promise<ScenarioResult> {
@@ -42,10 +42,9 @@ export async function runS1(baseUrl: string, latency: LatencyMode): Promise<Scen
 
     // told to head to the phones area; the customer walks over and presses E
     // on the specialist themselves (the real flow -- see the note above)
-    await walkToNpc(bot, "spec-phones");
     const specMark = bot.mark();
-    await bot.send({ type: "talk_start", withId: "spec-phones" });
-    const specTurn = (await bot.next((m) => m.type === "turn" && m.conversationId !== greet.conversationId, 6000, specMark).catch(() => undefined)) as Turn | undefined;
+    // (the specialist may already be coming over to them, D58: whichever gets there first)
+    const specTurn = await reachSpecialist(bot, "spec-phones", specMark);
     if (!specTurn) {
       failures.push("S1: walked up to the specialist and pressed E, but never got a conversation turn back");
       return { scenario: "S1 happy path", bots: 1, failures, rtts: bot.takeRtts(), notes };

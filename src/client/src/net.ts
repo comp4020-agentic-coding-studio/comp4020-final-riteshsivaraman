@@ -295,6 +295,7 @@ class Net {
       }
       case "repair_status":
         this.repairStatus = message.status;
+        this.pollSettle();
         return true;
       case "toned":
         if (isTone(message.tone)) this.tones.set(message.id, { tone: message.tone, until: message.until });
@@ -357,6 +358,7 @@ class Net {
       case "engaged":
         this.engaged.set(message.npcId, message);
         this.released.delete(message.npcId);
+        this.pollSettle();
         return true;
       case "seated":
         this.seats.set(message.visitorId, { x: message.at.x, z: message.at.z, fx: message.face.x, fz: message.face.z });
@@ -400,6 +402,7 @@ class Net {
           this.released.set(message.npcId, { at: now, from: { x: m.x, z: m.z } });
           this.engaged.delete(message.npcId);
         }
+        this.pollSettle();
         return true;
       }
       case "notice":
@@ -435,7 +438,11 @@ class Net {
   // the server decides when a beat has passed, but it has no timer: while a
   // walk or an order involving you is open, ask it to catch up
   private pollSettle(): void {
-    const mine = this.escort !== null || this.orders.some((o) => o.customerId === this.you?.id || o.specId === this.you?.id);
+    // asking the server to catch up is how a walk or a wait you are part of moves on (nothing runs on its own): while someone
+    // is walking over to you, a repair is out for you, an escort or a payment involves you
+    const comingToMe = [...this.engaged.values()].some((e) => e.visitorId === this.you?.id && e.pending);
+    const repairing = this.repairStatus !== null && !this.repairStatus.ready;
+    const mine = this.escort !== null || comingToMe || repairing || this.orders.some((o) => o.customerId === this.you?.id || o.specId === this.you?.id);
     if (mine && !this.settlePoller) this.settlePoller = setInterval(() => this.send({ type: "settle" }), 500);
     else if (!mine && this.settlePoller) {
       clearInterval(this.settlePoller);

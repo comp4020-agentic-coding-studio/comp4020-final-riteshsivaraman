@@ -140,3 +140,21 @@ export async function driveConversationToEnd(bot: BotClient, conversationId: str
   }
   return seen;
 }
+
+// Gets to a specialist's first conversation turn however it comes about: since D58 an NPC may already have come over and opened
+// it by the time the bot has walked up, and the greeter may have stopped the bot on the way in. Looks for the specialist's turn
+// since `sinceMark`; failing that steps away from any greeter chat and presses E.
+export async function reachSpecialist(bot: BotClient, npcId: string, sinceMark: number): Promise<Turn | undefined> {
+  await walkToNpc(bot, npcId);
+  const mine = (m: ServerMessage): m is Turn => m.type === "turn" && m.withId === npcId;
+  const already = bot.messages.slice(sinceMark).find(mine);
+  if (already) return already as Turn;
+  const greeting = bot.messages.slice(sinceMark).filter((m): m is Turn => m.type === "turn" && m.withId === "greeter-1" && !m.ended).at(-1);
+  if (greeting) {
+    await bot.send({ type: "talk_leave" });
+    await bot.send({ type: "talk_close" });
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  await bot.send({ type: "talk_start", withId: npcId });
+  return (await bot.next(mine, 8000, sinceMark).catch(() => undefined)) as Turn | undefined;
+}

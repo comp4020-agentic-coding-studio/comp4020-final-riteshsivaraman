@@ -52,10 +52,27 @@ export class BotClient {
     this.label = label;
     this.latency = latency;
     this.socket = new WebSocket(wsUrl);
-    this.socket.on("message", (raw) => this.messages.push(JSON.parse(raw.toString()) as ServerMessage));
+    this.socket.on("message", (raw) => {
+      const m = JSON.parse(raw.toString()) as ServerMessage;
+      this.messages.push(m);
+      // like the real client: while an NPC is walking over to this bot, ask the server to catch up (it only notices an
+      // arrival on a request, and a bot standing still sends none), until the chat opens
+      if (m.type === "engaged" && m.visitorId === this.id && m.pending) this.startSettling();
+      if (m.type === "turn") this.stopSettling();
+    });
     this.socket.on("close", () => {
       this.closed = true;
+      this.stopSettling();
     });
+  }
+
+  private settler: ReturnType<typeof setInterval> | null = null;
+  private startSettling(): void {
+    if (!this.settler) this.settler = setInterval(() => void this.send({ type: "settle" }), 500);
+  }
+  private stopSettling(): void {
+    if (this.settler) clearInterval(this.settler);
+    this.settler = null;
   }
 
   async waitOpen(): Promise<void> {

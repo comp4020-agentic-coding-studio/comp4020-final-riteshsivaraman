@@ -9,7 +9,7 @@
 // direction passes while the opposite ships" -- this checks both outcomes
 // are possible and exactly one wins, not just that nobody crashes).
 import { BotClient, wsUrlFor, type LatencyMode } from "../client.ts";
-import { choiceByLabel, driveConversationToEnd, walkToNpc, STOP, type Turn } from "../flows.ts";
+import { choiceByLabel, driveConversationToEnd, reachSpecialist, STOP, type Turn } from "../flows.ts";
 import type { ScenarioResult } from "../report.ts";
 
 const prefer = (turn: Turn): string | undefined =>
@@ -40,9 +40,9 @@ export async function runS11(baseUrl: string, latency: LatencyMode): Promise<Sce
     await Promise.all([a.join({ kind: "customer", name: "S11 Rival A" }), b.join({ kind: "customer", name: "S11 Rival B" })]);
     // two different specialists, so neither queues behind the other: this is
     // about the stock row racing, not staff availability
-    await Promise.all([walkToNpc(a, "spec-phones"), walkToNpc(b, "spec-phones-2")]);
-    await Promise.all([a.send({ type: "talk_start", withId: "spec-phones" }), b.send({ type: "talk_start", withId: "spec-phones-2" })]);
-    const [helloA, helloB] = await Promise.all([a.next((m) => m.type === "turn", 6000) as Promise<Turn>, b.next((m) => m.type === "turn", 6000) as Promise<Turn>]);
+    // (the greeter may stop them on the way in, or a specialist may already be coming over: reachSpecialist copes with both)
+    const [helloA, helloB] = await Promise.all([reachSpecialist(a, "spec-phones", 0), reachSpecialist(b, "spec-phones-2", 0)]);
+    if (!helloA || !helloB) throw new Error("a bot never got its specialist's conversation");
 
     const [confirmA, confirmB] = await Promise.all([driveToConfirm(a, helloA.conversationId), driveToConfirm(b, helloB.conversationId)]);
 
