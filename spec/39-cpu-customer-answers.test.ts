@@ -169,7 +169,7 @@ describe("a promoted timetable customer answers a real specialist through the ta
     expect(b, "the same customer on the same day answered differently").toEqual(a);
   });
 
-  it("follows its timetable purpose: a customer who came in for something other than a phone says so and the chat ends", () => {
+  it("a customer whose timetable purpose is not a phone still stays and answers: it never walks out rudely after one question", () => {
     fresh();
     const other = CAST.find((c) => c.role === "customer" && c.purpose && ["laptop", "tablet", "audio"].includes(c.purpose))!;
     const t0 = claim(other.id);
@@ -179,8 +179,8 @@ describe("a promoted timetable customer answers a real specialist through the ta
     expect(i, "setup: the opening question is not on sam's menu").toBeGreaterThanOrEqual(0);
     staffMove(ctx(t0 + 1000), "sam", convOf(other.id).id, `m${i}`, "friendly");
     const row = convOf(other.id);
-    expect(sceneOf(row).answers["opening_intent"]?.picks, `a ${other.purpose} customer did not say it was here about something else`).toEqual(["other"]);
-    expect(row.ended_at, "the chat did not end after the customer said it was here for something else").not.toBeNull();
+    expect(sceneOf(row).answers["opening_intent"], `a ${other.purpose} customer did not answer`).toBeDefined();
+    expect(row.ended_at, "the customer walked out after the very first question").toBeNull();
   });
 
   it(`never loops: a specialist who only keeps asking is walked out on within ${MAX_CPU_REPLIES} answers`, () => {

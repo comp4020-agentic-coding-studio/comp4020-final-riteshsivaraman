@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { RawData, WebSocket } from "ws";
 import {
+  FLOOR,
   SPAWN,
   SPAWN_STAFF,
   type ClientMessage,
@@ -38,6 +39,8 @@ import {
   leaveStore,
   releaseClaimsOf,
   catchUpOffers,
+  reactTo,
+  setTone,
   cpuCustomersOnFloor,
   heldCpuCustomers,
   startInspect,
@@ -49,8 +52,10 @@ import {
 } from "./service.ts";
 import { avoidPeople, engagedPlaces } from "../shared/people.ts";
 import { heldPlaces } from "../shared/heldCpu.ts";
+import { isTone } from "../shared/emotions.ts";
 import { cpuCustomersLive } from "./cpuCustomer.ts";
-import { clampToWalkable, zoneOf, type Zone } from "../shared/world.ts";
+import { clampToWalkable, COUNTER, resolveCollisions, WALKWAY, zoneOf, type Zone } from "../shared/world.ts";
+import { headingTo } from "../shared/steering.ts";
 import { db } from "./db.ts";
 import { emitError, emitEvent, makeFolder, setNameLookup } from "./eventlog.ts";
 import { NPC_NAME } from "../shared/duty.ts";
@@ -72,6 +77,34 @@ interface Session extends VisitorInfo, Pose {
 }
 
 const sessions = new Map<string, Session>(); // visitor id -> live session
+
+// Where a new arrival appears: a customer at a random open spot outside the
+// store, a staff member at a random open spot on the customer-facing shop floor
+// (not the back rooms), never on top of anyone already standing there.
+function pickSpawn(kind: "customer" | "staff", others: Array<{ x: number; z: number }>): Pose {
+  const clear = (x: number, z: number): boolean => others.every((o) => Math.hypot(o.x - x, o.z - z) > 1.6);
+  for (let i = 0; i < 80; i++) {
+    let x: number;
+    let z: number;
+    if (kind === "customer") {
+      x = WALKWAY.minX + 1 + Math.random() * (WALKWAY.maxX - WALKWAY.minX - 2);
+      z = WALKWAY.minZ + 0.4 + Math.random() * (WALKWAY.maxZ - WALKWAY.minZ - 0.8);
+      if (!clear(x, z)) continue;
+      const ok = clampToWalkable("customer", x, z);
+      if (Math.hypot(ok.x - x, ok.z - z) > 0.01) continue;
+      return { x, z, ry: headingTo(x, z, 0, FLOOR.minZ + 3) };
+    }
+    x = FLOOR.minX + 1 + Math.random() * (FLOOR.maxX - FLOOR.minX - 2);
+    z = FLOOR.minZ + 1.5 + Math.random() * (COUNTER.z - COUNTER.d / 2 - 0.8 - (FLOOR.minZ + 1.5));
+    if (!clear(x, z)) continue;
+    const ok = resolveCollisions(x, z);
+    if (Math.hypot(ok.x - x, ok.z - z) > 0.01) continue;
+    const walk = clampToWalkable("customer", x, z);
+    if (Math.hypot(walk.x - x, walk.z - z) > 0.01) continue;
+    return { x, z, ry: headingTo(x, z, 0, 0) };
+  }
+  return kind === "customer" ? SPAWN : SPAWN_STAFF;
+}
 
 const otherVisitors = (id: string): Array<{ x: number; z: number }> =>
   [...sessions.values()].filter((s) => s.id !== id).map((s) => ({ x: s.x, z: s.z }));
@@ -301,7 +334,7 @@ export function handleConnection(socket: WebSocket): void {
       }
 
       // appear at the spawn point, or beside whoever is standing on it
-      const start = profile.kind === "customer" ? SPAWN : SPAWN_STAFF;
+      const start = pickSpawn(profile.kind === "customer" ? "customer" : "staff", otherVisitors(visitor.id));
       const spot = avoidPeople(start.x, start.z, otherVisitors(visitor.id), Date.now());
       me = {
         ...visitor,
@@ -363,7 +396,10 @@ export function handleConnection(socket: WebSocket): void {
       return;
     }
     if (me && message.type === "talk_choose" && typeof message.conversationId === "string" && typeof message.choice === "string") {
+      // the tone a customer picked for this answer shows on their face, like a specialist's
+      if (isTone(message.tone)) deliver(setTone(serviceCtx(), me.id, message.tone));
       deliver(chooseTurn(serviceCtx(), me.id, message.conversationId, message.choice));
+      deliver(reactTo(serviceCtx(), me.id)); // the NPC across from them shows how it took that
       return;
     }
     if (me && message.type === "escort_cancel") {
@@ -376,7 +412,10 @@ export function handleConnection(socket: WebSocket): void {
       return;
     }
     if (me && message.type === "staff_move" && typeof message.conversationId === "string" && typeof message.actId === "string") {
-      deliver(staffMove(serviceCtx(), me.id, message.conversationId, message.actId, typeof message.tone === "string" ? message.tone : "neutral"));
+      const tone = typeof message.tone === "string" ? message.tone : "neutral";
+      deliver(staffMove(serviceCtx(), me.id, message.conversationId, message.actId, tone));
+      // the tone they spoke in shows on their face, and an NPC across from them answers it
+      deliver([...(isTone(tone) ? setTone(serviceCtx(), me.id, tone) : []), ...reactTo(serviceCtx(), me.id)]);
       return;
     }
     if (me && message.type === "payment_advance" && typeof message.conversationId === "string") {

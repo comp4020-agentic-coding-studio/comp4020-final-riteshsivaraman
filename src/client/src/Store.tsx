@@ -494,6 +494,8 @@ function Remotes() {
         const mine = chat.speaker === r.info.id;
         state = { ...state, mode: talkingNow ? (mine ? "talk" : "listen") : "idle", mood: talkingNow && mine ? "smile" : "neutral", ...(other ? { gaze: { x: other.x, y: 1.55, z: other.z } } : {}) };
       }
+      const feel = net.faceOf(r.info.id);
+      if (feel) state = { ...state, mood: feel };
       speeds.current.set(r.info.id, { ...state, carrying: net.carrying(r.info.id), pay: handheldPoseFor(r.info.id) });
     }
     root.current?.children.forEach((child) => {
@@ -818,7 +820,7 @@ function SelfView() {
     const prev = state.current.speed ?? 0;
     const smooth = prev + (speed - prev) * 0.2;
     const seat = net.you ? net.seats.get(net.you.id) : undefined;
-    state.current = { carrying: net.carrying(net.you?.id ?? ""), pay: handheldPoseFor(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: "idle", mood: "neutral", speed: smooth, seated: !!seat };
+    state.current = { carrying: net.carrying(net.you?.id ?? ""), pay: handheldPoseFor(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: "idle", mood: net.faceOf(net.you?.id ?? "") ?? "neutral", speed: smooth, seated: !!seat };
     g.position.set(net.me.x, STORE_Y, net.me.z);
     g.rotation.y = camera.rotation.y;
   });

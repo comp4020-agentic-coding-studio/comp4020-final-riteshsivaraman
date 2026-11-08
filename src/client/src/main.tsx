@@ -13,7 +13,6 @@ import { productById } from "../../shared/catalogue.ts";
 import { armAutoplayGate, wireUiClicks } from "./audio.ts";
 import { SoundToggle } from "./SoundToggle.tsx";
 import { PayCard } from "./PayCard.tsx";
-import "./styles.css";
 
 // Sound (#11): arm the autoplay gate and the UI click cue once, as soon as
 // this module loads — before React even mounts, so the very first tap

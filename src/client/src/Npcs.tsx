@@ -1,3 +1,4 @@
+import { ambientTone, toneFace } from "../../shared/emotions.ts";
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
@@ -117,7 +118,7 @@ export function Npcs() {
       shown.current.set(def.id, { x: nx, z: nz, ry: raw.ry });
       child.position.set(nx, STORE_Y, nz);
       child.rotation.y = raw.ry;
-      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: raw.mood, seated: raw.seated, device: raw.device, gaze: raw.gaze, carrying: net.carrying(def.id), pay: handheldPoseFor(def.id) };
+      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: (!raw.walking && (net.faceOf(def.id) ?? (raw.mood === "neutral" && !eng && !hold ? toneFace(ambientTone(def.id, now)) : null))) || raw.mood, seated: raw.seated, device: raw.device, gaze: raw.gaze, carrying: net.carrying(def.id), pay: handheldPoseFor(def.id) };
       intents.current[i] = raw.intent;
     });
     if (LABELS && ++frames.current % 20 === 0) bump((n) => n + 1);

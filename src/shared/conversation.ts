@@ -1,4 +1,5 @@
 import { PRODUCTS, productById } from "./catalogue.ts";
+import { FAULTS, faultById, runCheck, SYMPTOM_LABEL, type FaultRec, type Symptom } from "./talk/scenes/service/data.ts";
 
 // A conversation between a visitor and a character, as a state machine: a pure
 // function of (where it is, what the visitor picked, what the shop has in
@@ -9,7 +10,7 @@ import { PRODUCTS, productById } from "./catalogue.ts";
 // The visitor picks from a short list each turn (SCOPE D9). The server owns the
 // state and applies the effects; this only says what comes next.
 
-export type ScriptId = "greeter" | "phones";
+export type ScriptId = "greeter" | "phones" | "repair";
 
 // Where a visitor is in their visit (the player_state table).
 export type PlayerStateName =
@@ -40,6 +41,10 @@ export interface ConvState {
   node: string;
   product?: string;
   colour?: string;
+  // the repair script: what they told the genius, and what it comes to
+  symptom?: Symptom;
+  wet?: boolean;
+  fault?: string;
 }
 
 export interface Choice {
@@ -60,7 +65,10 @@ export type Effect =
   | { type: "request_help"; needs: string }
   // put one unit aside. The server does this atomically and, if someone else
   // got there first, runs the step again with the new stock.
-  | { type: "reserve"; product: string; colour: string };
+  | { type: "reserve"; product: string; colour: string }
+  // how a repair visit ended: fixed while they wait, swapped for a replacement,
+  // or kept for a longer service (come back in `days`); the server records it
+  | { type: "repair"; outcome: "quick" | "replacement" | "later"; days?: number; fault: string };
 
 export interface StepResult {
   state: ConvState;
@@ -147,7 +155,112 @@ function turnFor(s: ConvState, world: World): Turn {
         return end("No problem. I'm here if you want anything.");
     }
   }
+  if (s.script === "repair") return repairTurn(s);
   return end("");
+}
+
+
+// ---- the Genius Bar: a repair, as a decision tree (Ritesh, 2026-11-09) ----
+//
+// A genius (an NPC; no real staff needed) narrows the problem down with a few
+// questions: what is wrong, has it been near liquid, one question specific to
+// the symptom. The answers pick a fault from the same table the talk engine's
+// service scene uses (talk/scenes/service/data.ts: real general troubleshooting
+// knowledge, with this store's turnaround and cost invented and labelled so
+// there). The fault decides how it ends: a quick fix back within a minute, a
+// replacement unit now, or a longer service to come back for another day.
+
+const DETAIL: Record<Symptom, { ask: string; choices: Choice[] }> = {
+  wont_charge: { ask: "Have you tried a different cable and charger?", choices: [{ id: "tried", label: "Yes, still nothing" }, { id: "not_yet", label: "Not yet" }] },
+  wont_turn_on: { ask: "When you press the button, does anything show: a logo, a buzz, a sound?", choices: [{ id: "sign", label: "Yes, something happens" }, { id: "nothing", label: "Nothing at all" }] },
+  cracked_screen: { ask: "Underneath the cracks, does the touch still respond and the picture look normal?", choices: [{ id: "works", label: "Yes, it works fine" }, { id: "faulty", label: "No, touch or picture is off" }] },
+  battery_drain: { ask: "Did the battery trouble start after a software update, or has it crept up over months?", choices: [{ id: "update", label: "After an update" }, { id: "months", label: "Over months" }] },
+};
+
+// the fault the answers point to: the symptom's own table, narrowed by the detail answer
+export function diagnose(symptom: Symptom, wet: boolean, detail: string): FaultRec {
+  // water on a symptom that has a water-related cause is the stronger signal; otherwise the detail answer narrows it
+  if (!(wet && FAULTS.some((f) => f.symptom === symptom && f.waterRelated))) {
+    if (symptom === "wont_charge" && detail === "not_yet") return faultById("port_debris");
+    if (symptom === "wont_turn_on" && detail === "sign") return faultById("battery_depleted");
+    if (symptom === "cracked_screen") return faultById(detail === "works" ? "screen_only" : "screen_and_internals");
+    if (symptom === "battery_drain") return faultById(detail === "update" ? "background_usage" : "battery_health_drain");
+  }
+  return runCheck(symptom, wet);
+}
+
+// how a fault ends: the three outcomes
+export function repairOutcome(f: FaultRec): { outcome: "quick" | "replacement" | "later"; days?: number } {
+  if (f.location === "in_store" && f.etaDays === null) return { outcome: "quick" };
+  if (f.waterRelated || (f.etaDays ?? 0) >= 7) return { outcome: "replacement" };
+  return { outcome: "later", days: f.etaDays ?? 1 };
+}
+
+const SYMPTOMS: Symptom[] = ["wont_charge", "wont_turn_on", "cracked_screen", "battery_drain"];
+const dayWord = (n: number): string => (n === 1 ? "tomorrow" : `in ${n} days`);
+
+function repairTurn(s: ConvState): Turn {
+  const fault = s.fault ? faultById(s.fault) : undefined;
+  switch (s.node) {
+    case "hello":
+      return ask("Hi, welcome to the Genius Bar. What's going on with your device?", [
+        ...SYMPTOMS.map((k) => ({ id: `symptom:${k}`, label: SYMPTOM_LABEL[k] })),
+        { id: "leave", label: "Never mind" },
+      ]);
+    case "wet":
+      return ask("Okay. Has it been near water or any liquid recently?", [
+        { id: "yes", label: "Yes, it got wet" },
+        { id: "no", label: "No" },
+      ]);
+    case "detail": {
+      const d = DETAIL[s.symptom!];
+      return ask(d.ask, d.choices);
+    }
+    case "diagnosis":
+      return ask(`Right, that points to ${fault!.label}.`, [{ id: "ok", label: "Okay, what happens now?" }]);
+    case "warn":
+      return ask("One thing before I start: this kind of repair can wipe what's on the device. Do you have a backup?", [
+        { id: "go", label: "Yes, go ahead" },
+        { id: "think", label: "No, let me think about it" },
+      ]);
+    case "quick":
+      return end("Good news, that's a quick one. Give me about a minute and I'll have it back to you: I'll let you know the moment it's ready.");
+    case "replacement":
+      return end("This one isn't worth repairing. I'll swap it for a replacement unit: it's ready at the bar for you now, and we'll sort out the old one.");
+    case "later": {
+      const d = repairOutcome(fault!).days ?? 1;
+      return end(`This needs a proper service, so I'll keep it. It'll be ready ${dayWord(d)}: come back to the Genius Bar then and ask for me.`);
+    }
+    case "declined":
+      return end("No problem. Back it up, and come back whenever you're ready. Nothing's been touched.");
+    case "browsing":
+      return end("No problem. I'm here if you need anything.");
+  }
+  return end("");
+}
+
+function repairStep(state: ConvState, choiceId: string, go: (node: string, patch?: Partial<ConvState>, effects?: Effect[]) => StepResult): StepResult | null {
+  const done = (node: string, f: FaultRec): StepResult => {
+    const o = repairOutcome(f);
+    return go(node, {}, [{ type: "player_state", state: "browsing", needs: null }, { type: "repair", outcome: o.outcome, days: o.days, fault: f.id }]);
+  };
+  switch (state.node) {
+    case "hello":
+      if (choiceId.startsWith("symptom:")) return go("wet", { symptom: choiceId.slice("symptom:".length) as Symptom });
+      return go("browsing", {}, [{ type: "player_state", state: "browsing", needs: null }]);
+    case "wet":
+      return go("detail", { wet: choiceId === "yes" });
+    case "detail":
+      return go("diagnosis", { fault: diagnose(state.symptom!, !!state.wet, choiceId).id });
+    case "diagnosis": {
+      const f = faultById(state.fault!);
+      return f.destructive ? go("warn") : done(repairOutcome(f).outcome, f);
+    }
+    case "warn":
+      if (choiceId === "go") return done(repairOutcome(faultById(state.fault!)).outcome, faultById(state.fault!));
+      return go("declined", {}, [{ type: "player_state", state: "browsing", needs: null }]);
+  }
+  return null;
 }
 
 export function begin(script: ScriptId, world: World): StepResult {
@@ -217,6 +330,10 @@ export function step(state: ConvState, choiceId: string, world: World): StepResu
         if (choiceId === "other_phone") return go("models", { product: undefined, colour: undefined });
         return go("browsing", {}, [{ type: "player_state", state: "browsing" }]);
     }
+  }
+  if (state.script === "repair") {
+    const r = repairStep(state, choiceId, go);
+    if (r) return r;
   }
   return { error: "no such node" };
 }

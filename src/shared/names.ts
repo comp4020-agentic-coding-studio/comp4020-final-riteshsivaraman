@@ -2,8 +2,8 @@
 // grouped only so a chosen male/female look gets a matching suggestion; the
 // visitor can type anything (cleanName() in profile.ts still applies).
 export const FIRST_NAMES = {
-  male: ["Sam", "Theo", "Marcus", "Dev", "Owen", "Felix", "Jonah", "Ravi", "Leo", "Kofi", "Mateo", "Hugo", "Arjun", "Ben", "Callum", "Nico"],
-  female: ["Maya", "Priya", "Zoe", "Ines", "Hana", "Ruby", "Amara", "Freya", "Lena", "Noor", "Tessa", "Isla", "Mei", "Chloe", "Sana", "Elise"],
+  male: ["Sam", "Theo", "Marcus", "Dev", "Owen", "Felix", "Jonah", "Ravi", "Leo", "Kofi", "Mateo", "Hugo", "Arjun", "Ben", "Callum", "Nico", "Jasper", "Luca", "Declan", "Kai", "Rory", "Emeka", "Mason", "Oscar", "Finn"],
+  female: ["Maya", "Priya", "Zoe", "Ines", "Hana", "Ruby", "Amara", "Freya", "Lena", "Noor", "Tessa", "Isla", "Mei", "Chloe", "Sana", "Elise", "Anika", "Yara", "Imogen", "Salma", "Talia", "Willa", "Dani", "Leila"],
 } as const;
 
 export type Gender = keyof typeof FIRST_NAMES;

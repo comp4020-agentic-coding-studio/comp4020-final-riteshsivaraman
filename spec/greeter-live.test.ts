@@ -33,11 +33,13 @@ class Visitor {
     this.id = w.you.id;
     return w;
   }
+  polls = 0;
   async next(want: (m: ServerMessage) => boolean, ms = 6000, from = 0): Promise<ServerMessage> {
     const deadline = Date.now() + ms;
     while (Date.now() < deadline) {
       const found = this.messages.slice(from).find(want);
       if (found) return found;
+      if (this.id && ++this.polls % 25 === 0) this.send({ type: "settle" }); // the real client polls like this
       await new Promise((r) => setTimeout(r, 20));
     }
     throw new Error(`timed out waiting for a message (have: ${this.messages.map((m) => (m.type === "notice" ? `notice "${m.text}"` : m.type)).join(", ")})`);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNet } from "./net.ts";
+import { TONES, TONE_LABEL } from "../../shared/emotions.ts";
 
 // The conversation box, matching the staff side's look (Ritesh, 2026-11-08):
 // a scrollable chat log of the whole back-and-forth so far (net.talkLog),
@@ -143,6 +144,15 @@ export function Talk() {
         )}
       </div>
       {turn.awaiting === "staff" && !turn.ended && <div className="talk-wait">Waiting for {turn.withName}…</div>}
+      {done && !turn.ended && turn.awaiting === "customer" && (
+        <div className="staff-tones" role="radiogroup" aria-label="Tone">
+          {TONES.map((t) => (
+            <button key={t} type="button" role="radio" aria-checked={net.myTone === t} className={net.myTone === t ? "on" : ""} onClick={() => net.setMyTone(t)}>
+              {TONE_LABEL[t]}
+            </button>
+          ))}
+        </div>
+      )}
       {done && !turn.ended && turn.awaiting === "customer" && (
         <div className="talk-choices">
           {top.map((c, i) => (

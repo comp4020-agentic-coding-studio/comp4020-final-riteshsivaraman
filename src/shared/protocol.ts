@@ -199,7 +199,7 @@ export type ClientMessage =
   | { type: "role"; role: Role }
   // start a conversation with an NPC or an employee (E near them)
   | { type: "talk_start"; withId: string }
-  | { type: "talk_choose"; conversationId: string; choice: string }
+  | { type: "talk_choose"; conversationId: string; choice: string; tone?: string }
   // walk away mid-conversation, from either side (Esc)
   | { type: "talk_leave" }
   // dismissed the final turn: the NPC is let go only now
@@ -254,6 +254,8 @@ export type ServerMessage =
   | { type: "joined"; visitor: Present }
   | { type: "moved"; id: string; x: number; z: number; ry: number }
   | { type: "role"; id: string; role: Role }
+  // someone's tone (and so their face) changed (a person or an NPC); `until` is server ms, after which it is neutral again
+  | { type: "toned"; id: string; tone: string; until: number }
   | { type: "left"; id: string }
   | { type: "state"; state: PlayerStateName; want: string | null; needs: string | null }
   | ({ type: "turn" } & TurnView)

@@ -29,6 +29,7 @@ import { emitEvent } from "./eventlog.ts";
 import { advanceStaff, beginHumanTalk, payScene, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, standInAnswer, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import { offerSoldOut } from "../shared/talk/scene.ts";
 import type { Scene } from "../shared/talk/types.ts";
+import { npcTone, TONE_HOLD_MS, type Tone } from "../shared/emotions.ts";
 import { CPU_PAY_MS, cpuPayChoice, cpuReply, startCpuTalk, type CpuTalk } from "./cpuCustomer.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
@@ -271,8 +272,10 @@ function saveTalkConv(ctx: Ctx, row: ConvRow, data: TalkConvData, ended: boolean
 const nameOf = (ctx: Ctx, id: string): string => {
   const e = ctx.employees.find((x) => x.id === id);
   if (e) return e.name;
+  // a cast member is always called by their given name, never the placeholder row (cust-28) kept for them
+  if (NPC_NAME[id]) return NPC_NAME[id];
   const row = ctx.db.prepare("SELECT name FROM visitors WHERE id = ?").get(id) as { name: string } | undefined;
-  return row?.name ?? NPC_NAME[id] ?? NPC_LABEL[id] ?? id;
+  return row?.name ?? NPC_LABEL[id] ?? id;
 };
 
 const turnView = (row: ConvRow, withName: string, say: string, choices: TurnView["choices"], ended: boolean, awaiting: "customer" | "staff"): TurnView => ({
@@ -418,7 +421,7 @@ export function customersView(ctx: Ctx): CustomerView[] {
     .filter((r) => here.has(r.id) && !employeeIds.has(r.id) && r.state !== "leaving")
     .map((r) => ({
       id: r.id,
-      name: r.name,
+      name: NPC_NAME[r.id] ?? r.name,
       state: r.state,
       want: r.want,
       needs: r.needs,
@@ -745,15 +748,16 @@ const usesTalkEngine = (script: ScriptId, _withKind: "npc" | "visitor"): boolean
 // means "use the script's own line".
 function greeterHello(ctx: Ctx, customerId: string): string | null {
   const visits = (ctx.db.prepare("SELECT COUNT(*) AS n FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { n: number }).n;
-  if (visits <= 1) return null;
   const name = nameOf(ctx, customerId);
+  // even on a first visit she uses the name they gave at the door, so nobody is greeted as a stranger
+  if (visits <= 1) return `Welcome in, ${name}! What brings you here today?`;
   const last = ctx.db.prepare("SELECT sale FROM orders WHERE customer_id = ? AND stage = 'done' ORDER BY created_at DESC LIMIT 1").get(customerId) as { sale: string } | undefined;
   if (!last) return `Welcome back, ${name}! What brings you here today?`;
   const sale = JSON.parse(last.sale) as { name: string; colour: string };
   return `Welcome back, ${name}! How's the ${sale.colour} ${sale.name} treating you? What brings you here today?`;
 }
 
-function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "visitor", script: ScriptId, at: { x: number; z: number }, engagedSince: number = ctx.now): Outgoing[] {
+function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "visitor", script: ScriptId, at: { x: number; z: number }, engagedSince: number = ctx.now, engagedFrom?: { x: number; z: number }): Outgoing[] {
   const id = randomUUID();
   const cleared: Outgoing[] = [];
   if (usesTalkEngine(script, withKind)) {
@@ -769,7 +773,7 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
     // the specialist's first question is whether to sit down, if a table is free
     const offerSeat = !humanStaff && !begun.turn.ended && freeTableFor(ctx, customerId) !== null;
     const cpu = humanStaff ? cpuTalkFor(ctx, customerId) : undefined;
-    const data: TalkConvData = { engine: "talk", scene, at, ...(offerSeat ? { stage: "seat_offer" as const } : {}), ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at } } : {}), ...(cpu ? { cpu } : {}) };
+    const data: TalkConvData = { engine: "talk", scene, at, ...(offerSeat ? { stage: "seat_offer" as const } : {}), ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at, ...(engagedFrom ? { from: engagedFrom } : {}) } } : {}), ...(cpu ? { cpu } : {}) };
     const turn = seatChoices(ctx, row, data, begun.turn);
     ctx.db
       .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -779,7 +783,7 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
     const out: Outgoing[] = [...cleared, { to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, withId), turn.say, turn.choices, turn.ended, humanStaff ? "staff" : "customer") } }];
     const sm = stateMessage(ctx, customerId);
     if (sm) out.push(sm);
-    if (withKind === "npc") out.push({ to: "all", message: { type: "engaged", npcId: withId, visitorId: customerId, since: engagedSince, at } });
+    if (withKind === "npc") out.push({ to: "all", message: { type: "engaged", npcId: withId, visitorId: customerId, since: engagedSince, at, ...(engagedFrom ? { from: engagedFrom } : {}) } });
     else out.push(staffMenu(ctx, row, data));
     out.push(staffViewMessage(ctx));
     if (turn.ended) return [...out, ...finishTalk(ctx, { ...row, data: JSON.stringify(data) }, scene)];
@@ -789,7 +793,7 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   const world = stockWorld(ctx.db);
   const first = begin(script, world);
   const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: first.state.node, data: null, started_at: ctx.now, ended_at: null };
-  const eng: Engagement = { npcId: withId, visitorId: customerId, since: engagedSince, at };
+  const eng: Engagement = { npcId: withId, visitorId: customerId, since: engagedSince, at, ...(engagedFrom ? { from: engagedFrom } : {}) };
   const data: ConvData = { conv: first.state, awaiting: "customer", at, ...(withKind === "npc" ? { eng } : {}) };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -1239,13 +1243,16 @@ function saveTalkData(ctx: Ctx, row: ConvRow, d: TalkConvData): void {
   ctx.db.prepare("UPDATE conversations SET data = ? WHERE id = ?").run(JSON.stringify(d), row.id);
 }
 
+const withoutWelcome = (say: string): string => say.replace(/^Hi, welcome in\. I'm on the [^.]*\. /, "");
+
 function handleSeatChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId: string): Outgoing[] {
   if (choiceId === "seat:stand") {
     if (d.stage !== "seat_offer") return [notice(row.customer_id, "That is not one of the options.")];
     const next: TalkConvData = { ...d, stage: undefined };
     saveTalkData(ctx, row, next);
     log(ctx, row.customer_id, "seat_declined", { conversationId: row.id });
-    return [showTurn(ctx, row, next), ...(row.with_kind === "visitor" ? [staffMenu(ctx, row, next)] : [])];
+    // they have already been welcomed in the same breath as the seat offer: do not say hello twice
+    return [showTurn(ctx, row, next, withoutWelcome(currentTurn(next.scene).say)), ...(row.with_kind === "visitor" ? [staffMenu(ctx, row, next)] : [])];
   }
   if (choiceId !== "seat:sit") return [notice(row.customer_id, "That is not one of the options.")];
   const next: TalkConvData = { ...d, stage: undefined };
@@ -2096,8 +2103,13 @@ export function cancelEscort(ctx: Ctx, customerId: string): Outgoing[] {
 // when a designation has nobody real on it (every role with a script, not
 // just phones), which is exactly the "staff just stands around" complaint.
 
-const npcBusy = (ctx: Ctx, npcId: string): boolean =>
-  !!ctx.db.prepare("SELECT 1 FROM conversations WHERE ended_at IS NULL AND with_id = ? AND with_kind = 'npc'").get(npcId);
+// An NPC already in a conversation, or already on its way to open one with
+// someone else, cannot also be sent at a second customer.
+const npcBusy = (ctx: Ctx, npcId: string): boolean => {
+  if (ctx.db.prepare("SELECT 1 FROM conversations WHERE ended_at IS NULL AND with_id = ? AND with_kind = 'npc'").get(npcId)) return true;
+  const approaching = ctx.db.prepare("SELECT data FROM player_state WHERE data LIKE '%\"approach\":%'").all() as Array<{ data: string }>;
+  return approaching.some((r) => (JSON.parse(r.data) as OfferData).approach?.npcId === npcId);
+};
 
 // Whether any real human staff user who could serve this designation is
 // online and free to be offered the customer first (D47/D48 priority stays:
@@ -2105,15 +2117,98 @@ const npcBusy = (ctx: Ctx, npcId: string): boolean =>
 const noRealStaffFor = (ctx: Ctx, designation: string): boolean =>
   !ctx.employees.some((e) => designationOfEmployee(e) === designation && staffAvailable(ctx, e.id, "visitor") && !!ctx.position(e.id));
 
+// Opens the real conversation if the walk is actually done (or was never
+// needed — the NPC was already standing right there), otherwise just leaves
+// the approach noted for `settleApproaches` to catch up on a later request.
+function openWhenArrived(ctx: Ctx, customerId: string, npcId: string, script: ScriptId, since: number, at: { x: number; z: number }, from?: { x: number; z: number }): Outgoing[] {
+  const eng: Engagement = { npcId, visitorId: customerId, since, at, pending: true, waving: true, ...(from ? { from } : {}) };
+  // the customer walked on while the NPC was coming: go to where they are NOW, from where the NPC
+  // stands now, so it always ends up in front of them and facing them (never talking at the spot they left)
+  const cpos = ctx.position(customerId);
+  if (cpos && dist(cpos, at) > 0.4) {
+    const here = engagedMoment(npcId, eng, ctx.now);
+    const next = { npcId, script, since: ctx.now, at: { x: cpos.x, z: cpos.z }, from: { x: here.x, z: here.z } };
+    patchOfferData(ctx, customerId, { approach: next });
+    return [{ to: "all", message: { type: "engaged", npcId, visitorId: customerId, since: next.since, at: next.at, from: next.from, pending: true, waving: true } }];
+  }
+  if (engagedMoment(npcId, eng, ctx.now).walking) return [];
+  patchOfferData(ctx, customerId, { approach: undefined });
+  log(ctx, customerId, "npc_approach_arrived", { npcId });
+  return open(ctx, customerId, npcId, "npc", script, at, since, from);
+}
+
+// Starts an NPC walking over to open a conversation with a customer: a live
+// `engaged` broadcast (pending/waving, the same look `intentEngagement` gives
+// the payment visit) and a note on the customer's own player_state so
+// `settleApproaches` can open the real conversation once the walk is actually
+// done -- or, if there is no real walk to make (the NPC is already standing
+// right there), opens it immediately.
+function beginNpcApproach(ctx: Ctx, customerId: string, npcId: string, script: ScriptId, at: { x: number; z: number }): Outgoing[] {
+  const since = ctx.now;
+  patchOfferData(ctx, customerId, { approach: { npcId, script, since, at } });
+  const eng: Engagement = { npcId, visitorId: customerId, since, at, pending: true, waving: true };
+  const opened = openWhenArrived(ctx, customerId, npcId, script, since, at);
+  if (opened.length > 0) return opened;
+  return [{ to: "all", message: { type: "engaged", ...eng } }];
+}
+
+// Catches up every customer an NPC is walking over to: opens the real
+// conversation the moment the walk is actually done, instead of the instant
+// it started (previously `open()` ran at the same moment as the walk began,
+// so the chat and camera lock began while the NPC was still mid-room).
+export function settleApproaches(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  const rows = ctx.db.prepare("SELECT visitor_id, data FROM player_state WHERE data LIKE '%\"approach\":%'").all() as Array<{ visitor_id: string; data: string | null }>;
+  for (const row of rows) {
+    const customerId = row.visitor_id;
+    const st = stateOf(ctx.db, customerId);
+    const approach = st ? offerData(st).approach : undefined;
+    if (!approach) continue;
+    // the customer left, or is no longer free (claimed by someone else meanwhile): give up quietly
+    if (!ctx.present.includes(customerId) || !customerFree(ctx, customerId)) {
+      patchOfferData(ctx, customerId, { approach: undefined });
+      out.push({ to: "all", message: { type: "released", npcId: approach.npcId } });
+      continue;
+    }
+    out.push(...openWhenArrived(ctx, customerId, approach.npcId, approach.script, approach.since, approach.at, approach.from));
+  }
+  return out;
+}
+
 // If this customer is waiting for help, no real staff user could serve them,
-// and an on-duty NPC for that post is free, that NPC claims them now — the
-// same thing a human's `claim()` does, just automatic.
+// and an on-duty NPC for that post is free, that NPC walks over now — the
+// same thing a human's `claim()` does, just automatic, and the conversation
+// opens once they arrive (see `settleApproaches`).
+export const REPAIR_QUICK_MS = 60_000; // a quick fix at the Genius Bar comes back to you within a minute
+
+// A quick repair that has come to its minute: the customer is told once it is ready.
+export function settleRepairs(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  const rows = ctx.db.prepare("SELECT visitor_id, data FROM player_state WHERE data LIKE '%\"repair\":%'").all() as Array<{ visitor_id: string; data: string }>;
+  for (const r of rows) {
+    const rep = (JSON.parse(r.data) as OfferData).repair;
+    if (!rep || ctx.now < rep.readyAt) continue;
+    patchOfferData(ctx, r.visitor_id, { repair: undefined });
+    if (!ctx.present.includes(r.visitor_id)) continue;
+    log(ctx, r.visitor_id, "repair_ready", { by: rep.by });
+    out.push(notice(r.visitor_id, `${rep.by} has your device ready at the Genius Bar. Good as new.`));
+  }
+  return out;
+}
+
 export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
   if (!st || st.state !== "waiting_for_help" || !st.needs) return [];
+  if (offerData(st).approach) return []; // already on the way
   if (!noRealStaffFor(ctx, st.needs)) return [];
   const script = scriptFor(st.needs);
   if (!script) return [];
+  // the Genius Bar only takes repairs here (a pick-up waits for the bar), and only once the customer has
+  // actually come to the bar: the genius works behind it and does not go wandering after them
+  if (st.needs === "genius") {
+    const where = ctx.position(customerId);
+    if (st.want !== "repair" || !where || where.z < COUNTER.z - COUNTER.d / 2 - 4.5) return [];
+  }
   const offDutyIds = offDuty(ctx);
   const npcId = Object.keys(NPC_DESIGNATION).find((id) => NPC_DESIGNATION[id] === st.needs && !offDutyIds.includes(id) && !npcBusy(ctx, id));
   if (!npcId) return [];
@@ -2125,7 +2220,7 @@ export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
   // id is not a row in `visitors`, so it cannot be the events table's own
   // visitor_id (foreign key)
   log(ctx, customerId, "npc_claimed", { npcId, designation: st.needs });
-  return open(ctx, customerId, npcId, "npc", script, at);
+  return beginNpcApproach(ctx, customerId, npcId, script, at);
 }
 
 // A customer who hasn't asked for anything yet (just arrived, or browsing)
@@ -2156,7 +2251,15 @@ interface OfferData {
   offered?: string[]; // real staff users who let an offer of this customer pass, this wait
   claim?: { by: string; at: number; from: PlayerStateName; waitingSince: number }; // who has them, and where they stood on the list
   waitingSince?: number; // their place on the list, kept when a claim was released
+  repair?: { readyAt: number; by: string }; // a quick fix at the Genius Bar: ready at this time (told once, then cleared)
   cpu?: CpuMark; // a timetable customer: the visit it was promoted on, and where it waits (issue #20)
+  // an NPC walking over to open a conversation on its own (tryGreeterApproach,
+  // tryNpcAutoClaim): the conversation opens only once it arrives (issue
+  // #59-adjacent: previously `open()` ran the instant the walk started, so the
+  // chat and the camera lock began while the NPC was still mid-room,
+  // "talking to thin air"), the same arrived-then-open shape the payment
+  // visit (`intents`, `staffArrived`) already uses.
+  approach?: { npcId: string; script: ScriptId; since: number; at: { x: number; z: number }; from?: { x: number; z: number } };
 }
 
 const offerData = (st: StateRow): OfferData => (st.data ? (JSON.parse(st.data) as OfferData) : {});
@@ -2356,7 +2459,7 @@ function realStaffFor(ctx: Ctx, st: StateRow): boolean {
 // picture (a move, a join or leave, a settle poll).
 export function catchUpOffers(ctx: Ctx, first?: string): Outgoing[] {
   const cpu = [...settleCpuPayments(ctx), ...departCpuCustomers(ctx), ...promoteCpuCustomers(ctx)];
-  const out = [...cpu, ...settleOffers(ctx)];
+  const out = [...cpu, ...settleRepairs(ctx), ...settleApproaches(ctx), ...settleOffers(ctx)];
   const order = waitingList(ctx).map((w) => w.st.visitor_id);
   const ids = first ? [first, ...order.filter((id) => id !== first)] : order;
   for (const id of ids) {
@@ -2539,14 +2642,14 @@ export function tryGreeterApproach(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
   // a real staff user is (or is about to be) offered them: she gives way (D47); once
   // every free one has let the 15 s pass, she may take them, and the takeover is logged
-  if (!st || realStaffFor(ctx, st)) return [];
+  if (!st || realStaffFor(ctx, st) || offerData(st).approach) return [];
   const can = greeterCanTake(ctx, st);
   if (!can) return [];
   // she walks up to where they actually stand (the entrance zone is already inside the door), so she faces them;
   // the real staff users who let their offer pass are named, so a takeover reads as one
   const passedOver = offerData(st).offered ?? [];
   log(ctx, customerId, "npc_approached", { npcId: "greeter-1", ...(passedOver.length > 0 ? { passedOver } : {}) });
-  return [...endInspect(ctx, customerId, "the greeter came over"), ...open(ctx, customerId, "greeter-1", "npc", can.script, can.here)];
+  return [...endInspect(ctx, customerId, "the greeter came over"), ...beginNpcApproach(ctx, customerId, "greeter-1", can.script, can.here)];
 }
 
 // Whether the greeter could walk up to this customer now, setting aside who
@@ -2610,6 +2713,10 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
         with_id: r.turn.ended ? null : row.with_id,
       });
       log(ctx, row.customer_id, "state", { state: to, want: e.want ?? null, needs: e.needs ?? null });
+    } else if (e.type === "repair") {
+      log(ctx, row.customer_id, "repair_outcome", { outcome: e.outcome, days: e.days ?? null, fault: e.fault, by: row.with_id });
+      // a quick fix is told when it is ready, a minute on (no timer: the next request that arrives notices)
+      if (e.outcome === "quick") patchOfferData(ctx, row.customer_id, { repair: { readyAt: ctx.now + REPAIR_QUICK_MS, by: nameOf(ctx, row.with_id) } });
     } else if (e.type === "request_help") {
       log(ctx, row.customer_id, "help_requested", { needs: e.needs });
       const a = pointToHelper(ctx, row.customer_id, e.needs);
@@ -2824,3 +2931,36 @@ export function leaveConversation(ctx: Ctx, visitorId: string): Outgoing[] {
   return [];
 }
 
+
+
+// ---- tone on the face (issue #55) ----
+//
+// Who sounds how, for how long (ephemeral: a face settles back to neutral on
+// its own, so nothing here needs to survive a restart). A person's tone is the
+// one they pick with their move or answer; an NPC they are talking with picks
+// its own in answer, mostly neutral and nudged by theirs (shared/emotions.ts).
+
+const tones = new Map<string, { tone: Tone; until: number }>();
+
+export const toneOf = (id: string, now: number): Tone => {
+  const f = tones.get(id);
+  return f && f.until > now ? f.tone : "neutral";
+};
+
+export function setTone(ctx: Ctx, id: string, tone: Tone): Outgoing[] {
+  const until = ctx.now + TONE_HOLD_MS;
+  tones.set(id, { tone, until });
+  return [{ to: "all", message: { type: "toned", id, tone, until } }];
+}
+
+// An NPC in a conversation with this person answers how they sounded just now.
+export function reactTo(ctx: Ctx, humanId: string): Outgoing[] {
+  const asCustomer = ctx.db.prepare("SELECT with_id, with_kind FROM conversations WHERE ended_at IS NULL AND customer_id = ?").get(humanId) as { with_id: string; with_kind: string } | undefined;
+  const asStaff = ctx.db.prepare("SELECT customer_id FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND with_id = ?").get(humanId) as { customer_id: string } | undefined;
+  const npcId = asCustomer?.with_kind === "npc" ? asCustomer.with_id : asStaff && CPU_CUSTOMER_IDS.has(asStaff.customer_id) ? asStaff.customer_id : null;
+  if (!npcId) return [];
+  // one reaction per beat: a face that has just changed is left alone for a few seconds, so it never flickers
+  const was = tones.get(npcId);
+  if (was && ctx.now - (was.until - TONE_HOLD_MS) < 4000) return [];
+  return setTone(ctx, npcId, npcTone(toneOf(humanId, ctx.now)));
+}

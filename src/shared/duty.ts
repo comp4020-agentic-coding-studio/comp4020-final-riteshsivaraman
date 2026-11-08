@@ -35,8 +35,9 @@ export function npcsOffDuty(held: ReadonlyArray<string>): string[] {
 }
 
 // The conversation script a post can hold, if it has one yet.
-export function scriptFor(designation: string): "greeter" | "phones" | null {
+export function scriptFor(designation: string): "greeter" | "phones" | "repair" | null {
   if (designation === "greeter") return "greeter";
+  if (designation === "genius") return "repair";
   if (designation === "specialist:phones") return "phones";
   return null;
 }
@@ -69,7 +70,7 @@ const STAFF_NAMES: Record<string, string> = {
   "tech-1": "Jonah",
   "tech-2": "Ruby",
 };
-const CUSTOMER_NAMES = ["Ravi", "Amara", "Leo", "Freya", "Kofi", "Lena", "Mateo", "Noor", "Hugo", "Isla", "Arjun", "Mei", "Ben", "Sana"];
+const CUSTOMER_NAMES = ["Ravi", "Amara", "Leo", "Freya", "Kofi", "Lena", "Mateo", "Noor", "Hugo", "Isla", "Arjun", "Mei", "Ben", "Sana", "Marcus", "Zoe", "Callum", "Tessa", "Nico", "Elise", "Jasper", "Anika", "Luca", "Yara", "Declan", "Imogen", "Kai", "Salma", "Rory", "Talia", "Emeka", "Willa", "Mason", "Dani", "Oscar", "Leila", "Finn"]; // one per timetable customer (more than the roster, so nobody is "cust-17")
 export const NPC_NAME: Record<string, string> = {
   ...STAFF_NAMES,
   ...Object.fromEntries(CUSTOMER_NAMES.map((n, i) => [`cust-${i + 1}`, n])),

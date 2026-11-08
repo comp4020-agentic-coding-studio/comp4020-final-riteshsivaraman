@@ -41,6 +41,8 @@ export interface Remote {
   try: number;
 }
 
+import { isTone, toneFace, TONE_HOLD_MS, type Tone } from "../../shared/emotions.ts";
+
 const TOKEN_KEY = "visitor-token";
 const PROFILE_KEY = "visitor-profile";
 
@@ -133,6 +135,19 @@ class Net {
   seats = new Map<string, { x: number; z: number; fx: number; fz: number }>();
   // real people in a conversation: who each is talking with, and whose turn it is to talk
   chats = new Map<string, { with: string; speaker?: string; until: number }>();
+  // how each person (or NPC) sounds right now, until server time `until` (issue #55)
+  tones = new Map<string, { tone: Tone; until: number }>();
+  // the tone you answer in: shown on your face, and sent with each answer you pick
+  myTone: Tone = "neutral";
+  setMyTone(t: Tone): void {
+    this.myTone = t;
+    this.changed();
+  }
+  // the face for this person while a tone is on it, else null (the caller keeps its own)
+  faceOf(id: string): string | null {
+    const f = this.tones.get(id);
+    return f && f.until > this.serverNow() && f.tone !== "neutral" ? toneFace(f.tone) : null;
+  }
   // when the latest line from the other side arrived (their talking is drawn for as long as the line is long)
   turnAt = 0;
   staffAt = 0; // the same, for a specialist: when their panel last changed
@@ -276,6 +291,9 @@ class Net {
         }
         return false; // pose only: no re-render needed
       }
+      case "toned":
+        if (isTone(message.tone)) this.tones.set(message.id, { tone: message.tone, until: message.until });
+        return false; // drawn each frame
       case "role": {
         const r = this.remotes.get(message.id);
         if (r) r.role = message.role;
@@ -428,7 +446,8 @@ class Net {
   choose(choice: string, label?: string): void {
     if (this.turn && !this.turn.ended && this.turn.awaiting === "customer") {
       if (label) this.talkLog = [...this.talkLog, { who: "customer", text: label }];
-      this.send({ type: "talk_choose", conversationId: this.turn.conversationId, choice });
+      this.send({ type: "talk_choose", conversationId: this.turn.conversationId, choice, tone: this.myTone });
+      if (this.you) this.tones.set(this.you.id, { tone: this.myTone, until: this.serverNow() + TONE_HOLD_MS });
     }
   }
 

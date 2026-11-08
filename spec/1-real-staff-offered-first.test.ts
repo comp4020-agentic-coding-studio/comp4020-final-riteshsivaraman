@@ -113,11 +113,13 @@ class Visitor {
     const w = (await this.next((m) => m.type === "welcome")) as Extract<ServerMessage, { type: "welcome" }>;
     this.id = w.you.id;
   }
+  polls = 0;
   async next(want: (m: ServerMessage) => boolean, ms = 4000, from = 0): Promise<ServerMessage> {
     const deadline = Date.now() + ms;
     while (Date.now() < deadline) {
       const found = this.messages.slice(from).find(want);
       if (found) return found;
+      if (this.id && ++this.polls % 25 === 0) this.send({ type: "settle" }); // the real client polls like this
       await pause(20);
     }
     throw new Error(`timed out waiting for a message (have: ${this.messages.map((m) => (m.type === "notice" ? `notice "${m.text}"` : m.type)).join(", ")})`);
@@ -344,7 +346,8 @@ describe("the offer passes on, and a released claim keeps its place (store servi
     expect(eventsOf("ann").map((e) => e.type)).toEqual(expect.arrayContaining(["offer_made", "offer_expired"]));
 
     // once they let it pass too, the CPU may take her; the takeover names who passed
-    expect(turnTo(catchUpOffers(ctx(NOW + 2 * OFFER_MS), "ann"), "ann")?.withId).toBe("greeter-1");
+    catchUpOffers(ctx(NOW + 2 * OFFER_MS), "ann"); // she starts walking over
+    expect(turnTo(catchUpOffers(ctx(NOW + 2 * OFFER_MS + 60_000), "ann"), "ann")?.withId).toBe("greeter-1"); // the chat opens once she arrives
     expect(eventsOf("ann").find((e) => e.type === "npc_approached")?.data).toMatchObject({ npcId: "greeter-1", passedOver: ["near", "far"] });
   });
 

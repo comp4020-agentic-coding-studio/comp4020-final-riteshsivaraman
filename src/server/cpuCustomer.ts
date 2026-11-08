@@ -52,7 +52,10 @@ function personaOf(t: Pick<CpuTalk, "seed" | "purpose">): Persona {
   return t.purpose === "browse" ? { ...p, opening: "browse" } : p;
 }
 
-const shops = (purpose: Purpose | null): boolean => purpose === "phone" || purpose === "browse";
+// Everyone who is talking to a specialist plays along with the phones chat. They used to walk out
+// the moment they were asked, if their timetable purpose was a laptop or audio: it read as rude, and
+// there is no chat for those yet (device repair etc. is a later scene), so they stay and shop.
+const shops = (_purpose: Purpose | null): boolean => true;
 
 export function startCpuTalk(customerId: string, visit: number, purpose: Purpose | null): CpuTalk {
   const seed = `${customerId}:${visit}`;

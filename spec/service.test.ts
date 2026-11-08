@@ -2,6 +2,8 @@ import Database from "better-sqlite3";
 import { beforeEach, describe, expect, it } from "vitest";
 import { defaultStorage, productById, START_STOCK } from "../src/shared/catalogue.ts";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
+import { engagedMoment } from "../src/shared/engage.ts";
+import { headingTo, wrap } from "../src/shared/steering.ts";
 import { TABLE_SEATS } from "../src/shared/storeday.ts";
 import type { ServerMessage } from "../src/shared/protocol.ts";
 import { ENTRANCE_ZONE } from "../src/shared/world.ts";
@@ -30,7 +32,9 @@ import {
   VISIT_BEAT_MS,
   leaveStore,
   tryGreeterApproach,
+  settleApproaches,
   tryNpcAutoClaim,
+  settleRepairs,
   catchUpOffers,
   releaseExpired,
   startTalk,
@@ -54,6 +58,8 @@ const employees: Employee[] = [];
 const present: string[] = [];
 
 const ctx = (now = NOW): Ctx => ({ db, now, employees, present, position: (id) => positions.get(id) });
+// an NPC walking over opens the conversation only once it arrives, so the specs let the walk finish before looking
+const later = (out: Array<{ to: string; message: any }>, from = NOW) => [...out, ...settleApproaches(ctx(from + 60_000))];
 const npc = (id: string): { x: number; z: number } => {
   const def = NPCS.find((n) => n.id === id)!;
   return npcPose(def, NOW);
@@ -205,16 +211,16 @@ describe("returning customers: the greeter knows your name and your last purchas
     ).run(`order-${id}`, id, JSON.stringify(sale));
   }
 
-  it("a brand-new token gets today's existing greeting", () => {
+  it("a brand-new token is still greeted by the name they gave at the door", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
-    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say;
-    expect(say).toBe("Welcome in. What brings you here today?");
+    const say = last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")?.say;
+    expect(say).toBe("Welcome in, Pebble! What brings you here today?");
   });
 
   it("a returning token with no prior order is greeted by name only, not the old line", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
     comesBackAgain("c1");
-    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say ?? "";
+    const say = last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")?.say ?? "";
     expect(say).toMatch(/\bPebble\b/);
     expect(say.toLowerCase()).toMatch(/welcome back/);
     expect(say).not.toBe("Welcome in. What brings you here today?");
@@ -225,7 +231,7 @@ describe("returning customers: the greeter knows your name and your last purchas
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
     paidOrderFor("c1", { name: "iPhone 18 Pro", colour: "Glacier", storage: "256GB", price: 1999 });
     comesBackAgain("c1");
-    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say ?? "";
+    const say = last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")?.say ?? "";
     expect(say).toMatch(/\bPebble\b/);
     expect(say).toMatch(/Glacier/);
     expect(say).toMatch(/iPhone 18 Pro/);
@@ -238,7 +244,7 @@ describe("returning customers: the greeter knows your name and your last purchas
     // enter() only ever takes name from validateProfile's cleaned `name` field, and
     // the greeting itself is built from nameOf(ctx, id), which reads the visitors row
     db.prepare("UPDATE visitors SET name = ? WHERE id = ?").run("Pebble", "c1");
-    const say = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")?.say ?? "";
+    const say = last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")?.say ?? "";
     expect(say).toMatch(/\bPebble\b/);
   });
 });
@@ -606,6 +612,45 @@ describe("walking away mid-conversation (Esc, either side)", () => {
   });
 });
 
+describe("the Genius Bar repair, run by an NPC genius", () => {
+  const atBar = () => {
+    const g = npc("genius-1");
+    addVisitor("c1", "Pebble", { x: g.x, z: g.z + 1.5 }); // on the shop side of the bar
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', want = 'repair', needs = 'genius' WHERE visitor_id = 'c1'").run();
+  };
+  it("a customer who has come to the bar for a repair gets the genius, who opens the repair conversation", () => {
+    atBar();
+    const turn = last(later(tryNpcAutoClaim(ctx(), "c1")), "c1", "turn");
+    expect(turn).toMatchObject({ withId: "genius-1", ended: false });
+    expect(turn?.say).toMatch(/Genius Bar/);
+  });
+  it("a customer collecting an order is not put through a repair", () => {
+    atBar();
+    db.prepare("UPDATE player_state SET want = 'pickup' WHERE visitor_id = 'c1'").run();
+    expect(later(tryNpcAutoClaim(ctx(), "c1"))).toEqual([]);
+  });
+  it("a customer still far from the bar is not chased across the shop by the genius", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -6 });
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', want = 'repair', needs = 'genius' WHERE visitor_id = 'c1'").run();
+    expect(later(tryNpcAutoClaim(ctx(), "c1"))).toEqual([]);
+  });
+  it("a quick fix is announced as ready about a minute later, once", () => {
+    atBar();
+    let t = last(later(tryNpcAutoClaim(ctx(), "c1")), "c1", "turn")!;
+    const pick = (id: string) => (t = last(chooseTurn(ctx(), "c1", t.conversationId, id), "c1", "turn")!);
+    pick("symptom:wont_charge");
+    pick("no");
+    pick("not_yet"); // not tried another cable: it is the port
+    pick("ok");
+    expect(t.ended).toBe(true);
+    expect(t.say).toMatch(/minute/);
+    expect(messagesTo(settleRepairs(ctx(NOW + 30_000)), "c1", "notice")).toEqual([]); // not yet
+    expect(last(settleRepairs(ctx(NOW + 61_000)), "c1", "notice")?.text).toMatch(/ready at the Genius Bar/);
+    expect(settleRepairs(ctx(NOW + 120_000))).toEqual([]); // told once
+    expect(eventTypes()).toEqual(expect.arrayContaining(["repair_outcome", "repair_ready"]));
+  });
+});
+
 describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)", () => {
   // Wired into catchUpOffers 2026-11-09 (Ritesh, live: 2+ hours with a lone
   // human staff user and no CPU ever approaching him, "that gap needs to be
@@ -616,7 +661,7 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
     const s = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: s.x, z: s.z });
     db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
-    const out = tryNpcAutoClaim(ctx(), "c1");
+    const out = later(tryNpcAutoClaim(ctx(), "c1"));
     expect(last(out, "c1", "turn")).toMatchObject({ withId: "spec-phones", ended: false });
     expect(stateOf(db, "c1")?.state).toBe("in_conversation");
   });
@@ -624,7 +669,7 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
   it("is a no-op for a post with no script yet (genius, D34)", () => {
     addVisitor("c1", "Pebble", { x: 0, z: 0 });
     db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'genius' WHERE visitor_id = 'c1'").run();
-    expect(tryNpcAutoClaim(ctx(), "c1")).toEqual([]);
+    expect(later(tryNpcAutoClaim(ctx(), "c1"))).toEqual([]);
   });
 
   it("will not double-book an NPC already serving someone else", () => {
@@ -632,9 +677,9 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
     addVisitor("c1", "Pebble", { x: s.x, z: s.z });
     addVisitor("c2", "Biscuit", { x: s.x, z: s.z });
     for (const id of ["c1", "c2"]) db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = ?").run(id);
-    expect(last(tryNpcAutoClaim(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "spec-phones" });
+    expect(last(later(tryNpcAutoClaim(ctx(), "c1")), "c1", "turn")).toMatchObject({ withId: "spec-phones" });
     // the second NPC specialist takes the second customer, never the busy one
-    expect(last(tryNpcAutoClaim(ctx(), "c2"), "c2", "turn")).toMatchObject({ withId: "spec-phones-2" });
+    expect(last(later(tryNpcAutoClaim(ctx(), "c2")), "c2", "turn")).toMatchObject({ withId: "spec-phones-2" });
   });
 
   it("gives way to a real human staff user online for the same post: the NPC does not take the customer", () => {
@@ -642,7 +687,7 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
     addVisitor("c1", "Pebble", { x: s.x, z: s.z });
     db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
     addVisitor("priya", "Priya", { x: 0, z: 0 }, "specialist", "phones");
-    expect(tryNpcAutoClaim(ctx(), "c1"), "a free human on this post should block the NPC claim").toEqual([]);
+    expect(later(tryNpcAutoClaim(ctx(), "c1")), "a free human on this post should block the NPC claim").toEqual([]);
   });
 
   it("still claims once the only human on that post leaves", () => {
@@ -650,9 +695,9 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
     addVisitor("c1", "Pebble", { x: s.x, z: s.z });
     db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
     addVisitor("priya", "Priya", { x: 0, z: 0 }, "specialist", "phones");
-    expect(tryNpcAutoClaim(ctx(), "c1")).toEqual([]);
+    expect(later(tryNpcAutoClaim(ctx(), "c1"))).toEqual([]);
     employees.length = 0; // priya has left
-    expect(last(tryNpcAutoClaim(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "spec-phones" });
+    expect(last(later(tryNpcAutoClaim(ctx(), "c1")), "c1", "turn")).toMatchObject({ withId: "spec-phones" });
   });
 
   it("catchUpOffers reaches a waiting customer through the NPC when no real staff is online at all", () => {
@@ -667,7 +712,7 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
 describe("the greeter approaching a new customer on its own (tryGreeterApproach)", () => {
   it("opens a conversation at once with an arriving customer just inside, and the greeter walks over", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
-    const out = tryGreeterApproach(ctx(), "c1");
+    const out = later(tryGreeterApproach(ctx(), "c1"));
     expect(last(out, "c1", "turn")).toMatchObject({ withId: "greeter-1", ended: false });
     expect(last(out, "all", "engaged")).toMatchObject({ npcId: "greeter-1", visitorId: "c1" });
     expect(last(out, "all", "engaged")).not.toHaveProperty("pending"); // she is talking, not waiting to be accepted
@@ -678,16 +723,16 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
   it("she walks to where the customer actually stands, even right at the door, so she faces them", () => {
     const at = { x: 2.5, z: ENTRANCE_ZONE.minZ + 0.3 };
     addVisitor("c1", "Pebble", at);
-    expect(last(tryGreeterApproach(ctx(), "c1"), "all", "engaged")).toMatchObject({ npcId: "greeter-1", visitorId: "c1", at });
+    expect(last(later(tryGreeterApproach(ctx(), "c1")), "all", "engaged")).toMatchObject({ npcId: "greeter-1", visitorId: "c1", at });
   });
 
   it("never approaches the same customer twice", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
-    const id = last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")!.conversationId;
+    const id = last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")!.conversationId;
     leaveConversation(ctx(), "c1"); // back to browsing
     closeTalk(ctx(), "c1");
     expect(stateOf(db, "c1")?.state).toBe("browsing");
-    expect(tryGreeterApproach(ctx(), "c1")).toEqual([]);
+    expect(later(tryGreeterApproach(ctx(), "c1"))).toEqual([]);
     expect(db.prepare("SELECT ended_at FROM conversations WHERE id = ?").get(id)).not.toEqual({ ended_at: null });
   });
 
@@ -695,16 +740,16 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
     addVisitor("c2", "Biscuit", { x: 0, z: -11 }); // still outside
     addVisitor("c3", "Fern", { x: 5, z: 5 }); // deep in the store
-    expect(last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
-    expect(tryGreeterApproach(ctx(), "c2")).toEqual([]);
-    expect(tryGreeterApproach(ctx(), "c3")).toEqual([]);
+    expect(last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
+    expect(later(tryGreeterApproach(ctx(), "c2"))).toEqual([]);
+    expect(later(tryGreeterApproach(ctx(), "c3"))).toEqual([]);
   });
 
   it("first come, first served: while she has someone, the next is left alone and nothing queues", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
     addVisitor("c2", "Biscuit", { x: 0.4, z: -8 });
-    expect(last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
-    expect(tryGreeterApproach(ctx(), "c2")).toEqual([]);
+    expect(last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
+    expect(later(tryGreeterApproach(ctx(), "c2"))).toEqual([]);
     expect(stateOf(db, "c2")?.state).toBe("arriving");
     expect(db.prepare("SELECT COUNT(*) AS n FROM intents").get()).toEqual({ n: 0 });
     // pressing E at her is refused plainly while she is busy
@@ -712,7 +757,7 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     // once she is free again and c2 is still just inside, she greets them
     leaveConversation(ctx(), "c1");
     closeTalk(ctx(), "c1");
-    expect(last(tryGreeterApproach(ctx(), "c2"), "c2", "turn")).toMatchObject({ withId: "greeter-1" });
+    expect(last(later(tryGreeterApproach(ctx(), "c2")), "c2", "turn")).toMatchObject({ withId: "greeter-1" });
   });
 
   it("an old conversation nobody dismissed, from a customer long gone, does not keep her busy", () => {
@@ -720,26 +765,26 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     db.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES ('ghost', 'tok-ghost', 'Ghost', '#fff', 0, 0)").run();
     db.prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at, ended_at) VALUES ('old', 'ghost', 'greeter-1', 'npc', 'greeter', 'x', '{}', 1, 2)").run();
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
-    expect(last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
+    expect(last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
   });
 
   it("someone who stays on the last line past the limit no longer holds her", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
     addVisitor("c2", "Biscuit", { x: 0.4, z: -8 });
-    tryGreeterApproach(ctx(), "c1");
+    later(tryGreeterApproach(ctx(), "c1"));
     leaveConversation(ctx(), "c1"); // never dismissed
-    expect(tryGreeterApproach(ctx(), "c2")).toEqual([]);
-    expect(last(tryGreeterApproach(ctx(NOW + 10 * 60_000), "c2"), "c2", "turn")).toMatchObject({ withId: "greeter-1" });
+    expect(later(tryGreeterApproach(ctx(), "c2"))).toEqual([]);
+    expect(last(later(tryGreeterApproach(ctx(NOW + 10 * 60_000), "c2"), NOW + 10 * 60_000), "c2", "turn")).toMatchObject({ withId: "greeter-1" });
   });
 
   it("someone who has walked past the entrance is not chased", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
     addVisitor("c2", "Biscuit", { x: 0.4, z: -8 });
-    tryGreeterApproach(ctx(), "c1");
+    later(tryGreeterApproach(ctx(), "c1"));
     positions.set("c2", { x: 4, z: 3 }); // c2 walks on into the store
     leaveConversation(ctx(), "c1");
     closeTalk(ctx(), "c1");
-    expect(tryGreeterApproach(ctx(), "c2")).toEqual([]);
+    expect(later(tryGreeterApproach(ctx(), "c2"))).toEqual([]);
   });
 
   it("a customer pressing E on the greeter starts the conversation at once", () => {
@@ -768,20 +813,35 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
 
   it("greets someone again on a later visit, not just the first time they ever came", () => {
     addVisitor("c1", "Pebble", { x: 0, z: -8 });
-    expect(last(tryGreeterApproach(ctx(), "c1"), "c1", "turn")).toBeDefined();
-    expect(tryGreeterApproach(ctx(), "c1")).toEqual([]); // once per visit
+    expect(last(later(tryGreeterApproach(ctx(), "c1")), "c1", "turn")).toBeDefined();
+    expect(later(tryGreeterApproach(ctx(), "c1"))).toEqual([]); // once per visit
     // they leave, and come back later: a new visit
     leaveStore(ctx(), "c1");
     closeTalk(ctx(), "c1");
     enter(ctx(NOW + 600_000), "c1", { kind: "customer" });
-    expect(last(tryGreeterApproach(ctx(NOW + 600_000), "c1"), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
+    expect(last(later(tryGreeterApproach(ctx(NOW + 600_000), "c1"), NOW + 600_000), "c1", "turn")).toMatchObject({ withId: "greeter-1" });
+  });
+
+  it("follows a customer who walks on, and ends up facing where they actually stand", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    tryGreeterApproach(ctx(), "c1");
+    positions.set("c1", { x: 3, z: 1 }); // they wander into the store before she arrives
+    const reaim = last(settleApproaches(ctx(NOW + 100)), "all", "engaged");
+    expect(reaim).toMatchObject({ npcId: "greeter-1", at: { x: 3, z: 1 } });
+    expect(stateOf(db, "c1")?.state).not.toBe("in_conversation"); // still walking: no chat yet
+    const out = settleApproaches(ctx(NOW + 120_000));
+    const eng = last(out, "all", "engaged")!;
+    expect(eng.at).toEqual({ x: 3, z: 1 });
+    // face to face: at the moment the chat opens she is looking at the customer
+    const m = engagedMoment("greeter-1", eng, NOW + 120_000);
+    expect(Math.abs(wrap(m.ry - headingTo(m.x, m.z, 3, 1)))).toBeLessThan(0.05);
   });
 
   it("does not approach while a human holds the greeter post", () => {
     const g = npc("greeter-1");
     addVisitor("e1", "Sam", g, "greeter");
     addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
-    expect(tryGreeterApproach(ctx(), "c1")).toEqual([]);
+    expect(later(tryGreeterApproach(ctx(), "c1"))).toEqual([]);
   });
 });
 
@@ -1154,7 +1214,7 @@ describe("the event log tells the whole story of a sale", () => {
   it("records the greeting, the chat, the order, the hand-over, the payment and the end, each with who and what", () => {
     const g = npc("greeter-1");
     addVisitor("c1", "Pebble", { x: g.x + 1, z: g.z });
-    tryGreeterApproach(ctx(), "c1");
+    later(tryGreeterApproach(ctx(), "c1"));
     expect(eventTypes()).toEqual(expect.arrayContaining(["profile", "npc_approached", "conversation_started"]));
     leaveConversation(ctx(), "c1");
     closeTalk(ctx(), "c1");

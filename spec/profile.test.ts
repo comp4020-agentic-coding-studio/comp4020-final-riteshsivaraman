@@ -54,7 +54,7 @@ describe("posts", () => {
     for (const n of NPCS.filter((x) => x.role === "customer")) expect(NPC_DESIGNATION[n.id], n.id).toBeUndefined();
     expect(scriptFor("greeter")).toBe("greeter");
     expect(scriptFor("specialist:phones")).toBe("phones");
-    expect(scriptFor("genius")).toBeNull();
+    expect(scriptFor("genius")).toBe("repair"); // the Genius Bar runs repairs
     expect(scriptFor("technician")).toBeNull();
   });
 
