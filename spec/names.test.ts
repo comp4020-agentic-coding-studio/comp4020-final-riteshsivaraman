@@ -19,3 +19,13 @@ describe("the name someone is shown by", () => {
     expect(uniqueName("Player 2", new Set())).toBe("Player 2");
   });
 });
+
+describe("every timetable customer has a given name", () => {
+  it("never leaves a raw id like cust-38 on a name tag, and never repeats a name", async () => {
+    const { CAST } = await import("../src/shared/storeday.ts");
+    const { NPC_NAME } = await import("../src/shared/duty.ts");
+    for (const c of CAST) expect(NPC_NAME[c.id], c.id).toBeTruthy();
+    const names = Object.values(NPC_NAME).map((n) => n.toLowerCase());
+    expect(new Set(names).size).toBe(names.length);
+  });
+});
