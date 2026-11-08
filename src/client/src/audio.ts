@@ -13,6 +13,38 @@
 import { computeGains, type SoundSource } from "./sound.ts";
 
 const MUTE_KEY = "sound-muted";
+// music and chatter each have their own switch (on unless the visitor turned them off)
+const MUSIC_OFF_KEY = "sound-music-off";
+const CHATTER_OFF_KEY = "sound-chatter-off";
+const readFlag = (key: string): boolean => {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+};
+const writeFlag = (key: string, on: boolean): void => {
+  try {
+    localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    /* the choice just won't survive a reload */
+  }
+};
+
+// The background music is generated, like every other sound here: a slow loop of four warm chords
+// (a soft pad of detuned triangle waves through a low-pass filter) with a sparse pentatonic melody
+// plinking over it and an echo, so it never repeats exactly and never needs a file. Chords are Hz.
+const CHORDS: number[][] = [
+  [130.81, 196.0, 246.94, 329.63], // C major 7
+  [110.0, 164.81, 196.0, 261.63], // A minor 7
+  [87.31, 174.61, 220.0, 329.63], // F major 7
+  [98.0, 196.0, 246.94, 293.66], // G6
+];
+const CHORD_SECONDS = 8;
+const PENTATONIC = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5]; // C major pentatonic
+const MUSIC_LEVEL = 0.9;
+// how loud a talking person is at its loudest (right beside you), before the master volume
+const CHATTER_LEVEL = 0.2;
 // how many people's ambient murmur can be live at once — the issue's "a
 // phone does not choke" budget. Far more people than this can be in the
 // room; computeGains always keeps the nearest MAX_VOICES of them audible.
@@ -37,9 +69,18 @@ function writeMuted(muted: boolean): void {
   }
 }
 
+// One person's distant talk: breath noise through two band-pass "vowel" filters, shaped into syllables in
+// phrases with silences between, so the room has people talking in it rather than a constant hiss.
 interface Voice {
-  gain: GainNode;
+  gain: GainNode; // how loud they are from where the listener stands
+  env: GainNode; // the syllables
+  f1: BiquadFilterNode;
+  f2: BiquadFilterNode;
   source: AudioBufferSourceNode;
+  base1: number;
+  base2: number;
+  nextAt: number; // audio time the next syllable (or phrase) is due
+  talkUntil: number; // the end of the current phrase
   lastAudibleAt: number;
 }
 
@@ -50,7 +91,14 @@ class SoundEngine {
   private voices = new Map<string, Voice>();
   private listeners = new Set<() => void>();
   muted = readMuted();
+  musicOn = !readFlag(MUSIC_OFF_KEY);
+  chatterOn = !readFlag(CHATTER_OFF_KEY);
   unlocked = false;
+  private musicBus: GainNode | null = null;
+  private musicTimer: number | null = null;
+  private nextChordAt = 0;
+  private nextNoteAt = 0;
+  private chordIndex = 0;
 
   // Subscribe to mute changes (for the toggle button's React state).
   subscribe(fn: () => void): () => void {
@@ -73,11 +121,122 @@ class SoundEngine {
     this.master.connect(this.ctx.destination);
     this.noiseBuffer = this.makeNoiseBuffer(this.ctx);
     this.unlocked = true;
-    // Room tone and ambient murmur were a net negative in feel-check
-    // (Ritesh, 2026-11-07): "the small sound effects and cues are nice, the
-    // background sound isn't -- I don't want that at all." Cut both; the
-    // one-shot cues (footstep, door chime, UI click) stay.
+    // Background sound: cut on 2026-11-07 (a constant murmur read as a net negative), brought back on
+    // 2026-11-09 ("the store feels eerily silent") as two things with their own switches: music, and
+    // chatter that is speech-like and bursty with real silences, not a hum.
+    if (this.musicOn) this.startMusic();
     this.notify();
+  }
+
+  setMusic(on: boolean): void {
+    this.musicOn = on;
+    writeFlag(MUSIC_OFF_KEY, !on);
+    if (on) this.startMusic();
+    else this.stopMusic();
+    this.notify();
+  }
+  setChatter(on: boolean): void {
+    this.chatterOn = on;
+    writeFlag(CHATTER_OFF_KEY, !on);
+    this.notify();
+  }
+
+  // ---- music ----
+  private startMusic(): void {
+    if (!this.ctx || !this.master || this.musicTimer !== null) return;
+    const ctx = this.ctx;
+    if (!this.musicBus) {
+      const bus = ctx.createGain();
+      bus.gain.value = 0;
+      // a soft echo so the plinks shimmer
+      const delay = ctx.createDelay(1);
+      delay.delayTime.value = 0.375;
+      const fb = ctx.createGain();
+      fb.gain.value = 0.35;
+      const wet = ctx.createGain();
+      wet.gain.value = 0.45;
+      delay.connect(fb).connect(delay);
+      delay.connect(wet).connect(bus);
+      this.musicDelay = delay;
+      bus.connect(this.master);
+      this.musicBus = bus;
+    }
+    this.musicBus.gain.cancelScheduledValues(ctx.currentTime);
+    this.musicBus.gain.setTargetAtTime(MUSIC_LEVEL, ctx.currentTime, 1.5); // fades in
+    this.nextChordAt = ctx.currentTime + 0.2;
+    this.nextNoteAt = ctx.currentTime + 3;
+    this.musicTimer = window.setInterval(() => this.scheduleMusic(), 500);
+    this.scheduleMusic();
+  }
+  private musicDelay: DelayNode | null = null;
+
+  private stopMusic(): void {
+    if (this.musicTimer !== null) {
+      window.clearInterval(this.musicTimer);
+      this.musicTimer = null;
+    }
+    if (this.ctx && this.musicBus) {
+      this.musicBus.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.musicBus.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4); // fades out; notes already queued die quietly
+    }
+  }
+
+  // Looks a little ahead and queues whatever chords and notes fall inside it.
+  private scheduleMusic(): void {
+    if (!this.ctx || !this.musicBus) return;
+    const horizon = this.ctx.currentTime + 1.5;
+    while (this.nextChordAt < horizon) {
+      this.playChord(CHORDS[this.chordIndex % CHORDS.length]!, this.nextChordAt);
+      this.chordIndex++;
+      this.nextChordAt += CHORD_SECONDS;
+    }
+    while (this.nextNoteAt < horizon) {
+      this.playPluck(PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)]!, this.nextNoteAt);
+      this.nextNoteAt += 1.4 + Math.random() * 3.2;
+    }
+  }
+
+  private playChord(freqs: number[], at: number): void {
+    if (!this.ctx || !this.musicBus) return;
+    const ctx = this.ctx;
+    const end = at + CHORD_SECONDS;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 1100;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, at);
+    env.gain.linearRampToValueAtTime(0.02, at + 2.5);
+    env.gain.setValueAtTime(0.02, end - 0.5);
+    env.gain.linearRampToValueAtTime(0, end + 2.5); // overlaps the next chord, so it flows
+    lp.connect(env).connect(this.musicBus);
+    for (const f of freqs) {
+      for (const detune of [-6, 6]) {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = f;
+        osc.detune.value = detune;
+        osc.connect(lp);
+        osc.start(at);
+        osc.stop(end + 2.6);
+      }
+    }
+  }
+
+  private playPluck(freq: number, at: number): void {
+    if (!this.ctx || !this.musicBus || !this.musicDelay) return;
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0, at);
+    env.gain.linearRampToValueAtTime(0.045, at + 0.015);
+    env.gain.exponentialRampToValueAtTime(0.0001, at + 2.2);
+    osc.connect(env);
+    env.connect(this.musicBus);
+    env.connect(this.musicDelay);
+    osc.start(at);
+    osc.stop(at + 2.3);
   }
 
   setMuted(muted: boolean): void {
@@ -117,24 +276,74 @@ class SoundEngine {
   // though the one-shot cues read fine. See the comment on unlock() and
   // updateAmbience() for what replaced them.
 
-  // Call every frame (or as often as convenient) with the listener's
-  // position and every nearby person's id and position. Delegates the
-  // falloff and the voice cap entirely to computeGains (sound.ts); this
-  // method only turns the result into actual WebAudio nodes.
-  //
-  // Ambient murmur cut (Ritesh, 2026-11-07, feel-check): the background
-  // chatter was a net negative, even though the one-shot cues (footstep,
-  // door chime, UI click) read fine. computeGains itself is untouched and
-  // still spec-covered (issue #11's pure-mixer test); this just stops
-  // wiring its result into audible voices. Any existing voice is faded out
-  // and never recreated.
+  // Call every few frames with the listener's position and every nearby person's id and position.
+  // computeGains (sound.ts, pure and spec-covered) decides who is audible and how loud, nearest first and
+  // capped; this turns the result into a few voices that talk in bursts.
   updateAmbience(listener: { x: number; z: number }, sources: SoundSource[]): void {
     if (!this.ctx || !this.master) return;
     const ctx = this.ctx;
-    computeGains(listener, sources, MAX_VOICES); // kept live so the spec still exercises it
     const now = ctx.currentTime;
-    for (const voice of this.voices.values()) voice.gain.gain.setTargetAtTime(0, now, 0.25);
+    const gains = computeGains(listener, sources, MAX_VOICES);
+    const audible = new Set<string>();
+    if (this.chatterOn) {
+      for (const g of gains) {
+        if (g.gain < 0.01) continue;
+        audible.add(g.id);
+        const v = this.voices.get(g.id) ?? this.makeVoice(g.id, now);
+        v.gain.gain.setTargetAtTime(g.gain * CHATTER_LEVEL, now, 0.2);
+        v.lastAudibleAt = now;
+        this.talk(v, now);
+      }
+    }
+    for (const [id, voice] of this.voices) if (!audible.has(id)) voice.gain.gain.setTargetAtTime(0, now, 0.25);
     this.sweepIdleVoices(now);
+  }
+
+  private makeVoice(id: string, now: number): Voice {
+    const ctx = this.ctx!;
+    const source = this.noiseSource(ctx, true);
+    // a different voice each: a different pitch of "vowel" sound
+    const base1 = 380 + Math.random() * 320;
+    const base2 = 1100 + Math.random() * 1100;
+    const f1 = ctx.createBiquadFilter();
+    f1.type = "bandpass";
+    f1.frequency.value = base1;
+    f1.Q.value = 5;
+    const f2 = ctx.createBiquadFilter();
+    f2.type = "bandpass";
+    f2.frequency.value = base2;
+    f2.Q.value = 6;
+    const env = ctx.createGain();
+    env.gain.value = 0;
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    source.connect(f1).connect(env);
+    source.connect(f2).connect(env);
+    env.connect(gain).connect(this.master!);
+    source.start(now, Math.random() * 1.5);
+    const first = now + Math.random() * 4;
+    const voice: Voice = { gain, env, f1, f2, source, base1, base2, nextAt: first, talkUntil: first + 1.5 + Math.random() * 3, lastAudibleAt: now };
+    this.voices.set(id, voice);
+    return voice;
+  }
+
+  // Queues a voice's syllables a little ahead: a phrase of short rises and falls, then a silence.
+  private talk(v: Voice, now: number): void {
+    while (v.nextAt < now + 1.2) {
+      if (v.nextAt >= v.talkUntil) {
+        v.nextAt = Math.max(v.nextAt, v.talkUntil) + 2 + Math.random() * 7; // quiet, then another phrase
+        v.talkUntil = v.nextAt + 1.5 + Math.random() * 3.5;
+        continue;
+      }
+      const t = Math.max(v.nextAt, now);
+      const dur = 0.09 + Math.random() * 0.14;
+      v.f1.frequency.setValueAtTime(v.base1 * (0.8 + Math.random() * 0.5), t);
+      v.f2.frequency.setValueAtTime(v.base2 * (0.8 + Math.random() * 0.5), t);
+      v.env.gain.setValueAtTime(0, t);
+      v.env.gain.linearRampToValueAtTime(0.5 + Math.random() * 0.5, t + dur * 0.35);
+      v.env.gain.linearRampToValueAtTime(0, t + dur);
+      v.nextAt = t + dur + 0.03 + Math.random() * 0.1;
+    }
   }
 
   private sweepIdleVoices(now: number): void {
@@ -143,6 +352,7 @@ class SoundEngine {
         try {
           voice.source.stop();
           voice.source.disconnect();
+          voice.gain.disconnect();
         } catch {
           /* already stopped */
         }

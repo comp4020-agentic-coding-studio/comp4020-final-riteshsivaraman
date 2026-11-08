@@ -38,10 +38,15 @@ body,
   color: #111;
 }
 
-.sound-toggle {
+.sound-controls {
   position: fixed;
   right: 16px;
   bottom: 12px;
+  display: flex;
+  gap: 6px;
+  z-index: 20;
+}
+.sound-toggle {
   pointer-events: auto;
   padding: 4px 10px;
   font: inherit;
