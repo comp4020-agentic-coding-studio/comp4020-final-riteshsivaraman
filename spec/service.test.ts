@@ -988,6 +988,35 @@ describe("a sale after the chat: the bag, the specialist, the payment (Ritesh, 2
     expect(eventTypes()).toContain("stock_handed_over");
   });
 
+  it("holds the bag for a beat after the runner arrives before the specialist takes it, even though it is free immediately (issue #32)", () => {
+    decide();
+    closeTalk(ctx(NOW + 1000), "c1");
+    // get the order to 'fetching' and poll finely once it looks close, to
+    // find the exact tick the runner arrives and the exact tick the hand-off
+    // fires -- a mutant that drops the beat entirely hands the bag over on
+    // the very tick the runner arrives, which this distinguishes from the
+    // real, beat-delayed behaviour.
+    let t = NOW + 2000;
+    let arrivedAt: number | null = null;
+    let handedAt: number | null = null;
+    while (t < NOW + ORDER_MS) {
+      settleVisits(ctx(t));
+      if (arrivedAt === null) {
+        const row = db.prepare("SELECT arrived_at FROM orders WHERE customer_id = 'c1'").get() as { arrived_at: number | null } | undefined;
+        if (row?.arrived_at != null) arrivedAt = row.arrived_at;
+      }
+      if (handedAt === null && eventTypes().includes("stock_handed_over")) {
+        const row = db.prepare("SELECT ts FROM events WHERE type = 'stock_handed_over'").get() as { ts: number };
+        handedAt = row.ts;
+        break;
+      }
+      t += 100; // fine enough to catch the beat, coarse enough to stay fast
+    }
+    expect(arrivedAt, "the runner never recorded an arrival").not.toBeNull();
+    expect(handedAt, "the bag was never handed over").not.toBeNull();
+    expect(handedAt! - arrivedAt!).toBeGreaterThanOrEqual(1400); // CHECKOUT_BEAT_MS (1500) minus the 100ms poll granularity
+  });
+
   it("opens the payment when the specialist arrives, and the unit is sold", () => {
     decide();
     const pay = payFor("c1");
