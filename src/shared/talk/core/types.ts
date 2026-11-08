@@ -56,6 +56,7 @@ export type Pending =
   | { kind: "nudge" }
   | { kind: "rescue" }
   | { kind: "confirm" }
+  | { kind: "sold_out"; model: string } // the unit went between confirming and the stock check (issue #36): look at something else, or leave
   | { kind: "free" }; // staff only answered a throw-back; the customer may carry on or act
 
 export type StaffAct =

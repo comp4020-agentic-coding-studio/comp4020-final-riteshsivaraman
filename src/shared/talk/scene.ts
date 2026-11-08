@@ -208,6 +208,14 @@ export function customerMenu(sc: Scene): CustomerMenu | null {
       { id: "model", label: "Change the model" },
       { id: "leave", label: "Leave without a phone" },
     ];
+  } else if (p.kind === "sold_out") {
+    // Issue #36: the unit went between confirming and the stock check. A real
+    // choice, not a dead end -- look at something else (same exclusion setAside
+    // already does for "not for me"), or leave.
+    options = [
+      { id: "continue", label: "Keep looking at other phones" },
+      { id: "leave", label: "Leave without a phone" },
+    ];
   }
   const actions: CustomerMenu["actions"] = [];
   if (ctx.pool.length > 0 || p.kind === "nudge" || p.kind === "rescue") {
@@ -471,7 +479,25 @@ function answer(sc: Scene, ctx: Ctx, menu: CustomerMenu, picks: string[]): strin
       sc.order = sc.order.filter((q) => q !== "known_model");
       sc.fixed = undefined;
     }
+  } else if (p.kind === "sold_out") {
+    if (pick === "continue") setAside(sc, p.model); // same exclusion "not for me" uses: out of the pool, known_model reopened
+    else if (pick === "leave") sc.ended = { how: "left", why: "left without a phone" };
   }
   return null;
+}
+
+// Issue #36: the unit the customer confirmed sold out between their "yes" and
+// the stock check (src/server/service.ts's startCheckout). Rather than force-
+// ending the scene, this hands them a real choice: the sorry-line is still
+// spoken by the server (holder name / "someone else has it", #21/#3, kept
+// word for word), this only stops that line from being the final word.
+export function offerSoldOut(sc: Scene, model: string, sorry: string): Scene {
+  const next = clone(sc);
+  next.ended = null;
+  next.turn++;
+  next.toMove = "customer";
+  next.pending = { kind: "sold_out", model };
+  log(next, { who: "staff", tone: "unsure", move: "sold_out", text: sorry });
+  return next;
 }
 

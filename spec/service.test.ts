@@ -283,11 +283,13 @@ describe("stock at the moment of sale", () => {
     expect(eventTypes()).toContain("reservation_released");
   });
 
-  it("will not sell what is out of stock, and says so", () => {
+  it("will not sell what is out of stock, says so, and offers a real choice instead of ending the chat (issue #36)", () => {
     db.prepare("UPDATE stock SET qty = 0 WHERE product = 'iphone-18-pro' AND colour = 'Silver' AND storage = ?").run(storageOf18Pro);
     const { out } = selling("c1", "spec-phones", { ...glacier, colour: "Silver" });
-    expect(last(out, "c1", "turn")?.say).toMatch(/has gone/);
-    expect(last(out, "c1", "turn")?.ended).toBe(true);
+    const turn = last(out, "c1", "turn");
+    expect(turn?.say).toMatch(/has gone/);
+    expect(turn?.ended, "a real choice, not a dead end").toBe(false);
+    expect(turn?.choices.map((c) => c.id)).toEqual(expect.arrayContaining([expect.stringContaining("continue"), expect.stringContaining("leave")]));
     expect(db.prepare("SELECT COUNT(*) AS n FROM reservations").get()).toEqual({ n: 0 });
     expect(stockOf(db, "iphone-18-pro", "Silver", storageOf18Pro)).toBe(0);
   });

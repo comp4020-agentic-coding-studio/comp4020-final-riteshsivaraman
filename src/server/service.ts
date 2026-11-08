@@ -27,6 +27,7 @@ import { modelById } from "../shared/talk/data.ts";
 import { stockOf, takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
 import { advanceStaff, beginHumanTalk, payScene, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, standInAnswer, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
+import { offerSoldOut } from "../shared/talk/scene.ts";
 import type { Scene } from "../shared/talk/types.ts";
 import { CPU_PAY_MS, cpuPayChoice, cpuReply, startCpuTalk, type CpuTalk } from "./cpuCustomer.ts";
 
@@ -1497,13 +1498,30 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
   if (tracked) {
     if (!takeOne(ctx.db, product, sku.colour, sku.storage)) {
       log(ctx, row.customer_id, "reserve_lost", { product, colour: sku.colour });
-      const scene: Scene = { ...d.scene, ended: { how: "left", why: "sold out" } };
-      saveTalkData(ctx, row, { ...d, scene });
       const holder = holderNameOf(ctx, product, sku.colour, sku.storage);
-      const sorry = holder
-        ? `Sorry, I've just checked and the ${sku.colour} ${sale.name} is on hold for ${holder}.`
-        : `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
-      return [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sorry, [], true, "customer") } }, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
+      // Issue #36: the "on hold for X" / "gone" wording (#21/#3) is
+      // unchanged either way. When a live race for this exact unit was
+      // just lost to a named holder, the conversation still ends here (the
+      // unit is gone right now, nothing to continue toward, and
+      // spec/3-stock-holds-visible.test.ts's live race test expects the
+      // chat to end) -- offerSoldOut's real choice (continue looking, or
+      // leave) is for the generic "nothing in stock at all" case, where
+      // there genuinely is somewhere else to look.
+      if (holder) {
+        const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} is on hold for ${holder}.`;
+        const scene: Scene = { ...d.scene, ended: { how: "left", why: "sold out" } };
+        saveTalkData(ctx, row, { ...d, scene });
+        return [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sorry, [], true, "customer") } }, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
+      }
+      const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
+      const scene = offerSoldOut(d.scene, sku.model, sorry);
+      const next: TalkConvData = { ...d, scene };
+      saveTalkData(ctx, row, next);
+      const turn = currentTurn(scene);
+      const humanStaff = row.with_kind === "visitor";
+      const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, false, "customer") } }];
+      if (humanStaff) out.push(staffMenu(ctx, row, next));
+      return out;
     }
     ctx.db
       .prepare("INSERT INTO reservations (id, visitor_id, product, colour, storage, status, created_at, expires_at) VALUES (?, ?, ?, ?, ?, 'held', ?, ?)")
