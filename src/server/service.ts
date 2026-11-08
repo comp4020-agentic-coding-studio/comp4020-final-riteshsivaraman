@@ -655,6 +655,10 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
   const putDown = [...closed, ...endInspect(ctx, customerId, "started a conversation")];
   const r = resolveTalk(ctx, customerId, withId);
   if ("fail" in r) return [...putDown, ...r.fail];
+  // the one bringing this customer's bag comes to them and starts the payment
+  // themselves (issue #52): the customer's E never opens it, nor a new chat
+  const bringing = liveIntentOf(ctx.db, customerId, withId);
+  if (bringing) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} has your order and will come to you to take payment.`)];
   // busy: in a conversation, still standing with someone on their last turn, walking someone somewhere, or on their way to take payment
   if (staffBusy(ctx, withId, r.ok.withKind)) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} is with someone else. Please wait a moment.`)];
   // a real staff user claimed with E directly, no offer required (D54): tracked the
@@ -851,12 +855,12 @@ function intentEngagement(r: IntentRow): Engagement {
 
 const beginApproach = (r: IntentRow): Outgoing[] => (r.staff_kind === "npc" ? [{ to: "all", message: { type: "engaged", ...intentEngagement(r) } }] : []);
 
-// Whether the specialist has got to the customer. An NPC's position is the
-// same pure function the clients draw.
-function staffArrived(ctx: Ctx, r: IntentRow, cpos: { x: number; z: number }): boolean {
-  if (r.staff_kind === "npc") return !engagedMoment(r.staff_id, intentEngagement(r), ctx.now).walking;
-  const spos = ctx.position(r.staff_id);
-  return !!spos && dist(spos, cpos) <= TALK_RANGE;
+// Whether an NPC specialist has got to the customer: its position is the same
+// pure function the clients draw. A real specialist never "arrives" on their
+// own: they open the payment by pressing E at the customer (`staffTalk`), so
+// the customer walking up to them cannot start it (issue #52).
+function staffArrived(ctx: Ctx, r: IntentRow): boolean {
+  return r.staff_kind === "npc" && !engagedMoment(r.staff_id, intentEngagement(r), ctx.now).walking;
 }
 
 // Runs whatever has become due: a specialist who was waiting in line starts
@@ -879,7 +883,7 @@ export function settleVisits(ctx: Ctx): Outgoing[] {
       r = ctx.db.prepare("SELECT * FROM intents WHERE id = ?").get(r.id) as IntentRow;
       out.push(...beginApproach(r));
     }
-    const arrived = staffArrived(ctx, r, cpos);
+    const arrived = staffArrived(ctx, r);
     // someone coming to take payment follows a customer who wanders off, from where they stand now
     if (r.staff_kind === "npc" && arrived && dist(cpos, { x: r.at_x ?? cpos.x, z: r.at_z ?? cpos.z }) > 1.5) {
       const here = engagedMoment(r.staff_id, intentEngagement(r), ctx.now);
@@ -924,6 +928,15 @@ function staffTalk(ctx: Ctx, staffId: string, customerId: string): Outgoing[] {
   const spos = ctx.position(staffId);
   if (!cpos || !spos || dist(cpos, spos) > TALK_RANGE) return [notice(staffId, "Walk a little closer first.")];
   if (!customerFree(ctx, customerId)) return [notice(staffId, `${nameOf(ctx, customerId)} is busy right now.`)];
+  // carrying this customer's bag: their E is what opens the payment (issue #52)
+  const visit = liveIntentOf(ctx.db, customerId, staffId);
+  if (visit) {
+    const opened = ctx.db.transaction(() => {
+      log(ctx, customerId, "staff_approached", { staffId, for: "payment", visitId: visit.id });
+      return openPay(ctx, visit);
+    })();
+    return [...opened, ...settleOffers(ctx)];
+  }
   // the claim (D48): single-threaded, so the check above and the open below
   // cannot interleave with another E press; whoever comes second finds the
   // customer busy. Any free real staff user may claim, offered or not: the
