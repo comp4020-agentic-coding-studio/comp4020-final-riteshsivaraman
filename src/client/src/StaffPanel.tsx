@@ -17,7 +17,7 @@ export function StaffPanel() {
   const me = net.you.id;
   const post = designationOf({ kind: net.identity.kind, specialty: net.identity.specialty });
   const tasks = net.customers.filter((c) => c.state === "waiting_for_help" && c.needs === post && !c.withName);
-  const orders = net.orders.filter((o) => o.specId === me && o.stage !== "paying");
+  const orders = net.orders.filter((o) => o.specId === me && o.stage !== "paying" && o.stage !== "paid");
   const recent = net.updates.filter((u) => Date.now() - u.at < 20000);
   if (tasks.length === 0 && orders.length === 0 && recent.length === 0) return <aside className="staff-corner idle">No customers are waiting for you.</aside>;
   return (

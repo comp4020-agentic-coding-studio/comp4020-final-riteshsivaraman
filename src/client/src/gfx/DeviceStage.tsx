@@ -5,6 +5,10 @@ import { Desktop, Monitor } from "./computers.tsx";
 import { DEVICE_COLOURS, WOOD, type Kind } from "./common.tsx";
 import type { ScreenMode } from "./phones.tsx";
 import { Reflections } from "../Store.tsx";
+import { Handheld } from "./Handheld.tsx";
+import { Actor } from "./Actor.tsx";
+import { STAFF_SHIRT } from "../../../shared/profile.ts";
+import { payPose, REST } from "./pay-choreo.ts";
 
 // Dev only (`?device=1`): one product alone on a plinth, for the per-model
 // look check (graphics-brief "check your work" step 3). Not the in-store
@@ -15,6 +19,10 @@ import { Reflections } from "../Store.tsx";
 // `dist`/`h` (m) place a fixed camera for a headless screenshot. `kind=desktop`
 // or `kind=monitor` stands a Desktop / Monitor (DESKTOP_MODELS / DISPLAY_MODELS
 // id in `model`) instead; `ty` (m) moves the orbit target up for tall things.
+// `kind=handheld` stands the staff payment handheld (issue #42) upright;
+// `beat=scanned|total_shown|tapped|paid` and `ms` (into that beat) pose its
+// screen and effects as a payment would, with a made-up sample sale.
+// `kind=staff` stands a member of staff holding it (same `beat`/`ms`), facing +z.
 
 const Q = new URLSearchParams(location.search);
 
@@ -46,7 +54,15 @@ export function DeviceStage() {
           <planeGeometry args={[1.2, 1.2]} />
           <meshStandardMaterial color={WOOD} roughness={0.55} />
         </mesh>
-        {(kind as string) === "desktop" ? (
+        {(kind as string) === "staff" ? (
+          <group rotation={[0, Math.PI + devRotY, 0]}>
+            <Actor id="stage-staff" shirt={STAFF_SHIRT} uniform={{ cap: "#3b82f6", badge: "#3b82f6" }} getState={() => ({ walking: false, mode: "idle", mood: "smile", pay: stagePose() })} />
+          </group>
+        ) : (kind as string) === "handheld" ? (
+          <group position={[0, 0.1, 0]} rotation={[0, devRotY, 0]}>
+            <Handheld getPose={() => stagePose()} />
+          </group>
+        ) : (kind as string) === "desktop" ? (
           <Desktop model={model} colour={colour} x={0} y={0} z={0} side={1} rotY={devRotY} screenMode={screenMode} />
         ) : (kind as string) === "monitor" ? (
           <Monitor model={model} x={0} y={0} z={0} side={1} rotY={devRotY} screenMode={screenMode} />
@@ -63,4 +79,14 @@ export function DeviceStage() {
       )}
     </>
   );
+}
+
+// a sample sale for the dev stage only: the price is whatever `price` says
+function stagePose() {
+  const beat = Q.get("beat");
+  if (!beat) return REST;
+  const ms = Number(Q.get("ms") ?? "2000");
+  const sale = { name: Q.get("item") ?? "iPhone 17", colour: "Black", storage: "256GB", price: Number(Q.get("price") ?? "1499") };
+  if (beat === "paid") return payPose({ ...sale, beat: "tapped", beatAt: 0, paidAt: 0 }, ms, false);
+  return payPose({ ...sale, beat: beat as "scanned" | "total_shown" | "tapped", beatAt: 0 }, ms, false);
 }

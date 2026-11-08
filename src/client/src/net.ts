@@ -22,6 +22,11 @@ import type {
 
 export type Status = "connecting" | "open" | "closed" | "replaced";
 
+// A paid order is shown for its server window only (issue #49): until
+// `paidAt + PAID_SHOW_MS` on the server's clock, never a client timer.
+export const PAID_SHOW_MS = 4000;
+export const isPayShowing = (o: OrderView, serverNow: number): boolean => o.stage === "paying" || (o.stage === "paid" && o.paidAt !== undefined && serverNow < o.paidAt + PAID_SHOW_MS);
+
 // A remote visitor: where the server last said they were (tx/tz/try) and where
 // we are drawing them (x/z/ry), eased towards it each frame.
 export interface Remote {
@@ -434,6 +439,13 @@ class Net {
     this.send({ type: "staff_move", conversationId: this.staffConv.conversationId, actId, tone });
   }
 
+  // the handheld's own button (issue #42): advance the payment one beat
+  // (scan -> show total). The server decides; the tap is the customer's.
+  payAdvance(): void {
+    const pay = this.myPayingOrder?.pay;
+    if (pay && pay.beat === "scanned") this.send({ type: "payment_advance", conversationId: pay.conversationId });
+  }
+
   // a specialist steps away from the conversation (Esc)
   staffLeave(): void {
     if (this.staffConv) this.send({ type: "talk_leave" });
@@ -456,10 +468,21 @@ class Net {
 
   // the order you are part of, on either side
   get myOrderAsCustomer(): OrderView | undefined {
-    return this.orders.find((o) => o.customerId === this.you?.id && o.stage !== "paying");
+    return this.orders.find((o) => o.customerId === this.you?.id && o.stage !== "paying" && o.stage !== "paid");
   }
   get myOrderAsSpecialist(): OrderView | undefined {
-    return this.orders.find((o) => o.specId === this.you?.id);
+    return this.orders.find((o) => o.specId === this.you?.id && o.stage !== "paid");
+  }
+  // the payment you are taking or making right now (issue #42), including the
+  // brief "paid" window after it goes through
+  get myPayingOrder(): OrderView | undefined {
+    const me = this.you?.id;
+    return this.orders.find((o) => o.pay && isPayShowing(o, this.serverNow()) && (o.customerId === me || o.specId === me));
+  }
+  // the payment a member of staff is taking, for drawing their handheld
+  payingWith(staffId: string): OrderView | undefined {
+    const now = this.serverNow();
+    return this.orders.find((o) => o.specId === staffId && o.pay && isPayShowing(o, now));
   }
   // who is carrying a bag right now
   carrying(id: string): boolean {
