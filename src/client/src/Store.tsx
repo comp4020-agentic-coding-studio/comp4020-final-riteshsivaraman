@@ -13,7 +13,7 @@ import { NPCS, npcPose } from "../../shared/npcs.ts";
 import { poseChanged } from "../../shared/pose.ts";
 import { wrap } from "../../shared/steering.ts";
 import { designationOf, EMPLOYEE_COLOUR, STAFF_SHIRT } from "../../shared/profile.ts";
-import { avoidPeople, engagedPlaces } from "../../shared/people.ts";
+import { avoidPeople, bendAroundPeople, engagedPlaces, nonVisitorPeople } from "../../shared/people.ts";
 import { SPAWN, STORE_Y, type Pose } from "../../shared/protocol.ts";
 import { clampToWalkable, resolveCollisions, TABLE_H, zoneOf } from "../../shared/world.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID, type DeviceSlot } from "../../shared/slots.ts";
@@ -396,23 +396,34 @@ function Player() {
       wz /= len;
     }
 
+    // (in third person the camera is behind you, so your own place is net.me)
+    const fromMe = net.thirdPerson || wasThird.current;
+    wasThird.current = net.thirdPerson;
+    const meX = fromMe ? net.me.x : camera.position.x;
+    const meZ = fromMe ? net.me.z : camera.position.z;
+    // bend the wanted direction around anyone nearby before applying it, so
+    // another customer is walked around like a table instead of shoved
+    // apart only after you have already walked into them
+    const others = [...net.remotes.values()];
+    const engaged = new Map([...heldPlaces(net.heldCpu().values(), net.serverNow()), ...engagedPlaces(net.engaged.values(), net.serverNow())]);
+    if (len > 0) {
+      ({ x: wx, z: wz } = bendAroundPeople(wx, wz, meX, meZ, [...others, ...nonVisitorPeople(net.serverNow(), engaged, others)]));
+    }
+
     // Ease towards the wanted speed so you accelerate and settle, not snap.
     const ease = 1 - Math.exp(-12 * dt);
     velocity.current.x += (wx * WALK_SPEED - velocity.current.x) * ease;
     velocity.current.z += (wz * WALK_SPEED - velocity.current.z) * ease;
 
-    // (in third person the camera is behind you, so your own place is net.me)
-    const fromMe = net.thirdPerson || wasThird.current;
-    wasThird.current = net.thirdPerson;
-    let x = (fromMe ? net.me.x : camera.position.x) + velocity.current.x * dt;
-    let z = (fromMe ? net.me.z : camera.position.z) + velocity.current.z * dt;
+    let x = meX + velocity.current.x * dt;
+    let z = meZ + velocity.current.z * dt;
     // where you may stand depends on your role (staff reach the back room)
     if (SHOT) return;
     ({ x, z } = clampToWalkable(net.role, x, z));
     ({ x, z } = resolveCollisions(x, z, net.role));
     // people are solid too: other visitors, staff, customers, walkers
     // (a promoted timetable customer is solid where it is held, not on its timetable: issue #41)
-    ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow(), new Map([...heldPlaces(net.heldCpu().values(), net.serverNow()), ...engagedPlaces(net.engaged.values(), net.serverNow())])));
+    ({ x, z } = avoidPeople(x, z, others, net.serverNow(), engaged));
     ({ x, z } = clampToWalkable(net.role, x, z));
     // sound (#11): a footstep every stride length actually covered, and a
     // door chime the one time you cross from outside/the entrance onto the

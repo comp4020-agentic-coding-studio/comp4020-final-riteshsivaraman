@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
-import { avoidPeople, engagedPlaces, nonVisitorPeople, settledPeople } from "../src/shared/people.ts";
+import { avoidPeople, bendAroundPeople, engagedPlaces, nonVisitorPeople, settledPeople } from "../src/shared/people.ts";
 import { BODY_RADIUS, separateFromPeople } from "../src/shared/world.ts";
 
 // Promise: people are solid (Ritesh, 2026-10-11, "have collision between
@@ -132,4 +132,29 @@ it("an NPC who has gone to talk to someone is solid where it stands now, not at 
   // and where it stands now you cannot walk through it
   const bumped = avoidPeople(meeting.x + 0.1, meeting.z, [], T0, places);
   expect(Math.hypot(bumped.x - meeting.x, bumped.z - meeting.z)).toBeGreaterThanOrEqual(MIN - 1e-6);
+});
+
+// Ritesh, 2026-11-09: "every customer treats every other customer as an
+// OBSTACLE that you walk AROUND not into, like a TABLE" -- a walker heading
+// straight at someone should be bent off that heading before they overlap,
+// not just shoved apart afterwards (the job `separateFromPeople` already does).
+it("bends a walker's path away from someone directly ahead", () => {
+  // walking +z (0, 1) straight at someone 1m ahead: the wanted direction
+  // should tilt sideways, not stay dead-on
+  const bent = bendAroundPeople(0, 1, 0, 0, [{ x: 0, z: 1 }]);
+  expect(Math.abs(bent.x)).toBeGreaterThan(0.05);
+  // still roughly forward, not reversed
+  expect(bent.z).toBeGreaterThan(0);
+  // still a unit vector
+  expect(Math.hypot(bent.x, bent.z)).toBeCloseTo(1, 5);
+});
+
+it("leaves the wanted direction alone when nobody is near", () => {
+  const same = bendAroundPeople(0.6, 0.8, 0, 0, [{ x: 10, z: 10 }]);
+  expect(same.x).toBeCloseTo(0.6, 5);
+  expect(same.z).toBeCloseTo(0.8, 5);
+});
+
+it("leaves a stationary wish (0, 0) alone", () => {
+  expect(bendAroundPeople(0, 0, 0, 0, [{ x: 0.1, z: 0 }])).toEqual({ x: 0, z: 0 });
 });

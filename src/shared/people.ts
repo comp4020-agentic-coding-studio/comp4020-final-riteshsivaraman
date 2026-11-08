@@ -107,3 +107,48 @@ export function avoidPeople(
 ): { x: number; z: number } {
   return separateFromPeople(x, z, [...visitors, ...nonVisitorPeople(nowMs, engaged, visitors)]);
 }
+
+// Bends a wanted walk direction (wx, wz, already a unit vector or zero) away
+// from anyone nearby, before it is applied, so a person you are heading
+// straight at is curved round like a table -- not just shoved apart after
+// your positions already overlap (Ritesh, 2026-11-09: "treats every other
+// customer as an obstacle you walk AROUND not into, like a TABLE"). Same
+// steerTo geometry (steering.ts) used for furniture, applied to people: the
+// push grows as you get close, and a push to the side (always the same side
+// once committed, so a head-on pair pass each other rather than deadlock)
+// is strongest for someone directly ahead.
+const LOOK_AHEAD = 1.6; // metres: where a nearby person starts to bend your path
+const MARGIN = 0.5; // metres: the gap this tries to keep clear
+
+export function bendAroundPeople(
+  wx: number,
+  wz: number,
+  x: number,
+  z: number,
+  others: ReadonlyArray<{ x: number; z: number }>,
+): { x: number; z: number } {
+  if (wx === 0 && wz === 0) return { x: wx, z: wz };
+  let sx = wx;
+  let sz = wz;
+  const reach = MARGIN + LOOK_AHEAD;
+  for (const o of others) {
+    const dx = x - o.x;
+    const dz = z - o.z;
+    const d = Math.hypot(dx, dz);
+    if (d >= reach || d < 1e-6) continue;
+    const nx = dx / d;
+    const nz = dz / d;
+    const strength = Math.min(1, (reach - d) / reach);
+    const ahead = Math.max(0, -(nx * wx + nz * wz)); // 1 when directly in the way
+    sx += nx * strength * 1.2;
+    sz += nz * strength * 1.2;
+    // round it: always the same side once in the way, so a head-on pair pass
+    // each other instead of both dodging the same way forever
+    const side = -nz * wx + nx * wz >= 0 ? 1 : -1;
+    sx += -nz * side * strength * ahead * 1.4;
+    sz += nx * side * strength * ahead * 1.4;
+  }
+  const len = Math.hypot(sx, sz);
+  if (len < 1e-6) return { x: wx, z: wz };
+  return { x: sx / len, z: sz / len };
+}
