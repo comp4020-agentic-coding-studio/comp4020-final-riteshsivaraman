@@ -27,6 +27,7 @@ import { modelById } from "../shared/talk/data.ts";
 import { stockOf, takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
 import { advanceStaff, beginHumanTalk, payScene, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, standInAnswer, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
+import { offerSoldOut } from "../shared/talk/scene.ts";
 import type { Scene } from "../shared/talk/types.ts";
 import { CPU_PAY_MS, cpuPayChoice, cpuReply, startCpuTalk, type CpuTalk } from "./cpuCustomer.ts";
 
@@ -1497,13 +1498,22 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
   if (tracked) {
     if (!takeOne(ctx.db, product, sku.colour, sku.storage)) {
       log(ctx, row.customer_id, "reserve_lost", { product, colour: sku.colour });
-      const scene: Scene = { ...d.scene, ended: { how: "left", why: "sold out" } };
-      saveTalkData(ctx, row, { ...d, scene });
       const holder = holderNameOf(ctx, product, sku.colour, sku.storage);
+      // Issue #36: the unit went between confirming and this check. The
+      // "on hold for X" / "gone" wording (#21/#3) is unchanged -- only the
+      // scene no longer ends here: offerSoldOut hands the customer a real
+      // choice (continue looking, or leave) instead of a dead end.
       const sorry = holder
         ? `Sorry, I've just checked and the ${sku.colour} ${sale.name} is on hold for ${holder}.`
         : `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
-      return [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sorry, [], true, "customer") } }, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
+      const scene = offerSoldOut(d.scene, sku.model, sorry);
+      const next: TalkConvData = { ...d, scene };
+      saveTalkData(ctx, row, next);
+      const turn = currentTurn(scene);
+      const humanStaff = row.with_kind === "visitor";
+      const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, false, "customer") } }];
+      if (humanStaff) out.push(staffMenu(ctx, row, next));
+      return out;
     }
     ctx.db
       .prepare("INSERT INTO reservations (id, visitor_id, product, colour, storage, status, created_at, expires_at) VALUES (?, ?, ?, ?, ?, 'held', ?, ?)")
