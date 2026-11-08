@@ -231,6 +231,11 @@ interface Checkout {
   stage: "pay";
   sale: { name: string; colour: string; storage: string; price: number };
   beat: PaymentBeat;
+  // Issue #49: when `beat` was last reached, so the client can read the beat
+  // and its timestamp off OrderView instead of trusting a timer of its own.
+  // Set once in openPay (the "scanned" beat) and again every time advanceBeat
+  // moves the beat forward.
+  beatAt: number;
 }
 
 const NEXT_BEAT: Record<PaymentBeat, PaymentBeat | undefined> = {
@@ -1302,10 +1307,29 @@ const saveRunner = (ctx: Ctx, o: OrderRow, eng: Engagement, arrivedAt: number | 
   ctx.db.prepare("UPDATE orders SET runner = ?, arrived_at = ? WHERE id = ?").run(JSON.stringify(eng), arrivedAt, o.id);
 };
 
+// Issue #49: how long a just-completed order still shows as the synthetic
+// "paid" stage (the final tap/checkmark beat), purely a window compared
+// against the order's own stored `ended_at` -- never a timer.
+const PAID_WINDOW_MS = 4000;
+
+// The payment conversation for an order: same customer, same specialist, by
+// kind. Looked up by identity rather than a stored id because the order row
+// never carries a conversation id of its own, and the conversation may
+// already be ended (its `checkout` wiped by handleCheckoutChoice) by the time
+// a "paid" view is read for it.
+function paymentConvOf(ctx: Ctx, o: Pick<OrderRow, "customer_id" | "spec_id" | "spec_kind">): ConvRow | undefined {
+  return ctx.db
+    .prepare("SELECT * FROM conversations WHERE customer_id = ? AND with_id = ? AND with_kind = ? ORDER BY started_at DESC LIMIT 1")
+    .get(o.customer_id, o.spec_id, o.spec_kind) as ConvRow | undefined;
+}
+
+const recentlyPaidOrders = (db: Database.Database, now: number): OrderRow[] =>
+  db.prepare("SELECT * FROM orders WHERE stage = 'done' AND ended_at IS NOT NULL AND ended_at <= ? AND (? - ended_at) < ?").all(now, now, PAID_WINDOW_MS) as OrderRow[];
+
 export function orderViews(ctx: Ctx): OrderView[] {
-  return liveOrders(ctx.db).map((o) => {
+  const live = liveOrders(ctx.db).map((o): OrderView => {
     const sale = saleOf(o);
-    return {
+    const base: OrderView = {
       id: o.id,
       customerId: o.customer_id,
       customerName: nameOf(ctx, o.customer_id),
@@ -1316,7 +1340,38 @@ export function orderViews(ctx: Ctx): OrderView[] {
       stage: o.stage as OrderView["stage"],
       what: `${sale.colour} ${sale.name}`,
     };
+    if (o.stage !== "paying") return base;
+    const conv = paymentConvOf(ctx, o);
+    const d = conv ? anyDataOf(conv) : undefined;
+    const checkout = d && isTalkData(d) ? d.checkout : undefined;
+    if (!conv || !checkout) return base;
+    // price/name/colour/storage always come from the order's own stored
+    // `sale`, never recomputed off the conversation, so a client can never be
+    // shown a total the server didn't itself charge.
+    return { ...base, pay: { conversationId: conv.id, beat: checkout.beat, beatAt: checkout.beatAt, name: sale.name, colour: sale.colour, storage: sale.storage, price: sale.price } };
   });
+  // The synthetic "paid" window: the order has already reached `done`, so it
+  // is not in liveOrders, but everyone in the room should still see the
+  // tapped/checkmark beat briefly. Read-only and derived purely from
+  // `ended_at` vs `ctx.now` -- no new write, no timer.
+  const justPaid = recentlyPaidOrders(ctx.db, ctx.now).map((o): OrderView => {
+    const sale = saleOf(o);
+    const conv = paymentConvOf(ctx, o);
+    return {
+      id: o.id,
+      customerId: o.customer_id,
+      customerName: nameOf(ctx, o.customer_id),
+      specId: o.spec_id,
+      specName: nameOf(ctx, o.spec_id),
+      stockId: o.stock_id,
+      stockName: nameOf(ctx, o.stock_id),
+      stage: "paid",
+      what: `${sale.colour} ${sale.name}`,
+      pay: { conversationId: conv?.id ?? o.id, beat: "tapped", beatAt: o.ended_at!, name: sale.name, colour: sale.colour, storage: sale.storage, price: sale.price },
+      paidAt: o.ended_at!,
+    };
+  });
+  return [...live, ...justPaid];
 }
 
 // Every unit currently held (reservations, status 'held', not yet expired at
@@ -1576,7 +1631,7 @@ function openPay(ctx: Ctx, r: IntentRow): Outgoing[] {
   const id = randomUUID();
   const row: ConvRow = { id, customer_id: r.customer_id, with_id: r.staff_id, with_kind: r.staff_kind, script: "phones", node: "talk", data: null, started_at: ctx.now, ended_at: null };
   const eng: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since: r.opened_at ?? ctx.now, at: cpos };
-  const data: TalkConvData = { engine: "talk", scene: payScene(), at: cpos, checkout: { stage: "pay", sale, beat: "scanned" }, ...(r.staff_kind === "npc" ? { eng } : {}) };
+  const data: TalkConvData = { engine: "talk", scene: payScene(), at: cpos, checkout: { stage: "pay", sale, beat: "scanned", beatAt: ctx.now }, ...(r.staff_kind === "npc" ? { eng } : {}) };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
     .run(row.id, r.customer_id, r.staff_id, r.staff_kind, row.script, row.node, JSON.stringify(data), ctx.now);
@@ -1628,7 +1683,7 @@ function advanceBeat(ctx: Ctx, customerId: string, staffId: string, c: Checkout)
   if (!next) return c;
   if (next === "total_shown") log(ctx, customerId, "total_shown", { by: staffId, sale: c.sale });
   else log(ctx, customerId, "tapped", { by: staffId });
-  return { ...c, beat: next };
+  return { ...c, beat: next, beatAt: ctx.now };
 }
 
 // The staff handheld's own "scan" / "show total" action (issue #2): a real
