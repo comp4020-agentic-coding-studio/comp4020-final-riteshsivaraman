@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNet } from "./net.ts";
+import { touchUi } from "./touch.ts";
 import { TONES, TONE_LABEL } from "../../shared/emotions.ts";
 
 // The conversation box, matching the staff side's look (Ritesh, 2026-11-08):
@@ -129,7 +130,9 @@ export function Talk() {
   return (
     <div className="talk" role="dialog" aria-label={`Conversation with ${turn.withName}`}>
       <div className="talk-name">{turn.withName}</div>
-      {!turn.ended && <div className="talk-leave-hint"><kbd>Esc</kbd> to step away</div>}
+      {!turn.ended && (touchUi
+        ? <button type="button" className="talk-leave-hint talk-leave-btn" onClick={() => net.talkLeave()}>Step away</button>
+        : <div className="talk-leave-hint"><kbd>Esc</kbd> to step away</div>)}
       <div className="staff-log" ref={logEl} onClick={skip}>
         {net.talkLog.slice(0, -1).map((l, i) => (
           <p key={i} className={l.who === "customer" ? "you" : "them"}>

@@ -13,6 +13,8 @@ import { productById } from "../../shared/catalogue.ts";
 import { armAutoplayGate, wireUiClicks } from "./audio.ts";
 import { SoundToggle } from "./SoundToggle.tsx";
 import { PayCard } from "./PayCard.tsx";
+import { TouchControls } from "./TouchControls.tsx";
+import { touchUi } from "./touch.ts";
 import "./styles.css";
 
 // Sound (#11): arm the autoplay gate and the UI click cue once, as soon as
@@ -88,8 +90,8 @@ function Hud() {
       </div>
       <div className="hud-hint">
         {live.myInspectSlot
-          ? "Drag to turn the device in your hand · E, tap away, or Esc to put it down"
-          : "Drag the view to look around · W A S D to walk · arrows turn · E to talk · V to see yourself"}
+          ? touchUi ? "Drag to turn the device in your hand · tap away to put it down" : "Drag to turn the device in your hand · E, tap away, or Esc to put it down"
+          : touchUi ? "Drag the view to look around · use the arrows to walk · tap the button to talk or look" : "Drag the view to look around · W A S D to walk · arrows turn · E to talk · V to see yourself"}
       </div>
       {waiting && (
         <div className="chip-status">
@@ -138,8 +140,8 @@ function Hud() {
       {live.myOrderAsSpecialist?.stage === "with_spec" && !live.locked && (
         <div className="escort-banner">You have {live.myOrderAsSpecialist.customerName}'s {live.myOrderAsSpecialist.what}: find them and take payment.</div>
       )}
-      {live.hint && !live.locked && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
-      {!live.hint && live.deviceHint && !live.locked && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect {live.deviceHint.name}</div>}
+      {!touchUi && live.hint && !live.locked && <div className="hint">Press <kbd>E</kbd> to talk to {live.hint.name}</div>}
+      {!touchUi && !live.hint && live.deviceHint && !live.locked && !live.myInspectSlot && <div className="hint">Press <kbd>E</kbd> to inspect {live.deviceHint.name}</div>}
       {live.notice && Date.now() - live.notice.at < 4000 && <div className="toast">{live.notice.text}</div>}
     </div>
   );
@@ -202,6 +204,7 @@ function App() {
           <StaffTalk />
           <StaffPanel />
           <PayCard />
+          <TouchControls />
           <SoundToggle />
         </>
       )}

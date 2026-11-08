@@ -46,7 +46,7 @@ const PARAMS = new URLSearchParams(location.search);
 export const SHOT = PARAMS.has("shot");
 const FOV = Number(PARAMS.get("fov")) || 72;
 
-const keys = new Set<string>();
+export const keys = new Set<string>();
 
 // First person: the camera is the visitor's eyes. Keys move you relative to
 // where you are looking, and collisions use the same boxes the scene draws.
@@ -166,8 +166,37 @@ function Player() {
       dragging = false;
       // a tap, not a drag, while inspecting: tap-away puts the device down (D26)
       if (net.myInspectSlot && dragDistance < 4) net.inspectEnd();
+      // a tap (not a drag) on the person or device you are close enough to use: the same as pressing E at them
+      else if (dragDistance < 8 && !net.locked && !net.myInspectSlot) tapToInteract(e);
       canvas.releasePointerCapture?.(e.pointerId);
       canvas.style.cursor = "grab";
+    };
+    // the pixel distance within which a tap counts as being on a person or a device
+    const TAP_RADIUS = 90;
+    const tapToInteract = (e: PointerEvent): void => {
+      const rect = canvas.getBoundingClientRect();
+      const px = e.clientX - rect.left;
+      const py = e.clientY - rect.top;
+      const onScreen = (x: number, y: number, z: number): number => {
+        PROJECT_TMP.set(x, y, z).project(camera);
+        if (PROJECT_TMP.z > 1) return Infinity; // behind you
+        return Math.hypot(((PROJECT_TMP.x + 1) / 2) * rect.width - px, ((1 - PROJECT_TMP.y) / 2) * rect.height - py);
+      };
+      if (net.hint) {
+        const id = net.hint.id;
+        const r = net.remotes.get(id);
+        const eng = net.engaged.get(id);
+        const def = NPCS.find((n) => n.id === id);
+        const at = r ? { x: r.x, z: r.z } : eng ? engagedMoment(id, eng, net.serverNow()) : def ? npcPose(def, net.serverNow()) : null;
+        if (at && onScreen(at.x, STORE_Y + 1.1, at.z) < TAP_RADIUS) {
+          net.talkStart(id);
+          return;
+        }
+      }
+      if (!net.hint && net.deviceHint) {
+        const slot = DEVICE_SLOTS.find((s) => s.id === net.deviceHint!.slotId);
+        if (slot && onScreen(slot.x, STORE_Y + TABLE_H + 0.1, slot.z) < TAP_RADIUS) net.inspectStart(slot.id);
+      }
     };
     canvas.addEventListener("pointerdown", press);
     canvas.addEventListener("pointermove", drag);

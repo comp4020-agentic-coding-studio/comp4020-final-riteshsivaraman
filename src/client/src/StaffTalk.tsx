@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNet } from "./net.ts";
+import { touchUi } from "./touch.ts";
 
 // A real specialist's conversation (Ritesh, 2026-10-20), laid out like the
 // customer's: the chat on the left with the moves you can make, and on the
@@ -38,9 +39,13 @@ export function StaffTalk() {
     <>
       <section className="staff-talk" role="dialog" aria-label={`Serving ${conv.customerName}`}>
         <div className="talk-name">{conv.customerName}</div>
-        <div className="talk-leave-hint">
-          <kbd>Esc</kbd> to step away
-        </div>
+        {touchUi ? (
+          <button type="button" className="talk-leave-hint talk-leave-btn" onClick={() => net.staffLeave()}>Step away</button>
+        ) : (
+          <div className="talk-leave-hint">
+            <kbd>Esc</kbd> to step away
+          </div>
+        )}
         <div className="staff-log" ref={logEl}>
           {conv.log.length === 0 && <p className="staff-empty">You are on. Start with a greeting.</p>}
           {conv.log.map((l, i) => (
