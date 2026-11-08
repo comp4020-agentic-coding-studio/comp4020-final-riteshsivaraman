@@ -41,6 +41,21 @@ export interface CustomerView {
   // when (server ms): what a marker over the customer is drawn from
   offeredTo?: string;
   offerUntil?: number;
+  // a promoted timetable customer (issue #20/#41): where the server holds it
+  at?: { x: number; z: number };
+}
+
+// A timetable customer the store's rules have taken over (issue #20, ADR 10):
+// promoted onto the waiting list, held at the spot it was promoted on until it
+// leaves. Every client draws it there instead of along its timetable (#41).
+// `since` is the server time it was promoted; `leftAt`, once it has left: it
+// walks out of the door from `at` and is not drawn on its timetable again
+// until its day has it out of the store (shared/heldCpu.ts).
+export interface HeldCpu {
+  id: string;
+  at: { x: number; z: number };
+  since: number;
+  leftAt?: number;
 }
 
 // The menu a visitor is shown, and whose turn it is. `group` is optional and
@@ -208,6 +223,7 @@ export type ServerMessage =
       chats: ChatPair[];
       orders: OrderView[];
       holds: HoldView[];
+      heldCpu: HeldCpu[];
       // where you start: the client puts your view there
       spawn: Pose;
       seated: Array<{ visitorId: string; at: { x: number; z: number }; face: { x: number; z: number } }>;
@@ -224,6 +240,7 @@ export type ServerMessage =
   | { type: "chats"; pairs: ChatPair[] }
   | { type: "orders"; orders: OrderView[] }
   | { type: "holds"; holds: HoldView[] }
+  | { type: "held_cpu"; held: HeldCpu[] }
   // a line for a specialist's corner feed
   | { type: "update"; text: string }
   | { type: "duty"; offDuty: string[] }

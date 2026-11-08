@@ -14,8 +14,9 @@ import {
 } from "../shared/conversation.ts";
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
-import { FLOOR, type ChatPair, type CustomerView, type Engagement, type HoldView, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
+import { FLOOR, type ChatPair, type CustomerView, type Engagement, type HeldCpu, type HoldView, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
 import { engagedArrival, engagedMoment } from "../shared/engage.ts";
+import { heldDone } from "../shared/heldCpu.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
@@ -416,6 +417,7 @@ export function customersView(ctx: Ctx): CustomerView[] {
       withName: r.with_id ? nameOf(ctx, r.with_id) : null,
       note: r.data ? ((JSON.parse(r.data) as { note?: string }).note ?? null) : null,
       ...offerView(r.data),
+      ...(CPU_CUSTOMER_IDS.has(r.id) && ctx.position(r.id) ? { at: ctx.position(r.id) } : {}),
     }))
     .sort((a, b) => b.sinceMs - a.sinceMs);
 }
@@ -2330,6 +2332,29 @@ export function cpuCustomersOnFloor(db: Database.Database, now: number): Map<str
     floor.set(id, { x: m.x, z: m.z });
   }
   return floor;
+}
+
+// The promoted timetable customers every client draws in place of their
+// timetable (issue #41): those on the floor now, held where they were
+// promoted, and those that left on this visit with when they left (their
+// `leaving` state's since), so every client walks them out of the door from
+// the same spot at the same moment, and keeps them off their timetable until
+// its day has them out of the store (shared/heldCpu.ts). The unpromoted ones
+// `cpuCustomersOnFloor` also lists are exactly where their timetable has
+// them, so a client needs no word of them.
+export function heldCpuCustomers(db: Database.Database, now: number, floor = cpuCustomersOnFloor(db, now)): HeldCpu[] {
+  const held: HeldCpu[] = [];
+  for (const st of cpuRows(db)) {
+    const mark = cpuMarkOf(st.data)!;
+    const at = floor.get(st.visitor_id);
+    if (st.state !== "leaving") {
+      if (at) held.push({ id: st.visitor_id, at, since: mark.promotedAt });
+      continue;
+    }
+    const left: HeldCpu = { id: st.visitor_id, at: mark.at, since: mark.promotedAt, leftAt: st.since };
+    if (mark.visit === visitOf(now) && !heldDone(left, now)) held.push(left);
+  }
+  return held.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 // Whether the timetable has this customer standing at a table waiting for a
