@@ -534,11 +534,17 @@ const STAFF_SHIRT = "#2f5d9e";
 // the customers, each with a reason to be here. 14 slots spread an 8 minute
 // cycle so thin the floor was empty for long stretches and never had more
 // than 4 people in it at once (Ritesh, 2026-11-09, live: "the store is
-// literally empty"). Doubled to keep the floor feeling like a real Apple
-// Store, where it's rare for a table to be unattended.
+// literally empty"), and even doubled to 28 the floor still averaged fewer
+// customers (3.8) than the 7 staff who are always on it ("embarassingly more
+// staff than customers"). Tripling to 42 broke steering/capacity tests (two
+// specialists and two geniuses physically cannot each hold 3x as many
+// customers without colliding or going unserved) -- 35 (2.5x) is the ceiling
+// this floor's fixed staff/furniture can actually serve without the crowd
+// sensors (people.test.ts, npcs.test.ts) going red for a real reason.
 const PURPOSES: Purpose[] = [
   "phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse", "audio", "consult", "repair", "phone",
   "phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse", "audio", "consult", "repair", "phone",
+  "phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse",
 ];
 const CUSTOMER_SHIRTS = ["#e07a5f", "#81b29a", "#f2cc8f", "#9b72aa", "#6d9dc5", "#d4a373", "#7a9e7e", "#c46f8a", "#6f8f4a", "#4a7c9a"];
 
@@ -639,7 +645,7 @@ function build(): void {
     const tl = new Timeline(c.id, "customer", { x: 0, z: SHOP_FRONT - 1.7 }, { x: 0, z: SHOP_FRONT + 3 }, "on their way", "neutral");
     timelines.set(c.id, tl);
     const jitter = rand(i * 17 + 3) * 8;
-    const arrival = 6 + (i * (horizon - 30)) / customers.length + jitter;
+    const arrival = 6 + (i * (horizon - 20)) / customers.length + jitter;
     const entryX = (rand(i * 31 + 5) * 2 - 1) * (ENTRANCE_HALF - 0.6);
     tl.pos = { x: entryX, z: SHOP_FRONT - 1.7 };
     tl.away(arrival);
