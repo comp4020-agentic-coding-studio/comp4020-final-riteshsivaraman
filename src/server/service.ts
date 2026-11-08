@@ -1457,7 +1457,10 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
   log(ctx, row.customer_id, "order_placed", { orderId, conversationId: row.id, spec: row.with_id, stockId, sale, expiresAt: ctx.now + ORDER_MS });
   log(ctx, row.customer_id, "stock_ordered", { conversationId: row.id, stockId, sale });
   // the chat ends here: the engine's closing line sent them to a till, and it now says what really happens
-  const say = line.replace(/I'll take you across to the till.*$/s, "Let me check we have it and get it brought out.") + ` Have a look around: ${nameOf(ctx, row.with_id)} will come and find you when it's here.`;
+  // issue reported live (Ritesh, 2026-11-08): the specialist referred to
+  // themselves in the third person ("Priya will come and find you"). This
+  // line is spoken by the specialist themselves, so it's first person.
+  const say = line.replace(/I'll take you across to the till.*$/s, "Let me check we have it and get it brought out.") + " Have a look around: I'll come and find you when it's here.";
   const scene: Scene = d.scene.ended ? d.scene : { ...d.scene, ended: { how: "bought", sku: sku as never } };
   return [
     { to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } },
