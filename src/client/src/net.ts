@@ -367,9 +367,20 @@ class Net {
           this.send({ type: "move", x: message.at.x, z: message.at.z, ry: Math.atan2(message.at.x - message.face.x, message.at.z - message.face.z) });
         }
         return true;
-      case "unseated":
+      case "unseated": {
+        const was = this.seats.get(message.visitorId);
         this.seats.delete(message.visitorId);
+        if (was && message.visitorId === this.you?.id) {
+          // standing up: a step back from the stool, into the room, not on the spot where the stool was
+          const dx = was.x - was.fx;
+          const dz = was.z - was.fz;
+          const d = Math.hypot(dx, dz) || 1;
+          this.me.x = was.x + (dx / d) * 0.6;
+          this.me.z = was.z + (dz / d) * 0.6;
+          this.send({ type: "move", x: this.me.x, z: this.me.z, ry: Math.atan2(dx, dz) });
+        }
         return true;
+      }
       case "escort": {
         const { type: _t, ...e } = message;
         this.escort = e;

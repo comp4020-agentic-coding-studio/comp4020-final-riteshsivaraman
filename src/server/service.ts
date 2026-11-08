@@ -2144,16 +2144,15 @@ const noRealStaffFor = (ctx: Ctx, designation: string): boolean =>
 // Opens the real conversation if the walk is actually done (or was never
 // needed — the NPC was already standing right there), otherwise just leaves
 // the approach noted for `settleApproaches` to catch up on a later request.
-function openWhenArrived(ctx: Ctx, customerId: string, npcId: string, script: ScriptId, since: number, at: { x: number; z: number }, from?: { x: number; z: number }, retries = 0): Outgoing[] {
+function openWhenArrived(ctx: Ctx, customerId: string, npcId: string, script: ScriptId, since: number, at: { x: number; z: number }, from?: { x: number; z: number }, began = ctx.now): Outgoing[] {
   const eng: Engagement = { npcId, visitorId: customerId, since, at, pending: true, waving: true, ...(from ? { from } : {}) };
   // the customer walked on while the NPC was coming: go to where they are NOW, from where the NPC
   // stands now, so it always ends up in front of them and facing them (never talking at the spot they left)
   const cpos = ctx.position(customerId);
-  // (a few steps of drift are close enough; and after a few re-aims a customer who keeps walking is spoken to
-  // where the NPC gets to, rather than chased for ever)
-  if (cpos && dist(cpos, at) > 0.9 && retries < 3) {
+  // (the chat only opens once they are standing where the NPC has gone to, so the two are always face to face)
+  if (cpos && dist(cpos, at) > 0.35) {
     const here = engagedMoment(npcId, eng, ctx.now);
-    const next = { npcId, script, since: ctx.now, at: { x: cpos.x, z: cpos.z }, from: { x: here.x, z: here.z }, retries: retries + 1 };
+    const next = { npcId, script, since: ctx.now, at: { x: cpos.x, z: cpos.z }, from: { x: here.x, z: here.z }, began };
     patchOfferData(ctx, customerId, { approach: next });
     return [{ to: "all", message: { type: "engaged", npcId, visitorId: customerId, since: next.since, at: next.at, from: next.from, pending: true, waving: true } }];
   }
@@ -2171,9 +2170,9 @@ function openWhenArrived(ctx: Ctx, customerId: string, npcId: string, script: Sc
 // right there), opens it immediately.
 function beginNpcApproach(ctx: Ctx, customerId: string, npcId: string, script: ScriptId, at: { x: number; z: number }): Outgoing[] {
   const since = ctx.now;
-  patchOfferData(ctx, customerId, { approach: { npcId, script, since, at } });
+  patchOfferData(ctx, customerId, { approach: { npcId, script, since, at, began: since } });
   const eng: Engagement = { npcId, visitorId: customerId, since, at, pending: true, waving: true };
-  const opened = openWhenArrived(ctx, customerId, npcId, script, since, at);
+  const opened = openWhenArrived(ctx, customerId, npcId, script, since, at, undefined, since);
   if (opened.length > 0) return opened;
   return [{ to: "all", message: { type: "engaged", ...eng } }];
 }
@@ -2196,7 +2195,13 @@ export function settleApproaches(ctx: Ctx): Outgoing[] {
       out.push({ to: "all", message: { type: "released", npcId: approach.npcId } });
       continue;
     }
-    out.push(...openWhenArrived(ctx, customerId, approach.npcId, approach.script, approach.since, approach.at, approach.from, approach.retries));
+    // a customer who just keeps walking is not chased for ever: after a minute it is given up
+    if (approach.began !== undefined && ctx.now - approach.began > 60_000) {
+      patchOfferData(ctx, customerId, { approach: undefined });
+      out.push({ to: "all", message: { type: "released", npcId: approach.npcId } });
+      continue;
+    }
+    out.push(...openWhenArrived(ctx, customerId, approach.npcId, approach.script, approach.since, approach.at, approach.from, approach.began));
   }
   return out;
 }
@@ -2403,7 +2408,7 @@ interface OfferData {
   // chat and the camera lock began while the NPC was still mid-room,
   // "talking to thin air"), the same arrived-then-open shape the payment
   // visit (`intents`, `staffArrived`) already uses.
-  approach?: { npcId: string; script: ScriptId; since: number; at: { x: number; z: number }; from?: { x: number; z: number }; retries?: number };
+  approach?: { npcId: string; script: ScriptId; since: number; at: { x: number; z: number }; from?: { x: number; z: number }; began?: number };
 }
 
 const offerData = (st: StateRow): OfferData => (st.data ? (JSON.parse(st.data) as OfferData) : {});

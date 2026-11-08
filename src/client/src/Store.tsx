@@ -358,8 +358,10 @@ function Player() {
       return; // the position sent to others (net.me) is untouched: only the local view moves
     }
     if (wasTalkingWith.current) {
-      // conversation ended: ease back to standing where you actually are,
-      // looking the way you were — the exact reverse of panning in, not a snap
+      // conversation ended: ease back to standing where you actually are. You keep facing the way you are now
+      // (towards whoever you were talking to) and only level your head: swinging round to wherever you had been
+      // looking before the talk was a big, disorienting pan, worst after Esc
+      talkStandPose.current = { ry: camera.rotation.y, pitch: 0 };
       talkExiting.current = true;
       wasTalkingWith.current = null;
     }
@@ -971,26 +973,22 @@ export function Reflections() {
   return null;
 }
 
-// Feeds the pure mixer (sound.ts) every frame: the listener is the local
-// player, sources are every other visible person (other real visitors, and
-// NPCs who are actually present right now). No rendering, no state: this
-// only exists to call into audio.ts.
-const AMBIENCE_EVERY_MS = 150; // the mixer doesn't need to run at 60fps
+// The only voice in the store is whoever is talking to you: when a new line arrives (their reply to you in a conversation,
+// or, for a specialist, what the customer said) a burst of babble plays for as long as the line takes to say. Nothing
+// renders; it only calls into audio.ts.
 function Ambience() {
-  const lastRun = useRef(0);
+  const seen = useRef({ turn: 0, staff: 0 });
   useFrame(() => {
-    const now = performance.now();
-    if (now - lastRun.current < AMBIENCE_EVERY_MS) return;
-    lastRun.current = now;
-    const sources: SoundSource[] = [];
-    for (const r of net.remotes.values()) sources.push({ id: r.info.id, x: r.x, z: r.z });
-    const serverNow = net.serverNow();
-    for (const def of NPCS) {
-      if (net.offDuty.has(def.id)) continue;
-      const pose = npcPose(def, serverNow);
-      if (pose.present) sources.push({ id: def.id, x: pose.x, z: pose.z });
+    if (net.turnAt !== seen.current.turn) {
+      seen.current.turn = net.turnAt;
+      const t = net.talking;
+      if (t?.say) sound.speak(t.say.length);
     }
-    sound.updateAmbience(net.me, sources);
+    if (net.staffAt !== seen.current.staff) {
+      seen.current.staff = net.staffAt;
+      const last = net.staffConv?.log?.[net.staffConv.log.length - 1];
+      if (last?.who === "customer" && last.text) sound.speak(last.text.length);
+    }
   });
   return null;
 }

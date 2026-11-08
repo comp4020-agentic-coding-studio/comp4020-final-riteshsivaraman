@@ -929,12 +929,38 @@ describe("the greeter approaching a new customer on its own (tryGreeterApproach)
     const reaim = last(settleApproaches(ctx(NOW + 100)), "all", "engaged");
     expect(reaim).toMatchObject({ npcId: "greeter-1", at: { x: 3, z: 1 } });
     expect(stateOf(db, "c1")?.state).not.toBe("in_conversation"); // still walking: no chat yet
-    const out = settleApproaches(ctx(NOW + 120_000));
+    const out = settleApproaches(ctx(NOW + 40_000));
     const eng = last(out, "all", "engaged")!;
     expect(eng.at).toEqual({ x: 3, z: 1 });
     // face to face: at the moment the chat opens she is looking at the customer
-    const m = engagedMoment("greeter-1", eng, NOW + 120_000);
+    const m = engagedMoment("greeter-1", eng, NOW + 40_000);
     expect(Math.abs(wrap(m.ry - headingTo(m.x, m.z, 3, 1)))).toBeLessThan(0.05);
+  });
+
+  it("a customer who keeps walking is spoken to only once they stop, and is not chased for ever", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    tryGreeterApproach(ctx(), "c1");
+    // still walking: every check they have moved on, so she heads for where they are now and does not open
+    for (let t = 1; t <= 6; t++) {
+      positions.set("c1", { x: t * 1.2, z: -8 + t });
+      expect(stateOf(db, "c1")?.state, `opened while they were still walking (${t})`).not.toBe("in_conversation");
+      settleApproaches(ctx(NOW + t * 2_000));
+    }
+    expect(stateOf(db, "c1")?.state).not.toBe("in_conversation");
+    // they stop; she arrives and the chat opens, with her facing exactly where they stand
+    const out = settleApproaches(ctx(NOW + 40_000));
+    expect(last(out, "c1", "turn")).toMatchObject({ withId: "greeter-1" });
+    const eng = last(out, "all", "engaged")!;
+    expect(eng.at.x).toBeCloseTo(7.2, 5);
+    expect(eng.at.z).toBeCloseTo(-2, 5);
+  });
+  it("gives up on someone who walks for a full minute", () => {
+    addVisitor("c1", "Pebble", { x: 0, z: -8 });
+    tryGreeterApproach(ctx(), "c1");
+    positions.set("c1", { x: 5, z: 2 });
+    const out = settleApproaches(ctx(NOW + 61_000));
+    expect(last(out, "all", "released")).toMatchObject({ npcId: "greeter-1" });
+    expect(stateOf(db, "c1")?.state).not.toBe("in_conversation");
   });
 
   it("does not approach while a human holds the greeter post", () => {
