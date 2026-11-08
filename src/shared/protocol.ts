@@ -130,6 +130,14 @@ export interface HoldView {
 
 // A sale after the chat is over: the phone is on its way in a bag, then with
 // the specialist, who takes payment. Everyone sees it (the bag is carried).
+//
+// `stage: "paid"` (issue #49) is synthetic: it is never stored on the order
+// row itself (which reaches "done"), but is derived, read-only, by comparing
+// the order's stored `ended_at` to the current server time -- a brief window
+// (about 4s) after a sale completes so the final "tapped"/checkmark beat is
+// still visible to everyone in the room before the order disappears. Never a
+// timer: the same stored `ended_at`, read again on the next request, is what
+// makes this window close.
 export interface OrderView {
   id: string;
   customerId: string;
@@ -138,8 +146,23 @@ export interface OrderView {
   specName: string;
   stockId: string;
   stockName: string;
-  stage: "fetching" | "with_spec" | "paying";
+  stage: "fetching" | "with_spec" | "paying" | "paid";
   what: string; // "silver iPhone 18 Pro"
+  // Present only while stage is "paying" or the synthetic "paid": the
+  // server-authoritative beat and price, read from the stored sale -- never
+  // recomputed or trusted from client-parsed text (#42 renders off this).
+  pay?: {
+    conversationId: string;
+    beat: "scanned" | "total_shown" | "tapped";
+    beatAt: number; // server time the current beat was reached
+    name: string;
+    colour: string;
+    storage: string;
+    price: number;
+  };
+  // Present only when stage is "paid": the server time the order finished
+  // (orders.ended_at). The client hides itself once serverNow() > paidAt + 4000.
+  paidAt?: number;
 }
 
 // Two real people in a conversation, so everyone else sees them talk and
