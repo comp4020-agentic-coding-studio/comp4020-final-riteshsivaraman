@@ -39,6 +39,7 @@ import {
   releaseClaimsOf,
   catchUpOffers,
   cpuCustomersOnFloor,
+  heldCpuCustomers,
   startInspect,
   startTalk,
   stateOf,
@@ -47,6 +48,7 @@ import {
   type Outgoing,
 } from "./service.ts";
 import { avoidPeople, engagedPlaces } from "../shared/people.ts";
+import { heldPlaces } from "../shared/heldCpu.ts";
 import { clampToWalkable, zoneOf, type Zone } from "../shared/world.ts";
 import { db } from "./db.ts";
 import { emitError, emitEvent, makeFolder, setNameLookup } from "./eventlog.ts";
@@ -138,12 +140,15 @@ const present = (s: Session): Present => ({
 // hands it who is online and where, and delivers what it returns.
 // Issue #20: timetable customers who need help join the store's rules (the
 // waiting list, offers, claims) as customers, through `cpuCustomersOnFloor`.
-// Off unless CPU_CUSTOMERS_LIVE=1, because the client cannot yet press E at,
-// mark or hold a timetable customer (Store.tsx's E hint and OfferMarker only
-// know real visitors; Npcs.tsx keeps walking them on their timetable), so a
-// staff user would be offered someone they cannot claim (orchestrator ruling,
-// 2026-11-08: build the bridge, leave it off, client follow-up issue).
+// Off unless CPU_CUSTOMERS_LIVE=1. The client can now press E at, mark and
+// hold a promoted timetable customer (issue #41: the `held_cpu` message below),
+// but nothing answers for the customer in a conversation yet: that is the rule
+// engine, issue #39, and a staff user would be talking to nobody. The flag
+// stays off until #39 lands (orchestrator ruling, 2026-11-08).
 const CPU_CUSTOMERS_LIVE = process.env.CPU_CUSTOMERS_LIVE === "1";
+// the promoted timetable customers every client holds in place, as last sent
+const heldNow = (): ReturnType<typeof heldCpuCustomers> => (CPU_CUSTOMERS_LIVE ? heldCpuCustomers(db, Date.now()) : []);
+let lastHeldCpu = "[]";
 
 function serviceCtx(): Ctx {
   const all = [...sessions.values()];
@@ -193,6 +198,11 @@ function deliver(out: Outgoing[]): void {
   if (holds !== lastHolds) {
     lastHolds = holds;
     deliverAll([{ to: "all", message: { type: "holds", holds: JSON.parse(holds) } }]);
+  }
+  const held = JSON.stringify(heldNow());
+  if (held !== lastHeldCpu) {
+    lastHeldCpu = held;
+    deliverAll([{ to: "all", message: { type: "held_cpu", held: JSON.parse(held) } }]);
   }
   const pairs = JSON.stringify(stamped);
   if (pairs !== lastChats) {
@@ -329,6 +339,7 @@ export function handleConnection(socket: WebSocket): void {
         chats: chatPairs(db),
         orders: orderViews(ctx),
         holds: holdViews(ctx),
+        heldCpu: heldNow(),
         spawn: { x: me.x, z: me.z, ry: me.ry },
         seated: seatedList(db),
       });
@@ -423,7 +434,8 @@ export function handleConnection(socket: WebSocket): void {
         me.refused = wanted && held;
       }
       // people are solid: not through another visitor, staff or customer
-      p = avoidPeople(p.x, p.z, otherVisitors(me.id), now, engagedPlaces(engagements(db), now));
+      // (a promoted timetable customer is solid where it is held, as the client draws it: issue #41)
+      p = avoidPeople(p.x, p.z, otherVisitors(me.id), now, new Map([...heldPlaces(heldNow(), now), ...engagedPlaces(engagements(db), now)]));
       p = clampToWalkable(me.role, p.x, p.z);
       me.x = p.x;
       me.z = p.z;

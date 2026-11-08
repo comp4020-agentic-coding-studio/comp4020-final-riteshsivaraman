@@ -9,6 +9,7 @@ import type {
   Engagement,
   Identity,
   ChatPair,
+  HeldCpu,
   OrderView,
   HoldView,
   Inspection,
@@ -98,6 +99,12 @@ class Net {
   offDuty = new Set<string>();
   engaged = new Map<string, Engagement>();
   released = new Map<string, Release>();
+  // timetable customers the store's rules have taken over (issue #41): held
+  // where they were promoted, or walking out after; drawn from this, not their timetable
+  private held = new Map<string, HeldCpu>();
+  heldCpu(): ReadonlyMap<string, HeldCpu> {
+    return this.held;
+  }
   // the conversation you are in, the replies waiting on you if you are an
   // employee, and the customers you can see
   turn: TurnView | null = null;
@@ -243,6 +250,7 @@ class Net {
         this.setChats(message.chats);
         this.orders = message.orders;
         this.holds = message.holds;
+        this.held = new Map((message.heldCpu ?? []).map((h) => [h.id, h]));
         this.spawn = message.spawn;
         this.seats = new Map(message.seated.map((s) => [s.visitorId, { x: s.at.x, z: s.at.z, fx: s.face.x, fz: s.face.z }]));
         this.pollSettle();
@@ -298,6 +306,9 @@ class Net {
         return true;
       case "holds":
         this.holds = message.holds;
+        return true;
+      case "held_cpu":
+        this.held = new Map(message.held.map((h) => [h.id, h]));
         return true;
       case "update":
         this.pushUpdate(message.text);

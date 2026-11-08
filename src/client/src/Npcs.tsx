@@ -9,6 +9,8 @@ import { STORE_Y } from "../../shared/protocol.ts";
 import { Actor, type ActorState } from "./gfx/Actor.tsx";
 import { net, talkMs } from "./net.ts";
 import { NameFloat } from "./NameFloat.tsx";
+import { OfferMarker } from "./OfferMarker.tsx";
+import { heldMoment, heldPlaces } from "../../shared/heldCpu.ts";
 import { NPC_NAME } from "../../shared/duty.ts";
 import { npcLook } from "../../shared/look.ts";
 
@@ -33,7 +35,9 @@ export function Npcs() {
     // real visitors are obstacles too, so an NPC visually gives way instead
     // of gliding straight through someone standing in its path
     const visitors = [net.me, ...[...net.remotes.values()].map((r) => ({ x: r.x, z: r.z }))];
-    const settled = settledPeople(now, visitors).npc;
+    // a timetable customer the store's rules have taken over (issue #41) stands where the server holds it
+    const held = net.heldCpu();
+    const settled = settledPeople(now, visitors, heldPlaces(held.values(), now)).npc;
     root.current?.children.forEach((child, i) => {
       const def = NPCS[i];
       let raw: { x: number; z: number; ry: number; walking: boolean; present: boolean; mode: ActorState["mode"]; mood: string; seated: boolean; device: boolean; intent: string; with?: string; gaze?: { x: number; y: number; z: number } } = npcPose(def, now);
@@ -42,8 +46,20 @@ export function Npcs() {
       // with a visitor (they walk over and talk), or walking back to the day
       const eng = net.engaged.get(def.id);
       const rel = net.released.get(def.id);
+      const hold = held.get(def.id);
       let direct = false;
-      if (eng && (raw.present || eng.lead)) {
+      if (hold) {
+        // promoted (issue #20/#41): held at its spot, facing whoever it is talking with, then out of the door;
+        // nothing is drawn after that until its timetable day has it out of the store too
+        const chat = net.chats.get(def.id);
+        const other = chat ? (chat.with === net.you?.id ? net.me : net.remotes.get(chat.with)) : undefined;
+        const m = heldMoment(hold, now, other);
+        if (m && chat && other) {
+          const speaking = net.serverNow() < chat.until && chat.speaker === def.id;
+          raw = { ...m, mode: speaking ? "talk" : "listen", mood: speaking ? "smile" : "neutral" };
+        } else raw = m ?? { ...raw, present: false };
+        direct = true;
+      } else if (eng && (raw.present || eng.lead)) {
         const m = engagedMoment(def.id, eng, now);
         raw = { ...m, present: true };
         // showing intent: eyes on the person they want to talk to, wherever they are now, and a wave
@@ -81,7 +97,7 @@ export function Npcs() {
       }
       // an act that needs two (a handshake, a chat) is with someone who is no longer where the timetable
       // has them, because they are with a real visitor or walking back: do it with nobody, don't shake an empty hand
-      if (raw.present && !direct && raw.with && (net.engaged.has(raw.with) || net.released.has(raw.with) || net.offDuty.has(raw.with))) {
+      if (raw.present && !direct && raw.with && (net.engaged.has(raw.with) || net.released.has(raw.with) || net.offDuty.has(raw.with) || held.has(raw.with))) {
         raw = { ...raw, mode: "idle", mood: "smile", gaze: undefined };
       }
       child.visible = raw.present;
@@ -116,6 +132,8 @@ export function Npcs() {
         <group key={n.id} visible={false}>
           <Actor id={n.id} shirt={n.colour} uniform={uniforms[i]} look={looks[i]} getState={() => states.current[i]} />
           <NameFloat id={n.id} name={NPC_NAME[n.id] ?? n.id} npc y={2.05} />
+          {/* a promoted timetable customer is offered to staff like a real visitor (issue #41) */}
+          {n.role === "customer" && <OfferMarker id={n.id} y={2.5} />}
           {LABELS && (
             <Html position={[0, 2.35, 0]} center distanceFactor={9} style={{ pointerEvents: "none" }}>
               <div
