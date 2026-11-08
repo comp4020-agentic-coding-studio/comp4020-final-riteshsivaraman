@@ -531,8 +531,15 @@ export interface CastMember {
 const CAPS: Record<StaffRole, string> = { greeter: "#4caf50", specialist: "#ffd23f", genius: "#ff6f61", stock: "#9c6ade", technician: "#29b6f6" };
 const STAFF_SHIRT = "#2f5d9e";
 
-// the customers, each with a reason to be here
-const PURPOSES: Purpose[] = ["phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse", "audio", "consult", "repair", "phone"];
+// the customers, each with a reason to be here. 14 slots spread an 8 minute
+// cycle so thin the floor was empty for long stretches and never had more
+// than 4 people in it at once (Ritesh, 2026-11-09, live: "the store is
+// literally empty"). Doubled to keep the floor feeling like a real Apple
+// Store, where it's rare for a table to be unattended.
+const PURPOSES: Purpose[] = [
+  "phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse", "audio", "consult", "repair", "phone",
+  "phone", "laptop", "repair", "tablet", "audio", "consult", "phone", "pickup", "laptop", "browse", "audio", "consult", "repair", "phone",
+];
 const CUSTOMER_SHIRTS = ["#e07a5f", "#81b29a", "#f2cc8f", "#9b72aa", "#6d9dc5", "#d4a373", "#7a9e7e", "#c46f8a", "#6f8f4a", "#4a7c9a"];
 
 export const CAST: CastMember[] = [
@@ -632,7 +639,7 @@ function build(): void {
     const tl = new Timeline(c.id, "customer", { x: 0, z: SHOP_FRONT - 1.7 }, { x: 0, z: SHOP_FRONT + 3 }, "on their way", "neutral");
     timelines.set(c.id, tl);
     const jitter = rand(i * 17 + 3) * 8;
-    const arrival = 6 + (i * (horizon - 140)) / customers.length + jitter;
+    const arrival = 6 + (i * (horizon - 30)) / customers.length + jitter;
     const entryX = (rand(i * 31 + 5) * 2 - 1) * (ENTRANCE_HALF - 0.6);
     tl.pos = { x: entryX, z: SHOP_FRONT - 1.7 };
     tl.away(arrival);
