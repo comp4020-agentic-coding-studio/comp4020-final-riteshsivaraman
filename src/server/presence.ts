@@ -323,7 +323,15 @@ export function handleConnection(socket: WebSocket): void {
       // who they chose to be: validated, so nothing arbitrary reaches the
       // database or other visitors. Without a profile, a customer.
       const profile = validateProfile(message.profile);
-      if (profile.name) visitor.name = profile.name;
+      // nobody is called the same as an NPC or another person here (the random names come from the same pool
+      // as the NPCs'), so "Mason" always means one person
+      if (profile.name) {
+        const taken = new Set([...Object.values(NPC_NAME), ...[...sessions.values()].filter((o) => o.id !== visitor.id).map((o) => o.name)].map((n) => n.toLowerCase()));
+        let unique = profile.name;
+        for (let n = 2; taken.has(unique.toLowerCase()) && n < 50; n++) unique = `${profile.name} ${n}`;
+        profile.name = unique;
+        visitor.name = unique;
+      }
 
       // One live session per visitor: a second tab with the same token takes
       // over, and the older socket is closed so the client can say so.

@@ -135,6 +135,8 @@ class Net {
   seats = new Map<string, { x: number; z: number; fx: number; fz: number }>();
   // real people in a conversation: who each is talking with, and whose turn it is to talk
   chats = new Map<string, { with: string; speaker?: string; until: number }>();
+  // a device left at the Genius Bar, not yet collected (the "your repair" chip)
+  repairStatus: Extract<ServerMessage, { type: "repair_status" }>["status"] = null;
   // how each person (or NPC) sounds right now, until server time `until` (issue #55)
   tones = new Map<string, { tone: Tone; until: number }>();
   // the tone you answer in: shown on your face, and sent with each answer you pick
@@ -291,6 +293,9 @@ class Net {
         }
         return false; // pose only: no re-render needed
       }
+      case "repair_status":
+        this.repairStatus = message.status;
+        return true;
       case "toned":
         if (isTone(message.tone)) this.tones.set(message.id, { tone: message.tone, until: message.until });
         return false; // drawn each frame
@@ -525,6 +530,9 @@ class Net {
   }
 
   private pushUpdate(text: string): void {
+    // the same line twice in a row (a notice and the note that goes with it) is shown once
+    const lastUpdate = this.updates[this.updates.length - 1];
+    if (lastUpdate && lastUpdate.text === text && Date.now() - lastUpdate.at < 8000) return;
     this.updates = [...this.updates, { text, at: Date.now() }].slice(-6);
   }
 

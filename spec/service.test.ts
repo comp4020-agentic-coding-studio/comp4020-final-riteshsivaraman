@@ -35,6 +35,7 @@ import {
   settleApproaches,
   tryNpcAutoClaim,
   settleRepairs,
+  wantsReplacement,
   catchUpOffers,
   releaseExpired,
   startTalk,
@@ -682,23 +683,34 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
     const out = chooseTurn(ctx(), "c1", talk()!.conversationId, "stand");
     expect(messagesTo(out, "all", "seated")).toEqual([]);
   });
-  it("a quick fix has a follow-up: still working at 30 s, then the genius hands it back and the repair is closed", () => {
+  // back at the bar later: stand, and say you are here to collect
+  const collect = (when: number) => {
+    const t = last(startTalk(go(when), "c1", "genius-1"), "c1", "turn")!;
+    const hello = pick(t, "stand", when);
+    expect(hello.choices.map((c) => c.id)).toContain("collect");
+    return pick(hello, "collect", when);
+  };
+  it("a quick fix has a follow-up: you choose to collect; not ready at 30 s, then handed back and the repair is closed", () => {
     near();
     const end = quickFix(talk()!);
     expect(end.ended).toBe(true);
     closeTalk(ctx(), "c1");
-    expect(last(startTalk(go(NOW + 30_000), "c1", "genius-1"), "c1", "notice")?.text).toMatch(/still working on it/);
+    const early = collect(NOW + 30_000);
+    expect(early.say).toMatch(/still with the technician/);
+    expect(early.ended).toBe(true);
+    closeTalk(go(NOW + 31_000), "c1");
     expect(last(settleRepairs(ctx(NOW + 61_000)), "c1", "notice")?.text).toMatch(/press E to collect/);
-    const back = last(startTalk(go(NOW + 62_000), "c1", "genius-1"), "c1", "turn")!;
-    expect(back.say).toMatch(/Welcome back, it's all done/);
+    const back = collect(NOW + 62_000);
+    expect(back.say).toMatch(/it's all done/);
     const done = pick(back, "ok", NOW + 62_000);
     expect(done.ended).toBe(true);
     expect(eventTypes()).toEqual(expect.arrayContaining(["repair_outcome", "repair_ready", "repair_collected"]));
-    closeTalk(ctx(NOW + 63_000), "c1");
-    // collected: the next visit to the bar is a fresh repair, not another hand-back
-    expect(last(startTalk(go(NOW + 70_000), "c1", "genius-1"), "c1", "turn")?.say).toMatch(/take a seat/i);
+    closeTalk(go(NOW + 63_000), "c1");
+    // collected: nothing left to collect, so the option is gone
+    const fresh = pick(last(startTalk(go(NOW + 70_000), "c1", "genius-1"), "c1", "turn")!, "stand", NOW + 70_000);
+    expect(fresh.choices.map((c) => c.id)).not.toContain("collect");
   });
-  it("a longer service is collected on another day, meaning a later visit", () => {
+  it("a longer service is collected on another day (a later visit), and can come back as a replacement", () => {
     near();
     let t = pick(talk()!, "stand");
     for (const id of ["symptom:battery_drain", "no", "months"]) t = pick(t, id); // a worn battery: a day's service
@@ -707,9 +719,18 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
     t = pick(t, "ok");
     expect(t.ended).toBe(true);
     closeTalk(ctx(), "c1");
-    expect(last(startTalk(go(NOW + 5_000), "c1", "genius-1"), "c1", "notice")?.text).toMatch(/Come back on another day/);
+    expect(collect(NOW + 5_000).say).toMatch(/Come back on another day/);
+    closeTalk(go(NOW + 6_000), "c1");
     db.prepare("INSERT INTO events (ts, visitor_id, type, data) VALUES (?, 'c1', 'profile', '{}')").run(NOW + 60_000); // they come back another day
-    expect(last(startTalk(go(NOW + 61_000), "c1", "genius-1"), "c1", "turn")?.say).toMatch(/Welcome back, it's all done/);
+    const back = collect(NOW + 61_000);
+    expect(back.say).toMatch(wantsReplacement("c1", NOW) ? /couldn't bring it back/ : /it's all done/);
+  });
+  it("about one in five long services end in a replacement, and the same repair always ends the same way", () => {
+    let n = 0;
+    for (let i = 0; i < 1000; i++) if (wantsReplacement(`c${i}`, 1000 + i)) n++;
+    expect(n / 1000).toBeGreaterThan(0.15);
+    expect(n / 1000).toBeLessThan(0.25);
+    expect(wantsReplacement("c1", 1000)).toBe(wantsReplacement("c1", 1000));
   });
   it("a replacement is handed over there and then, with nothing left to collect", () => {
     near();

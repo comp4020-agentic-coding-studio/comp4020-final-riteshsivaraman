@@ -45,6 +45,9 @@ export interface ConvState {
   symptom?: Symptom;
   wet?: boolean;
   fault?: string;
+  // a device they left with the Genius Bar and have not collected: which fault it was, how long a service,
+  // whether it is ready now, and whether (after a long service) it could not be saved and is replaced
+  ticket?: { fault: string; kind: "quick" | "later"; ready: boolean; replace: boolean };
 }
 
 export interface Choice {
@@ -212,7 +215,8 @@ function repairTurn(s: ConvState): Turn {
         { id: "stand", label: "I'll stay standing" },
       ]);
     case "hello":
-      return ask("What's going on with your device?", [
+      return ask(s.ticket ? "What can I do for you today?" : "What's going on with your device?", [
+        ...(s.ticket ? [{ id: "collect", label: "I'm here to collect my device" }] : []),
         ...SYMPTOMS.map((k) => ({ id: `symptom:${k}`, label: SYMPTOM_LABEL[k] })),
         { id: "leave", label: "Never mind" },
       ]);
@@ -246,6 +250,10 @@ function repairTurn(s: ConvState): Turn {
     }
     case "later_end":
       return end("I've noted it all down under your name, so just come to the bar and I'll know exactly what we're doing. See you then!");
+    case "notready":
+      return end(s.ticket?.kind === "quick" ? "It's still with the technician: give it a few more moments and ask me again." : "It's still with our technicians. Come back on another day and ask me again.");
+    case "handback_replace":
+      return ask("I'm sorry: after the full service we couldn't bring it back. I've got a replacement for you, set up and ready.", [{ id: "ok", label: "Oh. Okay, thank you" }]);
     case "handback":
       return ask(`Welcome back, it's all done: we sorted out ${fault!.label}. It's as good as new.`, [{ id: "ok", label: "Brilliant, thank you" }]);
     case "handback_end":
@@ -268,6 +276,11 @@ function repairStep(state: ConvState, choiceId: string, go: (node: string, patch
     case "seat":
       return go("hello", {}, choiceId === "sit" ? [{ type: "sit" }] : []);
     case "hello":
+      if (choiceId === "collect" && state.ticket) {
+        const t = state.ticket;
+        if (!t.ready) return go("notready", {}, [browsing]);
+        return go(t.kind === "later" && t.replace ? "handback_replace" : "handback", { fault: t.fault });
+      }
       if (choiceId.startsWith("symptom:")) return go("wet", { symptom: choiceId.slice("symptom:".length) as Symptom });
       return go("browsing", {}, [browsing]);
     case "wet":
@@ -285,6 +298,7 @@ function repairStep(state: ConvState, choiceId: string, go: (node: string, patch
     case "later":
       return go(`${state.node}_end`, {}, [browsing]);
     case "replacement":
+    case "handback_replace":
       // a replacement is handed over there and then: the repair is closed
       return go("replacement_end", {}, [browsing, { type: "repair_collected", fault: state.fault! }]);
     case "handback":
@@ -293,14 +307,8 @@ function repairStep(state: ConvState, choiceId: string, go: (node: string, patch
   return null;
 }
 
-// Someone coming back to the Genius Bar for a device left with them: the repair is done, and it is handed back.
-export function beginHandback(world: World, fault: string): StepResult {
-  const state: ConvState = { script: "repair", node: "handback", fault };
-  return { state, turn: turnFor(state, world), effects: [{ type: "player_state", state: "in_conversation" }] };
-}
-
-export function begin(script: ScriptId, world: World): StepResult {
-  const state: ConvState = { script, node: script === "repair" ? "seat" : "hello" };
+export function begin(script: ScriptId, world: World, ticket?: ConvState["ticket"]): StepResult {
+  const state: ConvState = { script, node: script === "repair" ? "seat" : "hello", ...(ticket ? { ticket } : {}) };
   return { state, turn: turnFor(state, world), effects: [{ type: "player_state", state: "in_conversation" }] };
 }
 

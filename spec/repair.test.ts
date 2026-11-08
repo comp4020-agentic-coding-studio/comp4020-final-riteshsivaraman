@@ -71,4 +71,43 @@ describe("the Genius Bar repair conversation", () => {
       expect(FAULTS.find((f) => f.id === e.fault)!.waterRelated, p.path.join(">")).toBe(true);
     }
   });
+
+  describe("coming back for a device left with them", () => {
+    const run = (t: NonNullable<ConvState["ticket"]>) => {
+      const hello = step(begin("repair", world, t).state, "stand", world);
+      if ("error" in hello) throw new Error(hello.error);
+      expect(choicesFor(hello.state, world).map((c) => c.id)).toContain("collect");
+      const r = step(hello.state, "collect", world);
+      if ("error" in r) throw new Error(r.error);
+      return r;
+    };
+    it("without anything left with them there is no collect option", () => {
+      const hello = step(begin("repair", world).state, "stand", world);
+      if ("error" in hello) throw new Error(hello.error);
+      expect(choicesFor(hello.state, world).map((c) => c.id)).not.toContain("collect");
+    });
+    it("not ready: told so, and nothing is closed", () => {
+      const r = run({ fault: "port_debris", kind: "quick", ready: false, replace: false });
+      expect(r.turn.ended).toBe(true);
+      expect(r.effects.some((e) => e.type === "repair_collected")).toBe(false);
+    });
+    it("ready: handed back, then closed", () => {
+      const r = run({ fault: "port_debris", kind: "quick", ready: true, replace: false });
+      expect(r.state.node).toBe("handback");
+      const done = step(r.state, "ok", world);
+      if ("error" in done) throw new Error(done.error);
+      expect(done.turn.ended).toBe(true);
+      expect(done.effects.some((e) => e.type === "repair_collected")).toBe(true);
+    });
+    it("after a long service it can come back as a replacement, which also closes the repair", () => {
+      const r = run({ fault: "battery_health_drain", kind: "later", ready: true, replace: true });
+      expect(r.state.node).toBe("handback_replace");
+      const done = step(r.state, "ok", world);
+      if ("error" in done) throw new Error(done.error);
+      expect(done.effects.some((e) => e.type === "repair_collected")).toBe(true);
+    });
+    it("a quick fix is never swapped for a replacement", () => {
+      expect(run({ fault: "port_debris", kind: "quick", ready: true, replace: true }).state.node).toBe("handback");
+    });
+  });
 });

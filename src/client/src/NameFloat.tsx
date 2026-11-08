@@ -27,6 +27,10 @@ export function NameFloat({ id, name, npc, y }: { id: string; name: string; npc:
     const d = Math.hypot(v.x - net.me.x, v.z - net.me.z);
     const o = d >= SHOW_RANGE ? 0 : d <= FADE_FROM ? 1 : (SHOW_RANGE - d) / (SHOW_RANGE - FADE_FROM);
     el.current.style.opacity = String(o);
+    // the label grows as you approach (distanceFactor); past a point it would cover the screen, so it stops
+    // growing at roughly its size from 3.5 m away
+    el.current.style.transform = `scale(${Math.min(1, Math.max(0.3, d / 3.5))})`;
+    el.current.style.transformOrigin = "center bottom";
     el.current.style.visibility = o === 0 ? "hidden" : "visible";
   });
   return (

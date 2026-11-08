@@ -26,6 +26,28 @@ const STAGE = Q.has("stage");
 const DEVICE = Q.has("device");
 const DEV = Q.has("dev");
 
+// the device left at the Genius Bar: counts down a quick fix, then says when to collect it
+function RepairChip() {
+  const live = useNet();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const s = live.repairStatus!;
+  const left = s.readyAt === undefined ? 0 : s.readyAt - live.serverNow();
+  const ready = s.ready || (s.readyAt !== undefined && left <= 0);
+  return (
+    <div className="chip-status" role="status">
+      {ready
+        ? "Your device is ready: collect it at the Genius Bar (press E)"
+        : s.kind === "quick"
+          ? `Your device is with the technician: back in ${mmss(Math.max(0, left))}`
+          : "Your device is in for a longer service: come back on another day"}
+    </div>
+  );
+}
+
 const POST_LABEL: Record<string, string> = {
   greeter: "the greeter",
   "specialist:phones": "the phones team",
@@ -72,6 +94,7 @@ function Hud() {
           Waiting for {POST_LABEL[live.needs!] ?? live.needs} · {mmss(Date.now() - live.stateSince)}
         </div>
       )}
+      {live.repairStatus && <RepairChip />}
       {live.state === "in_purchase" && <div className="chip-status">Your phone is set aside. Pay at the Genius Bar.</div>}
       {live.holds.length > 0 && (
         <div className="holds-panel" aria-live="polite">
@@ -144,6 +167,15 @@ function App() {
     else net.enter(AUTO);
   }, []);
   const canDraw = webglAvailable();
+  // the entry screen draws your character in 3D too, so with WebGL off nothing can be shown at all:
+  // say so plainly rather than leaving a blank page
+  if (!canDraw && !DEVICE && !STAGE) {
+    return (
+      <p className="no-webgl" role="alert">
+        This browser can't draw the store: WebGL is turned off or unavailable. Turn on hardware acceleration in its settings (or try another browser such as Chrome), then reload.
+      </p>
+    );
+  }
   if (!entered) {
     return (
       <Entry

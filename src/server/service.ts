@@ -2,7 +2,6 @@ import type Database from "better-sqlite3";
 import { randomBytes, randomUUID } from "node:crypto";
 import {
   begin,
-  beginHandback,
   canMove,
   choicesFor,
   step,
@@ -459,6 +458,8 @@ export function rejoin(ctx: Ctx, visitorId: string, profile: { kind: string; spe
   // at their place, as when they leave (issue #1 criterion 6), not out to browsing
   const out = [...releaseClaimsOf(ctx, visitorId), ...retireStandIn(ctx, visitorId), ...leaveStore(ctx, visitorId)];
   enter(ctx, visitorId, profile, name);
+  // a device they left at the Genius Bar on an earlier visit is still theirs to collect
+  if (profile.kind === "customer") out.push(repairStatusOf(ctx, visitorId));
   return out;
 }
 
@@ -794,9 +795,9 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
 
   const world = stockWorld(ctx.db);
   // coming back to the Genius Bar for a device left with them: handed back if it is done, else told how it is going
-  const ticket = script === "repair" ? repairTicket(ctx, customerId) : undefined;
-  if (ticket && !ticketReady(ctx, customerId, ticket)) return [notice(customerId, ticket.outcome === "quick" ? `${nameOf(ctx, withId)} is still working on it: about ${Math.max(1, Math.ceil((ticket.ts + REPAIR_QUICK_MS - ctx.now) / 1000))} s to go.` : `${nameOf(ctx, withId)} is still servicing it. Come back on another day.`)];
-  const first = ticket ? beginHandback(world, ticket.fault) : begin(script, world);
+  const held = script === "repair" ? repairTicket(ctx, customerId) : undefined;
+  const ticket = held ? { fault: held.fault, kind: held.outcome, ready: ticketReady(ctx, customerId, held), replace: held.outcome === "later" && wantsReplacement(customerId, held.ts) } : undefined;
+  const first = begin(script, world, ticket);
   const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: first.state.node, data: null, started_at: ctx.now, ended_at: null };
   // the genius stays behind the bar: the customer comes to them (and sits), they do not walk over
   const post = script === "repair" ? NPCS.find((n) => n.id === withId) : undefined;
@@ -2138,14 +2139,16 @@ const noRealStaffFor = (ctx: Ctx, designation: string): boolean =>
 // Opens the real conversation if the walk is actually done (or was never
 // needed — the NPC was already standing right there), otherwise just leaves
 // the approach noted for `settleApproaches` to catch up on a later request.
-function openWhenArrived(ctx: Ctx, customerId: string, npcId: string, script: ScriptId, since: number, at: { x: number; z: number }, from?: { x: number; z: number }): Outgoing[] {
+function openWhenArrived(ctx: Ctx, customerId: string, npcId: string, script: ScriptId, since: number, at: { x: number; z: number }, from?: { x: number; z: number }, retries = 0): Outgoing[] {
   const eng: Engagement = { npcId, visitorId: customerId, since, at, pending: true, waving: true, ...(from ? { from } : {}) };
   // the customer walked on while the NPC was coming: go to where they are NOW, from where the NPC
   // stands now, so it always ends up in front of them and facing them (never talking at the spot they left)
   const cpos = ctx.position(customerId);
-  if (cpos && dist(cpos, at) > 0.4) {
+  // (a few steps of drift are close enough; and after a few re-aims a customer who keeps walking is spoken to
+  // where the NPC gets to, rather than chased for ever)
+  if (cpos && dist(cpos, at) > 0.9 && retries < 3) {
     const here = engagedMoment(npcId, eng, ctx.now);
-    const next = { npcId, script, since: ctx.now, at: { x: cpos.x, z: cpos.z }, from: { x: here.x, z: here.z } };
+    const next = { npcId, script, since: ctx.now, at: { x: cpos.x, z: cpos.z }, from: { x: here.x, z: here.z }, retries: retries + 1 };
     patchOfferData(ctx, customerId, { approach: next });
     return [{ to: "all", message: { type: "engaged", npcId, visitorId: customerId, since: next.since, at: next.at, from: next.from, pending: true, waving: true } }];
   }
@@ -2188,7 +2191,7 @@ export function settleApproaches(ctx: Ctx): Outgoing[] {
       out.push({ to: "all", message: { type: "released", npcId: approach.npcId } });
       continue;
     }
-    out.push(...openWhenArrived(ctx, customerId, approach.npcId, approach.script, approach.since, approach.at, approach.from));
+    out.push(...openWhenArrived(ctx, customerId, approach.npcId, approach.script, approach.since, approach.at, approach.from, approach.retries));
   }
   return out;
 }
@@ -2210,8 +2213,24 @@ export function settleRepairs(ctx: Ctx): Outgoing[] {
     if (!ctx.present.includes(r.visitor_id)) continue;
     log(ctx, r.visitor_id, "repair_ready", { by: rep.by });
     out.push(notice(r.visitor_id, `${rep.by} has your device ready: come to the Genius Bar and press E to collect it.`));
+    out.push(repairStatusOf(ctx, r.visitor_id));
   }
   return out;
+}
+
+// What the customer's "your repair" chip shows: whatever they have left at the Genius Bar and not collected.
+export function repairStatusOf(ctx: Ctx, customerId: string): Outgoing {
+  const t = repairTicket(ctx, customerId);
+  if (!t) return { to: customerId, message: { type: "repair_status", status: null } };
+  return { to: customerId, message: { type: "repair_status", status: { kind: t.outcome, ready: ticketReady(ctx, customerId, t), ...(t.outcome === "quick" ? { readyAt: t.ts + REPAIR_QUICK_MS } : {}) } } };
+}
+
+// After a long service, about one in five come back "couldn't be saved: here is a replacement". Fixed by
+// who and when (a hash), so the same repair always ends the same way.
+export function wantsReplacement(customerId: string, ts: number): boolean {
+  let h = 2166136261;
+  for (const c of `${customerId}:${ts}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return (h >>> 0) % 5 === 0;
 }
 
 // A repair a customer has left at the Genius Bar and not yet collected: from the events it already
@@ -2251,11 +2270,16 @@ function sitAtBar(ctx: Ctx, row: ConvRow, data: ConvData): { id: string; out: Ou
   return { id: free.id, out: [{ to: "all", message: { type: "seated", visitorId: row.customer_id, at: free.at, face: free.face } }, { to: "all", message: { type: "engaged", ...eng } }] };
 }
 
+export const NPC_AFTER_HUMAN_MS = 30_000; // how long a customer waits for a real staff user before an NPC takes them
+
 export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
   if (!st || st.state !== "waiting_for_help" || !st.needs) return [];
   if (offerData(st).approach) return []; // already on the way
-  if (!noRealStaffFor(ctx, st.needs)) return [];
+  // a real staff user comes first (D47/D48), but a customer is not left waiting on someone who never comes:
+  // once they have waited this long an NPC takes them anyway
+  const waited = ctx.now - (offerData(st).waitingSince ?? st.since);
+  if (!noRealStaffFor(ctx, st.needs) && waited < NPC_AFTER_HUMAN_MS) return [];
   const script = scriptFor(st.needs);
   if (!script) return [];
   // the Genius Bar only takes repairs here (a pick-up waits for the bar), and only once the customer has
@@ -2311,7 +2335,7 @@ interface OfferData {
   // chat and the camera lock began while the NPC was still mid-room,
   // "talking to thin air"), the same arrived-then-open shape the payment
   // visit (`intents`, `staffArrived`) already uses.
-  approach?: { npcId: string; script: ScriptId; since: number; at: { x: number; z: number }; from?: { x: number; z: number } };
+  approach?: { npcId: string; script: ScriptId; since: number; at: { x: number; z: number }; from?: { x: number; z: number }; retries?: number };
 }
 
 const offerData = (st: StateRow): OfferData => (st.data ? (JSON.parse(st.data) as OfferData) : {});
@@ -2511,7 +2535,7 @@ function realStaffFor(ctx: Ctx, st: StateRow): boolean {
 // picture (a move, a join or leave, a settle poll).
 export function catchUpOffers(ctx: Ctx, first?: string): Outgoing[] {
   const cpu = [...settleCpuPayments(ctx), ...departCpuCustomers(ctx), ...promoteCpuCustomers(ctx)];
-  const out = [...cpu, ...settleRepairs(ctx), ...settleApproaches(ctx), ...settleOffers(ctx)];
+  const out = [...cpu, ...settleRepairs(ctx), ...releaseStaleHolds(ctx), ...settleApproaches(ctx), ...settleOffers(ctx)];
   const order = waitingList(ctx).map((w) => w.st.visitor_id);
   const ids = first ? [first, ...order.filter((id) => id !== first)] : order;
   for (const id of ids) {
@@ -2786,6 +2810,7 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
       if (a.helperName || a.queued) helper = `${a.helperName ?? ""}|${a.waitLabel ?? ""}`;
     }
   }
+  if (r.effects.some((e) => e.type === "repair" || e.type === "repair_collected")) out.push(repairStatusOf(ctx, row.customer_id));
   log(ctx, row.customer_id, "turn", { conversationId: row.id, from: from.node, choice: choiceId, to: r.state.node });
 
   const next: ConvData = { ...data, conv: r.state, awaiting: "customer", pending: undefined, ...(barSeat ? { barSeat } : {}) };
@@ -2881,6 +2906,18 @@ function pendingCloseWhere(ctx: Ctx, column: "customer_id" | "with_id", id: stri
 }
 // the customer's last NPC conversation, ended but not yet dismissed
 const pendingCloseRow = (ctx: Ctx, customerId: string): ConvRow | undefined => pendingCloseWhere(ctx, "customer_id", customerId);
+
+// An NPC does not stay with someone who has finished and walked off without dismissing the last
+// turn: after a little while it is let go anyway (the greeter used to follow people round the shop).
+const STALE_HOLD_MS = 20_000;
+export function releaseStaleHolds(ctx: Ctx): Outgoing[] {
+  const rows = ctx.db
+    .prepare("SELECT DISTINCT customer_id FROM conversations WHERE with_kind = 'npc' AND ended_at IS NOT NULL AND ended_at < ? AND ended_at > ?")
+    .all(ctx.now - STALE_HOLD_MS, ctx.now - PENDING_CLOSE_MS) as Array<{ customer_id: string }>;
+  const out: Outgoing[] = [];
+  for (const r of rows) out.push(...closeTalk(ctx, r.customer_id));
+  return out;
+}
 
 export function closeTalk(ctx: Ctx, customerId: string): Outgoing[] {
   const row = pendingCloseRow(ctx, customerId);

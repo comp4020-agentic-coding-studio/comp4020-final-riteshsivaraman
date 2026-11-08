@@ -260,6 +260,8 @@ export type ServerMessage =
   | { type: "role"; id: string; role: Role }
   // someone's tone (and so their face) changed (a person or an NPC); `until` is server ms, after which it is neutral again
   | { type: "toned"; id: string; tone: string; until: number }
+  // a device they have left at the Genius Bar and not collected (null: nothing left with them)
+  | { type: "repair_status"; status: null | { kind: "quick" | "later"; ready: boolean; readyAt?: number; by?: string } }
   | { type: "left"; id: string }
   | { type: "state"; state: PlayerStateName; want: string | null; needs: string | null }
   | ({ type: "turn" } & TurnView)
