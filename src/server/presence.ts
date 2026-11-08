@@ -56,6 +56,7 @@ import { isTone } from "../shared/emotions.ts";
 import { cpuCustomersLive } from "./cpuCustomer.ts";
 import { clampToWalkable, COUNTER, resolveCollisions, WALKWAY, zoneOf, type Zone } from "../shared/world.ts";
 import { headingTo } from "../shared/steering.ts";
+import { uniqueName } from "../shared/names.ts";
 import { db } from "./db.ts";
 import { emitError, emitEvent, makeFolder, setNameLookup } from "./eventlog.ts";
 import { NPC_NAME } from "../shared/duty.ts";
@@ -323,12 +324,9 @@ export function handleConnection(socket: WebSocket): void {
       // who they chose to be: validated, so nothing arbitrary reaches the
       // database or other visitors. Without a profile, a customer.
       const profile = validateProfile(message.profile);
-      // nobody is called the same as an NPC or another person here (the random names come from the same pool
-      // as the NPCs'), so "Mason" always means one person
+      // two real people here at once are not called the same (an NPC wears an "NPC" tag, so a shared first name is fine)
       if (profile.name) {
-        const taken = new Set([...Object.values(NPC_NAME), ...[...sessions.values()].filter((o) => o.id !== visitor.id).map((o) => o.name)].map((n) => n.toLowerCase()));
-        let unique = profile.name;
-        for (let n = 2; taken.has(unique.toLowerCase()) && n < 50; n++) unique = `${profile.name} ${n}`;
+        const unique = uniqueName(profile.name, new Set([...sessions.values()].filter((o) => o.id !== visitor.id).map((o) => o.name.toLowerCase())));
         profile.name = unique;
         visitor.name = unique;
       }
