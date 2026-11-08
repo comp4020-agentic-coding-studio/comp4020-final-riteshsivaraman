@@ -92,7 +92,7 @@ commit message line is enough) — an unexplained pile of packages reads as
 the agent deciding alone, not a considered choice.
 
 ## Ritesh writes the prose
-README.md, PROCESS.md, ADR text, and reflections/*.md are his, in his voice.
+README.md, PROCESS.md and reflections/*.md are his, in his voice. ADRs may be written by Claude (Ritesh, 2026-11-09), marked as drafted by Claude, with the decision and who made it stated plainly.
 Every claim in them is tied to a commit or a file, and a gap in the record is
 stated as a gap, never filled with an invented fact. For the final submission he
 rewrites them in his own words. (The brief warns agent-written docs read like

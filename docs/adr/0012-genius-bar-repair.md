@@ -44,7 +44,7 @@ For where a repair is remembered:
 
 ## Decision
 
-B and Z. Claude chose them, 2026-11-09; Ritesh is asked to confirm.
+B and Z. Claude chose them, 2026-11-09; Ritesh confirmed the approach on 2026-11-09 and said ADRs can be written by Claude.
 
 - **Script.** Seat, then: what is wrong (won't charge, won't turn on, cracked screen,
   battery drains fast), liquid or not, one question specific to the symptom, a

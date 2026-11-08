@@ -39,8 +39,8 @@ walk involves them, and every `move` runs the same catch-up.
 ## Decision
 
 Option C. Claude chose it, 2026-11-09, without laying the options out for
-Ritesh first (CLAUDE.md asks for that on real-time mechanisms); he is asked to
-confirm it or choose B.
+Ritesh first (CLAUDE.md asks for that on real-time mechanisms). Ritesh overturned the
+rule that ADR text is his, so this stands as written and he can revisit it.
 
 What it is:
 
@@ -62,7 +62,7 @@ What it is:
 - **Housekeeping on the same cadence:** a finished conversation an NPC is still
   "holding" because the customer never dismissed it is let go after 20 s
   (`releaseStaleHolds`); a customer waiting on a real staff user who never comes
-  is taken by an NPC after 30 s (see ADR 9, addendum).
+  is taken by an NPC after 15 s (see ADR 9, addendum).
 - Walking is a pure function of the engagement and the server clock
   (`engagedMoment`), as before, so every client draws the same thing.
 
