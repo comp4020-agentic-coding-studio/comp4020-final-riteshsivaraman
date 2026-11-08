@@ -13,6 +13,7 @@ import {
   stateOf,
   takeOrder,
   waitingForSpecialist,
+  OFFER_MS,
   type Ctx,
   type Employee,
   type Outgoing,
@@ -247,6 +248,31 @@ describe("a promoted timetable customer answers a real specialist through the ta
     bridge(t);
     catchUpOffers(ctx(t));
     expect(stateOf(mem, id)?.state, "the customer stayed after paying").toBe("leaving");
+  });
+
+  // Ritesh, 2026-11-08 (issue #39, option B): oldest wait first, with no
+  // real-vs-CPU priority (D55: a CPU customer is a customer like any other).
+  it("with CPU customers on, the waiting list stays oldest-first: a CPU customer who waited longer keeps the lone specialist's offer when a real customer arrives", () => {
+    fresh();
+    const t0 = findWaiting("cust-1");
+    addStaff("sam", { x: 4, z: -2 });
+    bridge(t0);
+    catchUpOffers(ctx(t0));
+    expect(stateOf(mem, "cust-1")?.state, "setup: cust-1 was not promoted").toBe("waiting_for_help");
+    // a real visitor walks in later, while sam's offer of cust-1 is still live
+    mem.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES ('ann', 'tok-ann', 'Ann', '#fff', 0, 0)").run();
+    positions.set("ann", { x: 0, z: -4 });
+    present.push("ann");
+    enter(ctx(t0 + 2000), "ann", { kind: "customer" });
+    catchUpOffers(ctx(t0 + 2000));
+    const offerTo = (id: string): string | undefined => (JSON.parse(stateOf(mem, id)?.data ?? "{}") as { offer?: { to: string } }).offer?.to;
+    expect(offerTo("cust-1"), "the CPU customer who waited longer lost its offer to a newer real customer").toBe("sam");
+    expect(offerTo("ann"), "sam holds two offers at once").toBeUndefined();
+    // once sam's 15 s on cust-1 pass with no claim, the next in line, ann, is offered to sam
+    bridge(t0 + OFFER_MS + 500);
+    present.push("ann");
+    catchUpOffers(ctx(t0 + OFFER_MS + 500));
+    expect(offerTo("ann"), "the real customer was never offered after the CPU customer's window passed").toBe("sam");
   });
 
   it("the live switch is on by default, and can still be turned off", () => {

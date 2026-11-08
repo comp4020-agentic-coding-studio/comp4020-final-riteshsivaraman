@@ -63,7 +63,14 @@ beforeAll(async () => {
   const port = await freePort();
   dir = mkdtempSync(pathJoin(tmpdir(), "store-spec-offer-"));
   child = spawn("npx", ["tsx", "src/server/index.ts"], {
-    env: { ...process.env, PORT: String(port), DATABASE_PATH: pathJoin(dir, "store.db") },
+    // No timetable customers on this server's floor. The waiting list is
+    // oldest-first with no real-vs-CPU priority (Ritesh, 2026-11-08, issue #39
+    // option B), so a timetable customer who happens to be waiting on the real
+    // clock would hold the lone real specialist's one offer, and these tests
+    // would pass or fail by the time of day. This block is about real visitors
+    // and the CPU greeter; promoted timetable customers on the same list are
+    // pinned on a fake clock in spec/20, spec/41 and spec/39.
+    env: { ...process.env, PORT: String(port), DATABASE_PATH: pathJoin(dir, "store.db"), CPU_CUSTOMERS_LIVE: "0" },
     stdio: "ignore",
   });
   const baseUrl = `http://127.0.0.1:${port}`;
