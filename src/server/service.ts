@@ -2082,27 +2082,36 @@ export function cancelEscort(ctx: Ctx, customerId: string): Outgoing[] {
 // of scope for this pass (Ritesh, 2026-10-12: "later we can try giving npc a
 // type of state machine... for now" this lighter layer).
 //
-// `tryNpcAutoClaim` is written and unit-tested but deliberately NOT wired
-// into the live request paths yet: with today's scripts, the only designation
-// it would ever actually act on is "specialist:phones" (genius/stock/
-// technician have no script, D34, so it's a no-op for them regardless), and
-// that's the one post this project's own tests and D35 treat as a deliberate
-// human-staff interaction showcase (claim/hand-on/staff-reply). Having an
-// idle NPC beat a human to every waiting customer, every time, would make
-// that showcase unplayable rather than fix an idle-staff complaint — a
-// multi-user behaviour tradeoff CLAUDE.md wants Ritesh's call on, not a
-// default I pick. `tryGreeterApproach` has no such conflict (nothing today
-// ever greets a new customer unprompted) and is wired into "move" below.
+// `tryNpcAutoClaim` was written and unit-tested but left unwired, pending
+// Ritesh's call on the multi-user tradeoff D40 raised: an idle NPC beating a
+// human to every waiting customer would make the "specialist:phones" human-
+// staff showcase (claim/hand-on/staff-reply, D35) unplayable. Resolved
+// 2026-11-09 (Ritesh, after 2+ hours live with a lone human staff user idle
+// and no CPU ever approaching him: "that gap needs to be closed"): wired, but
+// scoped per-designation to `noRealStaffFor` below -- an NPC only auto-claims
+// a waiting customer when no real human staff user online could serve that
+// customer's post at all. With a human online for "specialist:phones" (the
+// showcase), the NPC never takes the customer from them: D47/D48's human-
+// first offer system still gets first refusal, same as today. It only fires
+// when a designation has nobody real on it (every role with a script, not
+// just phones), which is exactly the "staff just stands around" complaint.
 
 const npcBusy = (ctx: Ctx, npcId: string): boolean =>
   !!ctx.db.prepare("SELECT 1 FROM conversations WHERE ended_at IS NULL AND with_id = ? AND with_kind = 'npc'").get(npcId);
 
-// If this customer is waiting for help and an on-duty NPC for that post is
-// free, that NPC claims them now — the same thing a human's `claim()` does,
-// just automatic. See the note above on why this isn't called yet.
+// Whether any real human staff user who could serve this designation is
+// online and free to be offered the customer first (D47/D48 priority stays:
+// the NPC never competes with a human who could take this customer).
+const noRealStaffFor = (ctx: Ctx, designation: string): boolean =>
+  !ctx.employees.some((e) => designationOfEmployee(e) === designation && staffAvailable(ctx, e.id, "visitor") && !!ctx.position(e.id));
+
+// If this customer is waiting for help, no real staff user could serve them,
+// and an on-duty NPC for that post is free, that NPC claims them now — the
+// same thing a human's `claim()` does, just automatic.
 export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
   const st = stateOf(ctx.db, customerId);
   if (!st || st.state !== "waiting_for_help" || !st.needs) return [];
+  if (!noRealStaffFor(ctx, st.needs)) return [];
   const script = scriptFor(st.needs);
   if (!script) return [];
   const offDutyIds = offDuty(ctx);
@@ -2353,6 +2362,14 @@ export function catchUpOffers(ctx: Ctx, first?: string): Outgoing[] {
   for (const id of ids) {
     const greeted = tryGreeterApproach(ctx, id);
     if (greeted.length > 0) return [...out, ...greeted];
+  }
+  // nobody waiting just got greeted: a customer already asking for a post
+  // nobody real can serve is taken by that post's own NPC (2026-11-09), so a
+  // lone human staff user (or none at all) is never the only thing standing
+  // between a waiting customer and ever being served
+  for (const id of ids) {
+    const claimed = tryNpcAutoClaim(ctx, id);
+    if (claimed.length > 0) return [...out, ...claimed];
   }
   return out;
 }

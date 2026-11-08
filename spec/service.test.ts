@@ -31,6 +31,7 @@ import {
   leaveStore,
   tryGreeterApproach,
   tryNpcAutoClaim,
+  catchUpOffers,
   releaseExpired,
   startTalk,
   staffMove,
@@ -606,10 +607,11 @@ describe("walking away mid-conversation (Esc, either side)", () => {
 });
 
 describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)", () => {
-  // Not wired into any live request path yet (see service.ts's own note on
-  // why: today it would only ever act on "specialist:phones", which this
-  // suite's "employees" block treats as a deliberate human-staff showcase).
-  // Tested directly so the rule itself is still pinned down.
+  // Wired into catchUpOffers 2026-11-09 (Ritesh, live: 2+ hours with a lone
+  // human staff user and no CPU ever approaching him, "that gap needs to be
+  // closed"), scoped so it never competes with a real human staff user who
+  // could serve the same post (noRealStaffFor) -- D47/D48's human-first offer
+  // priority stays intact.
   it("claims a waiting customer when an on-duty, idle NPC matches their post", () => {
     const s = npc("spec-phones");
     addVisitor("c1", "Pebble", { x: s.x, z: s.z });
@@ -633,6 +635,32 @@ describe("an idle NPC claiming a waiting customer on its own (tryNpcAutoClaim)",
     expect(last(tryNpcAutoClaim(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "spec-phones" });
     // the second NPC specialist takes the second customer, never the busy one
     expect(last(tryNpcAutoClaim(ctx(), "c2"), "c2", "turn")).toMatchObject({ withId: "spec-phones-2" });
+  });
+
+  it("gives way to a real human staff user online for the same post: the NPC does not take the customer", () => {
+    const s = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
+    addVisitor("priya", "Priya", { x: 0, z: 0 }, "specialist", "phones");
+    expect(tryNpcAutoClaim(ctx(), "c1"), "a free human on this post should block the NPC claim").toEqual([]);
+  });
+
+  it("still claims once the only human on that post leaves", () => {
+    const s = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
+    addVisitor("priya", "Priya", { x: 0, z: 0 }, "specialist", "phones");
+    expect(tryNpcAutoClaim(ctx(), "c1")).toEqual([]);
+    employees.length = 0; // priya has left
+    expect(last(tryNpcAutoClaim(ctx(), "c1"), "c1", "turn")).toMatchObject({ withId: "spec-phones" });
+  });
+
+  it("catchUpOffers reaches a waiting customer through the NPC when no real staff is online at all", () => {
+    const s = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
+    const out = catchUpOffers(ctx());
+    expect(last(out, "c1", "turn")).toMatchObject({ withId: "spec-phones", ended: false });
   });
 });
 
