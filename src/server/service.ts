@@ -807,7 +807,7 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   const post = script === "repair" ? NPCS.find((n) => n.id === withId) : undefined;
   const hold = post ? npcPose(post, ctx.now) : undefined;
   const eng: Engagement = hold
-    ? { npcId: withId, visitorId: customerId, since: engagedSince, at, from: { x: hold.x, z: hold.z }, lead: { x: hold.x, z: hold.z, fx: at.x, fz: at.z } }
+    ? { npcId: withId, visitorId: customerId, since: engagedSince, at, from: { x: hold.x, z: hold.z }, lead: { x: hold.x, z: hold.z, fx: at.x, fz: at.z }, talking: true }
     : { npcId: withId, visitorId: customerId, since: engagedSince, at, ...(engagedFrom ? { from: engagedFrom } : {}) };
   const data: ConvData = { conv: first.state, awaiting: "customer", at, ...(withKind === "npc" ? { eng } : {}) };
   ctx.db
@@ -2329,7 +2329,7 @@ function sitAtBar(ctx: Ctx, row: ConvRow, data: ConvData): { id: string; out: Ou
   const free = BAR_SEATS.filter((s) => !taken.has(s.id) && ctx.present.every((id) => id === row.customer_id || (ctx.position(id) ? dist(ctx.position(id)!, s.at) > 0.7 : true)))
     .sort((a, b) => Math.abs(a.at.x - where.x) - Math.abs(b.at.x - where.x))[0];
   if (!free) return null;
-  const eng: Engagement = { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: free.at, from: { x: where.x, z: where.z }, lead: { x: where.x, z: where.z, fx: free.at.x, fz: free.at.z } };
+  const eng: Engagement = { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: free.at, from: { x: where.x, z: where.z }, lead: { x: where.x, z: where.z, fx: free.at.x, fz: free.at.z }, talking: true };
   data.eng = eng;
   log(ctx, row.customer_id, "seated", { conversationId: row.id, stool: free.id });
   return { id: free.id, out: [{ to: "all", message: { type: "seated", visitorId: row.customer_id, at: free.at, face: free.face } }, { to: "all", message: { type: "engaged", ...eng } }] };

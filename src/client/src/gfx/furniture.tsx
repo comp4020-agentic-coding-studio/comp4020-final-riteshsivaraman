@@ -30,7 +30,7 @@ import {
   type Table as TableSpec,
   TABLES,
 } from "../../../shared/world.ts";
-import { BAY_LEDGES, BAY_SHELVES, LEDGE_DEPTH, STOOL_SEAT_H } from "../../../shared/plan.ts";
+import { BAR_STOOL_SEAT_H, BAY_LEDGES, BAY_SHELVES, LEDGE_DEPTH, STOOL_SEAT_H } from "../../../shared/plan.ts";
 import { BAY_LEDGE_MODELS, TABLE_ASSIGNMENTS } from "../../../shared/assignments.ts";
 import { DEVICE_SLOTS, DEVICE_SLOT_BY_ID } from "../../../shared/slots.ts";
 import { net } from "../net.ts";
@@ -463,7 +463,7 @@ export function TableStool({ x, z }: { x: number; z: number }) {
 let barStoolGeo: BufferGeometry | null = null;
 function barStoolGeometry(): BufferGeometry {
   if (barStoolGeo) return barStoolGeo;
-  const seat = STOOL_SEAT_H;
+  const seat = BAR_STOOL_SEAT_H;
   const legTop = seat - 0.04;
   const legs = [0, 1, 2, 3].map((k) => splayLeg(Math.PI / 4 + (k * Math.PI) / 2, 0.13, 0.2, legTop, 0.036, MAPLE_LEG));
   const ringY = 0.28;

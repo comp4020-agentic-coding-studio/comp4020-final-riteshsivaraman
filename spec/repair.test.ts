@@ -35,13 +35,12 @@ describe("the Genius Bar repair conversation", () => {
     const outcomes = new Set(all.flatMap((p) => p.effects.filter((e): e is Extract<Effect, { type: "repair" }> => e.type === "repair").map((e) => e.outcome)));
     expect([...outcomes].sort()).toEqual(["later", "quick", "replacement"]);
   });
-  it("it opens by offering a seat, and only taking it sits the customer down", () => {
+  it("it opens by offering a seat, the only way in, and taking it sits the customer down", () => {
     expect(begin("repair", world).turn.say).toMatch(/take a seat/i);
-    const sits = all.filter((p) => p.path[0] === "sit");
-    const stands = all.filter((p) => p.path[0] === "stand");
-    expect(sits.length).toBeGreaterThan(0);
-    for (const p of sits) expect(p.effects.some((e) => e.type === "sit")).toBe(true);
-    for (const p of stands) expect(p.effects.some((e) => e.type === "sit")).toBe(false);
+    // seated is the only way at the bar: there is no standing option
+    expect(choicesFor(begin("repair", world).state, world).map((c) => c.id)).toEqual(["sit"]);
+    expect(all.length).toBeGreaterThan(0);
+    for (const p of all) expect(p.effects.some((e) => e.type === "sit"), p.path.join(">")).toBe(true);
   });
   it("every outcome closes properly: a closing line, and a replacement is closed there and then", () => {
     for (const p of all.filter((x) => x.effects.some((e) => e.type === "repair"))) expect(p.end.node, p.path.join(">")).toMatch(/_end$/);
@@ -74,7 +73,7 @@ describe("the Genius Bar repair conversation", () => {
 
   describe("coming back for a device left with them", () => {
     const run = (t: NonNullable<ConvState["ticket"]>) => {
-      const hello = step(begin("repair", world, t).state, "stand", world);
+      const hello = step(begin("repair", world, t).state, "sit", world);
       if ("error" in hello) throw new Error(hello.error);
       expect(choicesFor(hello.state, world).map((c) => c.id)).toContain("collect");
       const r = step(hello.state, "collect", world);
@@ -82,7 +81,7 @@ describe("the Genius Bar repair conversation", () => {
       return r;
     };
     it("without anything left with them there is no collect option", () => {
-      const hello = step(begin("repair", world).state, "stand", world);
+      const hello = step(begin("repair", world).state, "sit", world);
       if ("error" in hello) throw new Error(hello.error);
       expect(choicesFor(hello.state, world).map((c) => c.id)).not.toContain("collect");
     });

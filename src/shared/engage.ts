@@ -1,3 +1,4 @@
+import { seatEyeY, seatHeightAt } from "./seats.ts";
 import type { Behaviour } from "./behaviour.ts";
 import type { Engagement } from "./protocol.ts";
 import { headingTo, wrap } from "./steering.ts";
@@ -95,9 +96,10 @@ export function engagedMoment(npcId: string, e: Engagement, nowMs: number): Mome
     const ry = headingTo(goal.x, goal.z, e.lead.fx, e.lead.fz);
     if (e.seated) {
       // sitting at the table with the customer, turned a little towards them
-      return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, e.doing ?? "talk", "smile", "sitting down with a customer"), seated: true, gaze: { x: e.at.x, y: 1.2, z: e.at.z } };
+      return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, e.doing ?? "talk", "smile", "sitting down with a customer"), seated: true, gaze: { x: e.at.x, y: seatEyeY(seatHeightAt(e.at.x, e.at.z)), z: e.at.z } };
     }
-    return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, "idle", "smile", "showing a customer the way"), gaze: { x: e.at.x, y: 1.55, z: e.at.z } };
+    // waiting at the spot, or (talking) speaking with the customer from where they stand
+    return { ...asMoment({ x: goal.x, z: goal.z, ry, walking: false }, e.talking ? "talk" : "idle", "smile", e.talking ? "helping a customer from behind the bar" : "showing a customer the way"), gaze: { x: e.at.x, y: e.talking ? seatEyeY(seatHeightAt(e.at.x, e.at.z)) : 1.55, z: e.at.z } };
   }
   if (e.pending) {
     // arrived, showing intent: facing them, waiting to be accepted

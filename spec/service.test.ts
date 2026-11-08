@@ -643,7 +643,7 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
   const pick = (t: { conversationId: string }, id: string, when = NOW) => last(chooseTurn(ctx(when), "c1", t.conversationId, id), "c1", "turn")!;
   // the whole way through a quick fix, ending on its closing line
   const quickFix = (t0: { conversationId: string }) => {
-    let t = pick(t0, "stand");
+    let t = pick(t0, "sit");
     for (const id of ["symptom:wont_charge", "no", "not_yet", "ok", "ok"]) t = pick(t, id);
     return t;
   };
@@ -653,7 +653,7 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
     const t = talk();
     expect(t).toMatchObject({ withId: "genius-1", ended: false });
     expect(t?.say).toMatch(/take a seat/i);
-    expect(t?.choices.map((c) => c.label)).toEqual(["Take a seat", "I'll stay standing"]);
+    expect(t?.choices.map((c) => c.label)).toEqual(["Take a seat"]); // seated is the only way at the bar
   });
   it("the genius stays behind the bar: they never walk out to a waiting customer, and do not walk when the chat opens", () => {
     near();
@@ -679,15 +679,10 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
     expect(cur.ended).toBe(true);
     expect(last(ends, "all", "unseated")).toMatchObject({ visitorId: "c1" });
   });
-  it("staying standing seats nobody", () => {
-    near();
-    const out = chooseTurn(ctx(), "c1", talk()!.conversationId, "stand");
-    expect(messagesTo(out, "all", "seated")).toEqual([]);
-  });
   // back at the bar later: stand, and say you are here to collect
   const collect = (when: number) => {
     const t = last(startTalk(go(when), "c1", "genius-1"), "c1", "turn")!;
-    const hello = pick(t, "stand", when);
+    const hello = pick(t, "sit", when);
     expect(hello.choices.map((c) => c.id)).toContain("collect");
     return pick(hello, "collect", when);
   };
@@ -719,12 +714,12 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
     expect(eventTypes()).toEqual(expect.arrayContaining(["repair_outcome", "repair_trip", "repair_returning", "repair_ready", "repair_collected"]));
     closeTalk(go(readyAt + 3_000), "c1");
     // collected: nothing left to collect, so the option is gone
-    const fresh = pick(last(startTalk(go(readyAt + 10_000), "c1", "genius-1"), "c1", "turn")!, "stand", readyAt + 10_000);
+    const fresh = pick(last(startTalk(go(readyAt + 10_000), "c1", "genius-1"), "c1", "turn")!, "sit", readyAt + 10_000);
     expect(fresh.choices.map((c) => c.id)).not.toContain("collect");
   });
   it("a longer service is collected on another day (a later visit), and can come back as a replacement", () => {
     near();
-    let t = pick(talk()!, "stand");
+    let t = pick(talk()!, "sit");
     for (const id of ["symptom:battery_drain", "no", "months"]) t = pick(t, id); // a worn battery: a day's service
     t = pick(t, "ok");
     expect(t.say).toMatch(/proper service/);
@@ -746,7 +741,7 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
   });
   it("a replacement is handed over there and then, with nothing left to collect", () => {
     near();
-    let t = pick(talk()!, "stand");
+    let t = pick(talk()!, "sit");
     for (const id of ["symptom:wont_turn_on", "yes", "nothing", "ok", "go"]) t = pick(t, id); // water damage: swap it
     expect(t.say).toMatch(/replacement/);
     t = pick(t, "ok");

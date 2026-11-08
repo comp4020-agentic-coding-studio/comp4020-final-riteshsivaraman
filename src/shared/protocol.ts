@@ -93,6 +93,8 @@ export interface Engagement {
   lead?: { x: number; z: number; fx: number; fz: number };
   // with `lead`: sitting on that spot (a stool) rather than standing
   seated?: boolean;
+  // with `lead`: talking with the customer from that spot (a genius behind the bar), not just waiting there
+  talking?: boolean;
   // what it is doing while it stands there instead of just talking (checking
   // stock on its phone)
   doing?: "phone";

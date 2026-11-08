@@ -113,6 +113,8 @@ export const CARD_READER = { dx: 0.2, y: 1.1, w: 0.07, h: 0.1 } as const;
 
 // Stool positions live in layout.json; the seat height is a fact about stools.
 export const STOOL_SEAT_H = 0.7;
+// The bar stools are tall: sat on one, your eyes are level with a member of staff standing behind the bar.
+export const BAR_STOOL_SEAT_H = 0.82;
 
 // Ceiling and lights, from the front-on photograph and the close-ups: grey
 // slats run ACROSS the room (along x), long light panels sit in paired rows

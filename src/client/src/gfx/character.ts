@@ -788,6 +788,7 @@ export interface PoseInput {
   mode: Behaviour;
   seed: number; // varies idle motion between people
   seated?: boolean; // sitting on a stool
+  seatH?: number; // how high that stool's seat is (a bar stool is taller than a table stool)
   device?: boolean; // a device is out (also whenever mode is "device")
   // where the head should point, relative to the body (see shared/gaze.ts):
   // sideways and up or down at once. The behaviour's own head movement
@@ -1214,7 +1215,7 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
 
   const baseY = (b.root.userData.y ??= b.root.position.y) as number;
   // seated: the pelvis drops to the top of the stool (0.7 m) plus a little
-  const seatedY = Math.min(baseY, SEAT_H + 0.1);
+  const seatedY = Math.min(baseY, (p.seatH ?? SEAT_H) + 0.1);
   b.root.position.y = (baseY + Math.abs(s) * 0.03 * w) * (1 - seat) + seatedY * seat;
   b.root.rotation.z = weight * 0.8;
   // the thighs go forward and the shins hang down

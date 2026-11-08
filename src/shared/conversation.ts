@@ -210,10 +210,8 @@ function repairTurn(s: ConvState): Turn {
   const fault = s.fault ? faultById(s.fault) : undefined;
   switch (s.node) {
     case "seat":
-      return ask("Hi, welcome to the Genius Bar. Please, take a seat and tell me what's going on.", [
-        { id: "sit", label: "Take a seat" },
-        { id: "stand", label: "I'll stay standing" },
-      ]);
+      // seated is the only way: at the bar you sit, and are level with the genius
+      return ask("Hi, welcome to the Genius Bar. Please, take a seat and tell me what's going on.", [{ id: "sit", label: "Take a seat" }]);
     case "hello":
       return ask(s.ticket ? "What can I do for you today?" : "What's going on with your device?", [
         ...(s.ticket ? [{ id: "collect", label: "I'm here to collect my device" }] : []),

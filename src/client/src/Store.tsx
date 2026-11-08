@@ -30,6 +30,7 @@ import { slotDevice } from "./gfx/furniture.tsx";
 import { Room } from "./Room.tsx";
 import { net, useNet } from "./net.ts";
 import { sound } from "./audio.ts";
+import { seatEyeY, seatHeightAt } from "../../shared/seats.ts";
 import { handheldPoseFor, playPayCues } from "./payBeats.ts";
 import type { SoundSource } from "./sound.ts";
 
@@ -279,7 +280,14 @@ function Player() {
     // route — mid-walkover it hasn't arrived yet, so there is nothing to aim
     // at besides where it already stands), or another visitor's own reported
     // position if a human is staffing the desk.
-    const talkWithId = net.talking?.withId ?? net.staffTalking?.customerId ?? null;
+    let talkWithId = net.talking?.withId ?? net.staffTalking?.customerId ?? null;
+    // someone who has gone off across the shop or into the back (a genius taking your device to a technician) is not
+    // someone the view follows: the lock-on lets go once they are far away
+    if (talkWithId) {
+      const away = net.engaged.get(talkWithId);
+      const m = away ? engagedMoment(talkWithId, away, net.serverNow()) : null;
+      if (m && Math.hypot(m.x - net.me.x, m.z - net.me.z) > 8) talkWithId = null;
+    }
     if (talkWithId) {
       const eng = net.engaged.get(talkWithId);
       const remote = net.remotes.get(talkWithId);
@@ -297,7 +305,10 @@ function Player() {
         talkExiting.current = false;
         talkStandPose.current = { ry: camera.rotation.y, pitch: camera.rotation.x };
       }
-      TALK_TARGET.set(at.x, STORE_Y + (eng?.seated || net.seats.has(talkWithId) ? 1.2 : TALK_HEAD_Y), at.z); // a seated head is lower
+      // their face: a standing person's, or a seated one's at the height of the stool they are on
+      const theirSeat = net.seats.get(talkWithId);
+      const faceY = theirSeat ? seatEyeY(seatHeightAt(theirSeat.x, theirSeat.z)) : eng?.seated ? seatEyeY(seatHeightAt(at.x, at.z)) : TALK_HEAD_Y;
+      TALK_TARGET.set(at.x, STORE_Y + faceY, at.z);
       const mySeat = net.you ? net.seats.get(net.you.id) : undefined;
       const ease = 1 - Math.exp(-5 * dt); // slower than the device pan: a lean, not a snap-zoom
       if (mySeat) {
@@ -305,7 +316,7 @@ function Player() {
         const tx = mySeat.x + (at.x - mySeat.x) * 0.1;
         const tz = mySeat.z + (at.z - mySeat.z) * 0.1;
         camera.position.x += (tx - camera.position.x) * ease;
-        camera.position.y += (STORE_Y + 1.18 - camera.position.y) * ease;
+        camera.position.y += (STORE_Y + seatEyeY(seatHeightAt(mySeat.x, mySeat.z)) - camera.position.y) * ease; // eye level for the stool you are on
         camera.position.z += (tz - camera.position.z) * ease;
         turnToward(camera, TALK_TARGET, ease);
         net.me.x = mySeat.x;
@@ -480,7 +491,8 @@ function Remotes() {
       // smooth the estimate, otherwise the legs flicker on and off
       const smooth = prev ? (prev.speed ?? 0) + (speed - (prev.speed ?? 0)) * 0.2 : speed;
       const walking = smooth > 0.25 && !net.seats.has(r.info.id);
-      let state: ActorState = { walking, mode: "idle", mood: "neutral", speed: smooth, seated: net.seats.has(r.info.id) };
+      const theirSeat = net.seats.get(r.info.id);
+      let state: ActorState = { walking, mode: "idle", mood: "neutral", speed: smooth, seated: !!theirSeat, ...(theirSeat ? { seatH: seatHeightAt(theirSeat.x, theirSeat.z) } : {}) };
       // what they are doing, so everyone sees it: leaning over the device they
       // are inspecting, or talking and listening in a conversation
       const looking = [...net.inspections.values()].find((i) => i.visitorId === r.info.id);
@@ -820,7 +832,7 @@ function SelfView() {
     const prev = state.current.speed ?? 0;
     const smooth = prev + (speed - prev) * 0.2;
     const seat = net.you ? net.seats.get(net.you.id) : undefined;
-    state.current = { carrying: net.carrying(net.you?.id ?? ""), pay: handheldPoseFor(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: "idle", mood: net.faceOf(net.you?.id ?? "") ?? "neutral", speed: smooth, seated: !!seat };
+    state.current = { carrying: net.carrying(net.you?.id ?? ""), pay: handheldPoseFor(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: "idle", mood: net.faceOf(net.you?.id ?? "") ?? "neutral", speed: smooth, seated: !!seat, ...(seat ? { seatH: seatHeightAt(seat.x, seat.z) } : {}) };
     g.position.set(net.me.x, STORE_Y, net.me.z);
     g.rotation.y = camera.rotation.y;
   });

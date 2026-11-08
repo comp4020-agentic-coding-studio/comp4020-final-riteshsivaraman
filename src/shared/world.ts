@@ -269,6 +269,13 @@ export function bayCentre(i: number): number {
   return BAY_START_Z + PIER_W + BAY_W / 2 + i * (BAY_W + PIER_W);
 }
 
+// The wall between the shop and the back of house, with the staff door in it: staff (and NPCs on their routes)
+// go through the door, never the wall.
+export const DIVIDING_WALL: Box[] = [
+  { x: (FLOOR.minX - 3 + DOOR.minX) / 2, z: FLOOR.maxZ + 0.35, w: DOOR.minX - (FLOOR.minX - 3), d: 0.2, h: 3 },
+  { x: (DOOR.maxX + FLOOR.maxX + 3) / 2, z: FLOOR.maxZ + 0.35, w: FLOOR.maxX + 3 - DOOR.maxX, d: 0.2, h: 3 },
+];
+
 // Everything solid. Customers are also stopped by the bar partitions (they
 // cannot get behind the bar); staff can pass them.
 const COMMON_SOLIDS: Box[] = [
@@ -278,6 +285,7 @@ const COMMON_SOLIDS: Box[] = [
   ...BACK_SHELVES,
   ...SERVICE_DESKS,
   ...BACK_WALLS,
+  ...DIVIDING_WALL,
   ...BACK_FURNITURE,
 ];
 export const SOLIDS: Box[] = [...COMMON_SOLIDS, ...PARTITIONS];

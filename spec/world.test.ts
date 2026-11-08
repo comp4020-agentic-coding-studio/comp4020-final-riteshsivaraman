@@ -5,6 +5,7 @@ import {
   BACK_ROOM_Z1,
   BODY_RADIUS,
   DOOR,
+  DIVIDING_WALL,
   COUNTER,
   SOLIDS,
   TABLES,
@@ -19,7 +20,8 @@ import {
 // areas. One list of boxes feeds both what is drawn and what you bump into.
 
 it("keeps every shop-floor table, bench and the bar inside the walls", () => {
-  const shop = SOLIDS.filter((b) => b.z < FLOOR.maxZ + 0.5);
+  // (the wall between the shop and the back is not furniture: it runs past the walls on purpose, so a route cannot go round it)
+  const shop = SOLIDS.filter((b) => b.z < FLOOR.maxZ + 0.5 && !DIVIDING_WALL.includes(b));
   for (const b of shop) {
     expect(b.x - b.w / 2, "left edge").toBeGreaterThanOrEqual(FLOOR.minX);
     expect(b.x + b.w / 2, "right edge").toBeLessThanOrEqual(FLOOR.maxX);
