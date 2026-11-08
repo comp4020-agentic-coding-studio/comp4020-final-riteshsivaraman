@@ -88,3 +88,12 @@ customer, rather than leaving them stranded until a second staff member joins.
 - Issue #1, "Real staff users are offered waiting customers before CPUs".
 - CLAUDE.md "No background processes" (the 15 s window must be a stored timestamp), "Event log is load-bearing" (offers, claims and takeovers write `events` rows). Both are in issue #1's acceptance criteria 7 and 8.
 - Related: ADR 3 (who may see and do what), ADR 4 (cases and moves).
+
+## Addendum, 2026-11-09: when no human is available, or never comes
+
+Drafted by Claude; D58 is Ritesh's, the 30-second rule below is Claude's and he is asked to confirm it.
+
+- **D58 (Ritesh, 2026-11-09, after two hours as the only human staff user with no NPC ever coming to him: "that gap needs to be closed").** An on-duty NPC now claims a waiting customer on its own, but only when no real staff user online could serve that customer's post at all (`noRealStaffFor`). A human free for the same post is never pre-empted, so this ADR's decision stands unchanged while any human covers the post.
+- **The grace period (Claude, `SCOPE.md` D62).** Reviewing a live test, a customer waited about two minutes because a real specialist was online but not claiming, so the NPC rule never applied. The decision above (a human first, the offer passes after 15 s) is unchanged, but once a customer has waited **30 seconds** an NPC may take them even if a human is still nominally available (`NPC_AFTER_HUMAN_MS`, a stored wait time, not a timer). Cost: a human who is slow to respond loses the customer to an NPC at 30 s instead of keeping them; Option A's "a CPU gives way, never a human" is softened to "gives way, for 30 seconds". If that is wrong, the constant is the one place to change.
+- The NPC now opens its conversation only on arrival, not when it sets off (ADR 11).
+
