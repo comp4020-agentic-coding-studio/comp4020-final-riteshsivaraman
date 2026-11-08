@@ -618,6 +618,22 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
 // real slice.
 const usesTalkEngine = (script: ScriptId, _withKind: "npc" | "visitor"): boolean => script === "phones";
 
+// The greeter's hello is personalised from stored visit and order history
+// only -- a visitor's name (never anything a client sent: nameOf reads the
+// visitors row) and, if they have a prior paid order, what they bought
+// (issue #10). A token on its first ever visit (one "profile" event so far:
+// this visit's own, written by enter()) keeps the plain hello; null here
+// means "use the script's own line".
+function greeterHello(ctx: Ctx, customerId: string): string | null {
+  const visits = (ctx.db.prepare("SELECT COUNT(*) AS n FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { n: number }).n;
+  if (visits <= 1) return null;
+  const name = nameOf(ctx, customerId);
+  const last = ctx.db.prepare("SELECT sale FROM orders WHERE customer_id = ? AND stage = 'done' ORDER BY created_at DESC LIMIT 1").get(customerId) as { sale: string } | undefined;
+  if (!last) return `Welcome back, ${name}! What brings you here today?`;
+  const sale = JSON.parse(last.sale) as { name: string; colour: string };
+  return `Welcome back, ${name}! How's the ${sale.colour} ${sale.name} treating you? What brings you here today?`;
+}
+
 function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "visitor", script: ScriptId, at: { x: number; z: number }, engagedSince: number = ctx.now): Outgoing[] {
   const id = randomUUID();
   const cleared: Outgoing[] = [];
@@ -656,7 +672,9 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
     .run(row.id, customerId, withId, withKind, script, row.node, JSON.stringify(data), ctx.now);
   setState(ctx, customerId, { state: "in_conversation", with_id: withId });
   log(ctx, customerId, "conversation_started", { conversationId: row.id, with: withId, kind: withKind, script });
-  const out: Outgoing[] = [...cleared, { to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, withId), first.turn.say, first.turn.choices, false, "customer") } }];
+  // the greeter's hello is the one line personalised from stored history (issue #10)
+  const say = script === "greeter" && first.state.node === "hello" ? (greeterHello(ctx, customerId) ?? first.turn.say) : first.turn.say;
+  const out: Outgoing[] = [...cleared, { to: customerId, message: { type: "turn", ...turnView(row, nameOf(ctx, withId), say, first.turn.choices, false, "customer") } }];
   const sm = stateMessage(ctx, customerId);
   if (sm) out.push(sm);
   if (withKind === "npc") out.push({ to: "all", message: { type: "engaged", ...eng } });
