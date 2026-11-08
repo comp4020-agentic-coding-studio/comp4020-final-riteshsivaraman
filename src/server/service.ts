@@ -1499,13 +1499,21 @@ function startCheckout(ctx: Ctx, row: ConvRow, d: TalkConvData, sku: { model: st
     if (!takeOne(ctx.db, product, sku.colour, sku.storage)) {
       log(ctx, row.customer_id, "reserve_lost", { product, colour: sku.colour });
       const holder = holderNameOf(ctx, product, sku.colour, sku.storage);
-      // Issue #36: the unit went between confirming and this check. The
-      // "on hold for X" / "gone" wording (#21/#3) is unchanged -- only the
-      // scene no longer ends here: offerSoldOut hands the customer a real
-      // choice (continue looking, or leave) instead of a dead end.
-      const sorry = holder
-        ? `Sorry, I've just checked and the ${sku.colour} ${sale.name} is on hold for ${holder}.`
-        : `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
+      // Issue #36: the "on hold for X" / "gone" wording (#21/#3) is
+      // unchanged either way. When a live race for this exact unit was
+      // just lost to a named holder, the conversation still ends here (the
+      // unit is gone right now, nothing to continue toward, and
+      // spec/3-stock-holds-visible.test.ts's live race test expects the
+      // chat to end) -- offerSoldOut's real choice (continue looking, or
+      // leave) is for the generic "nothing in stock at all" case, where
+      // there genuinely is somewhere else to look.
+      if (holder) {
+        const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} is on hold for ${holder}.`;
+        const scene: Scene = { ...d.scene, ended: { how: "left", why: "sold out" } };
+        saveTalkData(ctx, row, { ...d, scene });
+        return [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), sorry, [], true, "customer") } }, ...finishTalk(ctx, getConv(ctx.db, row.id) ?? row, scene)];
+      }
+      const sorry = `Sorry, I've just checked and the ${sku.colour} ${sale.name} has gone: someone else has the last one.`;
       const scene = offerSoldOut(d.scene, sku.model, sorry);
       const next: TalkConvData = { ...d, scene };
       saveTalkData(ctx, row, next);
