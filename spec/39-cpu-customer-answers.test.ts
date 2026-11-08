@@ -223,13 +223,11 @@ describe("a promoted timetable customer answers a real specialist through the ta
       takeOrder(ctx(t), "sam");
     }
     expect(order()?.stage, "sam never got the bag").not.toBe("fetching");
-    // sam is already with the customer: the payment opens a beat later
-    for (let k = 0; k < 10 && order()?.stage === "with_spec"; k++) {
-      t += 600;
-      bridge(t);
-      settleVisits(ctx(t));
-    }
-    expect(order()?.stage, "the payment never opened").toBe("paying");
+    // sam, next to the customer with the bag, presses E at it: that opens the payment (issue #52)
+    t += 600;
+    bridge(t);
+    requestTalk(ctx(t), "sam", id);
+    expect(order()?.stage, "sam's E at the CPU customer did not open the payment").toBe("paying");
     const pay = mem.prepare("SELECT id FROM conversations WHERE customer_id = ? AND ended_at IS NULL").get(id) as { id: string };
     // sam shows the total on the handheld; the customer does not tap in the same instant
     advancePaymentBeat(ctx(t + 100), "sam", pay.id);
