@@ -723,9 +723,10 @@ function GuideMarkers() {
   const out: Array<{ key: string; x: number; z: number; colour: string }> = [];
   // where staff are walking you (a demo device, the till): yellow
   if (live.escort && !live.myInspectSlot) out.push({ key: "escort", x: live.escort.goal.x, z: live.escort.goal.z, colour: "#ffd23f" });
-  // where you were told to wait to be fetched: green
-  const w = live.waitingAt;
-  if (w) out.push({ key: "wait", x: w.x, z: w.z, colour: "#8cf0b4" });
+  // issue #56: a customer waiting for help used to be told to stand at a
+  // fixed spot (green ring); removed so they can roam free while waiting --
+  // the offer marker (#1) already tells a free staff member where to find
+  // them, wherever they actually are.
   // a specialist waiting for the bag: where the stock person is: purple
   const order = live.myOrderAsSpecialist;
   const runner = order?.stage === "fetching" ? live.engaged.get(order.stockId) : undefined;

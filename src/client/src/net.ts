@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from "react";
 import type { PlayerStateName } from "../../shared/conversation.ts";
-import { waitSpotFor } from "../../shared/duty.ts";
 import { engagedMoment, type Release } from "../../shared/engage.ts";
 import type { Profile } from "../../shared/profile.ts";
 import type {
@@ -134,14 +133,6 @@ class Net {
   holds: HoldView[] = [];
   // the stock person has come to you and you may take the bag (set by the scene)
   runnerNear = false;
-  // told where to go for the help you asked for: the spot of the post you need
-  get waitingAt(): { x: number; z: number; label: string } | null {
-    if (this.state === "waiting_for_help" && !this.escort) {
-      const spot = this.needs ? waitSpotFor(this.needs) : null;
-      if (spot) return spot;
-    }
-    return null;
-  }
   // a member of staff is walking you somewhere (to a demo device, to the till)
   escort: { id: string; kind: "demo" | "seat"; npcId: string; npcName: string; text: string; goal: { x: number; z: number } } | null = null;
   // the conversation as the scene should treat it: while you are being walked

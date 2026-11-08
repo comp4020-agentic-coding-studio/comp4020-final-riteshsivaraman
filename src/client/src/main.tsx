@@ -91,11 +91,6 @@ function Hud() {
           DEV: walking as {live.role === "staff" ? "staff" : "a customer"} (click to switch)
         </button>
       )}
-      {live.waitingAt && !live.locked && (
-        <div className="escort-banner">
-          Head to {live.waitingAt.label} and press E on whoever is free.
-        </div>
-      )}
       {live.escort && (
         <div className="escort-banner">
           {live.escort.text}
