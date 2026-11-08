@@ -612,6 +612,19 @@ describe("walking away mid-conversation (Esc, either side)", () => {
   });
 });
 
+describe("what the customer said, in words", () => {
+  it("a customer's menu pick comes back as the line the engine says for it, for the chat log", () => {
+    const s = npc("spec-phones");
+    addVisitor("c1", "Pebble", { x: s.x, z: s.z });
+    db.prepare("UPDATE player_state SET state = 'waiting_for_help', needs = 'specialist:phones' WHERE visitor_id = 'c1'").run();
+    const t = talkAt(later(tryNpcAutoClaim(ctx(), "c1")));
+    const pick = t.choices.find((c) => !c.standing)!;
+    const next = last(chooseTurn(ctx(), "c1", t.conversationId, pick.id), "c1", "turn")!;
+    expect(next.youSaid, "no spoken line for the pick").toBeTruthy();
+    expect(next.youSaid).not.toBe(pick.label);
+  });
+});
+
 describe("the Genius Bar repair, run by an NPC genius", () => {
   const atBar = () => {
     const g = npc("genius-1");

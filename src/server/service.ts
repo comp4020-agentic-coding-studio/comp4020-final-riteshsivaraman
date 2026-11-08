@@ -2841,12 +2841,15 @@ function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgo
   const prior = anyDataOf(row);
   const data: TalkConvData = { ...(isTalkData(prior) ? prior : {}), engine: "talk", scene };
   saveTalkConv(ctx, row, data, turn.ended);
+  // the customer's pick as the engine says it in words, so the chat reads as a conversation
+  const youSaid = scene.log.slice(from.log.length).filter((l) => l.who === "customer").at(-1)?.text;
+  const said = (out: Outgoing[]): Outgoing[] => (youSaid ? out.map((o) => (o.to === row.customer_id && o.message.type === "turn" ? { ...o, message: { ...o.message, youSaid } } : o)) : out);
   // they have decided: no trip to the till. The specialist checks stock on
   // their phone, a stock person brings the device out, and they pay right here.
   if (scene.ended?.how === "bought") return startCheckout(ctx, row, data, scene.ended.sku, turn.say);
   // a real specialist: the customer waits and the specialist is shown what they chose
-  if (humanStaff && !turn.ended) return [waitingTurn(ctx, row), staffMenu(ctx, row, data)];
-  const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, turn.ended, "customer") } }];
+  if (humanStaff && !turn.ended) return said([waitingTurn(ctx, row), staffMenu(ctx, row, data)]);
+  const out: Outgoing[] = said([{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), turn.say, turn.choices, turn.ended, "customer") } }]);
   if (turn.ended) return [...out, ...finishTalk(ctx, row, scene)];
   const sm = stateMessage(ctx, row.customer_id);
   if (sm) out.push(sm);

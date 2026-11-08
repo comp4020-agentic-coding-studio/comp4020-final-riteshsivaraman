@@ -168,7 +168,7 @@ export const BANK: QuestionDef[] = [
     id: "use_case",
     kind: "soft",
     multi: true,
-    ask: (ctx) => `What will ${ctx.sc.gift ? "they" : "you"} mainly use it for? Pick as many as apply.`,
+    ask: (ctx) => `What will ${ctx.sc.gift ? "they" : "you"} mainly use it for?`,
     pre: (ctx) => ctx.ranked.length > 1,
     options: () => [
       { id: "office", label: "Office and email" },

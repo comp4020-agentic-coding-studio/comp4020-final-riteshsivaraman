@@ -307,6 +307,11 @@ class Net {
         return true;
       case "turn":
         if (this.turn?.conversationId !== message.conversationId) this.talkLog = [];
+        // replace the menu label just logged ("Name the iPhone 17") with what the customer actually said
+        if (message.youSaid) {
+          const i = this.talkLog.map((l) => l.who).lastIndexOf("customer");
+          if (i >= 0) this.talkLog = this.talkLog.map((l, k) => (k === i ? { ...l, text: message.youSaid! } : l));
+        }
         if (message.say) this.talkLog = [...this.talkLog, { who: "them", text: message.say }];
         this.turn = message;
         this.turnAt = Date.now();

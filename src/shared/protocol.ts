@@ -72,6 +72,8 @@ export interface TurnView {
   choices: Array<{ id: string; label: string; group?: string; standing?: boolean }>; // standing: always-available exits (leave, back, carry on), shown quietly
   ended: boolean;
   awaiting: "customer" | "staff"; // whose turn: a customer waits on staff, shown no menu
+  // what the customer's pick came out as in words ("I'll go with the iPhone 17."), for the chat log in place of the menu label they clicked
+  youSaid?: string;
 }
 
 
