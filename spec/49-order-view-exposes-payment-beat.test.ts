@@ -12,6 +12,7 @@ import {
   enter,
   orderViews,
   ORDER_MS,
+  requestTalk,
   settleVisits,
   startTalk,
   takeOrder,
@@ -66,7 +67,8 @@ const orderStage = (): string | undefined => (db.prepare("SELECT stage FROM orde
 // NPC's does (catchUpRunner only advances the runner leg; a real specialist
 // presses E -- takeOrder -- to actually take the bag), so `staffId` lets a
 // human-staffed order press it on every tick, same as a specialist standing
-// there the whole time would.
+// there the whole time would. Holding the bag, a real specialist opens the
+// payment by pressing E at the customer (issue #52), never by proximity alone.
 function payFor(customer: string, staffId?: string): { id: string; t: number } {
   closeTalk(ctx(NOW + 1000), customer);
   let t = NOW + 2000;
@@ -76,7 +78,7 @@ function payFor(customer: string, staffId?: string): { id: string; t: number } {
     t += 1000;
   }
   for (let i = 0; i < 150; i++, t += 1000) {
-    const turn = last(settleVisits(ctx(t)), customer, "turn");
+    const turn = last([...settleVisits(ctx(t)), ...(staffId ? requestTalk(ctx(t), staffId, customer) : [])], customer, "turn");
     if (turn) return { id: turn.conversationId, t };
   }
   throw new Error(`no payment conversation: stage=${orderStage()}`);
