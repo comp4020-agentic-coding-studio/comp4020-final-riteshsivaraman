@@ -231,6 +231,14 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE intents ADD COLUMN from_x REAL;
   ALTER TABLE intents ADD COLUMN from_z REAL;
   `,
+  // 13 (issue #31): every hot query against events filters on visitor_id and
+  // type together (freeSince's joined-since check, the catch-up offer
+  // staleness reads, a visit's own profile/inspect history) -- a full
+  // table scan per call, measured at 4.9ms/query at 200k rows. This index
+  // covers every one of those shapes; no behaviour changes, read-only speedup.
+  `
+  CREATE INDEX events_visitor_type ON events (visitor_id, type);
+  `,
 ];
 
 // Applies every step the database has not seen yet, each in its own
