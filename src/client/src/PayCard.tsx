@@ -84,7 +84,14 @@ export function PayCard() {
         <>
           <div className="pay-tick" aria-hidden="true">✓</div>
           <div className="pay-price">{s.price}</div>
-          <div className="pay-note">Paid</div>
+          <div className="pay-note">{order.method ? `Paid by ${order.method === "phone" ? "phone" : "card"}` : "Paid"}</div>
+          <div className="pay-receipt" aria-label="Receipt">
+            <div className="pay-receipt-head">Receipt</div>
+            <div className="pay-receipt-row"><span>{order.what}</span><span>{s.price}</span></div>
+            {order.pay && <div className="pay-receipt-row dim"><span>{order.pay.storage}</span><span /></div>}
+            <div className="pay-receipt-row dim"><span>{order.method === "phone" ? "Tapped with phone" : order.method === "card" ? "Card" : "Paid"}</span><span>#{order.id.slice(0, 4).toUpperCase()}</span></div>
+            <div className="pay-receipt-row dim"><span>Served by {order.specName}</span><span /></div>
+          </div>
         </>
       )}
     </aside>

@@ -1447,9 +1447,17 @@ export function orderViews(ctx: Ctx): OrderView[] {
       what: `${sale.colour} ${sale.name}`,
       pay: { conversationId: conv?.id ?? o.id, beat: "tapped", beatAt: o.ended_at!, name: sale.name, colour: sale.colour, storage: sale.storage, price: sale.price },
       paidAt: o.ended_at!,
+      ...paidMethod(ctx, o.customer_id),
     };
   });
   return [...live, ...justPaid];
+}
+
+// How the customer paid, from the purchase_paid event the tap wrote (no new column).
+function paidMethod(ctx: Ctx, customerId: string): { method?: "card" | "phone" } {
+  const row = ctx.db.prepare("SELECT data FROM events WHERE visitor_id = ? AND type = 'purchase_paid' ORDER BY rowid DESC LIMIT 1").get(customerId) as { data: string } | undefined;
+  const m = row ? (JSON.parse(row.data) as { method?: string }).method : undefined;
+  return m === "card" || m === "phone" ? { method: m } : {};
 }
 
 // Every unit currently held (reservations, status 'held', not yet expired at

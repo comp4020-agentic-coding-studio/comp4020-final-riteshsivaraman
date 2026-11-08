@@ -1118,3 +1118,30 @@ kbd {
   }
 }
 
+
+/* the receipt slides up out of the card once it is paid, and the tap ripples twice */
+.pay-receipt {
+  margin: 10px -4px -2px;
+  padding: 8px 10px;
+  background: #fffdf5;
+  color: #222;
+  border-radius: 6px 6px 10px 10px;
+  text-align: left;
+  font-size: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  transform-origin: top center;
+  animation: pay-receipt-out 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.pay-receipt-head { font-weight: 800; letter-spacing: 2px; text-transform: uppercase; border-bottom: 1px dashed #bbb; padding-bottom: 3px; margin-bottom: 3px; }
+.pay-receipt-row { display: flex; justify-content: space-between; gap: 8px; }
+.pay-receipt-row.dim { color: #777; }
+@keyframes pay-receipt-out {
+  from { transform: translateY(-60%) scaleY(0.2); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.pay-card.pay-paid .pay-tick { animation: pay-tick-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes pay-tick-pop { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.pay-tap.rippling { animation: pay-ripple 0.7s ease-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .pay-receipt, .pay-card.pay-paid .pay-tick { animation: none; }
+}

@@ -178,6 +178,8 @@ export interface OrderView {
   // Present only when stage is "paid": the server time the order finished
   // (orders.ended_at). The client hides itself once serverNow() > paidAt + 4000.
   paidAt?: number;
+  // Present only when stage is "paid": how the customer paid, read off the purchase_paid event
+  method?: "card" | "phone";
 }
 
 // Two real people in a conversation, so everyone else sees them talk and

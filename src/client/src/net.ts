@@ -24,7 +24,7 @@ export type Status = "connecting" | "open" | "closed" | "replaced";
 
 // A paid order is shown for its server window only (issue #49): until
 // `paidAt + PAID_SHOW_MS` on the server's clock, never a client timer.
-export const PAID_SHOW_MS = 4000;
+export const PAID_SHOW_MS = 6000; // long enough to read the receipt
 export const isPayShowing = (o: OrderView, serverNow: number): boolean => o.stage === "paying" || (o.stage === "paid" && o.paidAt !== undefined && serverNow < o.paidAt + PAID_SHOW_MS);
 
 // A remote visitor: where the server last said they were (tx/tz/try) and where
