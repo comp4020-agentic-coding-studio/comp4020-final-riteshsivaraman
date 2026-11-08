@@ -620,8 +620,19 @@ export function startTalk(ctx: Ctx, customerId: string, withId: string): Outgoin
   if ("fail" in r) return [...putDown, ...r.fail];
   // busy: in a conversation, still standing with someone on their last turn, walking someone somewhere, or on their way to take payment
   if (staffBusy(ctx, withId, r.ok.withKind)) return [...putDown, notice(customerId, `${nameOf(ctx, withId)} is with someone else. Please wait a moment.`)];
+  // a real staff user claimed with E directly, no offer required (D54): tracked the
+  // same way an offer-claimed customer is (issue #30), so a disconnect with no NPC
+  // of the post free puts them back on the waiting list instead of out to browsing.
+  // One transaction, as the claim-while-offered path (`staffTalk`) does: the
+  // conversation and the claim land together or not at all.
+  const before = r.ok.withKind === "visitor" ? stateOf(ctx.db, customerId) : undefined;
+  const opened = ctx.db.transaction(() => {
+    const opened = open(ctx, customerId, withId, r.ok.withKind, r.ok.script, r.ok.here);
+    if (before) recordClaim(ctx, customerId, withId, before);
+    return opened;
+  })();
   // a real staff user being offered this customer is told the offer is off
-  return [...putDown, ...open(ctx, customerId, withId, r.ok.withKind, r.ok.script, r.ok.here), ...settleOffers(ctx)];
+  return [...putDown, ...opened, ...settleOffers(ctx)];
 }
 
 // Script "phones" against an NPC uses the new talk engine; everything else

@@ -10,7 +10,7 @@ import type { ClientMessage, ServerMessage } from "../src/shared/protocol.ts";
 import type { Profile } from "../src/shared/profile.ts";
 import { migrate } from "../src/server/migrate.ts";
 import { seedStock } from "../src/server/stock.ts";
-import { catchUpOffers, customersView, enter, handOverPost, OFFER_MS, rejoin, releaseClaimsOf, requestTalk, stateOf, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
+import { catchUpOffers, customersView, enter, handOverPost, leaveStore, OFFER_MS, rejoin, releaseClaimsOf, requestTalk, stateOf, type Ctx, type Employee, type Outgoing } from "../src/server/service.ts";
 
 // Issue #1, SCOPE D47 and D48. Promise: given a waiting customer, a free real
 // staff user is offered the customer before any CPU, exactly one staff member
@@ -413,6 +413,51 @@ describe("the offer passes on, and a released claim keeps its place (store servi
 
     // back at her original place: ahead of Bo (nearer to the newcomer, and on the list
     // the whole time), so the next real staff user to come free is offered Ann
+    add("tia", { x: 2, z: -5 }, "specialist");
+    catchUpOffers(ctx(t + 10));
+    expect(offeredTo("ann")).toBe("tia");
+    expect(offeredTo("bo")).toBeUndefined();
+  });
+
+  // Issue #30: a customer who presses E directly on a free real staff user
+  // (no offer first — the claim path `staffTalk` always uses) must be tracked
+  // the same way an offer-claimed customer is, so the same disconnect-recovery
+  // logic (`releaseClaimsOf`) applies regardless of how the conversation started.
+  it("a customer who pressed E directly on a free staff user (no offer) also returns to the waiting list if that staff user disconnects with no NPC free (issue #30)", () => {
+    fresh();
+    add("sam", { x: 0, z: -6 }, "specialist");
+    add("ann", { x: 0, z: -7 });
+    add("bo", { x: 2, z: -7 });
+    waitedSince("ann", NOW - 9000); // Ann has waited longest
+    waitedSince("bo", NOW - 1000);
+    // Ann presses E on Sam directly: no offer was ever made (settleOffers/catchUpOffers never ran)
+    expect(offeredTo("ann")).toBeUndefined();
+    expect(turnTo(requestTalk(ctx(NOW + 10), "ann", "sam"), "ann")?.withId).toBe("sam");
+    expect(stateOf(mem, "ann")?.state).toBe("in_conversation");
+
+    // every NPC phones specialist is busy elsewhere, so nobody can carry Sam's conversation on
+    for (const npc of ["spec-phones", "spec-phones-2"]) {
+      const cid = `busy-with-${npc}`;
+      mem.prepare("INSERT INTO visitors (id, token, name, colour, created_at, last_seen) VALUES (?, ?, ?, '#fff', 0, 0)").run(cid, `tok-${cid}`, cid);
+      mem.prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, 'npc', 'phones', 'talk', '{}', ?)").run(`conv-${npc}`, cid, npc, NOW);
+    }
+    // the real disconnect order (presence.ts `depart`): handOverPost, then
+    // releaseClaimsOf, then leaveStore closes whatever conversation is still open
+    const t = NOW + 2000;
+    expect(handOverPost(ctx(t), "sam")).toEqual([]);
+    releaseClaimsOf(ctx(t), "sam");
+    leaveStore(ctx(t), "sam");
+    gone("sam");
+    // without the fix, a direct-E claim is never recorded, so releaseClaimsOf finds
+    // nothing to release and leaveStore ends the conversation the ordinary way,
+    // putting the customer out to "browsing" (excluded from the waiting list)
+    // instead of back onto it as "arriving"
+    expect(stateOf(mem, "ann")?.state, "Ann was put out to browsing, off the waiting list, instead of returned to it").toBe("arriving");
+    expect((mem.prepare("SELECT COUNT(*) AS n FROM conversations WHERE customer_id = 'ann' AND ended_at IS NULL").get() as { n: number }).n).toBe(0);
+    expect(eventsOf("ann").find((e) => e.type === "claim_released")?.data).toMatchObject({ staffId: "sam", waitingSince: NOW - 9000 });
+
+    // back at her original place: ahead of Bo, so the next real staff user to come
+    // free is offered Ann, exactly as the offer-claim path behaves (criterion 6)
     add("tia", { x: 2, z: -5 }, "specialist");
     catchUpOffers(ctx(t + 10));
     expect(offeredTo("ann")).toBe("tia");
