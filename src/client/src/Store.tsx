@@ -6,6 +6,7 @@ import type { Camera, DirectionalLight as DirectionalLightType, Object3D } from 
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { Group, Mesh, MeshBasicMaterial } from "three";
 import { engagedMoment } from "../../shared/engage.ts";
+import { heldPlaces, heldTalkCandidates } from "../../shared/heldCpu.ts";
 import { sunStateAt } from "../../shared/sun.ts";
 import { NPC_DESIGNATION, NPC_LABEL, scriptFor } from "../../shared/duty.ts";
 import { NPCS, npcPose } from "../../shared/npcs.ts";
@@ -282,7 +283,14 @@ function Player() {
       const eng = net.engaged.get(talkWithId);
       const remote = net.remotes.get(talkWithId);
       const now = net.serverNow();
-      const at = eng ? engagedMoment(talkWithId, eng, now) : remote ? { x: remote.x, z: remote.z } : npcPose(NPCS.find((n) => n.id === talkWithId) ?? NPCS[0]!, now);
+      const hold = net.heldCpu().get(talkWithId);
+      const at = eng
+        ? engagedMoment(talkWithId, eng, now)
+        : remote
+          ? { x: remote.x, z: remote.z }
+          : hold
+            ? hold.at
+            : npcPose(NPCS.find((n) => n.id === talkWithId) ?? NPCS[0]!, now);
       if (wasTalkingWith.current !== talkWithId) {
         wasTalkingWith.current = talkWithId;
         talkExiting.current = false;
@@ -402,7 +410,8 @@ function Player() {
     ({ x, z } = clampToWalkable(net.role, x, z));
     ({ x, z } = resolveCollisions(x, z, net.role));
     // people are solid too: other visitors, staff, customers, walkers
-    ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow(), engagedPlaces(net.engaged.values(), net.serverNow())));
+    // (a promoted timetable customer is solid where it is held, not on its timetable: issue #41)
+    ({ x, z } = avoidPeople(x, z, [...net.remotes.values()], net.serverNow(), new Map([...heldPlaces(net.heldCpu().values(), net.serverNow()), ...engagedPlaces(net.engaged.values(), net.serverNow())])));
     ({ x, z } = clampToWalkable(net.role, x, z));
     // sound (#11): a footstep every stride length actually covered, and a
     // door chime the one time you cross from outside/the entrance onto the
@@ -467,7 +476,7 @@ function Remotes() {
       const chat = net.chats.get(r.info.id);
       if (slot && !walking) state = { ...state, mode: "observe", mood: "curious", gaze: { x: slot.x, y: TABLE_H + 0.05, z: slot.z } };
       else if (chat && !walking) {
-        const other = chat.with === net.you?.id ? net.me : net.remotes.get(chat.with);
+        const other = chat.with === net.you?.id ? net.me : (net.remotes.get(chat.with) ?? net.heldCpu().get(chat.with)?.at);
         // only the one who just spoke talks, and only as long as the line takes to say
         const talkingNow = net.serverNow() < chat.until;
         const mine = chat.speaker === r.info.id;
@@ -633,6 +642,9 @@ function Interact() {
           consider(r.info.id, r.info.name, r.x, r.z);
         }
       }
+      // a timetable customer the store's rules have taken over is a customer like
+      // any other (D55): staff reach it where the server holds it (issue #41)
+      if (!isCustomer) for (const c of heldTalkCandidates(net.heldCpu().values(), net.chats, now)) consider(c.id, c.name, c.x, c.z);
     }
     const b = best as { id: string; name: string } | null;
     const next = b ? { id: b.id, name: b.name } : null;
