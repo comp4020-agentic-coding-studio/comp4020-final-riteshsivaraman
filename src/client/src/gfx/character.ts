@@ -127,6 +127,7 @@ export interface BoneSet {
   hip: [Bone, Bone];
   kn: [Bone, Bone];
   dev: Bone; // the device in the right hand: scaled to nothing when it is put away
+  pay: Bone; // the staff payment handheld in the left hand (issue #42); Actor mounts it for staff only
 }
 
 export interface Character {
@@ -379,6 +380,9 @@ export function buildCharacter(
   // the middle of the right hand; Actor mounts the device a little in front
   const hand = wristPt[1].clone().addScaledVector(wristPt[1].clone().sub(elbowPt[1]).normalize(), 0.065);
   const dev = mk("dev", hand.x, hand.y, hand.z, wr[1]);
+  // the same for the left hand: where a member of staff holds the payment handheld
+  const handL = wristPt[0].clone().addScaledVector(wristPt[0].clone().sub(elbowPt[0]).normalize(), 0.065);
+  const pay = mk("pay", handL.x, handL.y, handL.z, wr[0]);
   const idx = (b: Bone): number => list.indexOf(b);
 
   // ---- parts ----
@@ -760,7 +764,7 @@ export function buildCharacter(
 
   return {
     root: group,
-    bones: { root, spine, head, brow: browBones, lids, mouth, mouthOpen, sh, el, wr, hip, kn, dev },
+    bones: { root, spine, head, brow: browBones, lids, mouth, mouthOpen, sh, el, wr, hip, kn, dev, pay },
     triangles: merged.getAttribute("position").count / 3,
     look,
     body: bodyStyle,
@@ -792,6 +796,11 @@ export interface PoseInput {
   // a world point (x, z) the hands meet at, for a handshake: halfway to the
   // partner. Without it they reach to an arm's length ahead.
   meet?: { x: number; z: number };
+  // a member of staff's payment handheld (issue #42), left hand: `raise` 0
+  // hanging at the side, 1 held up in front of the chest; `aim` 0 the screen
+  // to the holder (scanning), 1 turned to the customer. Both already eased and
+  // derived from server time by the caller (pay-choreo.ts). Absent: no handheld.
+  pay?: { raise: number; aim: number };
 }
 
 // Bones from a behaviour, a walk cycle and a mood. Signs, for a hanging limb
@@ -817,6 +826,13 @@ const ikQ2 = new Quaternion();
 const HAND_ROLL = 1.45;
 // a held device leans back from vertical by this much, screen toward the face
 const DEVICE_TILT = -0.8;
+// the payment handheld shown to a customer: tipped back only this much, so the
+// screen faces them a little upward, about at their eye line
+const PAY_SHOW_TILT = -0.35;
+const payQ = new Quaternion();
+const payRest = new Quaternion();
+const payUp = new Quaternion();
+const payTmp = new Quaternion();
 function reachWith(c: Character, i: 0 | 1, goal: Vector3, w: number): void {
   const b = c.bones;
   const sh = b.sh[i];
@@ -1160,6 +1176,24 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
   // looking at something: the head points at it on both axes, the behaviour's
   // own head movement kept as a small drift. The spine's lean already tips the
   // head forward, so it is taken off the pitch.
+  // the payment handheld raised: the left hand comes up in front of the chest,
+  // a little to the left of centre, over whatever the behaviour was doing
+  if (p.pay) {
+    const r = walking ? 0 : p.pay.raise;
+    // the goal stays set while the smoothed reach is still letting go, so the
+    // arm lowers rather than snapping back (except over the tablet's own left hand)
+    const lettingGo = (st.reachL ?? 0) > 0.02 && p.mode !== "device";
+    if (r > 0.001 || lettingGo) {
+      T.reachL = Math.max(T.reachL, r);
+      handL = new Vector3(-0.05, c.shoulderY - 0.17, -0.3 - 0.04 * p.pay.aim);
+    }
+    if (r > 0.01) {
+      T.rollL = 0;
+      T.shLx = Math.max(T.shLx, 0.9 * r);
+      T.elL = Math.max(T.elL, 1.5 * r);
+      T.pitch = Math.max(T.pitch, 0.35 * r * (1 - p.pay.aim));
+    }
+  }
   if (p.gaze && !walking) {
     T.yaw = p.gaze.yaw + T.yaw * 0.25;
     T.pitch = p.gaze.pitch * 0.9 - T.lean + T.pitch * 0.1;
@@ -1215,6 +1249,23 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
     b.wr[1].getWorldQuaternion(ikQ);
     b.spine.getWorldQuaternion(ikQ2);
     b.dev.quaternion.copy(ikQ.invert()).multiply(ikQ2).multiply(ikQ.setFromAxisAngle(ikAxis.set(1, 0, 0), DEVICE_TILT));
+  }
+
+  // the payment handheld: hanging at the side (top down, screen to the thigh)
+  // until raised, then turned like the tablet above, screen to the holder
+  // tipped back, and on `aim` swung round to face the customer, tipped up
+  if (p.pay) {
+    const r = walking ? 0 : p.pay.raise;
+    c.root.updateMatrixWorld(true);
+    b.wr[0].getWorldQuaternion(payQ);
+    payQ.invert();
+    b.spine.getWorldQuaternion(payRest);
+    payUp.copy(payRest);
+    payRest.multiply(payTmp.setFromAxisAngle(ikAxis.set(1, 0, 0), Math.PI)).multiply(payTmp.setFromAxisAngle(ikAxis.set(0, 1, 0), Math.PI / 2));
+    const tilt = DEVICE_TILT + (PAY_SHOW_TILT - DEVICE_TILT) * p.pay.aim;
+    payUp.multiply(payTmp.setFromAxisAngle(ikAxis.set(0, 1, 0), Math.PI * p.pay.aim)).multiply(payTmp.setFromAxisAngle(ikAxis.set(1, 0, 0), tilt));
+    payRest.slerp(payUp, r);
+    b.pay.quaternion.copy(payQ).multiply(payRest);
   }
 
   // face: lids (with a blink and the eye style's resting droop), brows (lift

@@ -6,6 +6,8 @@ import { lookFor, type LookChoice } from "../../../shared/look.ts";
 import type { Behaviour } from "../../../shared/behaviour.ts";
 import { buildCharacter, EXPRESSIONS, follow, poseCharacter, type Mood } from "./character.ts";
 import { Device } from "./Device.tsx";
+import { Handheld, HANDHELD_GRIP_Y } from "./Handheld.tsx";
+import type { HandheldPose } from "./pay-choreo.ts";
 
 // The real model a held device is (Ritesh, 2026-10-12: pair character
 // actions with real objects, not an invented generic slab). One fixed
@@ -31,6 +33,9 @@ export interface ActorState {
   carrying?: boolean;
   // a world point to look at (y is height above the floor), if any
   gaze?: { x: number; y: number; z: number };
+  // staff only: the payment handheld's pose, while taking a payment (issue
+  // #42); absent, it hangs at their side
+  pay?: HandheldPose;
 }
 
 // The store's bag: dark paper with the mark on both faces, a pair of handles. Hung
@@ -142,8 +147,21 @@ export function Actor({
       char.root.parent.getWorldPosition(tmp);
       meet = { x: (tmp.x + s.gaze.x) / 2, z: (tmp.z + s.gaze.z) / 2 };
     }
-    poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device, gaze, meet }, m, blink);
+    const pay = uniform ? { raise: s.pay?.raise ?? 0, aim: s.pay?.aim ?? 0 } : undefined;
+    poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device, gaze, meet, pay }, m, blink);
+    // the handheld is put away while the tablet is out (the left hand is tapping it)
+    if (payRef.current) payRef.current.visible = !(s.device || s.mode === "device") || (s.pay?.raise ?? 0) > 0.01;
   });
+  const payRef = useRef<Group>(null);
+  // the handheld rides the left hand's bone, attached the same way as the device below
+  useEffect(() => {
+    const group = payRef.current;
+    if (!group || !uniform) return;
+    char.bones.pay.add(group);
+    return () => {
+      char.bones.pay.remove(group);
+    };
+  }, [char, !!uniform]);
   const held = char.deviceKind ? HELD_DEVICE[char.deviceKind] : undefined;
   const devRef = useRef<Group>(null);
   // `char.bones.dev` already has a parent (the forearm bone) inside
@@ -165,6 +183,14 @@ export function Actor({
       <primitive object={char.root}>
         <Bag getState={getState} />
       </primitive>
+      {uniform && (
+        <group ref={payRef}>
+          {/* gripped by the bottom of the reader sled, the screen clear of the fingers */}
+          <group position={[0, -HANDHELD_GRIP_Y, 0.03]}>
+            <Handheld getPose={() => getState().pay} />
+          </group>
+        </group>
+      )}
       {held && (
         <group ref={devRef}>
           {/* the dev bone is turned each frame so +z (the screen) faces the
