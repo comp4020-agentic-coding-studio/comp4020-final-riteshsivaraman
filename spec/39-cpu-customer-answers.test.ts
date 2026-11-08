@@ -194,7 +194,7 @@ describe("a promoted timetable customer answers a real specialist through the ta
     expect(sc.log.filter((l) => l.who === "customer").length).toBeLessThanOrEqual(MAX_CPU_REPLIES);
   });
 
-  it("buys for real: takes a unit off the shelf, waits for the bag, and pays once sam shows the total", () => {
+  it("buys for real: takes a unit off the shelf, waits for the bag, and pays a beat after the total is shown", () => {
     // find, deterministically, a phone customer whose answers end in a sale with this specialist
     const buyers = CAST.filter((c) => c.role === "customer" && c.purpose === "phone").map((c) => c.id);
     let buyer: string | undefined;
@@ -230,11 +230,12 @@ describe("a promoted timetable customer answers a real specialist through the ta
     }
     expect(order()?.stage, "the payment never opened").toBe("paying");
     const pay = mem.prepare("SELECT id FROM conversations WHERE customer_id = ? AND ended_at IS NULL").get(id) as { id: string };
-    // the customer does not tap before the total is shown
+    // sam shows the total on the handheld; the customer does not tap in the same instant
     advancePaymentBeat(ctx(t + 100), "sam", pay.id);
-    expect(order()?.stage, "the customer paid before seeing the total").toBe("paying");
+    catchUpOffers(ctx(t + 200));
+    expect(order()?.stage, "the customer tapped the instant the total was shown").toBe("paying");
     expect(eventsOf(id, "total_shown").length).toBe(1);
-    // ...and taps once it has seen it
+    // ...and taps a beat later, with no further click from sam (the client has no handheld button yet)
     t += 2000;
     bridge(t);
     catchUpOffers(ctx(t));

@@ -28,6 +28,7 @@ import { stockOf, takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
 import { advanceStaff, beginHumanTalk, payScene, beginTalk, currentTurn, staffActList, staffLog, staffStats, STAFF_TONES, stepStaffMove, standInAnswer, stepTalk, talkChoices, talkEnded, type TalkTurn } from "./talkWire.ts";
 import type { Scene } from "../shared/talk/types.ts";
+import { CPU_PAY_MS, cpuPayChoice, cpuReply, startCpuTalk, type CpuTalk } from "./cpuCustomer.ts";
 
 // The conversation script (shared/conversation.ts) only ever asks for a
 // colour — no storage picker exists yet (ADR 5) — so the server sells
@@ -217,6 +218,8 @@ interface TalkConvData {
   checkout?: Checkout; // the sale is made: stock is being fetched, then they pay here
   // the customer has left and an NPC customer stands in for them, answering from the engine's own customer model
   standIn?: { npcId: string; name: string; eng: Engagement };
+  // a promoted timetable customer answers by rule, not by click (issue #39, cpuCustomer.ts)
+  cpu?: CpuTalk;
 }
 
 // Paying (Ritesh, 2026-10-19, reworked 2026-10-21): the sale is made in one chat,
@@ -516,6 +519,54 @@ export function handOverCustomer(ctx: Ctx, leaverId: string): Outgoing[] {
   return out;
 }
 
+// ---- a promoted timetable customer answering a real specialist (issue #39) ----
+//
+// The rules themselves are in cpuCustomer.ts; this is where they meet the
+// conversation row. A timetable customer is promoted with a `cpu` mark on its
+// player_state (issue #20), and a real staff user who opens the phones
+// conversation with it gets a conversation that carries its seed and purpose.
+
+function cpuTalkFor(ctx: Ctx, customerId: string): CpuTalk | undefined {
+  if (!CPU_CUSTOMER_IDS.has(customerId)) return undefined;
+  const st = stateOf(ctx.db, customerId);
+  const mark = st ? cpuMarkOf(st.data) : undefined;
+  if (!mark) return undefined;
+  return startCpuTalk(customerId, mark.visit, castOf(customerId).purpose ?? null);
+}
+
+// The specialist has moved: the customer answers at once, by rule, through the
+// same engine step a real customer's click takes, one events row per answer.
+function cpuAnswers(ctx: Ctx, row: ConvRow, d: TalkConvData): Outgoing[] {
+  const before = d.scene;
+  const r = d.cpu ? cpuReply(before, d.cpu) : null;
+  if (!r) return [staffMenu(ctx, row, d), staffViewMessage(ctx)];
+  logTalkTurn(ctx, row, before, r.choice, r.scene);
+  const next: TalkConvData = { ...d, scene: r.scene, cpu: r.talk };
+  saveTalkConv(ctx, row, next, !!r.scene.ended);
+  if (r.scene.ended?.how === "bought") return startCheckout(ctx, row, next, r.scene.ended.sku, r.scene.log[r.scene.log.length - 1]?.text ?? "");
+  if (r.scene.ended) return finishTalk(ctx, row, r.scene);
+  return [staffMenu(ctx, row, next), staffViewMessage(ctx)];
+}
+
+// A timetable customer at the payment taps a beat after the latest beat it was
+// shown, the way a real visitor's tap does: the tap catches up any beat the
+// specialist has not shown yet (handleCheckoutChoice). A stored column (beatAt)
+// compared on the next request, never a timer.
+function settleCpuPayments(ctx: Ctx): Outgoing[] {
+  const out: Outgoing[] = [];
+  const rows = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor'").all() as ConvRow[];
+  for (const row of rows) {
+    if (!CPU_CUSTOMER_IDS.has(row.customer_id)) continue;
+    const d = anyDataOf(row);
+    if (!isTalkData(d) || !d.checkout || ctx.now - d.checkout.beatAt < CPU_PAY_MS) continue;
+    const st = stateOf(ctx.db, row.customer_id);
+    const mark = st ? cpuMarkOf(st.data) : undefined;
+    if (!mark) continue;
+    out.push(...handleCheckoutChoice(ctx, row, d, cpuPayChoice(row.customer_id, mark.visit)));
+  }
+  return out;
+}
+
 // The customer who left has come back (same visitor): the stand-in steps aside.
 export function retireStandIn(ctx: Ctx, visitorId: string): Outgoing[] {
   const row = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND customer_id = ?").get(visitorId) as ConvRow | undefined;
@@ -544,7 +595,9 @@ export function handOverPost(ctx: Ctx, leaverId: string): Outgoing[] {
   out.push(...transferOrders(ctx, leaverId, npcId, pos));
   const row = ctx.db.prepare("SELECT * FROM conversations WHERE ended_at IS NULL AND with_kind = 'visitor' AND with_id = ?").get(leaverId) as ConvRow | undefined;
   const d0 = row ? anyDataOf(row) : null;
-  if (!row || !d0 || !isTalkData(d0) || d0.scene.ended) {
+  // a timetable customer's chat is not carried on by an NPC (nothing would answer
+  // the NPC's moves for it): releaseClaimsOf puts it back on the waiting list instead
+  if (!row || !d0 || !isTalkData(d0) || d0.scene.ended || d0.cpu) {
     // nobody to carry on with: the NPC appears where they stood, then goes back to its day
     const eng: Engagement = { npcId, visitorId: leaverId, since: ctx.now, at: pos, from: pos, lead: { x: pos.x, z: pos.z, fx: pos.x, fz: pos.z } };
     return [...out, { to: "all", message: { type: "engaged", ...eng } }, { to: "all", message: { type: "released", npcId } }];
@@ -710,7 +763,8 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
     const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: "talk", data: null, started_at: ctx.now, ended_at: null };
     // the specialist's first question is whether to sit down, if a table is free
     const offerSeat = !humanStaff && !begun.turn.ended && freeTableFor(ctx, customerId) !== null;
-    const data: TalkConvData = { engine: "talk", scene, at, ...(offerSeat ? { stage: "seat_offer" as const } : {}), ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at } } : {}) };
+    const cpu = humanStaff ? cpuTalkFor(ctx, customerId) : undefined;
+    const data: TalkConvData = { engine: "talk", scene, at, ...(offerSeat ? { stage: "seat_offer" as const } : {}), ...(withKind === "npc" ? { eng: { npcId: withId, visitorId: customerId, since: engagedSince, at } } : {}), ...(cpu ? { cpu } : {}) };
     const turn = seatChoices(ctx, row, data, begun.turn);
     ctx.db
       .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -1031,7 +1085,7 @@ function staffMenu(ctx: Ctx, row: ConvRow, d: TalkConvData): Outgoing {
   const blocked = !!d.checkout || d.stage === "seat_offer" || !!liveEscortOf(ctx.db, row.customer_id) || !!d.scene.ended;
   const myMove = d.scene.toMove === "staff" && !blocked;
   const acts = myMove ? staffActList(d.scene) : [];
-  if (myMove && !d.scene.forced && !d.seat && !d.standIn && freeTableFor(ctx, row.customer_id)) acts.push({ id: "seat", label: "Offer to sit down at a table", hint: "talk it through seated" });
+  if (myMove && !d.scene.forced && !d.seat && !d.standIn && !d.cpu && freeTableFor(ctx, row.customer_id)) acts.push({ id: "seat", label: "Offer to sit down at a table", hint: "talk it through seated" });
   const view: StaffMenuView = {
     conversationId: row.id,
     customerId: row.customer_id,
@@ -1059,7 +1113,7 @@ export function staffMove(ctx: Ctx, staffId: string, conversationId: string, act
   if (!isTalkData(d0)) return [notice(staffId, "That conversation is over.")];
   if (d0.checkout || d0.stage === "seat_offer" || liveEscortOf(ctx.db, row.customer_id)) return [notice(staffId, "Not yet: wait for this to finish.")];
   if (actId === "seat") {
-    if (d0.seat || d0.standIn || d0.scene.toMove !== "staff") return [notice(staffId, "Not now.")];
+    if (d0.seat || d0.standIn || d0.cpu || d0.scene.toMove !== "staff") return [notice(staffId, "Not now.")];
     if (!freeTableFor(ctx, row.customer_id)) return [notice(staffId, "Every table is taken right now."), staffMenu(ctx, row, d0)];
     const next: TalkConvData = { ...d0, stage: "seat_offer" };
     saveTalkData(ctx, row, next);
@@ -1074,6 +1128,7 @@ export function staffMove(ctx: Ctx, staffId: string, conversationId: string, act
   const next: TalkConvData = { ...d0, scene };
   saveTalkConv(ctx, row, next, false);
   if (d0.standIn) return scene.ended ? finishTalk(ctx, row, scene) : [staffMenu(ctx, row, next), staffViewMessage(ctx)];
+  if (d0.cpu) return cpuAnswers(ctx, row, next);
   const out: Outgoing[] = [];
   // a demo: the two of them walk to a real device of that model
   if (r.scene.demoed.length > d0.scene.demoed.length) return [...out, ...startDemoEscort(ctx, row, r.scene.demoed[r.scene.demoed.length - 1]!), staffMenu(ctx, row, next)];
@@ -2253,7 +2308,7 @@ function realStaffFor(ctx: Ctx, st: StateRow): boolean {
 // own. She takes at most one. Called on every request that could change the
 // picture (a move, a join or leave, a settle poll).
 export function catchUpOffers(ctx: Ctx, first?: string): Outgoing[] {
-  const cpu = [...departCpuCustomers(ctx), ...promoteCpuCustomers(ctx)];
+  const cpu = [...settleCpuPayments(ctx), ...departCpuCustomers(ctx), ...promoteCpuCustomers(ctx)];
   const out = [...cpu, ...settleOffers(ctx)];
   const order = waitingList(ctx).map((w) => w.st.visitor_id);
   const ids = first ? [first, ...order.filter((id) => id !== first)] : order;
