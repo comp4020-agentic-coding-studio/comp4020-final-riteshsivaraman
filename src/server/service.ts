@@ -15,7 +15,7 @@ import {
 import { NPC_DESIGNATION, NPC_LABEL, NPC_NAME, npcsOffDuty, scriptFor, waitSpotFor } from "../shared/duty.ts";
 import { isStaff, NPCS, npcPose } from "../shared/npcs.ts";
 import { FLOOR, type ChatPair, type CustomerView, type Engagement, type HeldCpu, type HoldView, type Inspection, type OrderView, type ServerMessage, type StaffMenuView, type TurnView } from "../shared/protocol.ts";
-import { engagedArrival, engagedMoment } from "../shared/engage.ts";
+import { engagedArrival, engagedMoment, rejoinMoment } from "../shared/engage.ts";
 import { heldDone } from "../shared/heldCpu.ts";
 import { designationOf, type EmployeeKind, type Specialty } from "../shared/profile.ts";
 import { defaultStorage, productById } from "../shared/catalogue.ts";
@@ -310,7 +310,11 @@ export function engagements(db: Database.Database): Engagement[] {
   const pending = (db.prepare("SELECT * FROM intents WHERE status = 'open' AND staff_kind = 'npc'").all() as IntentRow[]).map(
     intentEngagement,
   );
-  return [...live, ...pending];
+  // a genius who has taken a repair to the technician in the back stands there too, for everyone
+  const errands = (db.prepare("SELECT data FROM player_state WHERE data LIKE '%\"trip\":%'").all() as Array<{ data: string }>)
+    .map((r) => (JSON.parse(r.data) as { repair?: { trip?: Engagement } }).repair?.trip)
+    .filter((t): t is Engagement => !!t);
+  return [...live, ...pending, ...errands];
 }
 
 export function dutyMessage(ctx: Ctx): Outgoing {
@@ -866,6 +870,7 @@ const liveIntentOf = (db: Database.Database, customerId: string, staffId: string
 function staffBusy(ctx: Ctx, staffId: string, kind: "npc" | "visitor"): boolean {
   if (kind === "visitor") return !!openConversationOf(ctx.db, staffId);
   if (npcBusy(ctx, staffId)) return true;
+  if (onRepairErrand(ctx, staffId)) return true; // at the technician with someone's device, or walking back with it
   if (pendingCloseWhere(ctx, "with_id", staffId)) return true; // still standing with someone on their last turn
   if (ctx.db.prepare("SELECT 1 FROM escorts WHERE staff_id = ? AND status IN ('walking','inspecting')").get(staffId)) return true;
   return !!ctx.db.prepare("SELECT 1 FROM intents WHERE staff_id = ? AND status = 'open'").get(staffId);
@@ -2200,29 +2205,74 @@ export function settleApproaches(ctx: Ctx): Outgoing[] {
 // and an on-duty NPC for that post is free, that NPC walks over now — the
 // same thing a human's `claim()` does, just automatic, and the conversation
 // opens once they arrive (see `settleApproaches`).
-export const REPAIR_QUICK_MS = 60_000; // a quick fix at the Genius Bar comes back to you within a minute
 
 // A quick repair that has come to its minute: the customer is told once it is ready.
 export function settleRepairs(ctx: Ctx): Outgoing[] {
   const out: Outgoing[] = [];
   const rows = ctx.db.prepare("SELECT visitor_id, data FROM player_state WHERE data LIKE '%\"repair\":%'").all() as Array<{ visitor_id: string; data: string }>;
   for (const r of rows) {
+    const id = r.visitor_id;
     const rep = (JSON.parse(r.data) as OfferData).repair;
-    if (!rep || ctx.now < rep.readyAt) continue;
-    patchOfferData(ctx, r.visitor_id, { repair: undefined });
-    if (!ctx.present.includes(r.visitor_id)) continue;
-    log(ctx, r.visitor_id, "repair_ready", { by: rep.by });
-    out.push(notice(r.visitor_id, `${rep.by} has your device ready: come to the Genius Bar and press E to collect it.`));
-    out.push(repairStatusOf(ctx, r.visitor_id));
+    if (!rep || rep.queued) continue;
+    // the technician has had it for a minute: the genius sets off back to the bar with it
+    if (rep.trip && rep.releaseAt !== undefined && ctx.now >= rep.releaseAt) {
+      const back = backWalkMs(rep.npcId, rep.trip, rep.releaseAt);
+      patchOfferData(ctx, id, { repair: { by: rep.by, npcId: rep.npcId, readyAt: rep.releaseAt + back } });
+      log(ctx, id, "repair_returning", { by: rep.npcId });
+      out.push({ to: "all", message: { type: "released", npcId: rep.npcId } });
+      continue;
+    }
+    if (rep.readyAt === undefined || ctx.now < rep.readyAt) continue;
+    patchOfferData(ctx, id, { repair: undefined });
+    if (!ctx.present.includes(id)) continue;
+    log(ctx, id, "repair_ready", { by: rep.by });
+    out.push(notice(id, `${rep.by} is back at the bar with your device: come to the Genius Bar and press E to collect it.`));
+    out.push(repairStatusOf(ctx, id));
   }
   return out;
+}
+
+export const REPAIR_WORK_MS = 60_000; // how long the technician has a device before it comes back
+
+// the technician the genius hands a device to, and where they are
+function technicianSpot(now: number): { x: number; z: number } {
+  const def = NPCS.find((n) => n.id === "tech-1");
+  const p = def ? npcPose(def, now) : undefined;
+  return p ? { x: p.x, z: p.z } : { x: 4.6, z: 21.6 };
+}
+
+// How long the walk back to the bar takes from where the genius stood at the technician (the same walk
+// the clients draw when it is let go).
+function backWalkMs(npcId: string, trip: Engagement, atMs: number): number {
+  const arrived = engagedMoment(npcId, trip, atMs);
+  for (let s = 1; s <= 120; s++) if (!rejoinMoment(npcId, { at: atMs, from: { x: arrived.x, z: arrived.z } }, atMs + s * 1000)) return s * 1000;
+  return 120_000;
+}
+
+// The genius takes a quick repair to the technician in the back (everyone sees the walk), hands it over, waits a
+// minute, and comes back; it is ready when they are. Starts when the conversation closes, not when it was decided.
+function beginRepairTrip(ctx: Ctx, customerId: string, npcId: string): Outgoing[] | null {
+  const st = stateOf(ctx.db, customerId);
+  const rep = st ? offerData(st).repair : undefined;
+  const def = NPCS.find((n) => n.id === npcId);
+  if (!rep || !rep.queued || rep.npcId !== npcId || !def) return null;
+  const from = npcPose(def, ctx.now);
+  const tech = technicianSpot(ctx.now);
+  const trip: Engagement = { npcId, visitorId: customerId, since: ctx.now, at: tech, from: { x: from.x, z: from.z } };
+  const arrived = engagedArrival(npcId, trip);
+  const releaseAt = arrived.at + REPAIR_WORK_MS;
+  patchOfferData(ctx, customerId, { repair: { by: rep.by, npcId, trip, releaseAt } });
+  log(ctx, customerId, "repair_trip", { by: npcId, arrivesAt: arrived.at, releaseAt });
+  return [{ to: "all", message: { type: "engaged", ...trip } }];
 }
 
 // What the customer's "your repair" chip shows: whatever they have left at the Genius Bar and not collected.
 export function repairStatusOf(ctx: Ctx, customerId: string): Outgoing {
   const t = repairTicket(ctx, customerId);
   if (!t) return { to: customerId, message: { type: "repair_status", status: null } };
-  return { to: customerId, message: { type: "repair_status", status: { kind: t.outcome, ready: ticketReady(ctx, customerId, t), ...(t.outcome === "quick" ? { readyAt: t.ts + REPAIR_QUICK_MS } : {}) } } };
+  const st = stateOf(ctx.db, customerId);
+  const readyAt = st ? offerData(st).repair?.readyAt : undefined;
+  return { to: customerId, message: { type: "repair_status", status: { kind: t.outcome, ready: ticketReady(ctx, customerId, t), ...(readyAt !== undefined ? { readyAt } : {}) } } };
 }
 
 // After a long service, about one in five come back "couldn't be saved: here is a replacement". Fixed by
@@ -2231,6 +2281,15 @@ export function wantsReplacement(customerId: string, ts: number): boolean {
   let h = 2166136261;
   for (const c of `${customerId}:${ts}`) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
   return (h >>> 0) % 5 === 0;
+}
+
+// Whether this NPC is away on a repair: at a technician with a device, or walking back with it.
+function onRepairErrand(ctx: Ctx, npcId: string): boolean {
+  const rows = ctx.db.prepare("SELECT data FROM player_state WHERE data LIKE '%\"repair\":%'").all() as Array<{ data: string }>;
+  return rows.some((r) => {
+    const rep = (JSON.parse(r.data) as OfferData).repair;
+    return !!rep && rep.npcId === npcId && !rep.queued && (!!rep.trip || (rep.readyAt !== undefined && ctx.now < rep.readyAt));
+  });
 }
 
 // A repair a customer has left at the Genius Bar and not yet collected: from the events it already
@@ -2246,7 +2305,13 @@ function repairTicket(ctx: Ctx, customerId: string): RepairTicket | undefined {
 }
 // a quick fix is ready after its minute; a longer service after "another day": a later visit
 function ticketReady(ctx: Ctx, customerId: string, t: RepairTicket): boolean {
-  if (t.outcome === "quick") return ctx.now >= t.ts + REPAIR_QUICK_MS;
+  if (t.outcome === "quick") {
+    // ready once the genius is back with it (cleared when that is told); no record at all means it was already told
+    const st = stateOf(ctx.db, customerId);
+    const rep = st ? offerData(st).repair : undefined;
+    if (!rep) return true;
+    return !rep.queued && !rep.trip && rep.readyAt !== undefined && ctx.now >= rep.readyAt;
+  }
   const visit = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { t: number | null }).t ?? 0;
   return visit > t.ts;
 }
@@ -2327,7 +2392,10 @@ interface OfferData {
   offered?: string[]; // real staff users who let an offer of this customer pass, this wait
   claim?: { by: string; at: number; from: PlayerStateName; waitingSince: number }; // who has them, and where they stood on the list
   waitingSince?: number; // their place on the list, kept when a claim was released
-  repair?: { readyAt: number; by: string }; // a quick fix at the Genius Bar: ready at this time (told once, then cleared)
+  // a quick fix at the Genius Bar: the genius takes it to a technician in the back, they work on it for a minute,
+  // and it is ready when the genius is back at the bar. `queued` until the conversation closes (the trip starts then);
+  // `trip` while the genius is away (an engagement, so everyone sees the walk); then only `readyAt`, until it is told.
+  repair?: { by: string; npcId: string; queued?: boolean; trip?: Engagement; releaseAt?: number; readyAt?: number };
   cpu?: CpuMark; // a timetable customer: the visit it was promoted on, and where it waits (issue #20)
   // an NPC walking over to open a conversation on its own (tryGreeterApproach,
   // tryNpcAutoClaim): the conversation opens only once it arrives (issue
@@ -2802,7 +2870,7 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
     } else if (e.type === "repair") {
       log(ctx, row.customer_id, "repair_outcome", { outcome: e.outcome, days: e.days ?? null, fault: e.fault, by: row.with_id });
       // a quick fix is told when it is ready, a minute on (no timer: the next request that arrives notices)
-      if (e.outcome === "quick") patchOfferData(ctx, row.customer_id, { repair: { readyAt: ctx.now + REPAIR_QUICK_MS, by: nameOf(ctx, row.with_id) } });
+      if (e.outcome === "quick") patchOfferData(ctx, row.customer_id, { repair: { queued: true, by: nameOf(ctx, row.with_id), npcId: row.with_id } });
     } else if (e.type === "request_help") {
       log(ctx, row.customer_id, "help_requested", { needs: e.needs });
       const a = pointToHelper(ctx, row.customer_id, e.needs);
@@ -2923,8 +2991,10 @@ export function closeTalk(ctx: Ctx, customerId: string): Outgoing[] {
   const row = pendingCloseRow(ctx, customerId);
   if (!row) return [];
   log(ctx, customerId, "conversation_closed", { conversationId: row.id });
+  // a quick repair: the genius does not go back to their post, they take the device to the back first
+  const trip = beginRepairTrip(ctx, customerId, row.with_id);
   // the NPC is free again and whoever was waiting for it can come now
-  return [{ to: "all", message: { type: "released", npcId: row.with_id } }, ...settleVisits(ctx)];
+  return [...(trip ?? [{ to: "all" as const, message: { type: "released" as const, npcId: row.with_id } }]), ...settleVisits(ctx)];
 }
 
 function applyTalk(ctx: Ctx, row: ConvRow, from: Scene, choiceId: string): Outgoing[] {

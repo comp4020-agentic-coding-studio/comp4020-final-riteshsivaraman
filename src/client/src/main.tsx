@@ -42,7 +42,9 @@ function RepairChip() {
       {ready
         ? "Your device is ready: collect it at the Genius Bar (press E)"
         : s.kind === "quick"
-          ? `Your device is with the technician: back in ${mmss(Math.max(0, left))}`
+          ? s.readyAt === undefined
+            ? "Your device is with the technician in the back"
+            : `Your device is on its way back: ready in ${mmss(Math.max(0, left))}`
           : "Your device is in for a longer service: come back on another day"}
     </div>
   );

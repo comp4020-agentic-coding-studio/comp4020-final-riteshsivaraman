@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { beforeEach, describe, expect, it } from "vitest";
 import { defaultStorage, productById, START_STOCK } from "../src/shared/catalogue.ts";
 import { NPCS, npcPose } from "../src/shared/npcs.ts";
+import { engagedArrival } from "../src/shared/engage.ts";
 import { engagedMoment } from "../src/shared/engage.ts";
 import { headingTo, wrap } from "../src/shared/steering.ts";
 import { TABLE_SEATS } from "../src/shared/storeday.ts";
@@ -690,24 +691,35 @@ describe("the Genius Bar repair, run by an NPC genius", () => {
     expect(hello.choices.map((c) => c.id)).toContain("collect");
     return pick(hello, "collect", when);
   };
-  it("a quick fix has a follow-up: you choose to collect; not ready at 30 s, then handed back and the repair is closed", () => {
+  it("a quick fix: the genius takes it to a technician in the back, they work on it a minute, the genius brings it back, and you collect it", () => {
     near();
     const end = quickFix(talk()!);
     expect(end.ended).toBe(true);
-    closeTalk(ctx(), "c1");
-    const early = collect(NOW + 30_000);
-    expect(early.say).toMatch(/still with the technician/);
-    expect(early.ended).toBe(true);
-    closeTalk(go(NOW + 31_000), "c1");
-    expect(last(settleRepairs(ctx(NOW + 61_000)), "c1", "notice")?.text).toMatch(/press E to collect/);
-    const back = collect(NOW + 62_000);
+    // when the chat is closed the genius sets off for the back room, not back to their post
+    const closed = closeTalk(ctx(), "c1");
+    expect(messagesTo(closed, "all", "released")).toEqual([]);
+    const trip = last(closed, "all", "engaged")!;
+    expect(trip.npcId).toBe("genius-1");
+    expect(trip.at.z).toBeGreaterThan(15); // the technician is in the back room
+    // away: nobody else can be served by them, and you cannot talk to them from here
+    expect(last(startTalk(go(NOW + 30_000), "c1", "genius-1"), "c1", "notice")).toBeDefined();
+    const arrives = engagedArrival("genius-1", trip).at;
+    expect(arrives).toBeGreaterThan(NOW + 5_000); // it takes a real walk
+    // the technician has it for a minute, then the genius is let go to walk back
+    expect(messagesTo(settleRepairs(ctx(arrives + 30_000)), "all", "released")).toEqual([]);
+    const set = settleRepairs(ctx(arrives + 61_000));
+    expect(last(set, "all", "released")).toMatchObject({ npcId: "genius-1" });
+    // and when they are back at the bar, you are told it is ready, once
+    const readyAt = arrives + 61_000 + 120_000;
+    expect(last(settleRepairs(ctx(readyAt)), "c1", "notice")?.text).toMatch(/back at the bar with your device/);
+    expect(settleRepairs(ctx(readyAt + 1_000))).toEqual([]);
+    const back = collect(readyAt + 2_000);
     expect(back.say).toMatch(/it's all done/);
-    const done = pick(back, "ok", NOW + 62_000);
-    expect(done.ended).toBe(true);
-    expect(eventTypes()).toEqual(expect.arrayContaining(["repair_outcome", "repair_ready", "repair_collected"]));
-    closeTalk(go(NOW + 63_000), "c1");
+    expect(pick(back, "ok", readyAt + 2_000).ended).toBe(true);
+    expect(eventTypes()).toEqual(expect.arrayContaining(["repair_outcome", "repair_trip", "repair_returning", "repair_ready", "repair_collected"]));
+    closeTalk(go(readyAt + 3_000), "c1");
     // collected: nothing left to collect, so the option is gone
-    const fresh = pick(last(startTalk(go(NOW + 70_000), "c1", "genius-1"), "c1", "turn")!, "stand", NOW + 70_000);
+    const fresh = pick(last(startTalk(go(readyAt + 10_000), "c1", "genius-1"), "c1", "turn")!, "stand", readyAt + 10_000);
     expect(fresh.choices.map((c) => c.id)).not.toContain("collect");
   });
   it("a longer service is collected on another day (a later visit), and can come back as a replacement", () => {
