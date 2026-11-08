@@ -112,6 +112,14 @@ class Net {
   // the conversation you are in, the replies waiting on you if you are an
   // employee, and the customers you can see
   turn: TurnView | null = null;
+  // the customer's own running chat log (Ritesh, 2026-11-08: match the
+  // staff side's scrollable log). TurnView only ever carries the current
+  // line, never a history, so this accumulates it client-side: each new
+  // turn's `say` is the other person speaking, and each choice the customer
+  // actually clicks is recorded here too (by its label, not just its id) so
+  // the log reads as a real back-and-forth. Cleared when a conversation ends
+  // and a fresh one starts, same lifetime as `turn`.
+  talkLog: Array<{ who: "customer" | "them"; text: string }> = [];
   // a real specialist's side of a conversation: the chat, the moves allowed now,
   // and the customer's facts; null when they are not in one
   staffConv: StaffMenuView | null = null;
@@ -280,6 +288,8 @@ class Net {
         this.setState(message.state, message.want, message.needs);
         return true;
       case "turn":
+        if (this.turn?.conversationId !== message.conversationId) this.talkLog = [];
+        if (message.say) this.talkLog = [...this.talkLog, { who: "them", text: message.say }];
         this.turn = message;
         this.turnAt = Date.now();
         return true;
@@ -415,8 +425,9 @@ class Net {
     this.changed();
   }
 
-  choose(choice: string): void {
+  choose(choice: string, label?: string): void {
     if (this.turn && !this.turn.ended && this.turn.awaiting === "customer") {
+      if (label) this.talkLog = [...this.talkLog, { who: "customer", text: label }];
       this.send({ type: "talk_choose", conversationId: this.turn.conversationId, choice });
     }
   }

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNet } from "./net.ts";
 
-// The conversation box, at the bottom of the screen like a Pokemon text box:
-// who is speaking, what they say, and your choices as numbered buttons (press
-// 1 to 9, or click). When it is the employee's turn it says so, and when it has
-// ended Space, Enter or Esc closes it. Esc also works mid-conversation, before
-// it has ended (Ritesh, 2026-10-12: there was previously no way to walk away
+// The conversation box, matching the staff side's look (Ritesh, 2026-11-08):
+// a scrollable chat log of the whole back-and-forth so far (net.talkLog),
+// with your choices as numbered buttons below it (press 1 to 9, or click).
+// When it is the employee's turn it says so, and when it has ended Space,
+// Enter or Esc closes it. Esc also works mid-conversation, before it has
+// ended (Ritesh, 2026-10-12: there was previously no way to walk away
 // without finishing it). The mouse is never captured, so it stays visible.
 //
 // A choice's optional `group` (protocol.ts) folds it under a named, collapsed
@@ -70,14 +71,21 @@ export function Talk() {
   const net = useNet();
   const turn = net.talking;
   const [open, setOpen] = useState<string | null>(null);
+  const logEl = useRef<HTMLDivElement>(null);
 
   const { top, standing, groups } = useMemo(() => groupChoices(turn?.choices ?? []), [turn?.choices]);
 
+  // only the newest line (the last entry of net.talkLog) types out; everything
+  // above it in the log is already-settled history, shown in full at once
   const [shown, done, skip] = useTypewriter(turn?.say ?? "", turn?.conversationId);
   const doneRef = useRef(done);
   doneRef.current = done;
   const skipRef = useRef(skip);
   skipRef.current = skip;
+
+  useEffect(() => {
+    if (logEl.current) logEl.current.scrollTop = logEl.current.scrollHeight;
+  }, [net.talkLog.length, turn?.conversationId, shown]);
 
   useEffect(() => {
     setOpen(null); // a fresh turn's groups start collapsed, every time
@@ -110,7 +118,7 @@ export function Talk() {
       const n = Number(e.key);
       // Only the top-level (ungrouped) choices get a number shortcut — a
       // grouped one is reached by opening its heading first, by design.
-      if (Number.isInteger(n) && n >= 1 && n <= top.length && t.awaiting === "customer") net.choose(top[n - 1]!.id);
+      if (Number.isInteger(n) && n >= 1 && n <= top.length && t.awaiting === "customer") net.choose(top[n - 1]!.id, top[n - 1]!.label);
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
@@ -120,18 +128,25 @@ export function Talk() {
   return (
     <div className="talk" role="dialog" aria-label={`Conversation with ${turn.withName}`}>
       <div className="talk-name">{turn.withName}</div>
-      <div className="talk-head">
-        <div className="talk-avatar" aria-hidden="true">{turn.withName.trim().charAt(0).toUpperCase()}</div>
-        <p className="talk-say" onClick={skip} aria-label={turn.say}>
-          <span aria-hidden="true">{shown}</span>
-        </p>
-      </div>
       {!turn.ended && <div className="talk-leave-hint"><kbd>Esc</kbd> to step away</div>}
+      <div className="staff-log" ref={logEl} onClick={skip}>
+        {net.talkLog.slice(0, -1).map((l, i) => (
+          <p key={i} className={l.who === "customer" ? "you" : "them"}>
+            <span>{l.who === "customer" ? "You" : turn.withName}</span> {l.text}
+          </p>
+        ))}
+        {net.talkLog.length > 0 && (
+          <p className={net.talkLog[net.talkLog.length - 1]!.who === "customer" ? "you" : "them"} aria-label={turn.say}>
+            <span>{net.talkLog[net.talkLog.length - 1]!.who === "customer" ? "You" : turn.withName}</span>{" "}
+            <span aria-hidden="true">{shown}</span>
+          </p>
+        )}
+      </div>
       {turn.awaiting === "staff" && !turn.ended && <div className="talk-wait">Waiting for {turn.withName}…</div>}
       {done && !turn.ended && turn.awaiting === "customer" && (
         <div className="talk-choices">
           {top.map((c, i) => (
-            <button key={c.id} type="button" className="talk-card" onClick={() => net.choose(c.id)}>
+            <button key={c.id} type="button" className="talk-card" onClick={() => net.choose(c.id, c.label)}>
               <kbd>{i + 1}</kbd> {c.label}
             </button>
           ))}
@@ -145,7 +160,7 @@ export function Talk() {
               {open === name && (
                 <div className="talk-group-items">
                   {items.map((c) => (
-                    <button key={c.id} type="button" onClick={() => net.choose(c.id)}>
+                    <button key={c.id} type="button" onClick={() => net.choose(c.id, c.label)}>
                       {c.label}
                     </button>
                   ))}
@@ -156,7 +171,7 @@ export function Talk() {
           {standing.length > 0 && (
             <div className="talk-standing">
               {standing.map((c) => (
-                <button key={c.id} type="button" onClick={() => net.choose(c.id)}>
+                <button key={c.id} type="button" onClick={() => net.choose(c.id, c.label)}>
                   {c.label}
                 </button>
               ))}
