@@ -39,6 +39,12 @@ export interface Scene {
   fixed?: string; // the model the customer named or chose
   excluded: string[];
   demoed: string[];
+  // Models physically inspected at a table this visit (D39's inspections,
+  // surfaced from the server at conversation start — issue #35). Excluded
+  // from demoCandidates the same as `demoed`, so staff don't offer a demo of
+  // a phone the customer is already holding, but (same as `demoed`) the
+  // customer can still ask for it: this only stops the unprompted offer.
+  inspected: string[];
   recommended: string[];
   carried: { colours?: string[]; minGB?: number } | null; // wishes that travelled with them to a new phone, not yet checked
   wantsMore: boolean; // they asked about other phones: staff ask questions again before offering anything

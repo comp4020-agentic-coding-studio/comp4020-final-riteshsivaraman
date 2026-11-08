@@ -40,6 +40,7 @@ export function newScene(): Scene {
     order: [],
     excluded: [],
     demoed: [],
+    inspected: [],
     recommended: [],
     carried: null,
     wantsMore: false,

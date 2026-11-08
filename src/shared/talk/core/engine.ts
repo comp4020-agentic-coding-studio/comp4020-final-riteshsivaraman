@@ -376,9 +376,14 @@ export function validatePicks<Opt extends EngineOptionFields & { param?: { prefi
 }
 
 // A phone/laptop the customer has already seen is not offered again (they
-// can still ask for it); one they said no to is not offered either.
-export function demoCandidates<Model extends { id: string }>(ranked: Model[], demoed: string[], declinedDemo: string[]): string[] {
-  return ranked.filter((m) => !declinedDemo.includes(m.id) && !demoed.includes(m.id)).slice(0, 4).map((m) => m.id);
+// can still ask for it); one they said no to is not offered either. Nor is
+// one they have physically inspected on the floor this visit (issue #35:
+// the server surfaces that history into `inspected` at conversation start —
+// see src/shared/talk/scene.ts's demoCandidates and src/server/service.ts's
+// `open()`). `inspected` defaults to empty for callers (the laptop and
+// service scenes) that have no physical-inspection system wired up yet.
+export function demoCandidates<Model extends { id: string }>(ranked: Model[], demoed: string[], declinedDemo: string[], inspected: string[] = []): string[] {
+  return ranked.filter((m) => !declinedDemo.includes(m.id) && !demoed.includes(m.id) && !inspected.includes(m.id)).slice(0, 4).map((m) => m.id);
 }
 
 // When nothing fits and the customer won't relax, the nearest models are the
