@@ -1182,7 +1182,11 @@ export function poseCharacter(c: Character, p: PoseInput, m: Mood, blink: number
     const r = walking ? 0 : p.pay.raise;
     // the goal stays set while the smoothed reach is still letting go, so the
     // arm lowers rather than snapping back (except over the tablet's own left hand)
-    const lettingGo = (st.reachL ?? 0) > 0.02 && p.mode !== "device";
+    // (only a reach the handheld itself started: `payHeld` marks it, so another
+    // behaviour's left-hand reach easing out is never redirected here)
+    if (r > 0.001) st.payHeld = 1;
+    else if ((st.reachL ?? 0) <= 0.02 || p.mode === "device") st.payHeld = 0;
+    const lettingGo = st.payHeld === 1;
     if (r > 0.001 || lettingGo) {
       T.reachL = Math.max(T.reachL, r);
       handL = new Vector3(-0.05, c.shoulderY - 0.17, -0.3 - 0.04 * p.pay.aim);

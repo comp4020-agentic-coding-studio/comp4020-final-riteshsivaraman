@@ -20,12 +20,20 @@ export function StaffTalk() {
         e.preventDefault();
         net.staffLeave();
       }
+      // the handheld's button: show the customer the total (issue #42)
+      if (e.code === "KeyF" && !e.repeat && net.staffTalking && net.myPayingOrder?.pay?.beat === "scanned") {
+        e.preventDefault();
+        net.payAdvance();
+      }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [net]);
   if (!conv) return null;
   const myMove = conv.awaiting === "staff";
+  // taking payment on the handheld: the scan has happened, the total is yours to show
+  const pay = net.myPayingOrder?.pay;
+  const paying = !!pay && net.myPayingOrder?.specId === net.you?.id && net.myPayingOrder?.customerId === conv.customerId;
   return (
     <>
       <section className="staff-talk" role="dialog" aria-label={`Serving ${conv.customerName}`}>
@@ -42,6 +50,17 @@ export function StaffTalk() {
           ))}
         </div>
         <div className="staff-status">{conv.status}</div>
+        {paying && (
+          <div className="staff-pay">
+            {pay.beat === "scanned" ? (
+              <button type="button" className="talk-card" onClick={() => net.payAdvance()}>
+                Show {conv.customerName} the total <kbd>F</kbd>
+              </button>
+            ) : (
+              <p className="staff-empty">{pay.beat === "total_shown" ? `Waiting for ${conv.customerName} to tap…` : "Tapped."}</p>
+            )}
+          </div>
+        )}
         {myMove && (
           <>
             <div className="staff-tones" role="radiogroup" aria-label="Tone">

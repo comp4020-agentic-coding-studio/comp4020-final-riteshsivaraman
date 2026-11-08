@@ -29,6 +29,7 @@ import { slotDevice } from "./gfx/furniture.tsx";
 import { Room } from "./Room.tsx";
 import { net, useNet } from "./net.ts";
 import { sound } from "./audio.ts";
+import { handheldPoseFor, playPayCues } from "./payBeats.ts";
 import type { SoundSource } from "./sound.ts";
 
 const EYE_HEIGHT = 1.6;
@@ -473,7 +474,7 @@ function Remotes() {
         const mine = chat.speaker === r.info.id;
         state = { ...state, mode: talkingNow ? (mine ? "talk" : "listen") : "idle", mood: talkingNow && mine ? "smile" : "neutral", ...(other ? { gaze: { x: other.x, y: 1.55, z: other.z } } : {}) };
       }
-      speeds.current.set(r.info.id, { ...state, carrying: net.carrying(r.info.id) });
+      speeds.current.set(r.info.id, { ...state, carrying: net.carrying(r.info.id), pay: handheldPoseFor(r.info.id) });
     }
     root.current?.children.forEach((child) => {
       const r = net.remotes.get(child.name);
@@ -644,6 +645,12 @@ function Interact() {
   return null;
 }
 
+// The payment's scan beep and tap chirp (issue #42), each when its server time passes.
+function PayCues() {
+  useFrame(playPayCues);
+  return null;
+}
+
 // Who is looking at what, right now (D39): server-authoritative, so a visitor
 // who joins mid-inspection still sees it, matching how NPC engagement works.
 // This is the only visible trace of "someone's always watching" another
@@ -787,7 +794,7 @@ function SelfView() {
     const prev = state.current.speed ?? 0;
     const smooth = prev + (speed - prev) * 0.2;
     const seat = net.you ? net.seats.get(net.you.id) : undefined;
-    state.current = { carrying: net.carrying(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: "idle", mood: "neutral", speed: smooth, seated: !!seat };
+    state.current = { carrying: net.carrying(net.you?.id ?? ""), pay: handheldPoseFor(net.you?.id ?? ""), walking: smooth > 0.25 && !seat, mode: "idle", mood: "neutral", speed: smooth, seated: !!seat };
     g.position.set(net.me.x, STORE_Y, net.me.z);
     g.rotation.y = camera.rotation.y;
   });
@@ -975,6 +982,7 @@ export function Store() {
       <Remotes />
       <Npcs />
       <Interact />
+      <PayCues />
       <InspectMarkers />
       <FloatingDevice />
       <SelfView />

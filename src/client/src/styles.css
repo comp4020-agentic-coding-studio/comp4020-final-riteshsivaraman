@@ -1001,3 +1001,119 @@ kbd {
     display: none;
   }
 }
+
+/* The payment card (issue #42): the staff handheld's screen mirrored flat for
+   the two people in the payment, top centre so it never covers the talk boxes
+   in the bottom corners, and sized to read on a 390 px phone. */
+.pay-card {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  top: 62px;
+  margin: 0 auto;
+  max-width: 260px;
+  box-sizing: border-box;
+  padding: 10px 14px 12px;
+  background: linear-gradient(#16233a, #0b1220);
+  color: #fff;
+  border: 3px solid #2b2e33;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  font-family: system-ui, sans-serif;
+  z-index: 21;
+  pointer-events: none;
+}
+.pay-card.pay-paid {
+  background: linear-gradient(#123d2a, #0b2219);
+}
+.pay-steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.pay-steps li {
+  flex: 1;
+  padding-top: 4px;
+  border-top: 3px solid rgba(255, 255, 255, 0.18);
+}
+.pay-steps li.done {
+  color: rgba(255, 255, 255, 0.75);
+  border-top-color: #2fbf71;
+}
+.pay-steps li.on {
+  color: #fff;
+  font-weight: 700;
+  border-top-color: #8fd0ff;
+}
+.pay-item {
+  font-weight: 600;
+  font-size: 15px;
+}
+.pay-detail,
+.pay-note {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.pay-price {
+  margin: 4px 0;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.pay-tap {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 4px 12px;
+  border: 2px solid #8fd0ff;
+  border-radius: 999px;
+  color: #8fd0ff;
+  font-weight: 700;
+  font-size: 14px;
+}
+.pay-tap.rippling {
+  animation: pay-ripple 0.7s ease-out;
+}
+@keyframes pay-ripple {
+  from {
+    box-shadow: 0 0 0 0 rgba(143, 208, 255, 0.8);
+  }
+  to {
+    box-shadow: 0 0 0 18px rgba(143, 208, 255, 0);
+  }
+}
+.pay-tick {
+  width: 48px;
+  height: 48px;
+  margin: 2px auto 4px;
+  border-radius: 50%;
+  background: #2fbf71;
+  font-size: 30px;
+  line-height: 48px;
+  font-weight: 800;
+}
+.staff-pay {
+  margin: 6px 0 4px;
+}
+.staff-pay kbd {
+  margin-left: 6px;
+}
+@media (max-width: 560px) {
+  .pay-card {
+    top: 76px; /* below the two HUD lines, which wrap at phone width */
+    padding: 8px 12px 10px;
+  }
+  .pay-price {
+    font-size: 26px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pay-tap.rippling {
+    animation: none;
+  }
+}

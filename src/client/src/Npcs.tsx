@@ -11,6 +11,7 @@ import { net, talkMs } from "./net.ts";
 import { NameFloat } from "./NameFloat.tsx";
 import { NPC_NAME } from "../../shared/duty.ts";
 import { npcLook } from "../../shared/look.ts";
+import { handheldPoseFor } from "./payBeats.ts";
 
 // Staff and customers, drawn from the shared clock (see shared/npcs.ts and
 // shared/storeday.ts), so everyone sees the same people in the same places,
@@ -100,7 +101,7 @@ export function Npcs() {
       shown.current.set(def.id, { x: nx, z: nz, ry: raw.ry });
       child.position.set(nx, STORE_Y, nz);
       child.rotation.y = raw.ry;
-      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: raw.mood, seated: raw.seated, device: raw.device, gaze: raw.gaze, carrying: net.carrying(def.id) };
+      states.current[i] = { walking: raw.walking, mode: raw.mode, mood: raw.mood, seated: raw.seated, device: raw.device, gaze: raw.gaze, carrying: net.carrying(def.id), pay: handheldPoseFor(def.id) };
       intents.current[i] = raw.intent;
     });
     if (LABELS && ++frames.current % 20 === 0) bump((n) => n + 1);
