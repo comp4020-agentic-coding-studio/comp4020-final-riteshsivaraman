@@ -63,9 +63,12 @@ export interface ActView {
 // ---- demos ----
 
 // A phone the customer has already seen is not offered again (they can still
-// ask for it), and one they said no to is not offered either.
+// ask for it), one they said no to is not offered either, and nor is one
+// they have already physically inspected at a table this visit (issue #35,
+// `sc.inspected` seeded from src/server/service.ts's `open()` off the
+// inspections table).
 export function demoCandidates(ctx: Ctx): string[] {
-  return engine.demoCandidates(ctx.ranked, ctx.sc.demoed, ctx.sc.declinedDemo);
+  return engine.demoCandidates(ctx.ranked, ctx.sc.demoed, ctx.sc.declinedDemo, ctx.sc.inspected);
 }
 
 // ---- relaxing a requirement that left nothing ----

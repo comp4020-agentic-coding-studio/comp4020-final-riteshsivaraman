@@ -133,8 +133,12 @@ export function advanceStaff(sc: Scene, conversationId: string): Scene {
 
 // Starts a new phone conversation. Mirrors shared/conversation.ts's begin():
 // returns the first customer-facing turn after staff's opening line(s).
-export function beginTalk(conversationId: string): { scene: Scene; turn: TalkTurn } {
-  const opened = advanceStaff(newScene(), conversationId);
+// `inspected` (issue #35) is the phone models the customer has already
+// physically inspected at a table this visit (service.ts's
+// `inspectedModelsOf`, off the `inspections` table/events), seeded in before
+// the NPC's opening moves run so a demo is never offered for one of them.
+export function beginTalk(conversationId: string, inspected: string[] = []): { scene: Scene; turn: TalkTurn } {
+  const opened = advanceStaff({ ...newScene(), inspected }, conversationId);
   const menu = customerMenu(opened);
   return { scene: opened, turn: menu ? menuToTurn(menu) : { say: lastLine(opened), choices: [], ended: !!opened.ended } };
 }
@@ -196,8 +200,8 @@ export function talkEnded(sc: Scene): boolean {
 // picks from `staffActs` (each move the engine says is legal now, with its own
 // hint about how far it narrows the phones) and a tone.
 
-export function beginHumanTalk(): Scene {
-  return newScene();
+export function beginHumanTalk(inspected: string[] = []): Scene {
+  return { ...newScene(), inspected };
 }
 
 export interface StaffActOut {

@@ -350,6 +350,36 @@ export function startInspect(ctx: Ctx, visitorId: string, slotId: string): Outgo
   return out;
 }
 
+// The talk engine's model id of a device slot, if the slot is a phone table
+// with an assigned model (assignments.ts's TABLE_ASSIGNMENTS doesn't cover
+// every slot D28 gives a stable id to). Same mapping startDemoEscort's
+// demoSpot uses in reverse (talkModelId -> "iphone-${talkModelId}").
+function talkModelOfSlot(slotId: string): string | undefined {
+  const slot = DEVICE_SLOT_BY_ID.get(slotId);
+  if (!slot) return undefined;
+  const assigned = TABLE_ASSIGNMENTS[slot.tableId]?.[slot.side];
+  return assigned?.startsWith("iphone-") ? assigned.slice("iphone-".length) : undefined;
+}
+
+// Phone models physically inspected at a table this visit (D39, issue #35):
+// the specialist's demo offer must agree with the inspection table, which it
+// has no other way to see (demoCandidates only knows sc.demoed/declinedDemo,
+// src/shared/talk/types.ts). "This visit" is found the same way
+// greeterCanTake already finds it — the last `profile` event, written once
+// per enter()/rejoin() — matching declinedDemo/demoed's own this-visit-only
+// scope (CLAUDE.md: the event log is what a "did this happen" read uses).
+function inspectedModelsOf(ctx: Ctx, visitorId: string): string[] {
+  const visitStart = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(visitorId) as { t: number | null }).t ?? 0;
+  const rows = ctx.db.prepare("SELECT data FROM events WHERE visitor_id = ? AND type = 'inspect_start' AND ts >= ?").all(visitorId, visitStart) as Array<{ data: string | null }>;
+  const models = new Set<string>();
+  for (const r of rows) {
+    const slotId = r.data ? (JSON.parse(r.data) as { slotId?: string }).slotId : undefined;
+    const model = slotId ? talkModelOfSlot(slotId) : undefined;
+    if (model) models.add(model);
+  }
+  return [...models];
+}
+
 // ---- the staff's view of the customers ----
 
 export function customersView(ctx: Ctx): CustomerView[] {
@@ -623,8 +653,12 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   const cleared: Outgoing[] = [];
   if (usesTalkEngine(script, withKind)) {
     const humanStaff = withKind === "visitor";
+    // whatever this customer already physically inspected at a table this
+    // visit (issue #35) goes in before the first line is spoken, so the
+    // specialist's opening demo offer already excludes it
+    const inspected = inspectedModelsOf(ctx, customerId);
     // a real specialist moves first: the customer waits for them
-    const begun = humanStaff ? { scene: beginHumanTalk(), turn: { say: `${nameOf(ctx, withId)} is with you now.`, choices: [], ended: false } as TalkTurn } : beginTalk(id);
+    const begun = humanStaff ? { scene: beginHumanTalk(inspected), turn: { say: `${nameOf(ctx, withId)} is with you now.`, choices: [], ended: false } as TalkTurn } : beginTalk(id, inspected);
     const scene = begun.scene;
     const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: "talk", data: null, started_at: ctx.now, ended_at: null };
     // the specialist's first question is whether to sit down, if a table is free
