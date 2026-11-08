@@ -438,6 +438,19 @@ describe("employees", () => {
     return { open, id: last(open, "c1", "turn")!.conversationId };
   };
 
+  it("nobody can talk to a real specialist who is already in a conversation, nor to a customer already with someone", () => {
+    serving(); // c1 is with the real specialist e1
+    addVisitor("c2", "Biscuit", { x: -4 + 1, z: -3 + 1 });
+    const refused = requestTalk(ctx(), "c2", "e1");
+    expect(last(refused, "c2", "notice")?.text).toMatch(/with someone else/);
+    expect(last(refused, "c2", "turn")).toBeUndefined();
+    // and another specialist cannot reach c1, who is already being served
+    addVisitor("e2", "Dev", { x: -4 + 1, z: -3 - 1 }, "specialist", "phones");
+    const second = requestTalk(ctx(), "e2", "c1");
+    expect(last(second, "e2", "notice")?.text).toMatch(/busy right now/);
+    expect(last(second, "e2", "staff_menu")).toBeUndefined();
+  });
+
   it("a real specialist is given the engine's own moves, and the customer waits", () => {
     const { open } = serving();
     expect(last(open, "all", "engaged")).toBeUndefined(); // only NPCs are "engaged"

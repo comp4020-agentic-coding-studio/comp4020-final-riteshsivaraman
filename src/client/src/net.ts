@@ -567,6 +567,8 @@ class Net {
 }
 
 export const net = new Net();
+// `?camdebug` also exposes the connection state to the page, for checks
+if (typeof location !== "undefined" && new URLSearchParams(location.search).has("camdebug")) (window as unknown as { __net: unknown }).__net = net;
 
 // Tell the server we are going before the connection drops, so others see us
 // leave at once (see ClientMessage "bye").

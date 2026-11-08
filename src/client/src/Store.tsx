@@ -119,7 +119,7 @@ function Player() {
     const start = at && (at.length === 3 || at.length === 4) && at.every(Number.isFinite) ? at : null;
     camera.position.set(start ? start[0] : SPAWN.x, STORE_Y + EYE_HEIGHT, start ? start[1] : SPAWN.z);
     // `?camdebug` exposes the camera to the page, for checking where the view points
-    if (new URLSearchParams(location.search).has("camdebug")) (window as unknown as { __cam: unknown }).__cam = camera;
+    if (new URLSearchParams(location.search).has("camdebug")) Object.assign(window, { __cam: camera, __keys: keys });
     camera.rotation.order = "YXZ";
     camera.rotation.set(start && start.length === 4 ? (start[3] * Math.PI) / 180 : 0, start ? (start[2] * Math.PI) / 180 : SPAWN.ry, 0);
     const down = (e: KeyboardEvent) => {
@@ -699,26 +699,29 @@ function Interact() {
         if (!best || d < best.d) best = { id, name, d };
       };
       const now = net.serverNow();
+      // nobody who is already in a conversation (with a real person or an NPC) can be talked to: not offered, not tappable
+      const inChat = (id: string): boolean => net.chats.has(id) || [...net.engaged.values()].some((e) => e.visitorId === id || e.npcId === id);
       if (isCustomer) {
         for (const n of NPCS) {
           const post = NPC_DESIGNATION[n.id];
-          if (!post || !scriptFor(post) || net.offDuty.has(n.id) || net.engaged.has(n.id) || net.released.has(n.id)) continue;
+          if (!post || !scriptFor(post) || net.offDuty.has(n.id) || inChat(n.id) || net.released.has(n.id)) continue;
           const p = npcPose(n, now);
           if (p.present) consider(n.id, NPC_LABEL[n.id] ?? n.id, p.x, p.z);
         }
       }
       for (const r of net.remotes.values()) {
+        if (inChat(r.info.id)) continue;
         if (isCustomer) {
           if (r.identity.kind === "customer") continue;
           const post = designationOf({ kind: r.identity.kind, specialty: r.identity.specialty });
           if (post && scriptFor(post)) consider(r.info.id, r.info.name, r.x, r.z);
-        } else if (r.identity.kind === "customer" && !net.chats.has(r.info.id)) {
+        } else if (r.identity.kind === "customer") {
           consider(r.info.id, r.info.name, r.x, r.z);
         }
       }
       // a timetable customer the store's rules have taken over is a customer like
       // any other (D55): staff reach it where the server holds it (issue #41)
-      if (!isCustomer) for (const c of heldTalkCandidates(net.heldCpu().values(), net.chats, now)) consider(c.id, c.name, c.x, c.z);
+      if (!isCustomer) for (const c of heldTalkCandidates(net.heldCpu().values(), net.chats, now)) if (!inChat(c.id)) consider(c.id, c.name, c.x, c.z);
     }
     const b = best as { id: string; name: string } | null;
     const next = b ? { id: b.id, name: b.name } : null;
