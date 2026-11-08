@@ -685,17 +685,23 @@ kbd {
   gap: 8px;
   justify-content: flex-end;
 }
+/* the always-available exits are real buttons too (never bare underlined text): quieter than the answers, but clearly clickable */
 .talk-choices .talk-standing button {
-  padding: 5px 12px;
-  font-size: 13px;
-  border: 0;
-  background: transparent;
-  color: #555;
-  text-decoration: underline;
+  padding: 7px 14px;
+  font-size: 14px;
+  border: 2px solid #b8bec6;
+  background: #fff;
+  color: #333;
+  text-decoration: none;
 }
 .talk-choices .talk-standing button:hover {
-  color: #1d1f23;
+  border-color: #1d1f23;
+  background: #1d1f23;
+  color: #fff;
 }
+/* when it is the only thing on offer ("Thanks"), it is the answer: a full card */
+.talk-choices .talk-standing.only { justify-content: stretch; }
+.talk-choices .talk-standing.only button { flex: 1; padding: 12px 14px; font-size: 16px; font-weight: 500; text-align: left; }
 @keyframes talk-in {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: none; }

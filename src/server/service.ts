@@ -2,6 +2,7 @@ import type Database from "better-sqlite3";
 import { randomBytes, randomUUID } from "node:crypto";
 import {
   begin,
+  beginHandback,
   canMove,
   choicesFor,
   step,
@@ -22,7 +23,7 @@ import { defaultStorage, productById } from "../shared/catalogue.ts";
 import { DEVICE_SLOT_BY_ID, DEVICE_SLOTS } from "../shared/slots.ts";
 import { TABLE_ASSIGNMENTS } from "../shared/assignments.ts";
 import { ENTRANCE_ZONE, clampToWalkable, COUNTER, zoneOf } from "../shared/world.ts";
-import { CAST, castOf, CYCLE, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
+import { BAR_SEATS, CAST, castOf, CYCLE, momentOf, nearestStaffSpot, TABLE_SEATS, timelineOf } from "../shared/storeday.ts";
 import { modelById } from "../shared/talk/data.ts";
 import { stockOf, takeOne } from "./stock.ts";
 import { emitEvent } from "./eventlog.ts";
@@ -199,6 +200,7 @@ interface ConvData {
   pending?: { choiceId: string; label: string }; // what the customer picked, waiting for the employee
   at?: { x: number; z: number };
   eng?: Engagement; // how the NPC is currently drawn, so a walk can start from where it stands
+  barSeat?: string; // the Genius Bar stool the customer is sitting on, while they are
 }
 
 // The new talk engine's state for a "phones" conversation held with an NPC
@@ -791,9 +793,17 @@ function open(ctx: Ctx, customerId: string, withId: string, withKind: "npc" | "v
   }
 
   const world = stockWorld(ctx.db);
-  const first = begin(script, world);
+  // coming back to the Genius Bar for a device left with them: handed back if it is done, else told how it is going
+  const ticket = script === "repair" ? repairTicket(ctx, customerId) : undefined;
+  if (ticket && !ticketReady(ctx, customerId, ticket)) return [notice(customerId, ticket.outcome === "quick" ? `${nameOf(ctx, withId)} is still working on it: about ${Math.max(1, Math.ceil((ticket.ts + REPAIR_QUICK_MS - ctx.now) / 1000))} s to go.` : `${nameOf(ctx, withId)} is still servicing it. Come back on another day.`)];
+  const first = ticket ? beginHandback(world, ticket.fault) : begin(script, world);
   const row: ConvRow = { id, customer_id: customerId, with_id: withId, with_kind: withKind, script, node: first.state.node, data: null, started_at: ctx.now, ended_at: null };
-  const eng: Engagement = { npcId: withId, visitorId: customerId, since: engagedSince, at, ...(engagedFrom ? { from: engagedFrom } : {}) };
+  // the genius stays behind the bar: the customer comes to them (and sits), they do not walk over
+  const post = script === "repair" ? NPCS.find((n) => n.id === withId) : undefined;
+  const hold = post ? npcPose(post, ctx.now) : undefined;
+  const eng: Engagement = hold
+    ? { npcId: withId, visitorId: customerId, since: engagedSince, at, from: { x: hold.x, z: hold.z }, lead: { x: hold.x, z: hold.z, fx: at.x, fz: at.z } }
+    : { npcId: withId, visitorId: customerId, since: engagedSince, at, ...(engagedFrom ? { from: engagedFrom } : {}) };
   const data: ConvData = { conv: first.state, awaiting: "customer", at, ...(withKind === "npc" ? { eng } : {}) };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
@@ -2199,9 +2209,46 @@ export function settleRepairs(ctx: Ctx): Outgoing[] {
     patchOfferData(ctx, r.visitor_id, { repair: undefined });
     if (!ctx.present.includes(r.visitor_id)) continue;
     log(ctx, r.visitor_id, "repair_ready", { by: rep.by });
-    out.push(notice(r.visitor_id, `${rep.by} has your device ready at the Genius Bar. Good as new.`));
+    out.push(notice(r.visitor_id, `${rep.by} has your device ready: come to the Genius Bar and press E to collect it.`));
   }
   return out;
+}
+
+// A repair a customer has left at the Genius Bar and not yet collected: from the events it already
+// writes (the outcome when it was decided, and the collection when it was handed back), so no new column.
+interface RepairTicket { fault: string; outcome: "quick" | "later"; ts: number }
+function repairTicket(ctx: Ctx, customerId: string): RepairTicket | undefined {
+  const o = ctx.db.prepare("SELECT id, ts, data FROM events WHERE visitor_id = ? AND type = 'repair_outcome' ORDER BY id DESC LIMIT 1").get(customerId) as { id: number; ts: number; data: string } | undefined;
+  if (!o) return undefined;
+  const d = JSON.parse(o.data) as { outcome: string; fault: string };
+  if (d.outcome !== "quick" && d.outcome !== "later") return undefined; // a replacement was handed over there and then
+  if (ctx.db.prepare("SELECT 1 FROM events WHERE visitor_id = ? AND type = 'repair_collected' AND id > ?").get(customerId, o.id)) return undefined;
+  return { fault: d.fault, outcome: d.outcome, ts: o.ts };
+}
+// a quick fix is ready after its minute; a longer service after "another day": a later visit
+function ticketReady(ctx: Ctx, customerId: string, t: RepairTicket): boolean {
+  if (t.outcome === "quick") return ctx.now >= t.ts + REPAIR_QUICK_MS;
+  const visit = (ctx.db.prepare("SELECT MAX(ts) AS t FROM events WHERE visitor_id = ? AND type = 'profile'").get(customerId) as { t: number | null }).t ?? 0;
+  return visit > t.ts;
+}
+
+// The customer takes the bar stool in front of the genius; the genius stays where they are, now facing them.
+function sitAtBar(ctx: Ctx, row: ConvRow, data: ConvData): { id: string; out: Outgoing[] } | null {
+  const post = NPCS.find((n) => n.id === row.with_id);
+  const where = post ? npcPose(post, ctx.now) : undefined;
+  if (!where) return null;
+  const taken = new Set(
+    (ctx.db.prepare("SELECT data FROM conversations WHERE ended_at IS NULL AND id != ?").all(row.id) as Array<{ data: string | null }>)
+      .map((r) => (r.data ? (JSON.parse(r.data) as { barSeat?: string }).barSeat : undefined))
+      .filter((x): x is string => !!x),
+  );
+  const free = BAR_SEATS.filter((s) => !taken.has(s.id) && ctx.present.every((id) => id === row.customer_id || (ctx.position(id) ? dist(ctx.position(id)!, s.at) > 0.7 : true)))
+    .sort((a, b) => Math.abs(a.at.x - where.x) - Math.abs(b.at.x - where.x))[0];
+  if (!free) return null;
+  const eng: Engagement = { npcId: row.with_id, visitorId: row.customer_id, since: ctx.now, at: free.at, from: { x: where.x, z: where.z }, lead: { x: where.x, z: where.z, fx: free.at.x, fz: free.at.z } };
+  data.eng = eng;
+  log(ctx, row.customer_id, "seated", { conversationId: row.id, stool: free.id });
+  return { id: free.id, out: [{ to: "all", message: { type: "seated", visitorId: row.customer_id, at: free.at, face: free.face } }, { to: "all", message: { type: "engaged", ...eng } }] };
 }
 
 export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
@@ -2213,10 +2260,7 @@ export function tryNpcAutoClaim(ctx: Ctx, customerId: string): Outgoing[] {
   if (!script) return [];
   // the Genius Bar only takes repairs here (a pick-up waits for the bar), and only once the customer has
   // actually come to the bar: the genius works behind it and does not go wandering after them
-  if (st.needs === "genius") {
-    const where = ctx.position(customerId);
-    if (st.want !== "repair" || !where || where.z < COUNTER.z - COUNTER.d / 2 - 4.5) return [];
-  }
+  if (st.needs === "genius") return []; // the genius stays behind the bar: the customer comes to them and presses E
   const offDutyIds = offDuty(ctx);
   const npcId = Object.keys(NPC_DESIGNATION).find((id) => NPC_DESIGNATION[id] === st.needs && !offDutyIds.includes(id) && !npcBusy(ctx, id));
   if (!npcId) return [];
@@ -2707,6 +2751,7 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
   }
 
   const out: Outgoing[] = [];
+  let barSeat = data.barSeat; // the Genius Bar stool they are on, if any
   let helper: string | null = null; // who was sent for the customer, if anyone
   for (const e of r.effects) {
     if (e.type === "player_state") {
@@ -2721,6 +2766,15 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
         with_id: r.turn.ended ? null : row.with_id,
       });
       log(ctx, row.customer_id, "state", { state: to, want: e.want ?? null, needs: e.needs ?? null });
+    } else if (e.type === "sit") {
+      const sat = sitAtBar(ctx, row, data);
+      if (sat) {
+        barSeat = sat.id;
+        out.push(...sat.out);
+      }
+    } else if (e.type === "repair_collected") {
+      log(ctx, row.customer_id, "repair_collected", { fault: e.fault, by: row.with_id });
+      patchOfferData(ctx, row.customer_id, { repair: undefined });
     } else if (e.type === "repair") {
       log(ctx, row.customer_id, "repair_outcome", { outcome: e.outcome, days: e.days ?? null, fault: e.fault, by: row.with_id });
       // a quick fix is told when it is ready, a minute on (no timer: the next request that arrives notices)
@@ -2734,7 +2788,11 @@ function apply(ctx: Ctx, row: ConvRow, data: ConvData, from: ConvState, choiceId
   }
   log(ctx, row.customer_id, "turn", { conversationId: row.id, from: from.node, choice: choiceId, to: r.state.node });
 
-  const next: ConvData = { ...data, conv: r.state, awaiting: "customer", pending: undefined };
+  const next: ConvData = { ...data, conv: r.state, awaiting: "customer", pending: undefined, ...(barSeat ? { barSeat } : {}) };
+  if (r.turn.ended && barSeat) {
+    out.push({ to: "all", message: { type: "unseated", visitorId: row.customer_id } });
+    next.barSeat = undefined;
+  }
   saveConv(ctx, row, next, r.turn.ended);
   const [helperName, waitLabel] = (helper ?? "").split("|");
   // nobody sends for them: they are told where to go, and who is free if anyone is
@@ -2896,11 +2954,12 @@ export function chooseTurn(ctx: Ctx, customerId: string, conversationId: string,
 // Ends a conversation and tells the customer why.
 function finish(ctx: Ctx, row: ConvRow, say: string, why: string): Outgoing[] {
   const data = dataOf(row);
-  ctx.db.prepare("UPDATE conversations SET ended_at = ?, data = ? WHERE id = ?").run(ctx.now, JSON.stringify({ ...data, awaiting: "customer", pending: undefined }), row.id);
+  ctx.db.prepare("UPDATE conversations SET ended_at = ?, data = ? WHERE id = ?").run(ctx.now, JSON.stringify({ ...data, awaiting: "customer", pending: undefined, barSeat: undefined }), row.id);
   log(ctx, row.customer_id, "conversation_ended", { conversationId: row.id, why });
   const cur = stateOf(ctx.db, row.customer_id);
   if (cur && cur.state === "in_conversation") setState(ctx, row.customer_id, { state: "browsing", with_id: null });
   const out: Outgoing[] = [{ to: row.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, row.with_id), say, [], true, "customer") } }];
+  if (data.barSeat) out.push({ to: "all", message: { type: "unseated", visitorId: row.customer_id } });
   const sm = stateMessage(ctx, row.customer_id);
   if (sm) out.push(sm);
   out.push(staffViewMessage(ctx));

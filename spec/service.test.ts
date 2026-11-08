@@ -626,41 +626,100 @@ describe("what the customer said, in words", () => {
 });
 
 describe("the Genius Bar repair, run by an NPC genius", () => {
-  const atBar = () => {
+  const near = () => {
     const g = npc("genius-1");
-    addVisitor("c1", "Pebble", { x: g.x, z: g.z + 1.5 }); // on the shop side of the bar
-    db.prepare("UPDATE player_state SET state = 'waiting_for_help', want = 'repair', needs = 'genius' WHERE visitor_id = 'c1'").run();
+    addVisitor("c1", "Pebble", { x: g.x, z: g.z + 1.5 }); // across the bar from the genius
+    return g;
   };
-  it("a customer who has come to the bar for a repair gets the genius, who opens the repair conversation", () => {
-    atBar();
-    const turn = last(later(tryNpcAutoClaim(ctx(), "c1")), "c1", "turn");
-    expect(turn).toMatchObject({ withId: "genius-1", ended: false });
-    expect(turn?.say).toMatch(/Genius Bar/);
+  // the customer is back across the bar from wherever the genius is at that time of day
+  const go = (when: number): Ctx => {
+    const g = npcPose(NPCS.find((n) => n.id === "genius-1")!, when);
+    positions.set("c1", { x: g.x, z: g.z + 1.5 });
+    return ctx(when);
+  };
+  const talk = (when = NOW) => last(startTalk(ctx(when), "c1", "genius-1"), "c1", "turn");
+  const pick = (t: { conversationId: string }, id: string, when = NOW) => last(chooseTurn(ctx(when), "c1", t.conversationId, id), "c1", "turn")!;
+  // the whole way through a quick fix, ending on its closing line
+  const quickFix = (t0: { conversationId: string }) => {
+    let t = pick(t0, "stand");
+    for (const id of ["symptom:wont_charge", "no", "not_yet", "ok", "ok"]) t = pick(t, id);
+    return t;
+  };
+
+  it("the customer starts it from across the bar (E), and the genius greets them and offers a seat", () => {
+    near();
+    const t = talk();
+    expect(t).toMatchObject({ withId: "genius-1", ended: false });
+    expect(t?.say).toMatch(/take a seat/i);
+    expect(t?.choices.map((c) => c.label)).toEqual(["Take a seat", "I'll stay standing"]);
   });
-  it("a customer collecting an order is not put through a repair", () => {
-    atBar();
-    db.prepare("UPDATE player_state SET want = 'pickup' WHERE visitor_id = 'c1'").run();
-    expect(later(tryNpcAutoClaim(ctx(), "c1"))).toEqual([]);
-  });
-  it("a customer still far from the bar is not chased across the shop by the genius", () => {
-    addVisitor("c1", "Pebble", { x: 0, z: -6 });
+  it("the genius stays behind the bar: they never walk out to a waiting customer, and do not walk when the chat opens", () => {
+    near();
     db.prepare("UPDATE player_state SET state = 'waiting_for_help', want = 'repair', needs = 'genius' WHERE visitor_id = 'c1'").run();
     expect(later(tryNpcAutoClaim(ctx(), "c1"))).toEqual([]);
+    const g = npc("genius-1");
+    const eng = last(startTalk(ctx(), "c1", "genius-1"), "all", "engaged")!;
+    expect(eng.lead).toMatchObject({ x: g.x, z: g.z }); // held at their own spot
+    expect(eng.from).toMatchObject({ x: g.x, z: g.z });
   });
-  it("a quick fix is announced as ready about a minute later, once", () => {
-    atBar();
-    let t = last(later(tryNpcAutoClaim(ctx(), "c1")), "c1", "turn")!;
-    const pick = (id: string) => (t = last(chooseTurn(ctx(), "c1", t.conversationId, id), "c1", "turn")!);
-    pick("symptom:wont_charge");
-    pick("no");
-    pick("not_yet"); // not tried another cable: it is the port
-    pick("ok");
+  it("taking a seat puts the customer on a bar stool facing the genius, and they stand up again when it ends", () => {
+    near();
+    const t = talk()!;
+    const out = chooseTurn(ctx(), "c1", t.conversationId, "sit");
+    expect(last(out, "all", "seated")).toMatchObject({ visitorId: "c1" });
+    let cur = last(out, "c1", "turn")!;
+    const ends: Outgoing[] = [];
+    for (const id of ["symptom:cracked_screen", "no", "works", "ok", "ok"]) {
+      const o = chooseTurn(ctx(), "c1", cur.conversationId, id);
+      ends.push(...o);
+      cur = last(o, "c1", "turn")!;
+    }
+    expect(cur.ended).toBe(true);
+    expect(last(ends, "all", "unseated")).toMatchObject({ visitorId: "c1" });
+  });
+  it("staying standing seats nobody", () => {
+    near();
+    const out = chooseTurn(ctx(), "c1", talk()!.conversationId, "stand");
+    expect(messagesTo(out, "all", "seated")).toEqual([]);
+  });
+  it("a quick fix has a follow-up: still working at 30 s, then the genius hands it back and the repair is closed", () => {
+    near();
+    const end = quickFix(talk()!);
+    expect(end.ended).toBe(true);
+    closeTalk(ctx(), "c1");
+    expect(last(startTalk(go(NOW + 30_000), "c1", "genius-1"), "c1", "notice")?.text).toMatch(/still working on it/);
+    expect(last(settleRepairs(ctx(NOW + 61_000)), "c1", "notice")?.text).toMatch(/press E to collect/);
+    const back = last(startTalk(go(NOW + 62_000), "c1", "genius-1"), "c1", "turn")!;
+    expect(back.say).toMatch(/Welcome back, it's all done/);
+    const done = pick(back, "ok", NOW + 62_000);
+    expect(done.ended).toBe(true);
+    expect(eventTypes()).toEqual(expect.arrayContaining(["repair_outcome", "repair_ready", "repair_collected"]));
+    closeTalk(ctx(NOW + 63_000), "c1");
+    // collected: the next visit to the bar is a fresh repair, not another hand-back
+    expect(last(startTalk(go(NOW + 70_000), "c1", "genius-1"), "c1", "turn")?.say).toMatch(/take a seat/i);
+  });
+  it("a longer service is collected on another day, meaning a later visit", () => {
+    near();
+    let t = pick(talk()!, "stand");
+    for (const id of ["symptom:battery_drain", "no", "months"]) t = pick(t, id); // a worn battery: a day's service
+    t = pick(t, "ok");
+    expect(t.say).toMatch(/proper service/);
+    t = pick(t, "ok");
     expect(t.ended).toBe(true);
-    expect(t.say).toMatch(/minute/);
-    expect(messagesTo(settleRepairs(ctx(NOW + 30_000)), "c1", "notice")).toEqual([]); // not yet
-    expect(last(settleRepairs(ctx(NOW + 61_000)), "c1", "notice")?.text).toMatch(/ready at the Genius Bar/);
-    expect(settleRepairs(ctx(NOW + 120_000))).toEqual([]); // told once
-    expect(eventTypes()).toEqual(expect.arrayContaining(["repair_outcome", "repair_ready"]));
+    closeTalk(ctx(), "c1");
+    expect(last(startTalk(go(NOW + 5_000), "c1", "genius-1"), "c1", "notice")?.text).toMatch(/Come back on another day/);
+    db.prepare("INSERT INTO events (ts, visitor_id, type, data) VALUES (?, 'c1', 'profile', '{}')").run(NOW + 60_000); // they come back another day
+    expect(last(startTalk(go(NOW + 61_000), "c1", "genius-1"), "c1", "turn")?.say).toMatch(/Welcome back, it's all done/);
+  });
+  it("a replacement is handed over there and then, with nothing left to collect", () => {
+    near();
+    let t = pick(talk()!, "stand");
+    for (const id of ["symptom:wont_turn_on", "yes", "nothing", "ok", "go"]) t = pick(t, id); // water damage: swap it
+    expect(t.say).toMatch(/replacement/);
+    t = pick(t, "ok");
+    expect(t.ended).toBe(true);
+    closeTalk(ctx(), "c1");
+    expect(last(startTalk(go(NOW + 5_000), "c1", "genius-1"), "c1", "turn")?.say).toMatch(/take a seat/i);
   });
 });
 

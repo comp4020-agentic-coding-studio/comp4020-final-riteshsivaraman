@@ -149,8 +149,8 @@ export function Actor({
     }
     const pay = uniform ? { raise: s.pay?.raise ?? 0, aim: s.pay?.aim ?? 0 } : undefined;
     poseCharacter(char, { t: t.current, dt: SNAP ? 1 : dt, walk: walk.current, phase: phase.current, mode: s.walking ? "walk" : s.mode, seed, seated: s.seated, device: s.device, gaze, meet, pay }, m, blink);
-    // the handheld is put away while the tablet is out (the left hand is tapping it)
-    if (payRef.current) payRef.current.visible = !(s.device || s.mode === "device") || (s.pay?.raise ?? 0) > 0.01;
+    // the handheld only comes out to take a payment: staff do not walk around with it in their hand
+    if (payRef.current) payRef.current.visible = (s.pay?.raise ?? 0) > 0.01;
   });
   const payRef = useRef<Group>(null);
   // the handheld rides the left hand's bone, attached the same way as the device below

@@ -179,7 +179,7 @@ export function Talk() {
             </div>
           ))}
           {standing.length > 0 && (
-            <div className="talk-standing">
+            <div className={`talk-standing${top.length === 0 && groups.size === 0 ? " only" : ""}`}>
               {standing.map((c) => (
                 <button key={c.id} type="button" onClick={() => net.choose(c.id, c.label)}>
                   {c.label}

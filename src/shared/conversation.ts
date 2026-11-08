@@ -68,7 +68,11 @@ export type Effect =
   | { type: "reserve"; product: string; colour: string }
   // how a repair visit ended: fixed while they wait, swapped for a replacement,
   // or kept for a longer service (come back in `days`); the server records it
-  | { type: "repair"; outcome: "quick" | "replacement" | "later"; days?: number; fault: string };
+  | { type: "repair"; outcome: "quick" | "replacement" | "later"; days?: number; fault: string }
+  // sit at the bar stool in front of the genius (the server picks which)
+  | { type: "sit" }
+  // they have their device back: the repair is closed
+  | { type: "repair_collected"; fault: string };
 
 export interface StepResult {
   state: ConvState;
@@ -202,8 +206,13 @@ const dayWord = (n: number): string => (n === 1 ? "tomorrow" : `in ${n} days`);
 function repairTurn(s: ConvState): Turn {
   const fault = s.fault ? faultById(s.fault) : undefined;
   switch (s.node) {
+    case "seat":
+      return ask("Hi, welcome to the Genius Bar. Please, take a seat and tell me what's going on.", [
+        { id: "sit", label: "Take a seat" },
+        { id: "stand", label: "I'll stay standing" },
+      ]);
     case "hello":
-      return ask("Hi, welcome to the Genius Bar. What's going on with your device?", [
+      return ask("What's going on with your device?", [
         ...SYMPTOMS.map((k) => ({ id: `symptom:${k}`, label: SYMPTOM_LABEL[k] })),
         { id: "leave", label: "Never mind" },
       ]);
@@ -224,13 +233,23 @@ function repairTurn(s: ConvState): Turn {
         { id: "think", label: "No, let me think about it" },
       ]);
     case "quick":
-      return end("Good news, that's a quick one. Give me about a minute and I'll have it back to you: I'll let you know the moment it's ready.");
+      return ask("Good news, that's a quick one. Give me about a minute and I'll have it back to you.", [{ id: "ok", label: "Okay, I'll wait" }]);
+    case "quick_end":
+      return end("Have a seat or a look around. I'll call you over the moment it's ready, then come back to the bar and I'll hand it over.");
     case "replacement":
-      return end("This one isn't worth repairing. I'll swap it for a replacement unit: it's ready at the bar for you now, and we'll sort out the old one.");
+      return ask("This one isn't worth repairing. I'll swap it for a replacement unit: it's set up and ready for you now.", [{ id: "ok", label: "Great, thank you" }]);
+    case "replacement_end":
+      return end("There you go, a fresh replacement. Sorry for the trouble, and I'll deal with the old one. Take care!");
     case "later": {
       const d = repairOutcome(fault!).days ?? 1;
-      return end(`This needs a proper service, so I'll keep it. It'll be ready ${dayWord(d)}: come back to the Genius Bar then and ask for me.`);
+      return ask(`This needs a proper service, so I'll keep it. It'll be ready ${dayWord(d)}: come back to the Genius Bar then and ask for me.`, [{ id: "ok", label: "Okay, see you then" }]);
     }
+    case "later_end":
+      return end("I've noted it all down under your name, so just come to the bar and I'll know exactly what we're doing. See you then!");
+    case "handback":
+      return ask(`Welcome back, it's all done: we sorted out ${fault!.label}. It's as good as new.`, [{ id: "ok", label: "Brilliant, thank you" }]);
+    case "handback_end":
+      return end("My pleasure. If anything else acts up, you know where I am. Take care!");
     case "declined":
       return end("No problem. Back it up, and come back whenever you're ready. Nothing's been touched.");
     case "browsing":
@@ -240,31 +259,48 @@ function repairTurn(s: ConvState): Turn {
 }
 
 function repairStep(state: ConvState, choiceId: string, go: (node: string, patch?: Partial<ConvState>, effects?: Effect[]) => StepResult): StepResult | null {
-  const done = (node: string, f: FaultRec): StepResult => {
+  const browsing: Effect = { type: "player_state", state: "browsing", needs: null };
+  const decided = (f: FaultRec): StepResult => {
     const o = repairOutcome(f);
-    return go(node, {}, [{ type: "player_state", state: "browsing", needs: null }, { type: "repair", outcome: o.outcome, days: o.days, fault: f.id }]);
+    return go(o.outcome, {}, [{ type: "repair", outcome: o.outcome, days: o.days, fault: f.id }]);
   };
   switch (state.node) {
+    case "seat":
+      return go("hello", {}, choiceId === "sit" ? [{ type: "sit" }] : []);
     case "hello":
       if (choiceId.startsWith("symptom:")) return go("wet", { symptom: choiceId.slice("symptom:".length) as Symptom });
-      return go("browsing", {}, [{ type: "player_state", state: "browsing", needs: null }]);
+      return go("browsing", {}, [browsing]);
     case "wet":
       return go("detail", { wet: choiceId === "yes" });
     case "detail":
       return go("diagnosis", { fault: diagnose(state.symptom!, !!state.wet, choiceId).id });
     case "diagnosis": {
       const f = faultById(state.fault!);
-      return f.destructive ? go("warn") : done(repairOutcome(f).outcome, f);
+      return f.destructive ? go("warn") : decided(f);
     }
     case "warn":
-      if (choiceId === "go") return done(repairOutcome(faultById(state.fault!)).outcome, faultById(state.fault!));
-      return go("declined", {}, [{ type: "player_state", state: "browsing", needs: null }]);
+      if (choiceId === "go") return decided(faultById(state.fault!));
+      return go("declined", {}, [browsing]);
+    case "quick":
+    case "later":
+      return go(`${state.node}_end`, {}, [browsing]);
+    case "replacement":
+      // a replacement is handed over there and then: the repair is closed
+      return go("replacement_end", {}, [browsing, { type: "repair_collected", fault: state.fault! }]);
+    case "handback":
+      return go("handback_end", {}, [browsing, { type: "repair_collected", fault: state.fault! }]);
   }
   return null;
 }
 
+// Someone coming back to the Genius Bar for a device left with them: the repair is done, and it is handed back.
+export function beginHandback(world: World, fault: string): StepResult {
+  const state: ConvState = { script: "repair", node: "handback", fault };
+  return { state, turn: turnFor(state, world), effects: [{ type: "player_state", state: "in_conversation" }] };
+}
+
 export function begin(script: ScriptId, world: World): StepResult {
-  const state: ConvState = { script, node: "hello" };
+  const state: ConvState = { script, node: script === "repair" ? "seat" : "hello" };
   return { state, turn: turnFor(state, world), effects: [{ type: "player_state", state: "in_conversation" }] };
 }
 
