@@ -1,404 +1,265 @@
 # Learnings
 
-What Ritesh is learning about prompting and working with AI coding assistants
-on this project --- not stack gotchas (those were tracked here up to the entry
-below this note; new entries are about the prompter, not the stack). Each
-entry cites the commit(s) it's about, e.g.
-[`a1b2c3d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a1b2c3d),
-so a claim can be checked against what actually happened. Append-only --- if
-one turns out to be wrong, add a correction entry, don't delete the original.
+A bank of what **I** did differently when directing the agents, kept so that I can pick moments out of it when I write `PROCESS.md`. Nothing here is copied into `PROCESS.md`: that is my own account, in my own words.
 
-## "Navigate to a non-Inbox page and check" needs an in-app click, not a URL bar change, or the test can pass for the wrong reason
+## The rule for this file
 
-[`a4c671f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a4c671f)
+**Every sentence about me must trace to something I said, a decision recorded under my name (SCOPE.md), or my own earlier writing (reflections, PROCESS.md).** Technical detail belongs to the commit, not here: I only keep as much as I actually mentioned or chose. Where the record shows the agent doing something and not me, the entry sits in Part 2 and says so. Where a detail of my part is missing, it is a `[TK]` for me to fill from memory.
 
-Verifying the global live-preview banner, my first check used the browser
-tool's `navigate` action to jump straight to `/sent` by URL. The banner
-vanished -- which looked exactly like a failed fix, but wasn't: a URL-bar
-navigation is a full page reload in this SPA, which opens a brand-new
-`EventSource` with nothing played back (ADR 2's design is deliberately
-no-queue, no-replay). It would have told me the old, already-saved draft
-event was "lost," when the real question -- does the banner survive
-*client-side* route changes within one mounted session -- was never asked.
-Re-tested by clicking the in-app sidebar links (Inbox -> Compose -> Board)
-instead, which is how an actual user navigates and how the feature is
-specified to work, and the banner correctly persisted. Lesson: when a
-feature's whole point is "survives navigating away," the verification step
-has to navigate the way the app is actually used (`route()`/client-side),
-not however the tool defaults to doing it -- a reload-based check tests a
-different, stricter thing than what was asked for, and a failure there
-isn't evidence of anything.
+## What PROCESS.md has to show
 
-## A piped smoke test of an interactive CLI can fail for the test's own reason, not the tool's
+From the course (assessment page, "Legibility of process", and the final-project checklist, section B): the top band wants **deliberate direction**: failures fixed at the **harness level** rather than retried, **judgement visible in what was thrown away**, and an account that justifies the call (why it beat the obvious alternative, how I knew it was right before accepting it). Every claim needs a **commit citation**, and the account should say where the record is **only the repo** and where it is **my recall**. Prefer moments newer than crit 9 that I have not already used. Budget: 900 to 1100 words.
 
-[`1ae8e01`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/1ae8e01)
+Each Part 1 entry is a short narrative of what happened and what I did, then four fixed lines: where it landed, record, course lesson, and a PROCESS.md rating.
 
-Building `scripts/sim/` (SCOPE D43), my first "does this work" check piped
-scripted answers (`printf "1\nAisha\n..." | tsx scripts/sim/index.ts`) and it
-hung or showed a shifted answer (a customer named "1"). That looked exactly
-like a bug in the sim's input handling, and almost got reported as one.
-Isolated with a three-question `readline/promises` test script: the first
-`question()` resolves correctly against piped input, but a second
-sequential call on the same non-TTY stream drops the line entirely — a
-Node quirk with bulk/non-interactive stdin, unrelated to anything in the
-sim's own code. Confirmed by driving the same binary through a real
-pseudo-terminal (Python's `pty` module) instead of a plain pipe: every
-answer landed correctly. Lesson: "verify for real, not reported" cuts both
-ways — a failing check is evidence of a real bug only if the check itself
-is a valid simulation of how the feature is actually used; for an
-interactive terminal program, a bulk pipe isn't a human typing, and a pty
-is the cheap way to tell which one you're looking at before writing up a
-false gap.
+Restructured on 2026-11-07 by Claude at my request. Claude drafted this wording, so I check and reword it. The earlier wording is in git history.
 
-## A "this doesn't exist" gap claim needs a grep across the whole subsystem, not just the one file already open
+## How my Assignment 1 and 2 `PROCESS.md` files read (the voice to match)
 
-[`9e511ca`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9e511ca),
-corrected in
-[`e3ab3cb`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/e3ab3cb)
+Read from `Assignments/comp4020-ass1-riteshsivaraman/PROCESS.md` (687 words) and `comp4020-ass2-riteshsivaraman/PROCESS.md` (623 words). Their moments share a shape, and the best ones do these things; the final account should too:
 
-Checking the behaviour-loop/conversation design against the seven
-`customer-journeys.md` transcripts, I claimed a staff-to-staff handoff
-mechanism didn't exist, reasoning only from `conversation.ts`'s `Effect`
-type (`{needs: string}`, no free-text field). It was wrong: `service.ts`
-already had `handOn(staffId, customerId, to, note?)`, tested, writing a
-sanitised note into `player_state`. The real gap was narrower (it only
-fires from an explicit human action, never from a conversation script, and
-carries one opaque string, not structured facts) — but "doesn't exist at
-all" was a stronger, false claim that survived into a published artifact
-and a SCOPE.md decision before being caught, only because building the fix
-required actually reading `service.ts` first. Lesson: before writing "X
-isn't built" into a design doc, grep the whole subsystem the claim is
-about (here: `grep -n handOn\|note src/server/service.ts`), not just the
-one file the current line of reasoning happened to have open — a confident
-negative claim is exactly the kind of thing the don't-invent rule should have
-caught before it got documented, not after. Written into CLAUDE.md's
-"Don't invent, don't guess through ambiguity" section
-([`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff))
-during a later pass auditing which LEARNINGS entries had actually changed the
-harness versus stayed a one-off narrated lesson.
+- **Say the instinct, then refuse it.** Ass1 moment 2: the page passed every check and was lifeless; "my initial instinct was to list what looked wrong", and instead I asked why it was delivered that way and how the *workflow* should change.
+- **Fix the class, not the instance.** Ass1 moment 3 names the bug type and builds a defect loop (evidence before diagnosis, name the class, add the sensor that fires red, then fix).
+- **A rule can be the defect.** Ass1 moment 4: the harness itself said simulations should "demonstrate themselves at rest"; the rule had to change with the code.
+- **Put a number on it.** `0.0 x 143.3px` for a mark, 16 labels under 11px, a filmstrip from z=3.39 to 0.00, 154.5k of 200k tokens, seven replies before I noticed the review never happened. Specific figures are what make an account read as corroborated.
+- **Say what I accepted, and what I stopped accepting.** Ass2: I stopped asking for tweaks and demanded a complete redesign; I noticed a "looks good" had approved a whole information architecture.
+- **Divide the labour honestly.** Ass1 ends on what the sensors found (contrast, rounding, a 0px mark) versus what only I could perceive (a page that felt dead). Final project: same split between `spec/` and the feel-check.
+- **Cite every claim** with a commit link; one line at the top says which repo the links point to.
 
-## Hono sub-app routes don't match a trailing slash on the mount path
+# Part 1: moments where my own action is on the record
 
-`draftRoutes.post("/", ...)` mounted at `app.route("/api/drafts", draftRoutes)`
-matches `POST /api/drafts`, not `POST /api/drafts/` --- the trailing slash
-404s. Caught by testing the real endpoint with curl, not by reading the
-route table. Lesson: when a client fetch 404s on a route that's clearly
-registered, check for a trailing-slash mismatch between the client call and
-how the sub-app was mounted before suspecting anything else.
+## I chose the shape of a feature from laid-out options, and the choice became a standing rule
 
-## Deleting a row with a dependent FK reference needs the dependent deleted first
+*Seen-era (the archived email app, before the 11 October pivot)*
 
-`finalizeSend` deleted the `drafts` row after sending but before deleting its
-`draft_contributors` rows, so `better-sqlite3`'s foreign-key check (on by
-default) threw `FOREIGN KEY constraint failed` on the early-send path only
-(the auto-send path hadn't been exercised with contributors yet, so it
-hadn't surfaced). Lesson: a soft delete bug that only shows up once a row
-has a dependent child is easy to miss testing the happy path once; test the
-actual multi-user edit flow, not just "does sending work."
+**Commits:** [`cf2242d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/cf2242d)
 
-## Testing two users in two tabs of the same browser profile doesn't give two sessions
+I asked for a live preview in the email app, a real-time multi-user feature. The agent did not pick a reading and build it. It laid out the options, how much the recipient should see and how it should reach them, and asked. I chose the more invasive keystroke-level version, and SSE rather than the WebSocket that ADR 1 had already named. Neither was what it would have guessed.
 
-Both tabs share one cookie jar (same origin), so logging in as a second user
-in tab 2 silently rotates the session cookie for tab 1 too --- tab 1's UI
-still shows the first user (stale client-side state) while every request it
-makes now authenticates as the second user. This looked exactly like an
-authorization bug ("only the owner can send") until checked against the
-database directly. Lesson: for a live two-person manual check, use two
-genuinely separate browser contexts (incognito + regular window, or two
-browsers), never two tabs of one profile. The automated `spec/seen.test.ts`
-tests don't have this problem --- `spec/helpers.ts`'s `Client` class keeps
-its own cookie string per instance.
+The same commit wrote that into CLAUDE.md as a standing move: for decisions that affect many users or are expensive to reverse, lay out the options and costs and let me choose, instead of guessing.
 
-## A manual DB edit that misses a dependent row crashes the whole app on every subsequent boot
+- **Where it landed:** CLAUDE.md, same commit; the rule is still there.
+- **Record:** Repo for the rule and commit; my recall for what the options were.
+- **Course lesson:** [Week 8, “with an agent”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-8/#/adr-with-an-agent): “lay out three options for where this app stores X, and what each costs. Don't pick one yet.” Also [Week 9, “polling, server-sent events, WebSockets”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/three-transports), the choice I made between transports.
+- **For PROCESS.md:** Strong. The correction landed in the harness and is still in force. Frame it as the origin of a standing rule, since the feature itself was in the archived app.
 
-Cleaned up a leftover test account directly via `flyctl ssh console` +
-`sqlite3`: deleted the `users` row but not its `events` row (the signup
-event referencing that user id). `db.ts` runs `PRAGMA foreign_key_check`
-after every migration at every boot and throws if anything fails it --- so
-the app crash-looped on every restart afterwards, including Fly's normal
-auto-stop/auto-start cycle, until the orphaned `events` row was deleted too.
-Bug class: any manual edit to a table with dependent rows elsewhere needs
-the dependent rows cleaned up in the same pass, and this app's boot-time FK
-check has no self-healing path --- one bad row takes the whole site down
-until someone fixes the data by hand. If this happens again under time
-pressure: check `flyctl logs --no-tail` first (the crash reason is always
-right there), not the proxy's generic 502. Worth considering for a future
-pass: should the FK check degrade (log + continue) rather than hard-crash
-the boot, given this app wakes from a cold stop on every request after idle.
+## I answered an interview about what "good" means, and the unanswered part stayed marked
 
-*(Entries above this line predate the redirect described in this file's
-header and are stack gotchas, not prompting lessons --- kept as history.)*
+*Seen-era (the archived email app, before the 11 October pivot)*
 
-## "Lay out options, don't pick yet" turned a guess into a real decision
+**Commits:** [`3284399`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/3284399)
 
-[`cf2242d`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/cf2242d)
+For the Seen README, the agent interviewed me one question at a time with the week 8 framework instead of drafting a definition for me to react to. My answers on quality of execution and differentiation were specific. My answer on who it is for described the company's culture rather than a person, and the scaffold left that gap visibly marked instead of filling it with an invented persona. [TK: did I ask to be interviewed this way?]
 
-Asked to build "live preview (reading an email someone is sending you)" for
-a real-time, multi-user feature, I had a plausible reading ready to run with
-(keystroke-level stream to the recipient) but it wasn't the only one
-(coarse presence-only was equally plausible from the words alone), and the
-transport choice underneath it (polling / SSE / WebSocket) was explicitly
-the kind of decision the week 8 lecture says gets its own ADR. Laying out
-both the semantics question and the transport options as separate
-AskUserQuestion calls --- without picking one in either case --- surfaced
-that Ritesh wanted the more invasive keystroke-level version *and* SSE over
-the WebSocket ADR 1 had already named, neither of which I'd have guessed
-right by defaulting to "pick the most plausible reading and proceed."
-Lesson: when a request names a feature but not its exact shape, and the
-shape is itself a multi-user decision, the fix isn't a better guess --- it's
-turning the guess into an explicit choice before any code exists. Written
-into CLAUDE.md itself (the commit above) so this is a standing move the next
-session takes too, not something that only happened because I was asked
-twice in one session.
+- **Where it landed:** CLAUDE.md "Ritesh writes the prose" and the `[TK]` convention.
+- **Record:** Repo for the scaffold; my recall for how I answered.
+- **Course lesson:** [Week 8, “what would make it good?”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-8/#/good-not-features): ask that instead of “what should it do?”; and [Week 8, “is it any good?”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-8/#/is-it-any-good): the answer is about those people and that use.
+- **For PROCESS.md:** Medium. The README is being rewritten for the store; use only as the origin of the interview-then-scaffold method.
 
-## `pkill -f "tsx src/server/index.ts"` doesn't reliably kill the dev server, and a stale one fakes a passing mutation check
+## I caught a backwards tilt by looking at it, and the same kind of bug became one rule
 
-[`ae9a0cd`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/ae9a0cd)
+**Commits:** [`2ed2c7a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/2ed2c7a), [`a3b8070`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a3b8070), [`df52978`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/df52978), [`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff)
 
-Building the live-preview SSE feature, I edited `src/server/lib/drafts.ts` to
-add a deliberate mutation (dropping `bcc` from the live-preview broadcast
-audience, per the mutation-check skill), restarted with
-`pkill -f "tsx src/server/index.ts"; pnpm start &`, and reran the spec --- it
-passed clean, which should have been alarming on its own (a real bug in the
-code should fail a test written specifically to catch it). The `pkill`
-pattern didn't match anything (`tsx` execs into a bare `node` process that
-`lsof -i :8080` shows as `COMMAND node` with no visible args), so it never
-killed the old process; `pnpm start &` then hit `EADDRINUSE` and exited
-silently into its own log file I hadn't checked, leaving the *original*
-(pre-mutation, then later also post-revert) server still answering
-requests the whole time. I only caught it because a later bcc-only manual
-`curl`/`fetch` check against what I believed was the freshly-mutated server
-still delivered the preview --- the one result that shouldn't have been
-possible if the mutation were actually live. Lesson: after any
-"kill the dev server and restart" step, confirm the restart actually
-happened --- `lsof -ti :8080` (not `pkill -f` on the launch command string)
-for the PID, kill that PID directly, re-check the port is free, *then*
-start, and read the startup log for `EADDRINUSE` before trusting that a
-subsequent test run reflects the code on disk. A green (or red) result
-against a stale process is worse than no result, since it looks identical
-to a real one.
+In one session three different things had a rotation or offset the wrong way round. I caught the phone-lean tilt live, by looking at it; the agent had only checked a side render. After the third, the shape went into CLAUDE.md as one standing line: a rotation, heading or camera sign that looks right on a read-through is not evidence, so render it or write a test that fails against the old code first.
 
-## Interviewing for "what good means" surfaced a real framing gap I'd have papered over
+- **Where it landed:** CLAUDE.md "Known gotchas" (`8d20aff`).
+- **Record:** Repo for commits and the rule; my recall for the one I caught.
+- **Course lesson:** [Week 5, “ask for the artefact”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/): “the screenshot, the console, the response body, the exit code.” Also [Week 1, “done!” is a claim, not a fact](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-1/).
+- **For PROCESS.md:** Strong. The same bug three times, then a rule. Not yet in PROCESS.md.
 
-[`3284399`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/3284399)
+## I had a real photo of the phone and could see the agent's design from web sources was wrong
 
-Asked to help define "good" for the README, I used the week 8 lecture's own
-framework (function / quality of execution / differentiation from the
-median) and asked one question at a time instead of drafting a definition
-and asking Ritesh to react to it. Two of the three came back fast and
-specific (quality of execution: buys the transparency pitch first, only
-gradually clocks the horror; differentiation: no villain, it's the culture's
-own stated values applied with total consistency) --- but the first one,
-"who is this actually for," got an answer about the company's culture, not
-a specific persona, and I didn't push past that before moving on. The
-scaffold I wrote (structure/fact-list/a placeholder marker, not finished prose, per
-CLAUDE.md) correctly left that one gap marked rather than inventing a persona to
-fill the gap --- but if I'd been drafting instead of interviewing, "a young
-employee at a transparency-first startup" is exactly the kind of plausible-
-sounding filler I'd have written in without noticing it was never actually
-answered. Lesson: when interviewing for a definition that'll anchor later
-decisions (this one anchors a C9 grading criterion), an unanswered question
-needs to stay visibly unanswered, not get smoothed over by my own
-next-most-plausible guess just because the conversation moved on.
+**Commits:** [`255ce19`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/255ce19)
 
-## A rotation or heading sign is wrong in a way that reading the code won't catch — three separate times in one session
+The agent built the camera layout of a new phone from several web sources that agreed. I had an actual marketing photo of the real device and could see immediately that it was wrong; the sources were repeating a pre-launch leak. What had been built was thrown away. [TK: confirm it was rebuilt, and the commit.]
 
-[`2ed2c7a`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/2ed2c7a),
-[`a3b8070`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a3b8070),
-[`df52978`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/df52978)
+The rule written down was that a physical-layout claim is provisional until it is checked against a photo, and that the agent says so instead of reporting it as settled.
 
-Three unrelated bugs this session were the same shape: a rotation or offset
-sign that was backwards from what the surrounding reasoning assumed — the
-idle-staff heading default (pointed into the store instead of toward the
-front), the phone-lean tilt (flipped once, Ritesh caught it live, I'd only
-checked a side-profile render that I misjudged), and the inspect camera's
-pitch convention (a "negative = look down" value fed into a formula where
-positive meant "camera above the target," so the default camera ended up
-below table height looking up — the opposite of what the code comment next
-to it claimed). In every case the math *looked* right on a read-through; the
-only thing that caught it was an actual rendered check — a live screenshot,
-or (for the staff heading) a test that was made to fail against the old code
-first. Lesson: for anything involving a sign on a rotation, a heading, or a
-camera offset, "I reasoned through the trig and it should point the right
-way" is not evidence. The only acceptable check is rendering it and looking,
-and for the kind of thing a human will eyeball live anyway (device tilt, NPC
-facing), a quick screenshot before calling it done would have caught two of
-these three before Ritesh had to. Written into CLAUDE.md's "Known gotchas"
-([`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff))
-once the same shape (same bug, three times in one session) made it worth a
-standing line rather than three separate memories.
+- **Where it landed:** `references/product-line.md` sourcing note.
+- **Record:** Repo for the commit and note; my recall for the moment I saw the photo.
+- **Course lesson:** [Week 1, “done!” is a claim, not a fact](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-1/), and [Week 5, “never assume it works until it has run”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/): the agreement between web sources was a claim, and the photo was the check.
+- **For PROCESS.md:** Strong. Thrown-away work plus a rule, with a clear "how I knew". Not yet in PROCESS.md.
 
-## Confident, multi-source web coverage about a physical design detail can still be flat wrong
+## The same visual fix had to be asked for twice, and a rendered image settled it
 
-[`255ce19`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/255ce19)
+**Commits:** [`0f564d4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/0f564d4), [`9b74a21`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9b74a21), [`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff)
 
-Building the iPhone 18 Pro's camera plateau, I searched for its physical
-layout since Apple's own spec pages only list lens specs, not arrangement.
-Multiple independent-looking sources (MacRumors' pre-launch leak roundup,
-corroborating coverage) agreed: a full-width camera bar, replacing the
-square plateau. I built exactly that, geometry and all, and reported it
-confidently. It was wrong — not a hallucination, a real pre-launch leak that
-didn't match the final shipped design, which Ritesh could see immediately
-because he had an actual marketing photo of the real device. The text
-sources weren't lying; they were reporting rumors that turned out false,
-and nothing about their phrasing flagged that uncertainty for me to catch.
-Lesson: for a physical-appearance claim specifically (shape, layout,
-arrangement — as opposed to a spec like a price or a chip name, which a
-retailer's own page states as fact), multi-source text corroboration is not
-the same bar as verification, because the sources can all be repeating the
-same unconfirmed leak. The fix isn't "search harder" — it's treating any
-layout claim as provisional until checked against an actual photo, and
-saying so out loud rather than reporting it as settled. (Written into
-`references/product-line.md`'s sourcing note for the rest of the product-line
-build, so later sessions building other families don't repeat it.)
+Face marks were poking through the head. The agent reported fixes it could not check, because its browser tool had WebGL off. [TK: confirm I asked twice.] The second request led it to render the scene to an image, and that showed marks floating off some faces, the opposite of the original problem. The rule in CLAUDE.md is to check both directions of any poke-through or overlap defect.
 
-## "It's fixed" about a visual defect means nothing until something renders it, and one detector only checks one direction of the defect
+- **Where it landed:** CLAUDE.md "Known gotchas".
+- **Record:** Repo for commits and rule; my recall for the two requests.
+- **Course lesson:** [Week 5, “agentic manual testing”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/): drive the running artefact and report what you saw; and “ask for the artefact: the screenshot...”.
+- **For PROCESS.md:** Strong. A repeated correction that ended in a harness rule.
 
-[`0f564d4`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/0f564d4),
-[`9b74a21`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9b74a21)
+## I dictated the conversation model first and had the agent answer with a picture and defaults
 
-Asked twice to stop face marks (mouth, brows) from having polygons poke
-through them, the assistant reported fixes it could not see: its browser tool
-has WebGL off, so every "done" was reasoning from numbers. The turn that
-changed this was the assistant finding headless Chrome with SwiftShader could
-render the stage to a PNG. That immediately showed a defect the earlier
-"checks" had missed: marks floating 2 to 3 cm off the face on some people. The
-first detector measured "mark hidden behind the head surface" (404 cells
-before the fix, 0 after) and passed while marks hovered in front of it; the
-cause was a probe footprint tall enough to reach the nose's lower slope, so
-the mouth was seated against the nose tip. Lesson: for "X pokes through Y"
-ask for the opposite failure too (X floats off Y) and for a render the agent
-actually looked at, not a green number; a metric for only one direction of a
-defect passes the other. Written into CLAUDE.md's "Known gotchas"
-([`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff))
-as a general rule for any future poke-through/overlap check, not just this
-one detector.
+**Commits:** [`236e47e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/236e47e), [`d389a76`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/d389a76)
 
-## Dictating the model first and getting a mockup plus numbered defaults back caught two wrong assumptions before any code
+Redesigning the conversation model, I described it in one long unstructured message and told the agent to listen and clarify only at the end. It came back with a mockup and eight numbered questions, each with a default. Two defaults were wrong. It proposed free text between two human players and I ruled out free text entirely. And it treated "device" as the model alone; the answer is both, with questions narrowing to model plus storage plus colour and demos by model only.
 
-[`236e47e`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/236e47e),
-[`d389a76`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/d389a76)
+A picture with a default per question is cheaper to correct than code, and answering "defaults" to the right ones takes seconds. The settled list went into a doc so the next session loads it.
 
-Redesigning the conversation model, I described it in one long unstructured
-message and told the assistant to listen and clarify only at the end. It
-answered with a static HTML mockup and eight numbered questions, each with a
-default. Two of its defaults were wrong: it proposed free text between two
-human players (I ruled out free text entirely, since it can't be tied to
-preconditions and effects), and it treated "device" as the model alone (the
-answer is both: questions narrow to model + storage + colour, while demos are
-by model only). Both would have been built into the POC had the assistant
-picked a reading and proceeded. Lesson (week 2, argue with the brief before
-it builds, and say what was assumed): a picture plus a default per question
-is cheaper to correct than code, and answering "defaults" to the ones that are
-right takes seconds. The settled list went into
-`docs/conversation-model/decisions.md` so the next session loads it.
+- **Where it landed:** `docs/conversation-model/decisions.md`.
+- **Record:** Repo for the doc and commits; my recall for the two corrections.
+- **Course lesson:** [Week 2, “make claude argue with you”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-2/): “what's ambiguous here, what did you assume, what have we missed?”
+- **For PROCESS.md:** Strong. A cheap picture beat code, and the settled list is in the repo.
 
-## Restating the no-invented-facts rule in each subagent prompt made all three flag the same gap instead of filling it
+## I read one played transcript myself and found what 400 green simulated runs missed
 
-[`a0a8149`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a0a8149)
+**Commits:** [`97da377`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/97da377)
 
-Round 1 of the question-bank loop used three parallel subagents, one scenario
-each. A subagent sees only its delegation message, so each prompt carried the
-rules in full: facts only from `devices.md`, anything else UNKNOWN, menus
-only, and a required "assumptions I made" section. All three independently
-declined to state the iPhone 18 Pro Max's exact prices (the sheet says
-a placeholder) and flagged the $2,299 figure they needed as an inference; A and C
-also refused "long battery" and "water resistant" claims. Lesson (week 9:
-a subagent sees only the delegation message, so restate every rule you want
-followed): the required assumptions section is what made the gap visible to
-me at review, rather than buried in plausible prose. The gap list ("NEEDS
-DATA") now drives what the Apple scrape has to cover.
+I pasted a conversation from the proof of concept and asked whether the agent could see what was wrong. Staff had shown the same phone three times in a row after the customer said they liked it, and had said "Sure thing." before "Nothing fits...". The simulation specs had all passed because they never said not to show the same phone twice.
 
-## A seeded NPC-vs-NPC simulation found four engine gaps that unit tests and hand-written replays had not
+Two new specs now reproduce it: they go red on seeds 8 and 9 with the old rule put back. I take away the habit of adding the spec before the fix.
 
-[`739eb14`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/739eb14),
-[`30cdf64`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/30cdf64)
+- **Where it landed:** Two specs in `spec/` for repeated demos and ordering.
+- **Record:** Repo: the transcript, the specs and the commit.
+- **Course lesson:** [Week 5, “agentic manual testing”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/): drive the running artefact yourself and report what you saw, then turn each finding into a check; plus [Week 3, “one well-aimed failing test will reorganise an agent’s whole approach”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-3/).
+- **For PROCESS.md:** Strong. A human reading found what the automation could not, and it ended in a check. Not yet in PROCESS.md.
 
-I wrote the turn engine and 17 unit tests against it, all green. The first
-400-run NPC-vs-NPC simulation then failed in four distinct ways: a crash
-when a question was reopened with no model fixed, staff with no way forward
-once questions and demos ran out (the engine had no "recommend" move, though
-the transcripts did), a relaxed requirement leaving its question marked as
-answered so staff could not ask it again, and reopens offering menus of dead
-ends on an empty pool. None of these were visible from my own cases, because
-I only wrote the paths I had imagined. The replays of the 11 transcripts, run
-by a separate agent, found a different set (a named model hiding its sibling
-models; throw-backs not offered at the confirm step). Lesson (week 3,
-backpressure: one well-aimed failing test reorganises the agent's whole
-approach, and a sensor must be fast, automatic and trustworthy): the cheap
-seeded simulation was the sensor that paid, and the invariants it checks (no
-side without a legal move, every conversation ends, no sale to someone who
-cannot be satisfied) were worth writing before the NPCs were any good.
+## I suggested automating my hand review, and the automated reviewer was checked before it was trusted
 
-## A human reading one played transcript found a loop that 400 green simulated runs had not
+**Commits:** [`1be68cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/1be68cf), [`c6b9987`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/c6b9987)
 
-[`97da377`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/97da377)
+I had been reading generated conversations by hand. I suggested automating it: generate many NPC-vs-NPC conversations with the menus logged and have a Haiku agent read them. The first pass reported 38 patterns, five were spot-checked against the transcripts and all held. The second pass, on fresh seeds, caught two blockers the fixes themselves had just introduced. [TK: was the spot-check my instruction?]
 
-Ritesh pasted a conversation from the proof of concept and asked whether I
-could see what was wrong. Staff had shown the same phone (the Duo) three times
-in a row after the customer said they liked it, and had said "Sure thing."
-before "Nothing fits...". My simulation specs passed because they checked
-structure (nobody stranded, every conversation ends, no repeated question) and
-never said "do not show the same phone twice"; the engine remembered demos the
-customer declined but not ones it had given. Lesson (week 5, agentic manual
-testing: drive the running thing yourself, then turn each finding into a
-permanent failing-first test): the seeded sim is only as good as the
-invariants somebody thought to write, and reading real transcripts is how the
-missing ones turn up. Two new specs now reproduce it (they go red on seeds 8
-and 9 with the old rule restored), and the habit going forward is to add the
-spec before the fix.
+- **Where it landed:** The review reports and the specs that pin each finding.
+- **Record:** Repo for reports and specs; my recall for the decision to automate.
+- **Course lesson:** [Week 9, “when to use a subagent”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/subagent-fit): “a review: a fresh context reviews better than one that wrote the code”; and [Week 5, “never assume it works until it has run”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/) for the spot-checks.
+- **For PROCESS.md:** Strong. Delegation with verification, both halves in the repo.
 
-## An automated reviewer on fresh seeds caught problems my own fixes introduced, and it needed checking before I trusted it
+## I asked for a prior-art check partway through the build
 
-[`1be68cf`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/1be68cf),
-[`c6b9987`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/c6b9987)
+**Commits:** [`9f7fd78`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9f7fd78)
 
-Ritesh suggested automating what he had been doing by hand: generate many
-NPC-vs-NPC conversations with the menus logged, and have a Haiku agent read
-them. The first pass (40 conversations) reported 38 patterns; I spot-checked
-five against the transcripts and all held, rejected three as already-decided,
-and fixed the rest. The second pass, on different seeds with a list of what
-was decided, reported 25 patterns and one regression, and two of its three
-blockers were things I had just introduced: my "of the ones we've been looking
-at" wording was a false claim when nothing had been narrowed, and my fix for
-"it" had left a phone that elimination alone had reduced to one being
-confirmed as though the customer had chosen it. Lesson (week 9: a fresh-context
-reviewer beats the writer; and week 5: do not trust a report you have not
-checked): the reviewer is cheap and finds what the writer cannot see, but it
-is noisy, so every claim gets a spot-check and every fix gets re-reviewed on
-seeds it has not seen. The review reports and the specs that pin each
-finding are in the repo.
+Partway through extracting the engine's generic core, someone joked that it sounded like Akinator and asked for a prior-art check before more build time was spent. [TK: confirm the joke and the request were mine.] The research found that no single library did what the design does, but that each half of it is a named, citable technique, and the finding went into `decisions.md` so a "why not use X" question at a crit has an answer.
 
-## Asking "does this already exist" mid-build, not just before the stack choice
+- **Where it landed:** `docs/conversation-model/decisions.md`.
+- **Record:** Repo for the commit and doc; my recall for the request.
+- **Course lesson:** [Week 8, “record-worthy decisions”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-8/#/what-earns-a-record): decisions that are “expensive to reverse, or that someone will ask about later”. The lecture frames this at the start; asking mid-build is my extension.
+- **For PROCESS.md:** Strong. A justified call with a cited record: why this design beat the obvious alternative.
 
-[`9f7fd78`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9f7fd78)
+## I said the conversation was too linear, then said patching it was not enough
 
-Partway through extracting the talk engine's generic core (phone and laptop scenes had just been
-confirmed to share the same shape), I half-joked that the whole thing was starting to sound like
-Akinator and asked for a prior-art check before sinking more build time into the extraction.
-The research found that Akinator itself is a weak analogue (Bayesian soft-scoring over a
-crowd-sourced database, no real hard-elimination step), but that each half of the engine's design
--- weighting a question by how much it narrows the pool, and eliminating candidates with hard
-constraints -- is independently a named, citable technique (expected-information-gain question
-selection from 20-questions theory; CSP-based product-configurator design), and that the specific
-combination is a named research area (constraint-based conversational recommender systems) with no
-single existing library doing it end to end. Lesson (week 8: lay out options and write a decision
-record before a choice that is expensive to reverse, not only at the stack-selection point): the
-lecture's framing is usually applied once, at the start of a subsystem, but a build worth multiple
-sessions is worth re-checking against prior art partway through too, once its actual shape has
-become clear enough to search for -- it is cheaper to ask after two scenes exist than after a third
-is built on an unexamined assumption. The finding is recorded in
-`docs/conversation-model/decisions.md` so it can be cited in PROCESS.md if a "why not use X"
-question comes up at a crit.
+**Commits:** [`a1fb3b3`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a1fb3b3)
 
-## The events table recorded everything, and `flyctl logs` still showed nothing
+After playing the customer side I said the flow was "way too linear", and that a fixed menu tree, however many branches, was "only like 1% of the possibilities." The first fixes were patches. Then I said they were still patching instances of a conversation that marched through one fixed question after another, "not fixing the underlying structure of how this can be a non linear conversation that can go in any order." The structure was replaced, not tuned.
 
-[`a60962b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a60962b)
+I kept pushing past the patch. [TK: how I knew the new structure was right.]
 
-Every state change already wrote an `events` row, so the app looked well logged, but the only stdout line was "listening on". Crit 10 reads logs with `flyctl logs`, which shows stdout and never the SQLite file. Lesson (week 10 tl;dr: "logs help only when a command the agent can run prints them"): a record nobody can read with the command in hand is not yet a log. The fix put one line per event on stdout beside the existing insert, and the check was two real WebSocket clients plus a search of the output for every session token.
+- **Where it landed:** SCOPE.md D43 and its follow-ups (my quotes are from there).
+- **Record:** Repo for the commit and the SCOPE text dated 2026-10-14; my recall for what I did between the two complaints.
+- **Course lesson:** [Week 5, “agentic manual testing”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/): I drove the running thing myself and reported what I saw (“way too linear”) instead of reading code. Closest match; the lecture does not cover replacing a structure.
+- **For PROCESS.md:** Strong, and new since crit 9. It is the same habit as Assignment 1's "refusing a one-off fix", so say it carried over, in one sentence, instead of retelling that story.
 
-## The scope moved, so the README and CLAUDE.md were still describing a store with a queue
+## I threw away the intent-to-talk handshake after watching everyone get stuck behind one greeting
 
-[TK: commit of the hygiene pass; none yet]
+**Commits:** [`a494c2b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a494c2b), [`21d4d97`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/21d4d97), [`eb65c80`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/eb65c80)
 
-On 2026-11-07 I said that a real Apple Store has no queue: you browse until staff find you, and payment happens on the spot. Our README, CLAUDE.md and SCOPE.md all still said "the Genius Bar queue is the shared state". Nothing had failed, since the code and the docs had drifted apart quietly, so I decided to do a hygiene check of README.md and CLAUDE.md against what the app now does, removing outdated assumptions and adding missing ones. Lesson (week 6: a correction written into the harness is permanent, then prune): writing a rule into the harness is only half of compounding. When the idea changes, the old rules keep being read every turn and now point the agent the wrong way, and the README is marked against them. So a scope change gets a hygiene pass over the harness files in the same sitting, not at the deadline. (Draft written by Claude at Ritesh's request; Ritesh to check and reword. Commit hash still to add.)
+After crit 10, where everyone was stuck behind one greeting and "Maya wants to talk" floated over every head, I decided talking has no handshake at all (SCOPE D46, 2026-10-21, superseding the 2026-10-19 decision). Pressing E at a free person opens the conversation at once, at a busy one it says they are with someone else, and nothing queues. The handshake had only just been built; the removal came two days after the decision it replaced. [TK: what I saw when I re-ran it.]
+
+- **Where it landed:** SCOPE D46, the removal commit, and a `greeter-live` spec (`eb65c80`).
+- **Record:** Repo for D46 and the commits; my recall for the crit observation.
+- **Course lesson:** [Week 10, “a multi-user app”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-10/#/multi-user-definition): “telling people apart, deciding what each may do, and handling two of them at once”, tested with “two Chrome profiles”. The handshake only broke with several people in the room.
+- **For PROCESS.md:** Strong. "Judgement visible in what was thrown away" is a named top-band descriptor.
+
+## Crit 10 reads logs with a command, so I made the events readable by that command
+
+**Commits:** [`a60962b`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a60962b)
+
+Crit 10 asks for who-did-what narrated from the logs, and the logs are read with `flyctl logs`. Every state change already wrote an `events` row, but nothing reached the output that command shows. Following the week 10 point that logs help only when a command the agent can run prints them, I had every event print a line, then checked it with two real WebSocket clients: the log alone said who joined, who was refused the back room and who left, and no session token appeared. A later run showed one notice logged 140 times and an error with no line, so repeats are folded and errors name the user (`73bb0a0`, `c5fbeff`).
+
+- **Where it landed:** The logging code, `73bb0a0`, `c5fbeff` and the ADR 3 addendum `52318d0`.
+- **Record:** Repo only (this is already in my PROCESS.md in my own words).
+- **Course lesson:** [Week 10, “what to log”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-10/#/what-to-log): “each event that matters: who, what, when, one line each”; never secrets or tokens.
+- **For PROCESS.md:** **Already used** as moment 4 of PROCESS.md. Don't repeat it.
+
+## I said a real Apple Store has no queue, and had the files that said otherwise checked
+
+**Commits:** [`9676dc0`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9676dc0)
+
+On 2026-11-07 I said that a real Apple Store has no queue: you browse until staff find you, and payment is taken on the spot. Our README, CLAUDE.md and SCOPE.md still said "the Genius Bar queue is the shared state". Nothing had failed; the documents had drifted from what I now meant, and the README is marked against them. So before scoping anything I asked for a hygiene check of README.md and CLAUDE.md to remove outdated assumptions and add missing ones.
+
+I then refined it: there is still an internal queue with staff as the resource, but staff approach the customer rather than customers lining up, and a real user behind the screen is always offered a customer before a CPU. That became SCOPE D47.
+
+- **Where it landed:** SCOPE D47 and a rewritten idea in CLAUDE.md (that commit), then D48 to D52.
+- **Record:** Repo for the commit; my recall for the wording of what I said.
+- **Course lesson:** [Week 6, “the compound step: write what you learned into the harness”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-6/), and “what compounding costs: every rule you compound in is context you pay” (the reason to prune); see also [Week 4, “you add it because the work kept failing”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-4/).
+- **For PROCESS.md:** Strong, and new since crit 9: the scope moved, and the harness moved with it in the same sitting.
+
+## I asked for the check that a rule is followed at the same time as the rule
+
+**Commits:** [`e97c1ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/e97c1ac), [`9676dc0`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9676dc0)
+
+While describing the parallel-agent workflow I added: "we need some kind of scheduled audits (or even self audits) to make sure this workflow is actually being followed and it not, it should be made more direct in the claude md." I asked for the rule and for a way to notice when it is not followed, together, instead of waiting for the first drift.
+
+That became an audit script, an `/audit-workflow` skill and a "Workflow" section in CLAUDE.md. [TK: what the first run found, from my memory; the audit log is not committed.]
+
+- **Where it landed:** `scripts/audit-workflow.sh`, the `/audit-workflow` skill and CLAUDE.md "Workflow".
+- **Record:** Repo for the files; my recall for what it found.
+- **Course lesson:** [Week 3, “guides and sensors”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-3/): guides steer before doing, sensors measure what was generated; the audit script is a sensor on the workflow. And [Week 3, “what makes a sensor worth wiring in”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-3/): specific, fast, automatic, trustworthy.
+- **For PROCESS.md:** Strong. A new harness-level move.
+
+## I named the failure I feared, and a one-minute test found one I had not named
+
+**Commits:** [`e97c1ac`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/e97c1ac)
+
+In the workflow brief I said "it is very important that agents don't overwrite each other's work when working in parallel, so it may be worthwhile using worktrees/branches." That put worktrees into the design. I agreed to a one-minute test before relying on them, and it showed that a worktree is taken from the committed work, so my uncommitted CLAUDE.md and SCOPE edits would have been invisible to any builder. That changed the order: commit the harness first, and work on `integration` so `main`, which deploys, stays untouched.
+
+- **Where it landed:** A wave precondition (commit first), the harness commits on `integration`, and an audit check for uncommitted paths.
+- **Record:** Repo for the checks; my recall for the test result.
+- **Course lesson:** [Week 9, “worktrees”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/parallel-worktrees): “two subagents editing one checkout overwrite each other; a git worktree gives each its own checkout”. Also [Week 9, “reading: run several at once; writing: one worktree each”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/reads-and-writes).
+- **For PROCESS.md:** Medium to strong. A cheap test that found a failure I had not named.
+
+## I noticed the cost of talking to the slow agent, and split talking from doing
+
+**Commits:** [`8118e74`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8118e74)
+
+After the orchestrator was set to run on ultracode, I said "if i try to talk with the orchestrator running ultracode everytime, it takes a lot of time for it to respond", and that it might work better with prompts that had been refined first. We added a faster `interface` agent for me to talk to, and the orchestrator runs separately. [TK: how it felt in use; it had not been run when this was written.]
+
+- **Where it landed:** `.claude/agents/interface.md`, `/brief`, `/status`.
+- **Record:** Repo for the files; my recall for how it felt.
+- **Course lesson:** [Week 9, “Ben uses… different models”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/ben-uses-subagents): “default subagents to sonnet … and reserve the session's top model for the genuinely hard subtasks”; and [Week 9, “subagent costs”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/subagent-costs) (about 15x the tokens). This is a slide, not one of the two listed lessons.
+- **For PROCESS.md:** Medium. A good design call; strong once I can say how I knew it helped.
+
+## I asked "does it know about our other files?" after the build, not before
+
+**Commits:** [TK: commit of the context-pack edits; none yet]
+
+Once the workflow existed I asked: "does this workflow know to interact ewith other files in this project like adr etc". It mostly did not: the agents named CLAUDE.md and SCOPE, and only one named an ADR. I only found out because I asked. The fix gave every agent a rule to find context through `docs/INDEX.md`, added a `needs-adr` label, and made the steward scaffold the ADR when a decision is expensive to reverse.
+
+- **Where it landed:** A shared context rule in all agents, the brief's READ FIRST line, the `needs-adr` label (not yet committed).
+- **Record:** Repo once committed; my recall for the question.
+- **Course lesson:** [Week 9, “two context windows”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/subagent-context): the subagent knows only what the delegation message tells it; and [Week 8, “with an agent”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-8/#/adr-with-an-agent): put in CLAUDE.md “Read them before changing the stack, storage or data model.”
+- **For PROCESS.md:** Medium. New and harness-level. Needs its commit before it can be cited.
+
+# Part 2: findings recorded in the agent's voice
+
+The earlier entries below were written by the agent about its own work, in the first person, and they contain technical detail I never mentioned. I have not claimed them as mine. Each is kept as one line so the facts are not lost; if I did something in one of these (a decision, a catch, an instruction), I add it from memory and move it up to Part 1, and otherwise it stays out of `PROCESS.md`.
+
+| Finding | Commit | Where it landed | Course lesson | If it was me, add |
+|---|---|---|---|---|
+| A banner check that reloaded the page proved nothing (verify by navigating like a user). Seen-era | [`a4c671f`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a4c671f) | nowhere | [Week 5, agentic manual testing](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/) | [TK] |
+| A failing piped test of an interactive tool was the test's fault; check through a real terminal | [`1ae8e01`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/1ae8e01) | CLAUDE.md gotchas | [Week 5, agentic manual testing](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-5/) | [TK: who proposed the check] |
+| A false "it isn't built" claim about staff handoff, caught when the fix needed reading the code; rule: search the whole subsystem before a negative claim | [`9e511ca`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/9e511ca), [`e3ab3cb`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/e3ab3cb), [`8d20aff`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/8d20aff) | CLAUDE.md "Don't invent". **Already in PROCESS.md moment 5**, in my own words | [Week 1, “done!” is a claim](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-1/) | [TK: how I caught it, and whether I asked for the audit pass] |
+| Trailing slash on a mounted sub-app route 404s. Seen-era stack gotcha | none | nowhere | [Week 7, the field name is a contract](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-7/) | skip |
+| A delete order bug with a foreign key child, found only on one path. Seen-era stack gotcha | none | nowhere | [Week 7, “what survives?”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-7/) | skip |
+| Two tabs of one browser profile are not two users. Seen-era | none | CLAUDE.md "Verification": a second, genuinely different profile; still drives `/feel-check` | [Week 10, “two Chrome profiles”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-10/#/multi-user-definition) | [TK: how I ran into it] |
+| A manual database edit left an orphan row and crash-looped the Seen app. Seen-era stack gotcha | none | nowhere | [Week 10, “what to log”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-10/#/what-to-log): paste the lines around the failure | skip |
+| A stale dev server made a mutation check look like it passed. Seen-era | [`ae9a0cd`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/ae9a0cd) | CLAUDE.md gotchas (stop every dev server, check `lsof`) | [Week 3, “what makes a sensor worth wiring in”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-3/): trustworthy | [TK] |
+| Three parallel subagents were each given the no-invented-facts rule and asked to list their assumptions, and all three flagged the same gap | [`a0a8149`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/a0a8149) | the "NEEDS DATA" list | [Week 9, “two context windows”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-9/#/subagent-context) | [TK: did I require the assumptions section?] |
+| A seeded NPC-vs-NPC simulation of 400 runs failed four ways that 17 green unit tests had not | [`739eb14`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/739eb14), [`30cdf64`](https://github.com/comp4020-agentic-coding-studio/comp4020-final-riteshsivaraman/commit/30cdf64) | invariants in the talk specs | [Week 3, “one well-aimed failing test”](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/lectures/week-3/) | [TK: who asked for the simulation?] |
+
+## Carried over from Assignments 1 and 2 (the harness compounds; don't retell these)
+
+The final-project brief says `CLAUDE.md` is "carried forward and grown from one deliverable to the next". Rules that started in my earlier PROCESS.md files, and where they stand in this repo's harness:
+
+| From | Commit | The rule | In this `CLAUDE.md` now? |
+|---|---|---|---|
+| Ass1 "Harness before page" | [`6073ba3`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-riteshsivaraman/commit/6073ba3) | Sensors, layering and design rules go in before any markup | Spirit kept: "Cut the feature, never the harness" and the sensor admission bar |
+| Ass1 "Refusing a one-off fix" | [`9698457`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-riteshsivaraman/commit/9698457), [`77ca492`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-riteshsivaraman/commit/77ca492) | Stills-only sensors measure nothing about motion; add a multi-frame one | Idea kept as "Feel, not just function"; the stills sentence was pruned on 2026-11-07 |
+| Ass1 "Making the protocol repeatable" | [`9d3b1f5`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-riteshsivaraman/commit/9d3b1f5) | The defect loop (evidence, name the class, red sensor, then fix) | Yes: "The defect loop" |
+| Ass2 "vague approvals" | [`06c6f7c`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass2-riteshsivaraman/commit/06c6f7c) | A large approval is read back, a vague constraint is quantified first, review is spoken not filed | **No.** Not in this repo's `CLAUDE.md`. [TK: do I want it back?] |
+| Ass2 "delegate, don't inline" | [`2a9d21a`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass2-riteshsivaraman/commit/2a9d21a) | After 154.5k of 200k tokens went on small inline fixes, the test is "does this need my judgement while it's written" | **No**, and it matters more now that builders run in parallel. The Workflow section covers who builds, not this test. [TK] |
+
+If I want the last two back it is one line each in `CLAUDE.md` "Workflow", written by me; the point for PROCESS.md is that the harness grew across deliverables, which is exactly what the markers read for.

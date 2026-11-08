@@ -11,6 +11,8 @@ decision or working state — an ADR, `WORKLOG.md`, `LEARNINGS.md`, `CUTS.md`,
 anything in `spec/`, `PROCESS.md` — add a one-line pointer to it here, in
 this section, when it's created. A fresh agent session should be able to
 find every resource by reading this file, not by discovering it mid-task.
+- `docs/process-interview.md` — Ritesh's interview answers (2026-11-08) for
+  the PROCESS.md TKs and moments: gists, each marked recall or repo-backed.
 - `PROCESS.md` — the account of how this was built, Ritesh's prose, cites
   commits by hash. Candidate citations as they happen: ADR 1 (stack choice),
   the feel-vs-function verification split and why, the timer/catch-up design
@@ -33,7 +35,11 @@ find every resource by reading this file, not by discovering it mid-task.
   "Atrium Stair") is represented in `Pose`, the protocol, persistence and
   `clampToWalkable`. Options laid out, nothing picked yet — read before
   touching `Pose`, `FLOOR`, `world.ts` or `presence.ts`'s move handling.
-- `docs/adr/0009-staff-assignment-priority.md` — ADR 9 (draft scaffold): real staff users are offered waiting customers before CPUs, nearest-free tie-break, no specialty matching for v1 (SCOPE D47, D48, D53, D54, issue #1). Consequences and costs are `[TK]`. Read before touching staff assignment.
+- `docs/adr/0009-staff-assignment-priority.md` — ADR 9 (draft; addendum 2026-11-09 on NPC auto-claim and the 30 s grace): real staff users are offered waiting customers before CPUs, nearest-free tie-break, no specialty matching for v1 (SCOPE D47, D48, D53, D54, issue #1). Consequences and costs are `[TK]`. Read before touching staff assignment.
+- `CREDITS.md` (repo root; also served at `/CREDITS.md`) — what comes from elsewhere (AI-generated posters and logo, Apple product names, dependency licences) and what notice it needs. Update when an asset or dependency is added.
+- `docs/adr/0011-npc-approaches-and-errands.md` — ADR 11 (draft, by Claude at Ritesh's request): an NPC that walks over or goes on an errand is stored on the customer's `player_state.data` and advanced from the request-driven catch-up; the chat opens only on arrival. Read before touching `settleApproaches` or the repair errand.
+- `docs/adr/0012-genius-bar-repair.md` — ADR 12 (draft, by Claude at Ritesh's request): the Genius Bar repair is a decision-tree `repair` script on the old engine with tickets derived from `events`. Read before changing repair.
+- `docs/adr/0013-tone-on-the-face.md` — ADR 13 (draft, by Claude at Ritesh's request): emotion is the existing tone shown on the face; state is in server memory. Read before changing tone or faces.
 - `docs/adr/0003-conversations-and-player-state.md` — ADR 3 (draft): player state in
   the database, menu conversations, employees online see customers' states. Facts
   filled in, reasoning filled in. Read before touching `visitors`,
