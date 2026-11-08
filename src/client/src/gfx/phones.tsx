@@ -523,11 +523,14 @@ export function PhoneDevice({
       )}
       {kind === "watch" && watch && watchBuilt && (
         <>
-          {/* a low display puck, the band looped over it, case facing out */}
-          <mesh position={[0, 0.006, 0]}>
-            <cylinderGeometry args={[0.042, 0.045, 0.012, 24]} />
-            {std(STAND, 0.5, 0.4)}
-          </mesh>
+          {/* a low display puck, the band looped over it, case facing out —
+              hidden while held, same as the phone's table stand above */}
+          {!held && (
+            <mesh position={[0, 0.006, 0]}>
+              <cylinderGeometry args={[0.042, 0.045, 0.012, 24]} />
+              {std(STAND, 0.5, 0.4)}
+            </mesh>
+          )}
           <group position={[0, 0.012, -WATCH_LOOP_R * 0.35]}>
             <FinishMeshes parts={watchBuilt.parts} />
             <mesh position={[0, WATCH_LOOP_R, watchBuilt.screen.z + 0.0003]} geometry={cached(`watchScreen:${watch.id}`, () => roundedPlane(watchBuilt.screen.w, watchBuilt.screen.h, watchBuilt.screen.r))}>

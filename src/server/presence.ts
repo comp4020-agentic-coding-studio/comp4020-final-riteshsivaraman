@@ -14,6 +14,7 @@ import {
 import { validateProfile, type Kind, type Specialty } from "../shared/profile.ts";
 import type { LookChoice } from "../shared/look.ts";
 import {
+  advancePaymentBeat,
   chooseTurn,
   customersView,
   dutyMessage,
@@ -365,6 +366,10 @@ export function handleConnection(socket: WebSocket): void {
     }
     if (me && message.type === "staff_move" && typeof message.conversationId === "string" && typeof message.actId === "string") {
       deliver(staffMove(serviceCtx(), me.id, message.conversationId, message.actId, typeof message.tone === "string" ? message.tone : "neutral"));
+      return;
+    }
+    if (me && message.type === "payment_advance" && typeof message.conversationId === "string") {
+      deliver(advancePaymentBeat(serviceCtx(), me.id, message.conversationId));
       return;
     }
     if (me && message.type === "talk_close") {

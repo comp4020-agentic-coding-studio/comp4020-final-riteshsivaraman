@@ -168,6 +168,9 @@ export type ClientMessage =
   | { type: "talk_close" }
   // a specialist's move in a conversation: one of the moves offered, in a tone
   | { type: "staff_move"; conversationId: string; actId: string; tone: string }
+  // the staff handheld's own action at the till: advances the payment one
+  // beat (scanned -> total_shown -> tapped), never more than one per request
+  | { type: "payment_advance"; conversationId: string }
   // "let the server catch up": sent while a payment visit or a walk involving
   // you is open, so its beats are checked without a server timer
   | { type: "settle" }
