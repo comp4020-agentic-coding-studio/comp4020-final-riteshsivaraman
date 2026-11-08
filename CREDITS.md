@@ -1,6 +1,6 @@
 ---
 status: draft
-what: What in the store comes from somewhere else, who made it, and what credit or notice it needs. Checked by Claude on 2026-11-09 against the repo and the production dependencies; items marked [TK] could not be established from the record.
+what: What in the store comes from somewhere else, who made it, and what credit or notice it needs. Checked by Claude on 2026-11-09 against the repo and the production dependencies.
 date: 2026-11-09
 ---
 
@@ -13,7 +13,7 @@ Almost everything is made in the code: the building, furniture, people, faces, d
 | What | Where | Made with | Notes |
 |---|---|---|---|
 | Nine wall and lightbox posters | `src/client/public/posters/*.webp` | The course image proxy, model `flux-1.1-pro` (commit `eff4a52`, SCOPE D45) | Prompts asked for no text, logos or brand names. AI-generated: say so wherever the project is presented. |
-| The store's logo (three files) | `src/client/public/brand/*.png`; options in `docs/experiments/logo/` | The course image proxy (commit `5946a20`); which model: [TK] | AI-generated, picked from four options. |
+| The store's logo (three files) | `src/client/public/brand/*.png`; options in `docs/experiments/logo/` | Claude, through the course image proxy (commit `5946a20`); per Ritesh's recall, exact image model not recorded | AI-generated, picked from four options. |
 
 ## Real-world names and data
 
