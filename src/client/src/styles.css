@@ -1212,3 +1212,5 @@ kbd {
 .touch .sound-toggle { padding: 6px 10px; }
 .talk-leave-btn { border: 0; font: inherit; font-size: 13px; color: #fff; cursor: pointer; padding: 6px 14px; top: -20px; }
 .touch .talk .talk-choices button, .touch .staff-talk button { min-height: 44px; }
+
+.entry-brand { font-weight: 800; }
