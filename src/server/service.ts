@@ -221,10 +221,23 @@ interface TalkConvData {
 // Paying (Ritesh, 2026-10-19, reworked 2026-10-21): the sale is made in one chat,
 // which ends; an order then carries it (orders below) until the specialist,
 // holding the bag, finds the customer and a short payment conversation opens.
+// Issue #2: the payment itself is a three-beat handheld state machine --
+// scanned -> total_shown -> tapped -- each beat a stored field advanced only
+// by an explicit request (CLAUDE.md: no timers). `paid` is not a `beat` value:
+// it is the order reaching stage `done`, which only `handleCheckoutChoice`
+// may do, and only once `beat` has reached "tapped".
+type PaymentBeat = "scanned" | "total_shown" | "tapped";
 interface Checkout {
   stage: "pay";
   sale: { name: string; colour: string; storage: string; price: number };
+  beat: PaymentBeat;
 }
+
+const NEXT_BEAT: Record<PaymentBeat, PaymentBeat | undefined> = {
+  scanned: "total_shown",
+  total_shown: "tapped",
+  tapped: undefined,
+};
 
 type AnyConvData = ConvData | TalkConvData;
 const isTalkData = (d: AnyConvData): d is TalkConvData => (d as TalkConvData).engine === "talk";
@@ -1529,7 +1542,7 @@ function openPay(ctx: Ctx, r: IntentRow): Outgoing[] {
   const id = randomUUID();
   const row: ConvRow = { id, customer_id: r.customer_id, with_id: r.staff_id, with_kind: r.staff_kind, script: "phones", node: "talk", data: null, started_at: ctx.now, ended_at: null };
   const eng: Engagement = { npcId: r.staff_id, visitorId: r.customer_id, since: r.opened_at ?? ctx.now, at: cpos };
-  const data: TalkConvData = { engine: "talk", scene: payScene(), at: cpos, checkout: { stage: "pay", sale }, ...(r.staff_kind === "npc" ? { eng } : {}) };
+  const data: TalkConvData = { engine: "talk", scene: payScene(), at: cpos, checkout: { stage: "pay", sale, beat: "scanned" }, ...(r.staff_kind === "npc" ? { eng } : {}) };
   ctx.db
     .prepare("INSERT INTO conversations (id, customer_id, with_id, with_kind, script, node, data, started_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
     .run(row.id, r.customer_id, r.staff_id, r.staff_kind, row.script, row.node, JSON.stringify(data), ctx.now);
@@ -1537,6 +1550,8 @@ function openPay(ctx: Ctx, r: IntentRow): Outgoing[] {
   setState(ctx, r.customer_id, { state: "in_conversation", with_id: r.staff_id });
   log(ctx, r.customer_id, "conversation_started", { conversationId: row.id, with: r.staff_id, kind: r.staff_kind, script: "payment", orderId: o.id });
   log(ctx, r.customer_id, "payment_started", { orderId: o.id, conversationId: row.id, sale });
+  // the first beat: the handheld scans the item, before any total is shown
+  log(ctx, r.customer_id, "scanned", { conversationId: row.id, by: r.staff_id, sale });
   const t = payTurn(data.checkout!);
   out.push({ to: r.customer_id, message: { type: "turn", ...turnView(row, nameOf(ctx, r.staff_id), t.say, t.choices, false, "customer") } });
   const sm = stateMessage(ctx, r.customer_id);
@@ -1568,11 +1583,54 @@ function transferOrders(ctx: Ctx, leaverId: string, npcId: string, at: { x: numb
   return out;
 }
 
+// Advances the checkout exactly one beat (scanned -> total_shown -> tapped),
+// logging that beat's own events row (naming the staff member and, via `log`'s
+// visitorId, the customer). A no-op once already at "tapped". Never called from
+// a timer or from settleVisits ticking on its own -- only from an explicit
+// request that names this conversation (CLAUDE.md "no background processes": a
+// deadline/beat is a stored column, caught up on the request that touches it).
+function advanceBeat(ctx: Ctx, customerId: string, staffId: string, c: Checkout): Checkout {
+  const next = NEXT_BEAT[c.beat];
+  if (!next) return c;
+  if (next === "total_shown") log(ctx, customerId, "total_shown", { by: staffId, sale: c.sale });
+  else log(ctx, customerId, "tapped", { by: staffId });
+  return { ...c, beat: next };
+}
+
+// The staff handheld's own "scan" / "show total" action (issue #2): a real
+// specialist drives the first two beats explicitly, one request at a time,
+// before the customer ever taps to pay. An NPC-staffed sale never needs this --
+// the customer's own tap (handleCheckoutChoice below) catches up any beat not
+// yet reached, as part of that one explicit request, so a payment with nobody
+// pressing a handheld button still completes correctly.
+export function advancePaymentBeat(ctx: Ctx, staffId: string, conversationId: string): Outgoing[] {
+  const row = getConv(ctx.db, conversationId);
+  if (!row || row.with_id !== staffId || row.with_kind !== "visitor" || row.ended_at !== null) return [notice(staffId, "That conversation is over.")];
+  const d = anyDataOf(row);
+  if (!isTalkData(d) || !d.checkout) return [notice(staffId, "Nothing to scan yet.")];
+  if (!NEXT_BEAT[d.checkout.beat]) return [notice(staffId, "Already at the tap.")];
+  const checkout = advanceBeat(ctx, row.customer_id, staffId, d.checkout);
+  const next: TalkConvData = { ...d, checkout };
+  saveTalkData(ctx, row, next);
+  return [staffMenu(ctx, row, next)];
+}
+
 function handleCheckoutChoice(ctx: Ctx, row: ConvRow, d: TalkConvData, choiceId: string): Outgoing[] {
-  const c = d.checkout!;
+  let c = d.checkout!;
   if (!["pay:card", "pay:phone", "pay:cancel"].includes(choiceId)) return [notice(row.customer_id, "That is not one of the options.")];
   const paid = choiceId !== "pay:cancel";
+  // The tap itself is an explicit request, so it may catch up whichever beats
+  // have not yet happened (CLAUDE.md: a deadline is a stored column caught up
+  // on the next request that touches it -- this call IS that request, never a
+  // bare tick of settleVisits). It can never skip one: each step still reads
+  // the previous beat off `c.beat` and writes its own events row before the
+  // sale is allowed to complete, so "paid" is reachable only by way of
+  // "scanned" -> "total_shown" -> "tapped", in that order, for this exact order.
+  if (paid) {
+    while (NEXT_BEAT[c.beat]) c = advanceBeat(ctx, row.customer_id, row.with_id, c);
+  }
   log(ctx, row.customer_id, paid ? "purchase_paid" : "purchase_cancelled", { conversationId: row.id, by: row.with_id, method: paid ? choiceId.slice(4) : null, sale: c.sale });
+  if (paid) log(ctx, row.customer_id, "paid", { by: row.with_id, sale: c.sale }); // the beat machine's own terminal event, alongside purchase_paid
   // paid: the held unit is sold; called off: it goes back on the shelf
   if (paid) ctx.db.prepare("UPDATE reservations SET status = 'sold' WHERE visitor_id = ? AND status = 'held'").run(row.customer_id);
   else releaseReservationsOf(ctx, row.customer_id, "changed their mind at the payment");
